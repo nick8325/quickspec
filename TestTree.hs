@@ -4,6 +4,7 @@ module TestTree(TestTree, terms, union, test,
 import Data.List(sort)
 import Utils
 import Control.Exception(assert)
+import Control.Parallel.Strategies
 
 -- Invariant: the children of a TestTree are sorted according to the
 -- parent's test. We exploit this in defining merge.
@@ -38,7 +39,7 @@ NonNil t1 `union` NonNil t2 = NonNil (t1 `union'` t2)
 union' :: Ord r => TestTree' r a -> TestTree' r a -> TestTree' r a
 t1 `union'` t2 =
   tree (terms' t1 ++ terms' t2) (eval t1)
-       (merge union' (eval t1 . rep) (branches t1) (branches t2))
+         (merge union' (eval t1 . rep) (branches t1) (branches t2))
 
 test :: Ord r => [a -> r] -> [a] -> TestTree r a
 test _ [] = Nil
@@ -71,7 +72,7 @@ classes :: TestResults r a -> [[a]]
 classes (Results Nil) = []
 classes (Results (NonNil t)) = aux t
   where aux Tree{rep = x, rest = xs, branches = []} = [x:xs]
-        aux Tree{branches = bs} = concatMap aux bs
+        aux Tree{branches = bs} = concat (parMap rwhnf aux bs)
 
 reps :: TestResults r a -> [a]
 reps = map head . classes

@@ -1,6 +1,6 @@
 -- Based on the paper "Proof-producing Congruence Closure".
 
-module CongruenceClosure(CC, newSym, (=:=), (=?=), rep, evalCC, execCC, runCC, ($$), S, funUse, argUse, lookup, initial) where
+module CongruenceClosure(CC, newSym, (=:=), (=?=), rep, evalCC, execCC, runCC, ($$), S, funUse, argUse, lookup, initial, frozen) where
 
 import Prelude hiding (lookup)
 import Control.Monad.State.Strict
@@ -160,3 +160,6 @@ execCC s m = snd (runCC s m)
 
 initial :: Int -> S
 initial n = S IntMap.empty IntMap.empty IntMap.empty (UF.initial n)
+
+frozen :: CC a -> CC a
+frozen x = fmap (evalState x) get
