@@ -23,7 +23,7 @@ data Context = Context {
   maxDepth :: Int
   }
 
-newtype Universe a = Universe (IntMap [Int])
+type Universe = K (IntMap [Int])
 
 type EQ = ReaderT (TypeMap Universe, Int) CC
 
@@ -33,12 +33,12 @@ initial d ts =
       (universe, rel) =
         CC.runCC (CC.initial n) $
           forM (classify ts) $
-          mapSomeM $ \(List xs) -> createUniverse xs
+          mapSomeM $ \(C xs) -> createUniverse xs
       
   in Context rel (Typed.fromList universe) d
 
 createUniverse :: [Term a] -> CC (Universe a)
-createUniverse ts = fmap (Universe . IntMap.fromList) (mapM createTerms tss)
+createUniverse ts = fmap (K . IntMap.fromList) (mapM createTerms tss)
   where tss = partitionBy depth ts
         createTerms ts@(t:_) = fmap (depth t,) (mapM flatten ts)
 
@@ -84,7 +84,7 @@ substs t univ d = map apply (map lookup (sequence (map choose vars)))
         choose (x, n) =
           case Map.findWithDefault (error "NaiveEquationalReasoning.substs: empty universe")
                (typ_ x) univ of
-            Some (Universe m) ->
+            Some (K m) ->
               [ (x, t)
               | d' <- [0..d-n],
                 t <- IntMap.findWithDefault [] d' m ]

@@ -8,8 +8,8 @@ import Data.Function
 import Data.Ord
 
 data Named a = Named {
-  name :: String,
   index :: Int,
+  name :: String,
   typ_ :: TypeRep,
   the :: a
   } deriving Typeable
@@ -23,14 +23,20 @@ instance Ord (Named a) where
 type Name = Named ()
 
 erase :: Named a -> Name
-erase (Named name index typ_ _) = Named name index typ_ ()
+erase (Named index name typ_ _) = Named index name typ_ ()
 
 data Term a =
     Var (Var a)
-  | Const (Named a)
+  | Const (Const a)
   | forall b. App (Term (b -> a)) (Term b) deriving Typeable
 
 type Var a = Named (Gen a)
+type Const a = Named (Value a)
+
+data Value a = Undefined | Value a deriving Typeable
+
+value Undefined = undefined
+value (Value x) = x
 
 -- Generate a random variable valuation
 valuation :: Gen (Var a -> a)
@@ -41,7 +47,7 @@ valuation = promote (\x -> index x `variant'` the x)
 
 eval :: (forall a. Var a -> a) -> Term a -> a
 eval env (Var x) = env x
-eval env (Const x) = the x
+eval env (Const x) = value (the x)
 eval env (App f x) = eval env f (eval env x)
 
 indices :: Term a -> [Int]
