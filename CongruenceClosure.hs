@@ -3,7 +3,8 @@
 module CongruenceClosure(CC, newSym, (=:=), (=?=), rep, evalCC, execCC, runCC, ($$), S, funUse, argUse, lookup, initial, frozen) where
 
 import Prelude hiding (lookup)
-import Control.Monad.State.Strict
+import Control.Monad
+import Control.Monad.Trans.State.Strict
 import Data.IntMap(IntMap)
 import qualified Data.IntMap as IntMap
 import UnionFind(UF, Replacement((:>)))

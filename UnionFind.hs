@@ -1,7 +1,8 @@
 module UnionFind(UF, Replacement((:>)), newSym, (=:=), rep, evalUF, execUF, runUF, S, isRep, initial) where
 
 import Prelude hiding (min)
-import Control.Monad.State.Strict
+import Control.Monad
+import Control.Monad.Trans.State.Strict
 import Data.IntMap(IntMap)
 import qualified Data.IntMap as IntMap
 
