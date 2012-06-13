@@ -32,6 +32,9 @@ data Sig = Sig {
 names :: TypeMap (C [] (C Named f)) -> [Name]
 names = concatMap (some (map (erase . unC) . unC)) . Map.elems
 
+types :: Sig -> [TypeRep]
+types sig = usort (map typ_ (names (constants sig)) ++ map typ_ (names (variables sig)))
+
 instance Show Sig where show = unlines . summarise
 
 summarise :: Sig -> [String]
@@ -47,7 +50,7 @@ summarise sig =
       [ intercalate ", " (map name xs) ++ " :: " ++ show (typ_ x) 
       | xs@(x:_) <- partitionBy typ_ (names (f sig)) ]
 
-data Observer a = forall b. Ord b => Observer (Gen (a -> b))
+data Observer a = forall b. Ord b => Observer (Gen (a -> b)) deriving Typeable
 
 emptySig :: Sig
 emptySig = Sig Typed.empty Typed.empty Typed.empty Typed.empty

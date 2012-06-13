@@ -1,3 +1,4 @@
+{-# LANGUAGE ExistentialQuantification #-}
 module TestTree(TestTree, terms, union, test,
                TestResults, cutOff, numTests, classes, reps) where
 
@@ -53,26 +54,26 @@ test' (tc:tcs) xs = tree xs tc (map (test' tcs) bs)
 -- A TestTree with finite depth, represented as a TestTree where some
 -- nodes have no branches. Since this breaks one of the TestTree
 -- invariants we use a different type.
-newtype TestResults r a = Results (TestTree r a)
+data TestResults a = forall r. Results (TestTree r a)
 
-cutOff :: Int -> TestTree r a -> TestResults r a
+cutOff :: Int -> TestTree r a -> TestResults a
 cutOff _ Nil = Results Nil
 cutOff n (NonNil t) = Results (NonNil (aux n t))
   where aux 0 t = t { branches = [] }
         aux m t@Tree{branches = [t']} = t { branches = [aux (m-1) t'] }
         aux _ t = t { branches = map (aux n) (branches t) }
 
-numTests :: TestResults r a -> Int
+numTests :: TestResults a -> Int
 numTests (Results Nil) = 0
 numTests (Results (NonNil t)) = aux t
   where aux Tree{branches = []} = 0
         aux Tree{branches = bs} = 1 + maximum (map aux bs)
 
-classes :: TestResults r a -> [[a]]
+classes :: TestResults a -> [[a]]
 classes (Results Nil) = []
 classes (Results (NonNil t)) = aux t
   where aux Tree{rep = x, rest = xs, branches = []} = [x:xs]
-        aux Tree{branches = bs} = concat (parMap rwhnf aux bs)
+        aux Tree{branches = bs} = concat (parMap rseq aux bs)
 
-reps :: TestResults r a -> [a]
+reps :: TestResults a -> [a]
 reps = map head . classes

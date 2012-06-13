@@ -15,19 +15,20 @@ data Some f = forall a. Typeable a => Some (f a)
 
 newtype K a b = K a
 newtype C f g a = C { unC :: f (g a) }
+
 data CType = CType deriving Typeable
 
 instance (Typeable1 f, Typeable1 g) => Typeable1 (C f g) where
   typeOf1 ~(C x) =
     mkTyConApp (typeRepTyCon (typeOf CType)) [ typeOf1 x ]
 
-some :: (forall a. f a -> b) -> Some f -> b
+some :: (forall a. Typeable a => f a -> b) -> Some f -> b
 some f (Some x) = f x
 
-mapSome :: (forall a. f a -> g a) -> Some f -> Some g
+mapSome :: (forall a. Typeable a => f a -> g a) -> Some f -> Some g
 mapSome f (Some x) = Some (f x)
 
-mapSomeM :: Monad m => (forall a. f a -> m (g a)) -> Some f -> m (Some g)
+mapSomeM :: Monad m => (forall a. Typeable a => f a -> m (g a)) -> Some f -> m (Some g)
 mapSomeM f (Some x) = liftM Some (f x)
 
 typ :: Some f -> TypeRep
@@ -64,5 +65,10 @@ lookup def x m =
         Nothing -> error "Typed.lookup: type error"
         Just z -> z
 
-mapValues :: (forall a. f a -> g a) -> TypeMap f -> TypeMap g
+mapValues :: (forall a. Typeable a => f a -> g a) -> TypeMap f -> TypeMap g
 mapValues f = fmap (mapSome f)
+
+apply :: (Typeable1 f, Typeable a, Typeable b) =>
+         (forall a b. f (a -> b) -> f a -> f b) ->
+         f a -> f b -> Maybe (Some f)
+apply f x y = undefined

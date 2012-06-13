@@ -1,4 +1,4 @@
-{-# LANGUAGE Rank2Types, ExistentialQuantification, DeriveDataTypeable #-}
+{-# LANGUAGE Rank2Types, ExistentialQuantification, DeriveDataTypeable, DeriveFunctor #-}
 module Term where
 
 import Data.Typeable
@@ -12,7 +12,7 @@ data Named a = Named {
   name :: String,
   typ_ :: TypeRep,
   the :: a
-  } deriving Typeable
+  } deriving (Typeable, Functor)
 
 instance Eq (Named a) where
   (==) = (==) `on` index
@@ -37,6 +37,10 @@ data Value a = Undefined | Value a deriving Typeable
 
 value Undefined = undefined
 value (Value x) = x
+
+isUndefined :: Term a -> Bool
+isUndefined (Const Named { the = Undefined }) = True
+isUndefined _ = False
 
 -- Generate a random variable valuation
 valuation :: Gen (Var a -> a)
