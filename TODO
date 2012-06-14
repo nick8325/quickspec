@@ -10,9 +10,8 @@ Give proper errors if use several observers in signature etc.
 
 Represent Term a as pair (UntypedTerm, Eval a).
 
-Remove test cases from TestResult.
-(From TestTree too? It only means union would take an extra parameter.)
-
 Replace C . f . unC with fmap f, or at least add mapSomeC etc.
 
 Give a warning if there aren't any variables of a particular type.
+
+Clean up existential/witness handling.
