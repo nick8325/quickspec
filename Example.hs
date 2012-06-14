@@ -33,7 +33,7 @@ lists _ = [
   fun1 "unit" (return :: a -> [a])]
 
 funs :: forall a. (Typeable a, Ord a, Arbitrary a, CoArbitrary a) => a -> [Sig]
-funs ty = [
+funs _ = [
   vars ["f", "g", "h"] (undefined :: a -> a),
   -- We treat . as a function of two arguments here (blind2)---i.e.,
   -- we do not generate terms of the form (f . g) x.
@@ -45,10 +45,14 @@ funs ty = [
   observer1 (\(x :: a) (f :: a -> a) -> f x)
   ]
 
+someVars :: forall a. (Typeable a, Arbitrary a) => a -> Sig
+someVars _ = vars ["x", "y", "z"] (undefined :: a)
+
 main = mapM_ quickSpec $ [
   bools,
   arith (undefined :: Int),
   funs (undefined :: Int),
-  [silence (funs 'A'),
+  [someVars 'A',
+   silence (funs 'A'),
    silence (arith (undefined :: Int)),
    signature (lists 'A')]]
