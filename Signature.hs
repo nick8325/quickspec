@@ -185,24 +185,24 @@ fun4 :: (Typeable a, Typeable b, Typeable c, Typeable d,
 fun4 x f = blind4 x f `mappend`
            ord (f undefined undefined undefined undefined)
 
-observer1 :: (Typeable a, Typeable b, Ord b) => (a -> b) -> Sig
-observer1 f = observerSig (Observer (return f))
+observer0 :: (Typeable a, Typeable b, Ord b) => (a -> b) -> Sig
+observer0 f = observerSig (Observer (return f))
 
-observer2 :: (Arbitrary a, Typeable a, Typeable b, Typeable c, Ord c) =>
+observer1 :: (Arbitrary a, Typeable a, Typeable b, Typeable c, Ord c) =>
              (a -> b -> c) -> Sig
-observer2 f = observerSig (Observer (f <$> arbitrary))
+observer1 f = observerSig (Observer (f <$> arbitrary))
 
-observer3 :: (Arbitrary a, Arbitrary b,
+observer2 :: (Arbitrary a, Arbitrary b,
               Typeable a, Typeable b, Typeable c, Typeable d,
               Ord d) =>
              (a -> b -> c -> d) -> Sig
-observer3 f = observerSig (Observer (f <$> arbitrary <*> arbitrary))
+observer2 f = observerSig (Observer (f <$> arbitrary <*> arbitrary))
 
-observer4 :: (Arbitrary a, Arbitrary b, Arbitrary c,
+observer3 :: (Arbitrary a, Arbitrary b, Arbitrary c,
               Typeable a, Typeable b, Typeable c, Typeable d, Typeable e,
               Ord e) =>
              (a -> b -> c -> d -> e) -> Sig
-observer4 f = observerSig (Observer (f <$> arbitrary <*> arbitrary <*> arbitrary))
+observer3 f = observerSig (Observer (f <$> arbitrary <*> arbitrary <*> arbitrary))
 
 inhabitedTypes :: Sig -> [TypeRep]
 inhabitedTypes = usort . map (some (typeOf . witness)) . toList . witnesses

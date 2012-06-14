@@ -37,7 +37,7 @@ funs ty = [
   vars ["f", "g", "h"] (undefined :: a -> a),
   blind2 "." (\(f :: a -> a) (g :: a -> a) -> f . g),
   blind0 "id" (id :: a -> a),
-  observer2 (\(x :: a) (f :: a -> a) -> f x)
+  observer1 (\(x :: a) (f :: a -> a) -> f x)
   ]
 
 main = mapM_ quickSpec $ [
