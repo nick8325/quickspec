@@ -1,4 +1,4 @@
-{-# LANGUAGE ExistentialQuantification, StandaloneDeriving, DeriveDataTypeable #-}
+{-# LANGUAGE ExistentialQuantification, StandaloneDeriving, DeriveDataTypeable, ScopedTypeVariables #-}
 module Signature where
 
 import Control.Applicative hiding (some)
@@ -28,7 +28,8 @@ data Sig = Sig {
   variables :: TypeMap (C [] (C Named Gen)),
   observers :: TypeMap Observer,
   ords :: TypeMap Observer,
-  witnesses :: TypeMap (K ()),
+  types :: TypeMap (K ()),
+  cotypes :: TypeMap (K ()),
   maxDepth_ :: First Int
   }
 
@@ -37,9 +38,6 @@ maxDepth = fromMaybe 3 . getFirst . maxDepth_
 
 names :: TypeMap (C [] (C Named f)) -> [Name]
 names = concatMap (some (map (erase . unC) . unC)) . Map.elems
-
-types :: Sig -> [TypeRep]
-types sig = usort (map typ_ (names (constants sig)) ++ map typ_ (names (variables sig)))
 
 instance Show Sig where show = unlines . summarise
 
@@ -75,7 +73,7 @@ summarise sig =
 data Observer a = forall b. Ord b => Observer (Gen (a -> b)) deriving Typeable
 
 emptySig :: Sig
-emptySig = Sig Typed.empty Typed.empty Typed.empty Typed.empty Typed.empty mempty
+emptySig = Sig Typed.empty Typed.empty Typed.empty Typed.empty Typed.empty Typed.empty mempty
 
 instance Monoid Sig where
   mempty = emptySig
@@ -85,7 +83,8 @@ instance Monoid Sig where
       variables = renumber (length constants') variables',
       observers = observers s1 `mappend` observers s2,
       ords = ords s1 `mappend` ords s2,
-      witnesses = witnesses s1 `mappend` witnesses s2, 
+      types = types s1 `mappend` types s2, 
+      cotypes = cotypes s1 `mappend` cotypes s2, 
       maxDepth_ = maxDepth_ s1 `mappend` maxDepth_ s2 }
     where constants' = constants s1 `jumble` constants s2
           variables' = variables s1 `jumble` variables s2
@@ -110,7 +109,12 @@ observerSig :: Typeable a => Observer a -> Sig
 observerSig x = emptySig { observers = Typed.fromList [Some x] }
 
 witness :: Typeable a => a -> Sig
-witness x = emptySig { witnesses = Typed.fromList [Some (witnessing x)] }
+witness x = emptySig { types = Typed.fromList [Some (witnessing x)] }
+  where witnessing :: a -> K () a
+        witnessing x = K ()
+
+cowitness :: Typeable a => a -> Sig
+cowitness x = emptySig { cotypes = Typed.fromList [Some (witnessing x)] }
   where witnessing :: a -> K () a
         witnessing x = K ()
 
@@ -124,20 +128,34 @@ constantValue :: Typeable a => String -> Value a -> Sig
 constantValue x v = constantSig (Named 0 x False (typeOf (unValue v)) v) `mappend` witness (unValue v)
   where unValue (Value x) = x
 
-blind0 :: Typeable a => String -> a -> Sig
+blind0 :: forall a. Typeable a => String -> a -> Sig
 blind0 x f = constantValue x (Value f)
 
-blind1 :: (Typeable a, Typeable b) => String -> (a -> b) -> Sig
-blind1 x f = blind0 x f `mappend` witness (f undefined)
+blind1 :: forall a b. (Typeable a, Typeable b) =>
+          String -> (a -> b) -> Sig
+blind1 x f = blind0 x f `mappend` cowitness (undefined :: a)
+                        `mappend` witness (undefined :: b)
 
-blind2 :: (Typeable a, Typeable b, Typeable c) => String -> (a -> b -> c) -> Sig
-blind2 x f = blind1 x f `mappend` witness (f undefined undefined)
+blind2 :: forall a b c. (Typeable a, Typeable b, Typeable c) =>
+          String -> (a -> b -> c) -> Sig
+blind2 x f = blind1 x f `mappend` cowitness (undefined :: a)
+                        `mappend` cowitness (undefined :: b)
+                        `mappend` witness (undefined :: c)
 
-blind3 :: (Typeable a, Typeable b, Typeable c, Typeable d) => String -> (a -> b -> c -> d) -> Sig
-blind3 x f = blind1 x f `mappend` witness (f undefined undefined undefined)
+blind3 :: forall a b c d. (Typeable a, Typeable b, Typeable c, Typeable d) =>
+          String -> (a -> b -> c -> d) -> Sig
+blind3 x f = blind1 x f `mappend` cowitness (undefined :: a)
+                        `mappend` cowitness (undefined :: b)
+                        `mappend` cowitness (undefined :: c)
+                        `mappend` witness (undefined :: d)
 
-blind4 :: (Typeable a, Typeable b, Typeable c, Typeable d, Typeable e) => String -> (a -> b -> c -> d -> e) -> Sig
-blind4 x f = blind1 x f `mappend` witness (f undefined undefined undefined undefined)
+blind4 :: forall a b c d e. (Typeable a, Typeable b, Typeable c, Typeable d, Typeable e) =>
+          String -> (a -> b -> c -> d -> e) -> Sig
+blind4 x f = blind1 x f `mappend` cowitness (undefined :: a)
+                        `mappend` cowitness (undefined :: b)
+                        `mappend` cowitness (undefined :: c)
+                        `mappend` cowitness (undefined :: d)
+                        `mappend` witness (undefined :: e)
 
 ord :: (Ord a, Typeable a) => a -> Sig
 ord x = ordSig (Observer (return id) `observing` x)
@@ -205,7 +223,7 @@ observer3 :: (Arbitrary a, Arbitrary b, Arbitrary c,
 observer3 f = observerSig (Observer (f <$> arbitrary <*> arbitrary <*> arbitrary))
 
 inhabitedTypes :: Sig -> [TypeRep]
-inhabitedTypes = usort . map (some (typeOf . witness)) . toList . witnesses
+inhabitedTypes = usort . map (some (typeOf . witness)) . toList . types
   where witness :: K () a -> a
         witness = undefined
 
@@ -220,3 +238,5 @@ testable ty sig =
 argTypes sig ty =
   [ ty1 | (ty1, ty2) <- catMaybes (map arrow (inhabitedTypes sig)), ty2 == ty ]
 
+witnesses :: Sig -> TypeMap (K ())
+witnesses sig = types sig `mappend` cotypes sig

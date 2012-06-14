@@ -24,35 +24,33 @@ import GHC.Prim
 findWitness :: Sig -> TypeRep -> Some (K ())
 findWitness sig ty =
   Map.findWithDefault
-    (error "Generate.witness: type not found")
+    (error $ "Generate.witness: type " ++ show ty ++ " not found")
     ty (witnesses sig)
 
-terms :: Sig -> TypeMap (C [] Term) -> TypeRep -> [Some Term]
-terms sig base ty =
-  app (Var . unC) (variables sig) ty ++
-  app (Const . unC) (constants sig) ty ++
-  [ Some (App (cast' f) x `asTypeOf` witness y)
-  | lhs <- argTypes sig ty,
-    Some x <- app id base lhs, 
+terms :: Typeable a => Sig -> TypeMap (C [] Term) -> a -> [Term a]
+terms sig base w =
+  app (Var . unC) (variables sig) w ++
+  app (Const . unC) (constants sig) w ++
+  [ App f x
+  | lhs <- argTypes sig (typeOf w),
+    Some lhsw <- [findWitness sig lhs],
+    x <- app id base (witness lhsw),
     not (isUndefined x), 
-    Some f <- terms sig base (mkFunTy lhs ty),
-    not (isUndefined f), 
-    Some y <- [findWitness sig ty] ]
+    f <- terms sig base (witnessFun (witness lhsw) w),
+    not (isUndefined f) ]
   
-  where app :: (forall a. f a -> g a) ->
-                 TypeMap (C [] f) ->
-                 TypeRep ->
-                 [Some g]
-        app f x ty =
-          case Map.lookup ty x of
-            Nothing -> []
-            Just (Some (C xs)) ->
-              [ Some (f x) | x <- xs ]
-              
-        witness :: K () a -> Term a
+  where app :: (Typeable a, Typeable1 f) =>
+               (forall a. f a -> g a) ->
+               TypeMap (C [] f) ->
+               a ->
+               [g a]
+        app f x ty = map f (unC (Typed.lookup (C []) ty x))
+
+        witness :: K () a -> a
         witness _ = undefined
-        
-        cast' x = fromMaybe (error "Generate.terms: type error") (cast x)
+
+        witnessFun :: (Typeable a, Typeable b) => a -> b -> (a -> b)
+        witnessFun = undefined
 
 unbuffered :: IO a -> IO a
 unbuffered x = do
@@ -74,7 +72,12 @@ generate' d sig = unbuffered $ do
   let count :: ([a] -> a) -> (forall b. f (g b) -> a) ->
                TypeMap (C f g) -> a
       count op f = op . map (Typed.some (f . unC)) . Typed.toList
-      ts = Typed.fromList [ gather (terms sig rs ty) | ty <- testableTypes sig ]
+      witness :: K () a -> a
+      witness = undefined
+      ts = Typed.fromList
+             [ Some (C (terms sig rs (witness x)))
+             | ty <- testableTypes sig, 
+               Some x <- [findWitness sig ty] ]
   printf "%d terms, " (count sum length ts)
   seeds <- genSeeds
   let cs = fmap (mapSome (C . test seeds sig . unC)) ts
