@@ -14,3 +14,5 @@ Remove test cases from TestResult.
 (From TestTree too? It only means union would take an extra parameter.)
 
 Replace C . f . unC with fmap f, or at least add mapSomeC etc.
+
+Give a warning if there aren't any variables of a particular type.
