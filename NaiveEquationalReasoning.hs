@@ -16,7 +16,6 @@ import Utils
 import Typed
 import Data.Ord
 import Data.List
-import Debug.Trace
 
 data Context = Context {
   rel :: CC.S,
@@ -76,13 +75,11 @@ t =:= u = do
 newtype Subst = Subst (forall a. Var a -> Int)
 
 substs :: Term a -> TypeMap Universe -> Int -> [Subst]
-substs t univ d = map apply (map lookup (sequence (map choose (dump vars))))
+substs t univ d = map apply (map lookup (sequence (map choose vars)))
   where vars :: [(Name, Int)]
         vars = map (maximumBy (comparing snd)) .
                partitionBy fst .
                holes $ t
-               
-        dump xs = traceShow (t, xs) xs
         
         choose :: (Name, Int) -> [(Name, Int)]
         choose (x, n) =
