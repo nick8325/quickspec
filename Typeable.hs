@@ -4,8 +4,9 @@
 
 {-# LANGUAGE NoMonomorphismRestriction #-}
 module Typeable(TypeRep, T.Typeable, T.Typeable1, T.Typeable2,
-                typeOf, typeOf1, cast, mkTyConApp, typeRepTyCon,
-                splitTyConApp, mkFunTy, unTypeRep) where
+                typeOf, typeOf1, cast, gcast,
+                mkTyConApp, typeRepTyCon, splitTyConApp,
+                mkFunTy, unTypeRep) where
 
 import qualified Data.Typeable as T
 import Data.Ord
@@ -26,6 +27,7 @@ instance Show TypeRep where
 typeOf = TypeRep . T.typeOf
 typeOf1 = TypeRep . T.typeOf1
 cast = T.cast
+gcast = T.gcast
 
 mkTyConApp f xs = TypeRep (T.mkTyConApp f (map unTypeRep xs))
 typeRepTyCon = T.typeRepTyCon . unTypeRep

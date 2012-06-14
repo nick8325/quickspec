@@ -1,10 +1,14 @@
-{-# LANGUAGE ExistentialQuantification, Rank2Types #-}
+{-# LANGUAGE Rank2Types #-}
 module Generate where
 
 import Signature
 import qualified TestTree as T
 import TestTree(TestResults, reps, classes, numTests, cutOff)
 import Typed
+import TypeRel(TypeRel)
+import qualified TypeRel
+import TypeMap(TypeMap)
+import qualified TypeMap
 import Term
 import Text.Printf
 import Typeable
@@ -21,36 +25,23 @@ import Data.Array hiding (index)
 import Unsafe.Coerce
 import GHC.Prim
 
-findWitness :: Sig -> TypeRep -> Some (K ())
+findWitness :: Sig -> TypeRep -> Witness
 findWitness sig ty =
   Map.findWithDefault
     (error $ "Generate.witness: type " ++ show ty ++ " not found")
     ty (witnesses sig)
 
-terms :: Typeable a => Sig -> TypeMap (C [] Term) -> a -> [Term a]
+terms :: Typeable a => Sig -> TypeRel Term -> a -> [Term a]
 terms sig base w =
-  app (Var . unC) (variables sig) w ++
-  app (Const . unC) (constants sig) w ++
+  map (Var . unC) (TypeRel.lookup w (variables sig)) ++
+  map (Const . unC) (TypeRel.lookup w (constants sig)) ++
   [ App f x
-  | lhs <- argTypes sig (typeOf w),
-    Some lhsw <- [findWitness sig lhs],
-    x <- app id base (witness lhsw),
+  | Some lhs <- map (findWitness sig) (argTypes sig (typeOf w)),
+    let w' = witness lhs,
+    x <- TypeRel.lookup w' base,
     not (isUndefined x), 
-    f <- terms sig base (witnessFun (witness lhsw) w),
+    f <- terms sig base (w' `witnessArrow` w),
     not (isUndefined f) ]
-  
-  where app :: (Typeable a, Typeable1 f) =>
-               (forall a. f a -> g a) ->
-               TypeMap (C [] f) ->
-               a ->
-               [g a]
-        app f x ty = map f (unC (Typed.lookup (C []) ty x))
-
-        witness :: K () a -> a
-        witness _ = undefined
-
-        witnessFun :: (Typeable a, Typeable b) => a -> b -> (a -> b)
-        witnessFun = undefined
 
 unbuffered :: IO a -> IO a
 unbuffered x = do
@@ -65,16 +56,14 @@ generate sig = generate' (maxDepth sig) sig
 
 generate' d sig | d < 0 =
   error "Generate.generate: maxDepth must be positive"
-generate' 0 sig = return Typed.empty
+generate' 0 sig = return TypeMap.empty
 generate' d sig = unbuffered $ do
-  rs <- fmap (mapValues (C . reps . unC)) (generate' (d - 1) sig)
+  rs <- fmap (TypeMap.mapValues (C . reps . unC)) (generate' (d - 1) sig)
   printf "Depth %d: " d
   let count :: ([a] -> a) -> (forall b. f (g b) -> a) ->
                TypeMap (C f g) -> a
-      count op f = op . map (Typed.some (f . unC)) . Typed.toList
-      witness :: K () a -> a
-      witness = undefined
-      ts = Typed.fromList
+      count op f = op . map (Typed.some (f . unC)) . TypeMap.toList
+      ts = TypeMap.fromList
              [ Some (C (terms sig rs (witness x)))
              | ty <- testableTypes sig, 
                Some x <- [findWitness sig ty] ]
@@ -95,7 +84,7 @@ genSeeds = do
 
 observe :: Typeable a => a -> Sig -> Observer a
 observe x sig =
-  Typed.lookup (Typed.lookup (error msg) x (ords sig))
+  TypeMap.lookup (TypeMap.lookup (error msg) x (ords sig))
                x (observers sig)
   where msg = "No way of observing values of type " ++ show (typeOf x)
 
@@ -116,5 +105,4 @@ memoSym sig f = unsafeCoerce . (arr !) . index
   where arr :: Array Int Any
         arr = array (0, maximum (0:map index (names (variables sig))))
                 [(index v, unsafeCoerce (f v))
-                | Some (C vs) <- Typed.toList (variables sig),
-                  C v <- vs]
+                | Some (C v) <- TypeRel.toList (variables sig) ]

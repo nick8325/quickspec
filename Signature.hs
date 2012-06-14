@@ -1,4 +1,4 @@
-{-# LANGUAGE ExistentialQuantification, StandaloneDeriving, DeriveDataTypeable, ScopedTypeVariables #-}
+{-# LANGUAGE ExistentialQuantification, ScopedTypeVariables #-}
 module Signature where
 
 import Control.Applicative hiding (some)
@@ -7,12 +7,14 @@ import Data.Monoid
 import Test.QuickCheck
 import Term
 import Typed
+import qualified TypeMap
+import TypeMap(TypeMap)
+import qualified TypeRel
+import TypeRel(TypeRel)
 import Data.List
 import qualified Data.Map as Map
 import Utils
 import Data.Maybe
-
-deriving instance Typeable1 Gen
 
 class Signature a where
   signature :: a -> Sig
@@ -24,12 +26,12 @@ instance Signature a => Signature [a] where
   signature = mconcat . map signature
 
 data Sig = Sig {
-  constants :: TypeMap (C [] (C Named Value)),
-  variables :: TypeMap (C [] (C Named Gen)),
+  constants :: TypeRel (C Named Value),
+  variables :: TypeRel (C Named Gen),
   observers :: TypeMap Observer,
   ords :: TypeMap Observer,
-  types :: TypeMap (K ()),
-  cotypes :: TypeMap (K ()),
+  types :: TypeMap Witnessed,
+  cotypes :: TypeMap Witnessed,
   maxDepth_ :: First Int
   }
 
@@ -70,10 +72,10 @@ summarise sig =
         Nothing -> True
         Just (_, rhs) -> not (rhs `elem` inhabitedTypes sig)
 
-data Observer a = forall b. Ord b => Observer (Gen (a -> b)) deriving Typeable
+data Observer a = forall b. Ord b => Observer (Gen (a -> b))
 
 emptySig :: Sig
-emptySig = Sig Typed.empty Typed.empty Typed.empty Typed.empty Typed.empty Typed.empty mempty
+emptySig = Sig TypeRel.empty TypeRel.empty TypeMap.empty TypeMap.empty TypeMap.empty TypeMap.empty mempty
 
 instance Monoid Sig where
   mempty = emptySig
@@ -86,46 +88,40 @@ instance Monoid Sig where
       types = types s1 `mappend` types s2, 
       cotypes = cotypes s1 `mappend` cotypes s2, 
       maxDepth_ = maxDepth_ s1 `mappend` maxDepth_ s2 }
-    where constants' = constants s1 `jumble` constants s2
-          variables' = variables s1 `jumble` variables s2
-          jumble x y =
-            concatMap (\(Some (C xs)) -> map Some xs) $
-            Typed.toList x ++ Typed.toList y
+    where constants' = TypeRel.toList (constants s1) ++
+                       TypeRel.toList (constants s2)
+          variables' = TypeRel.toList (variables s1) ++
+                       TypeRel.toList (variables s2)
   
           renumber n =
-            Typed.fromList .
-            Typed.classify .
+            TypeRel.fromList .
             zipWith (\i -> mapSome (alter i)) [n..]
           
           alter n (C x) = C x { index = n }
 
 constantSig :: Typeable a => Named (Value a) -> Sig
-constantSig x = emptySig { constants = Typed.fromList [Some (C [C x])] }
+constantSig x = emptySig { constants = TypeRel.singleton (C x) }
 
 variableSig :: Typeable a => Named (Gen a) -> Sig
-variableSig x = emptySig { variables = Typed.fromList [Some (C [C x])] }
+variableSig x = emptySig { variables = TypeRel.singleton (C x) }
 
 observerSig :: Typeable a => Observer a -> Sig
-observerSig x = emptySig { observers = Typed.fromList [Some x] }
+observerSig x = emptySig { observers = TypeMap.singleton x }
 
-witness :: Typeable a => a -> Sig
-witness x = emptySig { types = Typed.fromList [Some (witnessing x)] }
-  where witnessing :: a -> K () a
-        witnessing x = K ()
+typeSig :: Typeable a => a -> Sig
+typeSig x = emptySig { types = TypeMap.singleton (Witnessed x) }
 
-cowitness :: Typeable a => a -> Sig
-cowitness x = emptySig { cotypes = Typed.fromList [Some (witnessing x)] }
-  where witnessing :: a -> K () a
-        witnessing x = K ()
+cotypeSig :: Typeable a => a -> Sig
+cotypeSig x = emptySig { cotypes = TypeMap.singleton (Witnessed x) }
 
 ordSig :: Typeable a => Observer a -> Sig
-ordSig x = emptySig { ords = Typed.fromList [Some x] }
+ordSig x = emptySig { ords = TypeMap.singleton x }
 
 withDepth :: Int -> Sig
 withDepth n = emptySig { maxDepth_ = First (Just n) }
 
 constantValue :: Typeable a => String -> Value a -> Sig
-constantValue x v = constantSig (Named 0 x False (typeOf (unValue v)) v) `mappend` witness (unValue v)
+constantValue x v = constantSig (Named 0 x False (typeOf (unValue v)) v) `mappend` typeSig (unValue v)
   where unValue (Value x) = x
 
 blind0 :: forall a. Typeable a => String -> a -> Sig
@@ -133,29 +129,29 @@ blind0 x f = constantValue x (Value f)
 
 blind1 :: forall a b. (Typeable a, Typeable b) =>
           String -> (a -> b) -> Sig
-blind1 x f = blind0 x f `mappend` cowitness (undefined :: a)
-                        `mappend` witness (undefined :: b)
+blind1 x f = blind0 x f `mappend` cotypeSig (undefined :: a)
+                        `mappend` typeSig (undefined :: b)
 
 blind2 :: forall a b c. (Typeable a, Typeable b, Typeable c) =>
           String -> (a -> b -> c) -> Sig
-blind2 x f = blind1 x f `mappend` cowitness (undefined :: a)
-                        `mappend` cowitness (undefined :: b)
-                        `mappend` witness (undefined :: c)
+blind2 x f = blind1 x f `mappend` cotypeSig (undefined :: a)
+                        `mappend` cotypeSig (undefined :: b)
+                        `mappend` typeSig (undefined :: c)
 
 blind3 :: forall a b c d. (Typeable a, Typeable b, Typeable c, Typeable d) =>
           String -> (a -> b -> c -> d) -> Sig
-blind3 x f = blind1 x f `mappend` cowitness (undefined :: a)
-                        `mappend` cowitness (undefined :: b)
-                        `mappend` cowitness (undefined :: c)
-                        `mappend` witness (undefined :: d)
+blind3 x f = blind1 x f `mappend` cotypeSig (undefined :: a)
+                        `mappend` cotypeSig (undefined :: b)
+                        `mappend` cotypeSig (undefined :: c)
+                        `mappend` typeSig (undefined :: d)
 
 blind4 :: forall a b c d e. (Typeable a, Typeable b, Typeable c, Typeable d, Typeable e) =>
           String -> (a -> b -> c -> d -> e) -> Sig
-blind4 x f = blind1 x f `mappend` cowitness (undefined :: a)
-                        `mappend` cowitness (undefined :: b)
-                        `mappend` cowitness (undefined :: c)
-                        `mappend` cowitness (undefined :: d)
-                        `mappend` witness (undefined :: e)
+blind4 x f = blind1 x f `mappend` cotypeSig (undefined :: a)
+                        `mappend` cotypeSig (undefined :: b)
+                        `mappend` cotypeSig (undefined :: c)
+                        `mappend` cotypeSig (undefined :: d)
+                        `mappend` typeSig (undefined :: e)
 
 ord :: (Ord a, Typeable a) => a -> Sig
 ord x = ordSig (Observer (return id) `observing` x)
@@ -165,8 +161,8 @@ observing x _ = x
 
 silence :: Signature a => a -> Sig
 silence sig =
-  sig' { constants = mapValues (C . map (C . silence1 . unC) . unC) (constants sig'),
-         variables = mapValues (C . map (C . silence1 . unC) . unC) (variables sig') }
+  sig' { constants = TypeRel.mapValues (C . silence1 . unC) (constants sig'),
+         variables = TypeRel.mapValues (C . silence1 . unC) (variables sig') }
   where sig' = signature sig
         silence1 x = x { silent = True }
 
@@ -223,9 +219,7 @@ observer3 :: (Arbitrary a, Arbitrary b, Arbitrary c,
 observer3 f = observerSig (Observer (f <$> arbitrary <*> arbitrary <*> arbitrary))
 
 inhabitedTypes :: Sig -> [TypeRep]
-inhabitedTypes = usort . map (some (typeOf . witness)) . toList . types
-  where witness :: K () a -> a
-        witness = undefined
+inhabitedTypes = usort . map (some (typeOf . witness)) . TypeMap.toList . types
 
 testableTypes :: Sig -> [TypeRep]
 testableTypes sig = filter (flip testable sig) . inhabitedTypes $ sig
@@ -238,5 +232,5 @@ testable ty sig =
 argTypes sig ty =
   [ ty1 | (ty1, ty2) <- catMaybes (map arrow (inhabitedTypes sig)), ty2 == ty ]
 
-witnesses :: Sig -> TypeMap (K ())
+witnesses :: Sig -> TypeMap Witnessed
 witnesses sig = types sig `mappend` cotypes sig

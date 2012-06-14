@@ -14,31 +14,34 @@ import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Strict
 import Utils
 import Typed
+import Typeable
 import Data.Ord
 import Data.List
 
 data Context = Context {
   rel :: CC.S,
-  universe :: TypeMap Universe,
+  universe :: Map TypeRep Universe,
   maxDepth :: Int
   }
 
-type Universe = K (IntMap [Int])
+type Universe = IntMap [Int]
 
-type EQ = ReaderT (TypeMap Universe, Int) CC
+type EQ = ReaderT (Map TypeRep Universe, Int) CC
 
 initial :: Int -> [Some Term] -> Context
 initial d ts =
   let n = 1+maximum (0:concatMap (some indices) ts)
+      witness :: [Term a] -> a
+      witness = undefined
       (universe, rel) =
         CC.runCC (CC.initial n) $
-          forM (classify ts) $
-          mapSomeM $ \(C xs) -> createUniverse xs
+          forM (classify ts) $ \(Some (C xs)) ->
+            fmap (typeOf (witness xs),) (createUniverse xs)
       
-  in Context rel (Typed.fromList universe) d
+  in Context rel (Map.fromList universe) d
 
-createUniverse :: [Term a] -> CC (Universe a)
-createUniverse ts = fmap (K . IntMap.fromList) (mapM createTerms tss)
+createUniverse :: [Term a] -> CC Universe
+createUniverse ts = fmap IntMap.fromList (mapM createTerms tss)
   where tss = partitionBy depth ts
         createTerms ts@(t:_) = fmap (depth t,) (mapM flatten ts)
 
@@ -74,7 +77,7 @@ t =:= u = do
 
 newtype Subst = Subst (forall a. Var a -> Int)
 
-substs :: Term a -> TypeMap Universe -> Int -> [Subst]
+substs :: Term a -> Map TypeRep Universe -> Int -> [Subst]
 substs t univ d = map apply (map lookup (sequence (map choose vars)))
   where vars :: [(Name, Int)]
         vars = map (maximumBy (comparing snd)) .
@@ -83,12 +86,11 @@ substs t univ d = map apply (map lookup (sequence (map choose vars)))
         
         choose :: (Name, Int) -> [(Name, Int)]
         choose (x, n) =
-          case Map.findWithDefault (error "NaiveEquationalReasoning.substs: empty universe")
-               (typ_ x) univ of
-            Some (K m) ->
-              [ (x, t)
-              | d' <- [0..d-n],
-                t <- IntMap.findWithDefault [] d' m ]
+          let m = Map.findWithDefault (error "NaiveEquationalReasoning.substs: empty universe")
+                  (typ_ x) univ in
+          [ (x, t)
+          | d' <- [0..d-n],
+            t <- IntMap.findWithDefault [] d' m ]
         
         lookup :: [(Name, Int)] -> (Name -> Int)
         lookup ss =

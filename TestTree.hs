@@ -1,4 +1,3 @@
-{-# LANGUAGE ExistentialQuantification #-}
 module TestTree(TestTree, terms, union, test,
                TestResults, cutOff, numTests, classes, reps) where
 

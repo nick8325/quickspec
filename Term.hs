@@ -1,4 +1,4 @@
-{-# LANGUAGE Rank2Types, ExistentialQuantification, DeriveDataTypeable, DeriveFunctor #-}
+{-# LANGUAGE Rank2Types, ExistentialQuantification, DeriveFunctor #-}
 module Term where
 
 import Typeable
@@ -16,7 +16,7 @@ data Named a = Named {
   silent :: Bool,
   typ_ :: TypeRep,
   the :: a
-  } deriving (Typeable, Functor)
+  } deriving Functor
 
 instance Show (Named a) where
   show = name
@@ -35,7 +35,7 @@ erase (Named index name silent typ_ _) = Named index name silent typ_ ()
 data Term a =
     Var (Var a)
   | Const (Const a)
-  | forall b. App (Term (b -> a)) (Term b) deriving Typeable
+  | forall b. App (Term (b -> a)) (Term b)
 
 infixl 5 `App`
 
@@ -51,7 +51,7 @@ instance Eq (Term a) where
 type Var a = Named (Gen a)
 type Const a = Named (Value a)
 
-data Value a = Undefined | Value a deriving Typeable
+data Value a = Undefined | Value a
 
 value Undefined = undefined
 value (Value x) = x

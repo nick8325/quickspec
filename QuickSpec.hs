@@ -1,9 +1,10 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 module QuickSpec where
 
 import Generate
 import NaiveEquationalReasoning hiding (universe, maxDepth)
 import Typed
+import TypeMap(TypeMap)
+import qualified TypeMap
 import Signature
 import Term
 import Control.Monad
@@ -16,7 +17,7 @@ import Control.Applicative
 import Utils
 import System.Random
 
-data Equation a = Term a :=: Term a deriving Typeable
+data Equation a = Term a :=: Term a
 
 compareSomeEquations (Some eq1) (Some eq2) =
   compareEquations eq1 eq2
@@ -26,13 +27,11 @@ compareEquations (t :=: u) (v :=: w) =
 undefinedSig :: Sig -> Sig
 undefinedSig sig =
   mconcat
-    [ constantValue "undefined" (witness Undefined x)
-    | Some x <- Typed.toList (witnesses sig) ]
-  where witness :: Value a -> K () a -> Value a
-        witness x _ = x
+    [ constantValue "undefined" (Undefined `asTypeOf` Value (witness x))
+    | Some x <- TypeMap.toList (witnesses sig) ]
 
 untypedClasses :: TypeMap (C TestResults Term) -> [Some (C [] Term)]
-untypedClasses = concatMap (disperse . mapSome (C . map C . classes . unC)) . toList
+untypedClasses = concatMap (disperse . mapSome (C . map C . classes . unC)) . TypeMap.toList
 
 universe :: TypeMap (C TestResults Term) -> [Some Term]
 universe = concatMap disperse . untypedClasses
