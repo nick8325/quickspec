@@ -7,38 +7,37 @@ import TestTree(TestResults, reps, classes, numTests, cutOff)
 import Typed
 import Term
 import Text.Printf
-import Data.Typeable
+import Typeable
 import Utils
 import Test.QuickCheck.Gen
 import System.Random
 import qualified Data.Map as Map
 import Data.Maybe
 import Control.Spoon
+import Control.Monad
+import System.IO
+import Control.Exception
+import Data.Array hiding (index)
+import Unsafe.Coerce
+import GHC.Prim
 
-inhabitedTypes :: Sig -> [TypeRep]
-inhabitedTypes = usort . concatMap closure . types
-
-closure :: TypeRep -> [TypeRep]
-closure ty =
-  ty:
-  case arrow ty of
-    Nothing -> []
-    Just (a, b) -> closure b
-
-argTypes sig ty =
-  [ ty1 | (ty1, ty2) <- catMaybes (map arrow (inhabitedTypes sig)), ty2 == ty ]
+findWitness :: Sig -> TypeRep -> Some (K ())
+findWitness sig ty =
+  Map.findWithDefault
+    (error "Generate.witness: type not found")
+    ty (witnesses sig)
 
 terms :: Sig -> TypeMap (C [] Term) -> TypeRep -> [Some Term]
 terms sig base ty =
   app (Var . unC) (variables sig) ty ++
   app (Const . unC) (constants sig) ty ++
-  [ fromMaybe (error "Generate.terms: type error")
-      (apply App f x)
+  [ Some (App (cast' f) x `asTypeOf` witness y)
   | lhs <- argTypes sig ty,
     Some x <- app id base lhs, 
     not (isUndefined x), 
     Some f <- terms sig base (mkFunTy lhs ty),
-    not (isUndefined f) ]
+    not (isUndefined f), 
+    Some y <- [findWitness sig ty] ]
   
   where app :: (forall a. f a -> g a) ->
                  TypeMap (C [] f) ->
@@ -49,22 +48,37 @@ terms sig base ty =
             Nothing -> []
             Just (Some (C xs)) ->
               [ Some (f x) | x <- xs ]
+              
+        witness :: K () a -> Term a
+        witness _ = undefined
         
-generate :: Sig -> Int -> IO (TypeMap (C TestResults Term))
-generate sig n | n < 0 = error "Generate.generate: depth must be positive"
-generate sig 0 = return Typed.empty
-generate sig d = do
-  rs <- fmap (mapValues (C . reps . unC)) (generate sig (d-1))
+        cast' x = fromMaybe (error "Generate.terms: type error") (cast x)
+
+unbuffered :: IO a -> IO a
+unbuffered x = do
+  buf <- hGetBuffering stdout
+  bracket_
+    (hSetBuffering stdout NoBuffering)
+    (hSetBuffering stdout buf)
+    x
+
+generate :: Sig -> IO (TypeMap (C TestResults Term))
+generate Sig { maxDepth = n } | n < 0 =
+  error "Generate.generate: maxDepth must be positive"
+generate Sig { maxDepth = 0 } = return Typed.empty
+generate sig = unbuffered $ do
+  let d = maxDepth sig
+  rs <- fmap (mapValues (C . reps . unC)) (generate sig { maxDepth = d - 1})
   printf "Depth %d: " d
   let count :: ([a] -> a) -> (forall b. f (g b) -> a) ->
                TypeMap (C f g) -> a
       count op f = op . map (Typed.some (f . unC)) . Typed.toList
-      ts = Typed.fromList [ Typed.sequence (terms sig rs ty) | ty <- inhabitedTypes sig ]
+      ts = Typed.fromList [ gather (terms sig rs ty) | ty <- testableTypes sig ]
   printf "%d terms, " (count sum length ts)
   seeds <- genSeeds
   let cs = fmap (mapSome (C . test seeds sig . unC)) ts
   printf "%d tests, %d classes, %d raw equations.\n"
-      (count maximum numTests cs)
+      (count (maximum . (0:)) numTests cs)
       (count sum (length . classes) cs)
       (count sum (sum . map (subtract 1 . length) . classes) cs)
   return cs
@@ -89,5 +103,14 @@ test' seeds sig ts (Observer x) = cutOff 200 (T.test (map testCase seeds) ts)
   where
     testCase (g, n) =
       let (g1, g2) = split g
-          val = unGen valuation g1 n in
-      teaspoon . unGen x g2 n . eval val
+          val = memoSym sig (unGen valuation g1 n) in
+      teaspoon . force . unGen x g2 n . eval val
+    force x = x == x `seq` x
+
+memoSym :: Sig -> (forall a. Var a -> a) -> (forall a. Var a -> a)
+memoSym sig f = unsafeCoerce . (arr !) . index
+  where arr :: Array Int Any
+        arr = array (0, maximum (0:map index (names (variables sig))))
+                [(index v, unsafeCoerce (f v))
+                | Some (C vs) <- Typed.toList (variables sig),
+                  C v <- vs]

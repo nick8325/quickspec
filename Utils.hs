@@ -28,3 +28,7 @@ merge f c = aux
             LT -> x:aux xs (y:ys)
             GT -> y:aux (x:xs) ys
             EQ -> f x y:aux xs ys
+
+EQ `orElse` x = x
+x `orElse` _ = x
+

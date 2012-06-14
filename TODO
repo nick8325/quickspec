@@ -1,0 +1,16 @@
+Write wrapper around TypeRep to get around lack of Ord instance in old
+GHC versions + bug in new versions. (How to work around the bug?
+Tinkering required!)
+
+Print warnings if two constants with the same name+type.
+
+Rename C to O and use type List = [].
+
+Give proper errors if use several observers in signature etc.
+
+Represent Term a as pair (UntypedTerm, Eval a).
+
+Remove test cases from TestResult.
+(From TestTree too? It only means union would take an extra parameter.)
+
+Replace C . f . unC with fmap f, or at least add mapSomeC etc.

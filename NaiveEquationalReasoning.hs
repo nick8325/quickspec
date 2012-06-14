@@ -13,9 +13,10 @@ import Control.Monad
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Strict
 import Utils
-import Typed hiding (sequence)
+import Typed
 import Data.Ord
 import Data.List
+import Debug.Trace
 
 data Context = Context {
   rel :: CC.S,
@@ -61,7 +62,7 @@ t =?= u = liftCC $ do
   y <- flatten u
   x CC.=?= y
 
-(=:=) :: Term a -> Term a -> EQ ()
+(=:=) :: Term a -> Term a -> EQ Bool
 t =:= u = do
   (ctx, d) <- ask
   b <- t =?= u
@@ -70,15 +71,18 @@ t =:= u = do
       t' <- subst s t
       u' <- subst s u
       t' CC.=:= u'
+  return b
 
 newtype Subst = Subst (forall a. Var a -> Int)
 
 substs :: Term a -> TypeMap Universe -> Int -> [Subst]
-substs t univ d = map apply (map lookup (sequence (map choose vars)))
+substs t univ d = map apply (map lookup (sequence (map choose (dump vars))))
   where vars :: [(Name, Int)]
         vars = map (maximumBy (comparing snd)) .
                partitionBy fst .
                holes $ t
+               
+        dump xs = traceShow (t, xs) xs
         
         choose :: (Name, Int) -> [(Name, Int)]
         choose (x, n) =

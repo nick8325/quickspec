@@ -69,11 +69,14 @@ numTests (Results (NonNil t)) = aux t
   where aux Tree{branches = []} = 0
         aux Tree{branches = bs} = 1 + maximum (map aux bs)
 
-classes :: TestResults a -> [[a]]
-classes (Results Nil) = []
-classes (Results (NonNil t)) = aux t
+classes :: Ord a => TestResults a -> [[a]]
+classes = sort . map sort . unsortedClasses
+
+unsortedClasses :: TestResults a -> [[a]]
+unsortedClasses (Results Nil) = []
+unsortedClasses (Results (NonNil t)) = aux t
   where aux Tree{rep = x, rest = xs, branches = []} = [x:xs]
         aux Tree{branches = bs} = concat (parMap rseq aux bs)
 
-reps :: TestResults a -> [a]
+reps :: Ord a => TestResults a -> [a]
 reps = map head . classes
