@@ -14,6 +14,7 @@ import Data.Typeable
 import Data.List
 import Control.Applicative
 import Utils
+import System.Random
 
 data Equation a = Term a :=: Term a deriving Typeable
 
@@ -46,13 +47,16 @@ prune :: Int -> [Some Term] -> [Some Equation] -> [Some Equation]
 prune d univ eqs = evalEQ (initial d univ) (filterM (fmap not . provable) eqs)
   where provable (Some (t :=: u)) = t =:= u
 
-quickSpec :: Signature a => a -> IO ()
-quickSpec sig_ = do
+runTool :: Signature a => (Sig -> IO ()) -> a -> IO ()
+runTool tool sig_ = do
   putStrLn "== API =="
   print (signature sig_)
   
   let sig = signature sig_ `mappend` undefinedSig (signature sig_)
-  
+  tool sig
+
+quickSpec :: Signature a => a -> IO ()
+quickSpec = runTool $ \sig -> do
   putStrLn "== Testing =="
   r <- generate sig
   let eqs = equations r
@@ -67,5 +71,30 @@ quickSpec sig_ = do
       eqnFuns (Some (t :=: u)) = funs t ++ funs u
   forM_ (zip [1..] pruned) $ \(i, Some (t :=: u)) ->
     printf "%d: %s == %s\n" i (show t) (show u)
+
+  putStrLn ""
+
+sampleList :: StdGen -> Int -> [a] -> [a]
+sampleList g n xs | n >= length xs = xs
+                  | otherwise = aux g n (length xs) xs
+  where
+    aux g 0 _ _ = []
+    aux g _ _ [] = error "QuickSpec.sampleList: bug in sampling"
+    aux g size len (x:xs)
+      | i <= size = x:aux g' (size-1) (len-1) xs
+      | otherwise = aux g' size (len-1) xs
+      where (i, g') = randomR (1, len) g
+
+sampleTerms :: Signature a => a -> IO ()
+sampleTerms = runTool $ \sig -> do
+  putStrLn "== Testing =="
+  r <- generate sig
+  let univ = universe r
+      numTerms = 100
+
+  printf "\n== Here are %d terms out of a total of %d ==\n" numTerms (length univ)
+  g <- newStdGen
+  forM_ (zip [1..] (sampleList g numTerms univ)) $ \(i, Some t) ->
+    printf "%d: %s\n" i (show t)
 
   putStrLn ""
