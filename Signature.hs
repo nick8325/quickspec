@@ -29,8 +29,11 @@ data Sig = Sig {
   observers :: TypeMap Observer,
   ords :: TypeMap Observer,
   witnesses :: TypeMap (K ()),
-  maxDepth :: Int
+  maxDepth_ :: First Int
   }
+
+maxDepth :: Sig -> Int
+maxDepth = fromMaybe 3 . getFirst . maxDepth_
 
 names :: TypeMap (C [] (C Named f)) -> [Name]
 names = concatMap (some (map (erase . unC) . unC)) . Map.elems
@@ -68,7 +71,7 @@ summarise sig =
 data Observer a = forall b. Ord b => Observer (Gen (a -> b)) deriving Typeable
 
 emptySig :: Sig
-emptySig = Sig Typed.empty Typed.empty Typed.empty Typed.empty Typed.empty 3
+emptySig = Sig Typed.empty Typed.empty Typed.empty Typed.empty Typed.empty mempty
 
 instance Monoid Sig where
   mempty = emptySig
@@ -79,7 +82,7 @@ instance Monoid Sig where
       observers = observers s1 `mappend` observers s2,
       ords = ords s1 `mappend` ords s2,
       witnesses = witnesses s1 `mappend` witnesses s2, 
-      maxDepth = maxDepth s2 }
+      maxDepth_ = maxDepth_ s1 `mappend` maxDepth_ s2 }
     where constants' = constants s1 `jumble` constants s2
           variables' = variables s1 `jumble` variables s2
           jumble x y =
@@ -109,6 +112,9 @@ witness x = emptySig { witnesses = Typed.fromList [Some (witnessing x)] }
 
 ordSig :: Typeable a => Observer a -> Sig
 ordSig x = emptySig { ords = Typed.fromList [Some x] }
+
+withDepth :: Int -> Sig
+withDepth n = emptySig { maxDepth_ = First (Just n) }
 
 constantValue :: Typeable a => String -> Value a -> Sig
 constantValue x v = constantSig (Named 0 x (typeOf (unValue v)) v) `mappend` witness (unValue v)

@@ -63,12 +63,13 @@ unbuffered x = do
     x
 
 generate :: Sig -> IO (TypeMap (C TestResults Term))
-generate Sig { maxDepth = n } | n < 0 =
+generate sig = generate' (maxDepth sig) sig
+
+generate' d sig | d < 0 =
   error "Generate.generate: maxDepth must be positive"
-generate Sig { maxDepth = 0 } = return Typed.empty
-generate sig = unbuffered $ do
-  let d = maxDepth sig
-  rs <- fmap (mapValues (C . reps . unC)) (generate sig { maxDepth = d - 1})
+generate' 0 sig = return Typed.empty
+generate' d sig = unbuffered $ do
+  rs <- fmap (mapValues (C . reps . unC)) (generate' (d - 1) sig)
   printf "Depth %d: " d
   let count :: ([a] -> a) -> (forall b. f (g b) -> a) ->
                TypeMap (C f g) -> a
