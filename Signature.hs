@@ -66,7 +66,11 @@ summarise sig =
     starry xss@(xs:_) = map horizStars $ [stars] ++ xss ++ [stars]
       where stars = replicate (length xs) '*'
             horizStars xs = "****" ++ xs ++ "****"
-    untestable = filter (not . isArrow) (filter (not . flip testable sig) (inhabitedTypes sig))
+    untestable = filter isTerminal (filter (not . flip testable sig) (inhabitedTypes sig))
+    isTerminal ty =
+      case arrow ty of
+        Nothing -> True
+        Just (_, rhs) -> not (rhs `elem` inhabitedTypes sig)
 
 data Observer a = forall b. Ord b => Observer (Gen (a -> b)) deriving Typeable
 
@@ -201,7 +205,9 @@ observer4 :: (Arbitrary a, Arbitrary b, Arbitrary c,
 observer4 f = observerSig (Observer (f <$> arbitrary <*> arbitrary <*> arbitrary))
 
 inhabitedTypes :: Sig -> [TypeRep]
-inhabitedTypes = usort . concatMap closure . types
+inhabitedTypes = usort . map (some (typeOf . witness)) . toList . witnesses
+  where witness :: K () a -> a
+        witness = undefined
 
 testableTypes :: Sig -> [TypeRep]
 testableTypes sig = filter (flip testable sig) . inhabitedTypes $ sig
