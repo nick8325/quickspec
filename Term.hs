@@ -13,6 +13,7 @@ import Utils
 data Named a = Named {
   index :: Int,
   name :: String,
+  silent :: Bool,
   typ_ :: TypeRep,
   the :: a
   } deriving (Typeable, Functor)
@@ -29,7 +30,7 @@ instance Ord (Named a) where
 type Name = Named ()
 
 erase :: Named a -> Name
-erase (Named index name typ_ _) = Named index name typ_ ()
+erase (Named index name silent typ_ _) = Named index name silent typ_ ()
 
 data Term a =
     Var (Var a)
@@ -155,6 +156,13 @@ closure ty =
   case arrow ty of
     Nothing -> []
     Just (a, b) -> closure b
+
+funs :: Term a -> [Name]
+funs t = aux t []
+  where aux :: Term b -> [Name] -> [Name]
+        aux (Const x) = (erase x:)
+        aux Var{} = id
+        aux (App f x) = aux f . aux x
 
 vars :: Term a -> [Name]
 vars t = aux t []

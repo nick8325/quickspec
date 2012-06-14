@@ -117,7 +117,7 @@ withDepth :: Int -> Sig
 withDepth n = emptySig { maxDepth_ = First (Just n) }
 
 constantValue :: Typeable a => String -> Value a -> Sig
-constantValue x v = constantSig (Named 0 x (typeOf (unValue v)) v) `mappend` witness (unValue v)
+constantValue x v = constantSig (Named 0 x False (typeOf (unValue v)) v) `mappend` witness (unValue v)
   where unValue (Value x) = x
 
 blind0 :: Typeable a => String -> a -> Sig
@@ -141,11 +141,18 @@ ord x = ordSig (Observer (return id) `observing` x)
 observing :: Observer a -> a -> Observer a
 observing x _ = x
 
+silence :: Signature a => a -> Sig
+silence sig =
+  sig' { constants = mapValues (C . map (C . silence1 . unC) . unC) (constants sig'),
+         variables = mapValues (C . map (C . silence1 . unC) . unC) (variables sig') }
+  where sig' = signature sig
+        silence1 x = x { silent = True }
+
 vars :: (Arbitrary a, Typeable a) => [String] -> a -> Sig
 vars xs v = mconcat [ var x v | x <- xs ]
 
 var :: (Arbitrary a, Typeable a) => String -> a -> Sig
-var x v = variableSig (Named 0 x (typeOf v) (arbitrary `asTypeOf` return v))
+var x v = variableSig (Named 0 x False (typeOf v) (arbitrary `asTypeOf` return v))
 
 con, fun0 :: (Ord a, Typeable a) => String -> a -> Sig
 con = fun0

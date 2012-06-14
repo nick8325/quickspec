@@ -62,7 +62,9 @@ quickSpec sig_ = do
     (length univ)
   
   putStrLn "== Equations =="
-  let pruned = prune (maxDepth sig) univ (equations r)
+  let pruned = filter (not . all silent . eqnFuns)
+                 (prune (maxDepth sig) univ (equations r))
+      eqnFuns (Some (t :=: u)) = funs t ++ funs u
   forM_ (zip [1..] pruned) $ \(i, Some (t :=: u)) ->
     printf "%d: %s == %s\n" i (show t) (show u)
 
