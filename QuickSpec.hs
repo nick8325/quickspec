@@ -68,3 +68,4 @@ quickSpec sig_ = do
   forM_ (zip [1..] pruned) $ \(i, Some (t :=: u)) ->
     printf "%d: %s == %s\n" i (show t) (show u)
 
+  putStrLn ""
