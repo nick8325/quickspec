@@ -129,7 +129,8 @@ depth, size :: Term a -> Int
 depth (App f x) = depth f `max` (1 + depth x)
 depth _ = 1
 size (App f x) = size f + size x
-size _ = 1
+size (Var _) = 0
+size (Const _) = 1
 
 holes :: Term a -> [(Name, Int)]
 holes t = holes' 0 t []
