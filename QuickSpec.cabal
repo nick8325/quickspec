@@ -49,6 +49,7 @@ source-repository head
 
 library
   Exposed-modules:
+    Test.QuickSpec,
     Test.QuickSpec.Main,
     Test.QuickSpec.Signature,
     Test.QuickSpec.Term,

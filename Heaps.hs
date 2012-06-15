@@ -1,8 +1,8 @@
 {-# LANGUAGE ScopedTypeVariables,DeriveDataTypeable #-}
 module Heaps where
 
+import Test.QuickSpec
 import Test.QuickCheck
-import Test.QuickSpec.Signature
 import Data.Typeable
 import Data.Ord
 

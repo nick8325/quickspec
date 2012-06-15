@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
-import Test.QuickSpec.Main
-import Test.QuickSpec.Signature
+import Test.QuickSpec
+import Test.QuickSpec
 import Test.QuickCheck
 import Data.Typeable
 import qualified Heaps as H
