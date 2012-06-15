@@ -4,6 +4,8 @@ import QuickSpec
 import Signature
 import Test.QuickCheck
 import Data.Typeable
+import qualified Heaps as H
+import Data.List
 
 bools = [
   vars ["x", "y", "z"] True,
@@ -31,6 +33,14 @@ lists _ = [
   fun2 "map" (map :: (a -> a) -> [a] -> [a]),
   fun1 "unit" (return :: a -> [a])]
 
+-- A few more list functions that are helpful for the heaps example.
+heapsLists  :: forall a. (Typeable a, Ord a, Arbitrary a) => a -> [Sig]
+heapsLists _ = [
+  fun1 "sort" (sort :: [a] -> [a]),
+  fun2 "insert" (insert :: a -> [a] -> [a]),
+  fun1 "null" (null :: [a] -> Bool),
+  fun2 "delete" (delete :: a -> [a] -> [a]) ]
+
 funs :: forall a. (Typeable a, Ord a, Arbitrary a, CoArbitrary a) => a -> [Sig]
 funs _ = [
   vars ["f", "g", "h"] (undefined :: a -> a),
@@ -44,6 +54,7 @@ funs _ = [
   observer1 (\(x :: a) (f :: a -> a) -> f x)
   ]
 
+-- Generate a few variables at a particular type.
 someVars :: forall a. (Typeable a, Arbitrary a) => a -> Sig
 someVars _ = vars ["x", "y", "z"] (undefined :: a)
 
@@ -54,4 +65,8 @@ main = mapM_ quickSpec $ [
   [someVars 'A',
    silence (funs 'A'),
    silence (arith (undefined :: Int)),
-   signature (lists 'A')]]
+   signature (lists 'A')],
+  [someVars 'A',
+   silence (lists 'A'),
+   silence (heapsLists 'A'),
+   signature (H.heaps 'A')]]
