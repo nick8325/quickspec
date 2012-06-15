@@ -25,11 +25,11 @@ undefinedsSig sig =
     [ undefinedSig "undefined" (undefined `asTypeOf` witness x)
     | Some x <- map (findWitness sig) (inhabitedTypes sig) ]
 
-untypedClasses :: TypeMap (C TestResults Expr) -> [[Typed Term]]
-untypedClasses = concatMap (some (map (map (erase term)) . classes . unC)) . TypeMap.toList
+untypedClasses :: TypeMap (TestResults `O` Expr) -> [[Typed Term]]
+untypedClasses = concatMap (some (map (map (tag term)) . classes)) . TypeMap.toList2
 
 equations :: [[Typed Term]] -> [Equation]
-equations = sort . concatMap (toEquations . map val)
+equations = sort . concatMap (toEquations . map erase)
   where toEquations (x:xs) = [y :=: x | y <- xs]
 
 prune :: Int -> [Typed Term] -> [Equation] -> [Equation]
@@ -86,6 +86,6 @@ sampleTerms = runTool $ \sig -> do
   printf "\n== Here are %d terms out of a total of %d ==\n" numTerms (length univ)
   g <- newStdGen
   forM_ (zip [1 :: Int ..] (sampleList g numTerms univ)) $ \(i, t) ->
-    printf "%d: %s\n" i (show (val t))
+    printf "%d: %s\n" i (show (erase t))
 
   putStrLn ""

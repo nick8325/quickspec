@@ -1,4 +1,4 @@
-{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE Rank2Types, TypeOperators #-}
 module Generate where
 
 import Signature hiding (var, con)
@@ -30,25 +30,25 @@ terms sig base w =
     f <- terms sig base (const w),
     not (isUndefined (term f)) ]
 
-generate :: Sig -> IO (TypeMap (C TestResults Expr))
+generate :: Sig -> IO (TypeMap (TestResults `O` Expr))
 generate sig = generate' (maxDepth sig) sig
 
 generate' d sig | d < 0 =
   error "Generate.generate: maxDepth must be positive"
 generate' 0 sig = return TypeMap.empty
 generate' d sig = unbuffered $ do
-  rs <- fmap (TypeMap.mapValues (C . reps . unC)) (generate' (d - 1) sig)
+  rs <- fmap (TypeMap.mapValues2 reps) (generate' (d - 1) sig)
   printf "Depth %d: " d
   let count :: ([a] -> a) -> (forall b. f (g b) -> a) ->
-               TypeMap (C f g) -> a
-      count op f = op . map (Typed.some (f . unC)) . TypeMap.toList
+               TypeMap (f `O` g) -> a
+      count op f = op . map (Typed.some2 f) . TypeMap.toList
       ts = TypeMap.fromList
-             [ Some (C (terms sig rs (witness x)))
+             [ Some (O (terms sig rs (witness x)))
              | ty <- testableTypes sig, 
                Some x <- [findWitness sig ty] ]
   printf "%d terms, " (count sum length ts)
   seeds <- genSeeds
-  let cs = fmap (mapSome (C . test seeds sig . unC)) ts
+  let cs = fmap (mapSome2 (test seeds sig)) ts
   printf "%d tests, %d classes, %d raw equations.\n"
       (count (maximum . (0:)) numTests cs)
       (count sum (length . classes) cs)

@@ -1,4 +1,4 @@
-{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE Rank2Types, TypeOperators #-}
 module TypeMap where
 
 import qualified Data.Map as Map
@@ -31,3 +31,6 @@ lookup def x m =
 
 mapValues :: (forall a. Typeable a => f a -> g a) -> TypeMap f -> TypeMap g
 mapValues f = fmap (mapSome f)
+
+mapValues2 :: (forall a. Typeable a => f (g a) -> h (i a)) -> TypeMap (f `O` g) -> TypeMap (h `O` i)
+mapValues2 f = fmap (mapSome (O . f . unO))

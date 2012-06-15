@@ -29,11 +29,11 @@ type EQ = ReaderT (Map TypeRep Universe, Int) CC
 
 initial :: Int -> [Typed Term] -> Context
 initial d ts =
-  let n = 1+maximum (0:concatMap (map index . symbols . val) ts)
+  let n = 1+maximum (0:concatMap (map index . symbols . erase) ts)
       (universe, rel) =
         CC.runCC (CC.initial n) $
           forM (partitionBy (some (typeOf . witness) . typ) ts) $ \xs@(x:_) ->
-            fmap (some (typeOf . witness) (typ x),) (createUniverse (map val xs))
+            fmap (some (typeOf . witness) (typ x),) (createUniverse (map erase xs))
       
   in Context rel (Map.fromList universe) d
 
