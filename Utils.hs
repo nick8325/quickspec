@@ -3,6 +3,8 @@ module Utils where
 import Control.Arrow((&&&))
 import Data.List(groupBy, sortBy, group, sort)
 import Data.Ord(comparing)
+import System.IO
+import Control.Exception
 
 repeatM :: Monad m => m a -> m [a]
 repeatM = sequence . repeat
@@ -31,4 +33,12 @@ merge f c = aux
 
 EQ `orElse` x = x
 x `orElse` _ = x
+
+unbuffered :: IO a -> IO a
+unbuffered x = do
+  buf <- hGetBuffering stdout
+  bracket_
+    (hSetBuffering stdout NoBuffering)
+    (hSetBuffering stdout buf)
+    x
 

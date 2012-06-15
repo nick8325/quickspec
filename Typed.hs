@@ -14,8 +14,12 @@ newtype C f g a = C { unC :: f (g a) }
 newtype Witnessed a = Witnessed { witness :: a }
 type Witness = Some Witnessed
 
-witnessArrow :: (Typeable a, Typeable b) => a -> b -> (a -> b)
-witnessArrow = undefined
+data Typed a = Typed { typ :: Witness, val :: a }
+
+erase :: Typeable a => (f a -> b) -> f a -> Typed b
+erase f x = Typed (Some (Witnessed (witness x))) (f x)
+  where witness :: f a -> a
+        witness = undefined
 
 some :: (forall a. Typeable a => f a -> b) -> Some f -> b
 some f (Some x) = f x

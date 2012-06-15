@@ -34,4 +34,3 @@ typeRepTyCon = T.typeRepTyCon . unTypeRep
 splitTyConApp ty = (c, map TypeRep tys)
   where (c, tys) = T.splitTyConApp (unTypeRep ty)
 mkFunTy lhs rhs = TypeRep (T.mkFunTy (unTypeRep lhs) (unTypeRep rhs))
-

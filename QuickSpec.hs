@@ -13,63 +13,57 @@ import Data.Monoid
 import TestTree
 import Data.Typeable
 import Data.List
-import Control.Applicative
+import Control.Applicative hiding (some)
 import Utils
 import System.Random
 
-data Equation a = Term a :=: Term a
+data Equation = Term :=: Term deriving (Eq, Ord)
 
-compareSomeEquations (Some eq1) (Some eq2) =
-  compareEquations eq1 eq2
-compareEquations (t :=: u) (v :=: w) =
-  compareTerms t v `orElse` compareTerms u w
+instance Show Equation where
+  show (t :=: u) = show t ++ " == " ++ show u
 
-undefinedSig :: Sig -> Sig
-undefinedSig sig =
+undefinedsSig :: Sig -> Sig
+undefinedsSig sig =
   mconcat
-    [ constantValue "undefined" (Undefined `asTypeOf` Value (witness x))
-    | Some x <- TypeMap.toList (witnesses sig) ]
+    [ undefinedSig "undefined" (undefined `asTypeOf` witness x)
+    | Some x <- map (findWitness sig) (inhabitedTypes sig) ]
 
-untypedClasses :: TypeMap (C TestResults Term) -> [Some (C [] Term)]
-untypedClasses = concatMap (disperse . mapSome (C . map C . classes . unC)) . TypeMap.toList
+untypedClasses :: TypeMap (C TestResults Expr) -> [[Typed Term]]
+untypedClasses = concatMap (some (map (map (erase term)) . classes . unC)) . TypeMap.toList
 
-universe :: TypeMap (C TestResults Term) -> [Some Term]
-universe = concatMap disperse . untypedClasses
+equations :: [[Typed Term]] -> [Equation]
+equations = sort . concatMap (toEquations . map val)
+  where toEquations (x:xs) = [y :=: x | y <- xs]
 
-equations :: TypeMap (C TestResults Term) -> [Some Equation]
-equations = sortBy compareSomeEquations .
-            concatMap (disperse . mapSome (C . toEquations . unC)) . untypedClasses
-  where toEquations :: [Term a] -> [Equation a]
-        toEquations (x:xs) = [y :=: x | y <- xs]
-
-prune :: Int -> [Some Term] -> [Some Equation] -> [Some Equation]
+prune :: Int -> [Typed Term] -> [Equation] -> [Equation]
 prune d univ eqs = evalEQ (initial d univ) (filterM (fmap not . provable) eqs)
-  where provable (Some (t :=: u)) = t =:= u
+  where provable (t :=: u) = t =:= u
 
 runTool :: Signature a => (Sig -> IO ()) -> a -> IO ()
 runTool tool sig_ = do
   putStrLn "== API =="
   print (signature sig_)
   
-  let sig = signature sig_ `mappend` undefinedSig (signature sig_)
+  let sig = signature sig_ `mappend` undefinedsSig (signature sig_)
   tool sig
 
 quickSpec :: Signature a => a -> IO ()
 quickSpec = runTool $ \sig -> do
   putStrLn "== Testing =="
   r <- generate sig
-  let eqs = equations r
-      univ = universe r
+  let clss = untypedClasses r
+      eqs = equations clss
+      univ = concat clss
   printf "%d raw equations; %d terms in universe.\n\n"
     (length eqs)
     (length univ)
   
   putStrLn "== Equations =="
   let pruned = filter (not . all silent . eqnFuns)
-                 (prune (maxDepth sig) univ (equations r))
-      eqnFuns (Some (t :=: u)) = funs t ++ funs u
-  forM_ (zip [1..] pruned) $ \(i, Some (t :=: u)) ->
-    printf "%d: %s == %s\n" i (show t) (show u)
+                 (prune (maxDepth sig) univ eqs)
+      eqnFuns (t :=: u) = funs t ++ funs u
+  forM_ (zip [1 :: Int ..] pruned) $ \(i, eq) ->
+    printf "%d: %s\n" i (show eq)
 
   putStrLn ""
 
@@ -88,12 +82,13 @@ sampleTerms :: Signature a => a -> IO ()
 sampleTerms = runTool $ \sig -> do
   putStrLn "== Testing =="
   r <- generate sig
-  let univ = universe r
+  let clss = untypedClasses r
+      univ = concat clss
       numTerms = 100
 
   printf "\n== Here are %d terms out of a total of %d ==\n" numTerms (length univ)
   g <- newStdGen
-  forM_ (zip [1..] (sampleList g numTerms univ)) $ \(i, Some t) ->
-    printf "%d: %s\n" i (show t)
+  forM_ (zip [1 :: Int ..] (sampleList g numTerms univ)) $ \(i, t) ->
+    printf "%d: %s\n" i (show (val t))
 
   putStrLn ""

@@ -1,11 +1,11 @@
-{-# LANGUAGE ExistentialQuantification, ScopedTypeVariables #-}
+{-# LANGUAGE Rank2Types, ExistentialQuantification, ScopedTypeVariables #-}
 module Signature where
 
 import Control.Applicative hiding (some)
 import Typeable
 import Data.Monoid
 import Test.QuickCheck
-import Term
+import Term hiding (var)
 import Typed
 import qualified TypeMap
 import TypeMap(TypeMap)
@@ -26,8 +26,8 @@ instance Signature a => Signature [a] where
   signature = mconcat . map signature
 
 data Sig = Sig {
-  constants :: TypeRel (C Named Value),
-  variables :: TypeRel (C Named Gen),
+  constants :: TypeRel Constant,
+  variables :: TypeRel Variable,
   observers :: TypeMap Observer,
   ords :: TypeMap Observer,
   types :: TypeMap Witnessed,
@@ -38,15 +38,12 @@ data Sig = Sig {
 maxDepth :: Sig -> Int
 maxDepth = fromMaybe 3 . getFirst . maxDepth_
 
-names :: TypeMap (C [] (C Named f)) -> [Name]
-names = concatMap (some (map (erase . unC) . unC)) . Map.elems
-
 instance Show Sig where show = unlines . summarise
 
 summarise :: Sig -> [String]
 summarise sig =
-  [ "-- functions --" ] ++ describe showOp constants ++
-  [ "", "-- variables --" ] ++ describe id variables ++
+  [ "-- functions --" ] ++ describe showOp (sym . unConstant) constants ++
+  [ "", "-- variables --" ] ++ describe id (sym . unVariable) variables ++
   concat
   [ [ "", "** the following types are using non-standard equality **" ] ++
     map show (Map.keys (observers sig))
@@ -60,9 +57,11 @@ summarise sig =
   | not (null untestable) ]
     
   where
-    describe decorate f =
-      [ intercalate ", " (map (decorate . name) xs) ++ " :: " ++ show (typ_ x) 
-      | xs@(x:_) <- partitionBy typ_ (names (f sig)) ]
+    describe :: (String -> String) -> (forall a. f a -> Symbol) ->
+                (Sig -> TypeRel f) -> [String]
+    describe decorate un f =
+      [ intercalate ", " (map (decorate . name) xs) ++ " :: " ++ show (symbolType x)
+      | xs@(x:_) <- partitionBy symbolType (map (some un) (TypeRel.toList (f sig))) ]
     starry xss@(xs:_) = map horizStars $ [stars] ++ xss ++ [stars]
       where stars = replicate (length xs) '*'
             horizStars xs = "****" ++ xs ++ "****"
@@ -81,8 +80,8 @@ instance Monoid Sig where
   mempty = emptySig
   s1 `mappend` s2 =
     Sig {
-      constants = renumber 0 constants',
-      variables = renumber (length constants') variables',
+      constants = renumber (mapConstant . alter) 0 constants',
+      variables = renumber (mapVariable . alter) (length constants') variables',
       observers = observers s1 `mappend` observers s2,
       ords = ords s1 `mappend` ords s2,
       types = types s1 `mappend` types s2, 
@@ -93,17 +92,22 @@ instance Monoid Sig where
           variables' = TypeRel.toList (variables s1) ++
                        TypeRel.toList (variables s2)
   
-          renumber n =
+          renumber :: (forall a. Int -> f a -> f a) ->
+                      Int -> [Some f] -> TypeRel f
+          renumber alter n =
             TypeRel.fromList .
-            zipWith (\i -> mapSome (alter i)) [n..]
+            zipWith (\x -> mapSome (alter x)) [n..]
           
-          alter n (C x) = C x { index = n }
+          alter :: Int -> Symbol -> Symbol
+          alter n x = x { index = n }
 
-constantSig :: Typeable a => Named (Value a) -> Sig
-constantSig x = emptySig { constants = TypeRel.singleton (C x) }
+constantSig :: forall a. Typeable a => Constant a -> Sig
+constantSig x = emptySig { constants = TypeRel.singleton x }
+                `mappend` typeSig (undefined :: a)
 
-variableSig :: Typeable a => Named (Gen a) -> Sig
-variableSig x = emptySig { variables = TypeRel.singleton (C x) }
+variableSig :: forall a. Typeable a => Variable a -> Sig
+variableSig x = emptySig { variables = TypeRel.singleton x }
+                `mappend` cotypeSig (undefined :: a)
 
 observerSig :: Typeable a => Observer a -> Sig
 observerSig x = emptySig { observers = TypeMap.singleton x }
@@ -120,12 +124,11 @@ ordSig x = emptySig { ords = TypeMap.singleton x }
 withDepth :: Int -> Sig
 withDepth n = emptySig { maxDepth_ = First (Just n) }
 
-constantValue :: Typeable a => String -> Value a -> Sig
-constantValue x v = constantSig (Named 0 x False (typeOf (unValue v)) v) `mappend` typeSig (unValue v)
-  where unValue (Value x) = x
+undefinedSig :: forall a. Typeable a => String -> a -> Sig
+undefinedSig x u = constantSig (Constant (Atom ((symbol x u) { undef = True }) u))
 
 blind0 :: forall a. Typeable a => String -> a -> Sig
-blind0 x f = constantValue x (Value f)
+blind0 x f = constantSig (Constant (Atom (symbol x f) f))
 
 blind1 :: forall a b. (Typeable a, Typeable b) =>
           String -> (a -> b) -> Sig
@@ -161,8 +164,8 @@ observing x _ = x
 
 silence :: Signature a => a -> Sig
 silence sig =
-  sig' { constants = TypeRel.mapValues (C . silence1 . unC) (constants sig'),
-         variables = TypeRel.mapValues (C . silence1 . unC) (variables sig') }
+  sig' { constants = TypeRel.mapValues (mapConstant silence1) (constants sig'),
+         variables = TypeRel.mapValues (mapVariable silence1) (variables sig') }
   where sig' = signature sig
         silence1 x = x { silent = True }
 
@@ -170,7 +173,7 @@ vars :: (Arbitrary a, Typeable a) => [String] -> a -> Sig
 vars xs v = mconcat [ var x v | x <- xs ]
 
 var :: (Arbitrary a, Typeable a) => String -> a -> Sig
-var x v = variableSig (Named 0 x False (typeOf v) (arbitrary `asTypeOf` return v))
+var x v = variableSig (Variable (Atom (symbol x v) (arbitrary `asTypeOf` return v)))
 
 con, fun0 :: (Ord a, Typeable a) => String -> a -> Sig
 con = fun0
@@ -232,5 +235,8 @@ testable ty sig =
 argTypes sig ty =
   [ ty1 | (ty1, ty2) <- catMaybes (map arrow (inhabitedTypes sig)), ty2 == ty ]
 
-witnesses :: Sig -> TypeMap Witnessed
-witnesses sig = types sig `mappend` cotypes sig
+findWitness :: Sig -> TypeRep -> Witness
+findWitness sig ty =
+  Map.findWithDefault
+    (error $ "Generate.witness: type " ++ show ty ++ " not found")
+    ty (types sig `mappend` cotypes sig)

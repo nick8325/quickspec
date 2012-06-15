@@ -1,4 +1,4 @@
-{-# LANGUAGE Rank2Types, TupleSections #-}
+{-# LANGUAGE TupleSections #-}
 module NaiveEquationalReasoning where
 
 import Term
@@ -28,19 +28,17 @@ type Universe = IntMap [Int]
 
 type EQ = ReaderT (Map TypeRep Universe, Int) CC
 
-initial :: Int -> [Some Term] -> Context
+initial :: Int -> [Typed Term] -> Context
 initial d ts =
-  let n = 1+maximum (0:concatMap (some indices) ts)
-      witness :: [Term a] -> a
-      witness = undefined
+  let n = 1+maximum (0:concatMap (map index . symbols . val) ts)
       (universe, rel) =
         CC.runCC (CC.initial n) $
-          forM (classify ts) $ \(Some (C xs)) ->
-            fmap (typeOf (witness xs),) (createUniverse xs)
+          forM (partitionBy (some (typeOf . witness) . typ) ts) $ \xs@(x:_) ->
+            fmap (some (typeOf . witness) (typ x),) (createUniverse (map val xs))
       
   in Context rel (Map.fromList universe) d
 
-createUniverse :: [Term a] -> CC Universe
+createUniverse :: [Term] -> CC Universe
 createUniverse ts = fmap IntMap.fromList (mapM createTerms tss)
   where tss = partitionBy depth ts
         createTerms ts@(t:_) = fmap (depth t,) (mapM flatten ts)
@@ -58,13 +56,13 @@ execEQ ctx x = snd (runEQ ctx x)
 liftCC :: CC a -> EQ a
 liftCC x = ReaderT (const x)
 
-(=?=) :: Term a -> Term a -> EQ Bool
+(=?=) :: Term -> Term -> EQ Bool
 t =?= u = liftCC $ do
   x <- flatten t
   y <- flatten u
   x CC.=?= y
 
-(=:=) :: Term a -> Term a -> EQ Bool
+(=:=) :: Term -> Term -> EQ Bool
 t =:= u = do
   (ctx, d) <- ask
   b <- t =?= u
@@ -75,38 +73,32 @@ t =:= u = do
       t' CC.=:= u'
   return b
 
-newtype Subst = Subst (forall a. Var a -> Int)
+type Subst = Symbol -> Int
 
-substs :: Term a -> Map TypeRep Universe -> Int -> [Subst]
-substs t univ d = map apply (map lookup (sequence (map choose vars)))
-  where vars :: [(Name, Int)]
-        vars = map (maximumBy (comparing snd)) .
+substs :: Term -> Map TypeRep Universe -> Int -> [Subst]
+substs t univ d = map lookup (sequence (map choose vars))
+  where vars = map (maximumBy (comparing snd)) .
                partitionBy fst .
                holes $ t
-        
-        choose :: (Name, Int) -> [(Name, Int)]
+
         choose (x, n) =
           let m = Map.findWithDefault (error "NaiveEquationalReasoning.substs: empty universe")
-                  (typ_ x) univ in
+                  (symbolType x) univ in
           [ (x, t)
           | d' <- [0..d-n],
             t <- IntMap.findWithDefault [] d' m ]
-        
-        lookup :: [(Name, Int)] -> (Name -> Int)
+
         lookup ss =
           let m = IntMap.fromList [ (index x, y) | (x, y) <- ss ]
           in \x -> IntMap.findWithDefault (index x) (index x) m
 
-        apply :: (Name -> Int) -> Subst
-        apply s = Subst $ \x -> s (erase x)
-
-subst :: Subst -> Term a -> CC Int
-subst (Subst s) (Var x) = return (s x)
+subst :: Subst -> Term -> CC Int
+subst s (Var x) = return (s x)
 subst s (Const x) = return (index x)
 subst s (App f x) = do
   f' <- subst s f
   x' <- subst s x
   f' CC.$$ x'
 
-flatten :: Term a -> CC Int
-flatten = subst (Subst index)
+flatten :: Term -> CC Int
+flatten = subst index

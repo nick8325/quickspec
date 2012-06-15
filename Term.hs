@@ -1,4 +1,4 @@
-{-# LANGUAGE Rank2Types, ExistentialQuantification, DeriveFunctor #-}
+{-# LANGUAGE RankNTypes, ExistentialQuantification, DeriveFunctor #-}
 module Term where
 
 import Typeable
@@ -10,80 +10,44 @@ import Data.List
 import Data.Char
 import Utils
 
-data Named a = Named {
+data Symbol = Symbol {
   index :: Int,
   name :: String,
   silent :: Bool,
-  typ_ :: TypeRep,
-  the :: a
-  } deriving Functor
+  undef :: Bool,
+  symbolType :: TypeRep }
 
-instance Show (Named a) where
+symbol :: Typeable a => String -> a -> Symbol
+symbol x v = Symbol 0 x False False (typeOf v)
+
+instance Show Symbol where
   show = name
 
-instance Eq (Named a) where
+instance Eq Symbol where
   (==) = (==) `on` index
 
-instance Ord (Named a) where
+instance Ord Symbol where
   compare = comparing index
 
-type Name = Named ()
-
-erase :: Named a -> Name
-erase (Named index name silent typ_ _) = Named index name silent typ_ ()
-
-data Term a =
-    Var (Var a)
-  | Const (Const a)
-  | forall b. App (Term (b -> a)) (Term b)
+data Term =
+    Var Symbol
+  | Const Symbol
+  | App Term Term deriving Eq
 
 infixl 5 `App`
 
-termEq :: Term a -> Term b -> Bool
-Var x `termEq` Var y = index x == index y
-Const x `termEq` Const y = index x == index y
-App f x `termEq` App g y = f `termEq` g && x `termEq` y
-_ `termEq` _ = False
+instance Ord Term where
+  compare = comparing stamp
+    where
+      stamp t = (depth t, size t, -occur t, body t)
 
-instance Eq (Term a) where
-  (==) = termEq
+      occur t = length (usort (vars t))
 
-type Var a = Named (Gen a)
-type Const a = Named (Value a)
+      body (Var x) = Left (Left x)
+      body (Const x) = Left (Right x)
+      body (App f x) = Right (f, x)
 
-data Value a = Undefined | Value a
-
-value Undefined = undefined
-value (Value x) = x
-
-isUndefined :: Term a -> Bool
-isUndefined (Const Named { the = Undefined }) = True
-isUndefined _ = False
-
-instance Ord (Term a) where
-  compare = compareTerms
-
-compareTerms :: Term a -> Term b -> Ordering
-s `compareTerms` t = (stamp s `compare` stamp t) `orElse` (s `compareBody` t)
-  where
-    stamp t = (depth t, size t, -occur t)
-    
-    occur t = length (usort (vars t))
-    
-    top (Var s)   = Just (Left s)
-    top (Const s) = Just (Right s)
-    top _         = Nothing
-    
-    compareBody :: Term a -> Term b -> Ordering
-    Var x `compareBody` Var y = compare (index x) (index y)
-    Var x `compareBody` _ = LT
-    Const x `compareBody` Var y = GT
-    Const x `compareBody` Const y = compare (index x) (index y)
-    Const x `compareBody` _ = LT
-    App f x `compareBody` App g y =
-      (f `compareTerms` g) `orElse` (x `compareTerms` y)
-
-instance Show (Term a) where
+instance Show Term where
   showsPrec p t = showString (showTerm p t)
    where
      brack s = "(" ++ s ++ ")"
@@ -92,14 +56,13 @@ instance Show (Term a) where
      parenOp p s | p < 1 = s
                  | otherwise = brack s
 
-     showTerm :: Int -> Term b -> String
      showTerm p (Var v) = show v
      showTerm p (Const x) = showOp (name x)
      showTerm p (Const op `App` x) | isOp (name op) = 
        brack (showTerm 1 x ++ show op)
      showTerm p (Const op `App` x `App` y) | isOp (name op) =
        parenOp p (showTerm 1 x ++ show op ++ showTerm 1 y)
-     
+
      showTerm p (f `App` x) =
        parenFun p (showTerm 1 f ++ " " ++ showTerm 2 x)
 
@@ -107,38 +70,87 @@ showOp :: String -> String
 showOp op | isOp op = "(" ++ op ++ ")"
           | otherwise = op
 
--- Generate a random variable valuation
-valuation :: Gen (Var a -> a)
-valuation = promote (\x -> index x `variant'` the x)
-  where -- work around the fact that split doesn't work
-        variant' 0 = variant 0
-        variant' n = variant (-1) . variant' (n-1)
+isOp :: String -> Bool
+isOp "[]" = False
+isOp xs = not (all isIdent xs)
+  where isIdent x = isAlphaNum x || x == '\''
 
-eval :: (forall a. Var a -> a) -> Term a -> a
-eval env (Var x) = env x
-eval env (Const x) = value (the x)
-eval env (App f x) = eval env f (eval env x)
+isUndefined :: Term -> Bool
+isUndefined (Const Symbol { undef = True }) = True
+isUndefined _ = False
 
-indices :: Term a -> [Int]
-indices t = indices' t []
-  where indices' :: Term a -> [Int] -> [Int]
-        indices' (Var x) = (index x:)
-        indices' (Const x) = (index x:)
-        indices' (App f x) = indices' f . indices' x
+symbols :: Term -> [Symbol]
+symbols t = symbols' t []
+  where symbols' (Var x) = (x:)
+        symbols' (Const x) = (x:)
+        symbols' (App f x) = symbols' f . symbols' x
 
-depth, size :: Term a -> Int
+depth, size :: Term -> Int
 depth (App f x) = depth f `max` (1 + depth x)
 depth _ = 1
 size (App f x) = size f + size x
 size (Var _) = 0
 size (Const _) = 1
 
-holes :: Term a -> [(Name, Int)]
+holes :: Term -> [(Symbol, Int)]
 holes t = holes' 0 t []
-  where holes' :: Int -> Term a -> [(Name, Int)] -> [(Name, Int)]
-        holes' d (Var x) = ((erase x, d):)
+  where holes' d (Var x) = ((x, d):)
         holes' d Const{} = id
         holes' d (App f x) = holes' d f . holes' (d+1) x
+
+funs :: Term -> [Symbol]
+funs t = aux t []
+  where aux (Const x) = (x:)
+        aux Var{} = id
+        aux (App f x) = aux f . aux x
+
+vars :: Term -> [Symbol]
+vars t = aux t []
+  where aux (Var x) = (x:)
+        aux (App f x) = aux f . aux x
+        aux Const{} = id
+
+data Expr a = Expr {
+  term :: Term,
+  eval :: (forall b. Variable b -> b) -> a }
+
+instance Eq (Expr a) where
+  (==) = (==) `on` term
+
+instance Ord (Expr a) where
+  compare = comparing term
+
+instance Show (Expr a) where
+  show = show . term
+
+data Atom a = Atom {
+  sym :: Symbol,
+  value :: a } deriving Functor
+
+newtype Variable a = Variable { unVariable :: Atom (Gen a) } deriving Functor
+newtype Constant a = Constant { unConstant :: Atom a } deriving Functor
+
+mapVariable :: (Symbol -> Symbol) -> Variable a -> Variable a
+mapVariable f (Variable v) = Variable v { sym = f (sym v) }
+
+mapConstant :: (Symbol -> Symbol) -> Constant a -> Constant a
+mapConstant f (Constant v) = Constant v { sym = f (sym v) }
+
+-- Generate a random variable valuation
+valuation :: Gen (Variable a -> a)
+valuation = promote (\(Variable x) -> index (sym x) `variant'` value x)
+  where -- work around the fact that split doesn't work
+        variant' 0 = variant 0
+        variant' n = variant (-1) . variant' (n-1)
+
+var :: Variable a -> Expr a
+var v@(Variable (Atom x _)) = Expr (Var x) (\env -> env v)
+
+con :: Constant a -> Expr a
+con (Constant (Atom x v)) = Expr (Const x) (const v)
+
+app :: Expr (a -> b) -> Expr a -> Expr b
+app (Expr t f) (Expr u x) = Expr (App t u) (\env -> f env (x env))
 
 arrow :: TypeRep -> Maybe (TypeRep, TypeRep)
 arrow ty =
@@ -146,39 +158,4 @@ arrow ty =
     (c, [lhs, rhs]) | c == arr -> Just (lhs, rhs)
     _ -> Nothing
   where (arr, _) = splitTyConApp (typeOf (undefined :: Int -> Int))
-
-isArrow :: TypeRep -> Bool
-isArrow ty = arrow ty /= Nothing
-
-closure :: TypeRep -> [TypeRep]
-closure ty =
-  ty:
-  case arrow ty of
-    Nothing -> []
-    Just (a, b) -> closure b
-
-funs :: Term a -> [Name]
-funs t = aux t []
-  where aux :: Term b -> [Name] -> [Name]
-        aux (Const x) = (erase x:)
-        aux Var{} = id
-        aux (App f x) = aux f . aux x
-
-vars :: Term a -> [Name]
-vars t = aux t []
-  where aux :: Term b -> [Name] -> [Name]
-        aux (Var x) = (erase x:)
-        aux (App f x) = aux f . aux x
-        aux Const{} = id
-
-isOp :: String -> Bool
-isOp "[]" = False
-isOp xs = not (all isIdent xs)
-  where isIdent x = isAlphaNum x || x == '\''
-
-arity :: TypeRep -> Int
-arity ty =
-  case arrow ty of
-    Nothing -> 0
-    Just (_, rhs) -> 1 + arity rhs
 

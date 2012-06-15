@@ -1,7 +1,7 @@
 {-# LANGUAGE Rank2Types #-}
 module Generate where
 
-import Signature
+import Signature hiding (var, con)
 import qualified TestTree as T
 import TestTree(TestResults, reps, classes, numTests, cutOff)
 import Typed
@@ -19,39 +19,22 @@ import qualified Data.Map as Map
 import Data.Maybe
 import Control.Spoon
 import Control.Monad
-import System.IO
-import Control.Exception
 import Data.Array hiding (index)
-import Unsafe.Coerce
-import GHC.Prim
+import MemoValuation
 
-findWitness :: Sig -> TypeRep -> Witness
-findWitness sig ty =
-  Map.findWithDefault
-    (error $ "Generate.witness: type " ++ show ty ++ " not found")
-    ty (witnesses sig)
-
-terms :: Typeable a => Sig -> TypeRel Term -> a -> [Term a]
+terms :: Typeable a => Sig -> TypeRel Expr -> a -> [Expr a]
 terms sig base w =
-  map (Var . unC) (TypeRel.lookup w (variables sig)) ++
-  map (Const . unC) (TypeRel.lookup w (constants sig)) ++
-  [ App f x
+  map var (TypeRel.lookup w (variables sig)) ++
+  map con (TypeRel.lookup w (constants sig)) ++
+  [ app f x
   | Some lhs <- map (findWitness sig) (argTypes sig (typeOf w)),
     let w' = witness lhs,
     x <- TypeRel.lookup w' base,
-    not (isUndefined x), 
-    f <- terms sig base (w' `witnessArrow` w),
-    not (isUndefined f) ]
+    not (isUndefined (term x)),
+    f <- terms sig base (const w),
+    not (isUndefined (term f)) ]
 
-unbuffered :: IO a -> IO a
-unbuffered x = do
-  buf <- hGetBuffering stdout
-  bracket_
-    (hSetBuffering stdout NoBuffering)
-    (hSetBuffering stdout buf)
-    x
-
-generate :: Sig -> IO (TypeMap (C TestResults Term))
+generate :: Sig -> IO (TypeMap (C TestResults Expr))
 generate sig = generate' (maxDepth sig) sig
 
 generate' d sig | d < 0 =
@@ -88,21 +71,14 @@ observe x sig =
                x (observers sig)
   where msg = "No way of observing values of type " ++ show (typeOf x)
 
-test :: Typeable a => [(StdGen, Int)] -> Sig -> [Term a] -> TestResults (Term a)
+test :: Typeable a => [(StdGen, Int)] -> Sig -> [Expr a] -> TestResults (Expr a)
 test seeds sig ts = test' seeds sig ts (observe undefined sig)
 
-test' :: Typeable a => [(StdGen, Int)] -> Sig -> [Term a] -> Observer a -> TestResults (Term a)
-test' seeds sig ts (Observer x) = cutOff 200 (T.test (map testCase seeds) ts)
+test' :: Typeable a => [(StdGen, Int)] -> Sig -> [Expr a] -> Observer a -> TestResults (Expr a)
+test' seeds sig ts (Observer obs) = cutOff 200 (T.test (map testCase seeds) ts)
   where
     testCase (g, n) =
       let (g1, g2) = split g
-          val = memoSym sig (unGen valuation g1 n) in
-      teaspoon . force . unGen x g2 n . eval val
+          val = memoValuation sig (unGen valuation g1 n) in
+      \x -> teaspoon . force . unGen obs g2 n $ eval x val
     force x = x == x `seq` x
-
-memoSym :: Sig -> (forall a. Var a -> a) -> (forall a. Var a -> a)
-memoSym sig f = unsafeCoerce . (arr !) . index
-  where arr :: Array Int Any
-        arr = array (0, maximum (0:map index (names (variables sig))))
-                [(index v, unsafeCoerce (f v))
-                | Some (C v) <- TypeRel.toList (variables sig) ]
