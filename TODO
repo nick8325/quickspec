@@ -3,3 +3,5 @@ Print warnings if two constants with the same name+type.
 Give proper errors if use several observers in signature etc.
 
 Give a warning if there aren't any variables of a particular type.
+
+Make sampleTerms not bother testing the terms.

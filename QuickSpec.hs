@@ -37,16 +37,12 @@ prune :: Int -> [Typed Term] -> [Equation] -> [Equation]
 prune d univ eqs = evalEQ (initial d univ) (filterM (fmap not . provable) eqs)
   where provable (t :=: u) = t =:= u
 
-runTool :: Signature a => (Sig -> IO ()) -> a -> IO ()
-runTool tool sig_ = do
+runTests :: Signature a => (Sig -> [Equation] -> [Typed Term] -> IO ()) -> a -> IO ()
+runTests tool sig_ = do
   putStrLn "== API =="
   print (signature sig_)
-  
   let sig = signature sig_ `mappend` undefinedsSig (signature sig_)
-  tool sig
 
-runTests :: Sig -> IO ([Equation], [Typed Term])
-runTests sig = do
   putStrLn "== Testing =="
   r <- generate sig
   let clss = untypedClasses r
@@ -55,11 +51,11 @@ runTests sig = do
   printf "%d raw equations; %d terms in universe.\n\n"
     (length eqs)
     (length univ)
-  return (eqs, univ)
+
+  tool sig eqs univ
 
 quickSpec :: Signature a => a -> IO ()
-quickSpec = runTool $ \sig -> do
-  (eqs, univ) <- runTests sig
+quickSpec = runTests $ \sig eqs univ -> do
   putStrLn "== Equations =="
   let pruned = filter (not . all silent . eqnFuns)
                  (prune (maxDepth sig) univ eqs)
@@ -81,8 +77,7 @@ sampleList g n xs | n >= length xs = xs
       where (i, g') = randomR (1, len) g
 
 sampleTerms :: Signature a => a -> IO ()
-sampleTerms = runTool $ \sig -> do
-  (_, univ) <- runTests sig
+sampleTerms = runTests $ \sig _ univ -> do
   let numTerms = 100
 
   printf "\n== Here are %d terms out of a total of %d ==\n" numTerms (length univ)
