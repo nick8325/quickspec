@@ -27,11 +27,22 @@ instance Signature a => Signature [a] where
   signature = mconcat . map signature
 
 data Sig = Sig {
+  -- Constants, variables and observation functions.
   constants :: TypeRel Constant,
   variables :: TypeRel Variable,
   observers :: TypeMap Observer,
+
+  -- Ord instances, added whenever the 'fun' family of functions is used.
   ords :: TypeMap Observer,
+
+  -- Witnesses for Typeable. The following types must have witnesses:
+  -- * Any function argument.
+  -- * Any function result.
+  -- * Any partially-applied function type.
+  -- * Any variable type.
   witnesses :: TypeMap Witnessed,
+
+  -- Depth of terms in the universe.
   maxDepth_ :: First Int
   }
 
@@ -55,7 +66,7 @@ summarise sig =
     [ typeOf (witness w)
     | Some k <- TypeRel.toList (constants sig),
       Some w <- constantArgs sig k,
-      Some w `notElem` inhabitedTypes sig,
+      Some w `notElem` saturatedTypes sig,
       null (TypeRel.lookup (witness w) (variables sig)) ] ++
   warn ["",
         "-- WARNING: there are no variables of the following types; consider adding some --"]
@@ -64,7 +75,7 @@ summarise sig =
       Some w <- constantArgs sig k,
       -- There is a non-variable term of this type and it appears as the
       -- argument to some function
-      Some w `elem` inhabitedTypes sig,
+      Some w `elem` saturatedTypes sig,
       null (TypeRel.lookup (witness w) (variables sig)) ] ++
   warn ["",
         "-- WARNING: cannot test the following types; ",
@@ -260,30 +271,21 @@ testable sig x =
   typeOf x `Map.member` observers sig ||
   typeOf x `Map.member` ords sig
 
-splitArrow :: TypeRep -> Maybe (TypeRep, TypeRep)
-splitArrow ty =
-  case splitTyConApp ty of
-    (c, [lhs, rhs]) | c == arr -> Just (lhs, rhs)
-    _ -> Nothing
-  where (arr, _) = splitTyConApp (typeOf (undefined :: Int -> Int))
-
-right :: TypeRep -> TypeRep
-right ty = snd (fromMaybe (error msg) (splitArrow ty))
-  where
-    msg = "Test.QuickSpec.Signature.right: type oversaturated"
-
+-- Given a constant, find the types of its partial applications.
 constantApplications :: forall a. Typeable a => Sig -> Constant a -> [Witness]
 constantApplications sig (Constant (Atom {sym = sym })) =
   map (findWitness sig)
     (take (symbolArity sym + 1)
-     (iterate right (typeOf (undefined :: a))))
+     (iterate rightArrow (typeOf (undefined :: a))))
 
+-- Find the argument types of a constant.
 constantArgs :: forall a. Typeable a => Sig -> Constant a -> [Witness]
 constantArgs sig (Constant (Atom { sym = sym })) =
   map (findWitness sig)
     (take (symbolArity sym)
      (unfoldr splitArrow (typeOf (undefined :: a))))
 
+-- Find the type of a saturated constant.
 constantRes :: forall a. Typeable a => Sig -> Constant a -> Witness
 constantRes sig (Constant (Atom { sym = sym })) =
   findWitness sig
@@ -291,34 +293,28 @@ constantRes sig (Constant (Atom { sym = sym })) =
        (typeOf (undefined :: a)) !! symbolArity sym)
   where msg = "Test.QuickSpec.Signature.constantRes: type oversaturated"
 
+-- The set of types returned by saturated constants.
 saturatedTypes :: Sig -> [Witness]
 saturatedTypes sig =
   usort $
     [ constantRes sig k
     | Some k <- TypeRel.toList (constants sig) ]
 
-inhabitedTypes :: Sig -> [Witness]
-inhabitedTypes sig =
-  concat
-    [ constantApplications sig k
-    | Some k <- TypeRel.toList (constants sig) ]
-
--- The below functions enumerate all *witnessed* types of a particular
--- shape---there may be no terms of that type.
-
+-- Given a type, find a witness that it's a function.
 witnessArrow :: Typeable a => Sig -> a -> Maybe (Witness, Witness)
 witnessArrow sig x = do
   (lhs, rhs) <- splitArrow (typeOf x)
   liftM2 (,) (lookupWitness sig lhs) (lookupWitness sig rhs)
 
-functionWitnesses :: Sig -> [(Witness, Witness)]
-functionWitnesses sig =
-  catMaybes (map (some (witnessArrow sig . witness))
-             (TypeMap.toList (witnesses sig)))
-
+-- lhsWitnesses sig x is the set of witnessed function types that
+-- might accept x as a parameter. There is no guarantee that
+-- any particular type is inhabited.
 lhsWitnesses :: Typeable a => Sig -> a -> [Witness]
 lhsWitnesses sig x =
-  [ lhs | (lhs, rhs) <- functionWitnesses sig, witnessType rhs == typeOf x ]
+  [ lhs
+  | Some w <- TypeMap.toList (witnesses sig),
+    Just (lhs, rhs) <- [witnessArrow sig (witness w)],
+    witnessType rhs == typeOf x ]
 
 findWitness :: Sig -> TypeRep -> Witness
 findWitness sig ty =

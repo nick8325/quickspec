@@ -5,6 +5,7 @@ import Control.Monad
 import Test.QuickSpec.Utils.Typeable
 import Data.Ord
 import Data.Function
+import Data.Maybe
 
 data Some f = forall a. Typeable a => Some (f a)
 
@@ -55,3 +56,15 @@ someType :: Some f -> TypeRep
 someType (Some x) = typeOf (witness x)
   where witness :: f a -> a
         witness = undefined
+
+splitArrow :: TypeRep -> Maybe (TypeRep, TypeRep)
+splitArrow ty =
+  case splitTyConApp ty of
+    (c, [lhs, rhs]) | c == arr -> Just (lhs, rhs)
+    _ -> Nothing
+  where (arr, _) = splitTyConApp (typeOf (undefined :: Int -> Int))
+
+rightArrow :: TypeRep -> TypeRep
+rightArrow ty = snd (fromMaybe (error msg) (splitArrow ty))
+  where
+    msg = "Test.QuickSpec.Utils.Typed.rightArrow: type oversaturated"
