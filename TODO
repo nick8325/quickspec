@@ -1,17 +1,7 @@
-Write wrapper around TypeRep to get around lack of Ord instance in old
-GHC versions + bug in new versions. (How to work around the bug?
-Tinkering required!)
+Make TypeRep wrapper define its own Ord instance on old GHCs.
 
 Print warnings if two constants with the same name+type.
 
-Rename C to O and use type List = [].
-
 Give proper errors if use several observers in signature etc.
 
-Represent Term a as pair (UntypedTerm, Eval a).
-
-Replace C . f . unC with fmap f, or at least add mapSomeC etc.
-
 Give a warning if there aren't any variables of a particular type.
-
-Clean up existential/witness handling.
