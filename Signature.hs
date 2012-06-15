@@ -58,7 +58,7 @@ summarise sig =
     [""] ++
     map show untestable
   | not (null untestable) ]
-    
+
   where
     describe :: (String -> String) -> (forall a. f a -> Symbol) ->
                 (Sig -> TypeRel f) -> [String]
@@ -92,20 +92,20 @@ instance Monoid Sig where
       variables = renumber (mapVariable . alter) (length constants') variables',
       observers = observers s1 `mappend` observers s2,
       ords = ords s1 `mappend` ords s2,
-      types = types s1 `mappend` types s2, 
-      cotypes = cotypes s1 `mappend` cotypes s2, 
+      types = types s1 `mappend` types s2,
+      cotypes = cotypes s1 `mappend` cotypes s2,
       maxDepth_ = maxDepth_ s1 `mappend` maxDepth_ s2 }
     where constants' = TypeRel.toList (constants s1) ++
                        TypeRel.toList (constants s2)
           variables' = TypeRel.toList (variables s1) ++
                        TypeRel.toList (variables s2)
-  
+
           renumber :: (forall a. Int -> f a -> f a) ->
                       Int -> [Some f] -> TypeRel f
           renumber alter n =
             TypeRel.fromList .
             zipWith (\x -> mapSome (alter x)) [n..]
-          
+
           alter :: Int -> Symbol -> Symbol
           alter n x = x { index = n }
 

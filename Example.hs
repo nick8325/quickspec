@@ -11,7 +11,7 @@ bools = [
   vars ["x", "y", "z"] True,
   fun2 "||" (||),
   fun2 "&&" (&&),
-  fun1 "not" not, 
+  fun1 "not" not,
   fun0 "True" True,
   fun0 "False" False]
 

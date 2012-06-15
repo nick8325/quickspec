@@ -8,7 +8,7 @@ import Control.Parallel.Strategies
 
 -- Invariant: the children of a TestTree are sorted according to the
 -- parent's test. We exploit this in defining merge.
--- 
+--
 -- A TestTree is always infinite, and branches t is always a
 -- refinement of t (it may be trivial, so that length (branches t) == 1).
 -- As a special case, a TestTree may be Nil, but Nil may not appear in

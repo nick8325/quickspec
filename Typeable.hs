@@ -35,7 +35,7 @@ instance Ord TypeRep where
 #endif
 
 instance Show TypeRep where
-  showsPrec p = showsPrec p . unTypeRep 
+  showsPrec p = showsPrec p . unTypeRep
 
 typeOf = TypeRep . T.typeOf
 typeOf1 = TypeRep . T.typeOf1

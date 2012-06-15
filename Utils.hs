@@ -42,4 +42,3 @@ unbuffered x = do
     (hSetBuffering stdout NoBuffering)
     (hSetBuffering stdout buf)
     x
-

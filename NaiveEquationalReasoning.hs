@@ -34,7 +34,7 @@ initial d ts =
         CC.runCC (CC.initial n) $
           forM (partitionBy (witnessType . typ) ts) $ \xs@(x:_) ->
             fmap (witnessType (typ x),) (createUniverse (map erase xs))
-      
+
   in Context rel (Map.fromList universe) d
 
 createUniverse :: [Term] -> CC Universe
