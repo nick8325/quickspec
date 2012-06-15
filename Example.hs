@@ -37,9 +37,9 @@ lists _ = [
 heapsLists  :: forall a. (Typeable a, Ord a, Arbitrary a) => a -> [Sig]
 heapsLists _ = [
   fun1 "sort" (sort :: [a] -> [a]),
-  fun2 "insert" (insert :: a -> [a] -> [a]),
-  fun1 "null" (null :: [a] -> Bool),
-  fun2 "delete" (delete :: a -> [a] -> [a]) ]
+  fun2 "insertList" (insert :: a -> [a] -> [a]),
+  fun1 "nullList" (null :: [a] -> Bool),
+  fun2 "deleteList" (delete :: a -> [a] -> [a]) ]
 
 funs :: forall a. (Typeable a, Ord a, Arbitrary a, CoArbitrary a) => a -> [Sig]
 funs _ = [

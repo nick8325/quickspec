@@ -18,24 +18,24 @@ instance (Ord a, Arbitrary a) => Arbitrary (Heap a) where
   arbitrary = fmap fromList arbitrary
 
 toList :: Ord a => Heap a -> [a]
-toList h | empty h = []
-         | otherwise = top h:toList (delete h)
+toList h | Heaps.null h = []
+         | otherwise = findMin h:toList (deleteMin h)
 
 fromList :: Ord a => [a] -> Heap a
 fromList = foldr insert Nil
 
-empty :: Heap a -> Bool
-empty Nil = True
-empty _ = False
+null :: Heap a -> Bool
+null Nil = True
+null _ = False
 
-top :: Heap a -> a
-top (Branch _ x _ _) = x
+findMin :: Heap a -> a
+findMin (Branch _ x _ _) = x
 
 insert :: Ord a => a -> Heap a -> Heap a
 insert x h = merge h (branch x Nil Nil)
 
-delete :: Ord a => Heap a -> Heap a
-delete (Branch _ _ l r) = merge l r
+deleteMin :: Ord a => Heap a -> Heap a
+deleteMin (Branch _ _ l r) = merge l r
 
 branch :: Ord a => a -> Heap a -> Heap a -> Heap a
 branch x l r | npl l <= npl r = Branch (npl l + 1) x l r
@@ -57,9 +57,9 @@ heaps _ = [
   vars ["h", "h1", "h2"] (undefined :: Heap a),
   fun1 "toList" (toList :: Heap a -> [a]),
   fun1 "fromList" (fromList :: [a] -> Heap a),
-  fun1 "empty" (empty :: Heap a -> Bool),
-  fun1 "top" (top :: Heap a -> a),
+  fun1 "null" (Heaps.null :: Heap a -> Bool),
+  fun1 "findMin" (findMin :: Heap a -> a),
   fun2 "insert" (insert :: a -> Heap a -> Heap a),
-  fun1 "delete" (delete :: Heap a -> Heap a),
+  fun1 "deleteMin" (deleteMin :: Heap a -> Heap a),
   fun2 "merge" (merge :: Heap a -> Heap a -> Heap a),
-  fun0 "empty" (Nil :: Heap a)]
+  fun0 "nil" (Nil :: Heap a)]
