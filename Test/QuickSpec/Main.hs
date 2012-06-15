@@ -24,7 +24,7 @@ undefinedsSig :: Sig -> Sig
 undefinedsSig sig =
   mconcat
     [ undefinedSig "undefined" (undefined `asTypeOf` witness x)
-    | Some x <- map (findWitness sig) (inhabitedTypes sig) ]
+    | Some x <- saturatedTypes sig ]
 
 untypedClasses :: TypeMap (TestResults `O` Expr) -> [[Tagged Term]]
 untypedClasses = concatMap (some (map (map (tagged term)) . classes . unO)) . TypeMap.toList

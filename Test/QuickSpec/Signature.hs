@@ -15,6 +15,7 @@ import Data.List
 import qualified Data.Map as Map
 import Test.QuickSpec.Utils
 import Data.Maybe
+import Control.Monad
 
 class Signature a where
   signature :: a -> Sig
@@ -30,8 +31,7 @@ data Sig = Sig {
   variables :: TypeRel Variable,
   observers :: TypeMap Observer,
   ords :: TypeMap Observer,
-  types :: TypeMap Witnessed,
-  cotypes :: TypeMap Witnessed,
+  witnesses :: TypeMap Witnessed,
   maxDepth_ :: First Int
   }
 
@@ -51,16 +51,28 @@ summarise sig =
     (Map.keys (observers sig)) ++
 
   warn ["",
-        "**** WARNING: no variables of the following types; consider adding some ****"]
-    [ typeOf (witness x)
-    | Some x <- TypeMap.toList (cotypes sig),
-      null (TypeRel.lookup (witness x) (variables sig)) ] ++
-
-  warn ([""] ++
-        starry ["  WARNING: CANNOT NOT TEST THE FOLLOWING TYPES  ",
-                " (use 'fun' instead of 'blind' or use 'observe')"] ++
-        [""])
-    (filter isTerminal (filter (not . flip testable sig) (inhabitedTypes sig)))
+        "-- WARNING: the following types are uninhabited --"]
+    [ typeOf (witness w)
+    | Some k <- TypeRel.toList (constants sig),
+      Some w <- constantArgs sig k,
+      Some w `notElem` inhabitedTypes sig,
+      null (TypeRel.lookup (witness w) (variables sig)) ] ++
+  warn ["",
+        "-- WARNING: there are no variables of the following types; consider adding some --"]
+    [ typeOf (witness w)
+    | Some k <- TypeRel.toList (constants sig),
+      Some w <- constantArgs sig k,
+      -- There is a non-variable term of this type and it appears as the
+      -- argument to some function
+      Some w `elem` inhabitedTypes sig,
+      null (TypeRel.lookup (witness w) (variables sig)) ] ++
+  warn ["",
+        "-- WARNING: cannot test the following types; ",
+        "            consider using 'fun' instead of 'blind' or using 'observe' --"]
+    [ typeOf (witness w)
+    | Some w <- saturatedTypes sig,
+      -- The type is untestable and is the result type of a constant
+      not (testable sig (witness w)) ]
 
   where
     describe :: (String -> String) -> (forall a. f a -> Symbol) ->
@@ -72,14 +84,6 @@ summarise sig =
     warn _ [] = []
     warn msg xs = msg ++ map show (usort xs)
 
-    starry xss@(xs:_) = map horizStars $ [stars] ++ xss ++ [stars]
-      where stars = replicate (length xs) '*'
-            horizStars xs = "****" ++ xs ++ "****"
-    isTerminal ty =
-      case arrow ty of
-        Nothing -> True
-        Just (_, rhs) -> not (rhs `elem` inhabitedTypes sig)
-
 data Observer a = forall b. Ord b => Observer (Gen (a -> b))
 
 observe x sig =
@@ -88,7 +92,7 @@ observe x sig =
   where msg = "Test.QuickSpec.Signature.observe: no observers found for type " ++ show (typeOf x)
 
 emptySig :: Sig
-emptySig = Sig TypeRel.empty TypeRel.empty TypeMap.empty TypeMap.empty TypeMap.empty TypeMap.empty mempty
+emptySig = Sig TypeRel.empty TypeRel.empty TypeMap.empty TypeMap.empty TypeMap.empty mempty
 
 instance Monoid Sig where
   mempty = emptySig
@@ -98,8 +102,7 @@ instance Monoid Sig where
       variables = renumber (mapVariable . alter) (length constants') variables',
       observers = observers s1 `mappend` observers s2,
       ords = ords s1 `mappend` ords s2,
-      types = types s1 `mappend` types s2,
-      cotypes = cotypes s1 `mappend` cotypes s2,
+      witnesses = witnesses s1 `mappend` witnesses s2,
       maxDepth_ = maxDepth_ s1 `mappend` maxDepth_ s2 }
     where constants' = TypeRel.toList (constants s1) ++
                        TypeRel.toList (constants s2)
@@ -115,22 +118,18 @@ instance Monoid Sig where
           alter :: Int -> Symbol -> Symbol
           alter n x = x { index = n }
 
-constantSig :: forall a. Typeable a => Constant a -> Sig
+constantSig :: Typeable a => Constant a -> Sig
 constantSig x = emptySig { constants = TypeRel.singleton x }
-                `mappend` typeSig (undefined :: a)
 
 variableSig :: forall a. Typeable a => Variable a -> Sig
 variableSig x = emptySig { variables = TypeRel.singleton x }
-                `mappend` cotypeSig (undefined :: a)
 
-observerSig :: Typeable a => Observer a -> Sig
-observerSig x = emptySig { observers = TypeMap.singleton x }
+observerSig :: forall a. Typeable a => Observer a -> Sig
+observerSig x = emptySig { observers = TypeMap.singleton x } `mappend`
+                typeSig (undefined :: a)
 
 typeSig :: Typeable a => a -> Sig
-typeSig x = emptySig { types = TypeMap.singleton (Witnessed x) }
-
-cotypeSig :: Typeable a => a -> Sig
-cotypeSig x = emptySig { cotypes = TypeMap.singleton (Witnessed x) }
+typeSig x = emptySig { witnesses = TypeMap.singleton (Witnessed x) }
 
 ordSig :: Typeable a => Observer a -> Sig
 ordSig x = emptySig { ords = TypeMap.singleton x }
@@ -139,36 +138,50 @@ withDepth :: Int -> Sig
 withDepth n = updateDepth n emptySig
 
 undefinedSig :: forall a. Typeable a => String -> a -> Sig
-undefinedSig x u = constantSig (Constant (Atom ((symbol x u) { undef = True }) u))
+undefinedSig x u = constantSig (Constant (Atom ((symbol x 0 u) { undef = True }) u))
+
+primCon0 :: forall a. Typeable a => Int -> String -> a -> Sig
+primCon0 n x f = constantSig (Constant (Atom (symbol x n f) f))
+             `mappend` typeSig (undefined :: a)
+
+primCon1 :: forall a b. (Typeable a, Typeable b) =>
+          Int -> String -> (a -> b) -> Sig
+primCon1 n x f = primCon0 n x f
+             `mappend` typeSig (undefined :: a)
+             `mappend` typeSig (undefined :: b)
+
+primCon2 :: forall a b c. (Typeable a, Typeable b, Typeable c) =>
+          Int -> String -> (a -> b -> c) -> Sig
+primCon2 n x f = primCon1 n x f
+             `mappend` typeSig (undefined :: b)
+             `mappend` typeSig (undefined :: c)
+
+primCon3 :: forall a b c d. (Typeable a, Typeable b, Typeable c, Typeable d) =>
+          Int -> String -> (a -> b -> c -> d) -> Sig
+primCon3 n x f = primCon2 n x f
+             `mappend` typeSig (undefined :: c)
+             `mappend` typeSig (undefined :: d)
+
+primCon4 :: forall a b c d e. (Typeable a, Typeable b, Typeable c, Typeable d, Typeable e) =>
+          Int -> String -> (a -> b -> c -> d -> e) -> Sig
+primCon4 n x f = primCon3 n x f
+             `mappend` typeSig (undefined :: d)
+             `mappend` typeSig (undefined :: e)
 
 blind0 :: forall a. Typeable a => String -> a -> Sig
-blind0 x f = constantSig (Constant (Atom (symbol x f) f))
-
+blind0 = primCon0 0
 blind1 :: forall a b. (Typeable a, Typeable b) =>
           String -> (a -> b) -> Sig
-blind1 x f = blind0 x f `mappend` cotypeSig (undefined :: a)
-                        `mappend` typeSig (undefined :: b)
-
+blind1 = primCon1 1
 blind2 :: forall a b c. (Typeable a, Typeable b, Typeable c) =>
           String -> (a -> b -> c) -> Sig
-blind2 x f = blind1 x f `mappend` cotypeSig (undefined :: a)
-                        `mappend` cotypeSig (undefined :: b)
-                        `mappend` typeSig (undefined :: c)
-
+blind2 = primCon2 2
 blind3 :: forall a b c d. (Typeable a, Typeable b, Typeable c, Typeable d) =>
           String -> (a -> b -> c -> d) -> Sig
-blind3 x f = blind1 x f `mappend` cotypeSig (undefined :: a)
-                        `mappend` cotypeSig (undefined :: b)
-                        `mappend` cotypeSig (undefined :: c)
-                        `mappend` typeSig (undefined :: d)
-
+blind3 = primCon3 3
 blind4 :: forall a b c d e. (Typeable a, Typeable b, Typeable c, Typeable d, Typeable e) =>
           String -> (a -> b -> c -> d -> e) -> Sig
-blind4 x f = blind1 x f `mappend` cotypeSig (undefined :: a)
-                        `mappend` cotypeSig (undefined :: b)
-                        `mappend` cotypeSig (undefined :: c)
-                        `mappend` cotypeSig (undefined :: d)
-                        `mappend` typeSig (undefined :: e)
+blind4 = primCon4 4
 
 ord :: (Ord a, Typeable a) => a -> Sig
 ord x = ordSig (Observer (return id) `observing` x)
@@ -186,8 +199,9 @@ silence sig =
 vars :: (Arbitrary a, Typeable a) => [String] -> a -> Sig
 vars xs v = mconcat [ var x v | x <- xs ]
 
-var :: (Arbitrary a, Typeable a) => String -> a -> Sig
-var x v = variableSig (Variable (Atom (symbol x v) (arbitrary `asTypeOf` return v)))
+var :: forall a. (Arbitrary a, Typeable a) => String -> a -> Sig
+var x v = variableSig (Variable (Atom (symbol x 0 v) (arbitrary `asTypeOf` return v)))
+          `mappend` typeSig (undefined :: a)
 
 con, fun0 :: (Ord a, Typeable a) => String -> a -> Sig
 con = fun0
@@ -241,26 +255,75 @@ observer4 :: (Arbitrary a, Arbitrary b, Arbitrary c, Arbitrary d,
              (a -> b -> c -> d -> e -> f) -> Sig
 observer4 f = observerSig (Observer (f <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary))
 
-inhabitedTypes :: Sig -> [TypeRep]
-inhabitedTypes = usort . map (some (typeOf . witness)) . TypeMap.toList . types
+testable :: Typeable a => Sig -> a -> Bool
+testable sig x =
+  typeOf x `Map.member` observers sig ||
+  typeOf x `Map.member` ords sig
 
-testableTypes :: Sig -> [TypeRep]
-testableTypes sig = filter (flip testable sig) . inhabitedTypes $ sig
-
-testable :: TypeRep -> Sig -> Bool
-testable ty sig =
-  ty `Map.member` observers sig ||
-  ty `Map.member` ords sig
-
-arrow :: TypeRep -> Maybe (TypeRep, TypeRep)
-arrow ty =
+splitArrow :: TypeRep -> Maybe (TypeRep, TypeRep)
+splitArrow ty =
   case splitTyConApp ty of
     (c, [lhs, rhs]) | c == arr -> Just (lhs, rhs)
     _ -> Nothing
   where (arr, _) = splitTyConApp (typeOf (undefined :: Int -> Int))
 
+right :: TypeRep -> TypeRep
+right ty = snd (fromMaybe (error msg) (splitArrow ty))
+  where
+    msg = "Test.QuickSpec.Signature.right: type oversaturated"
+
+constantApplications :: forall a. Typeable a => Sig -> Constant a -> [Witness]
+constantApplications sig (Constant (Atom {sym = sym })) =
+  map (findWitness sig)
+    (take (symbolArity sym + 1)
+     (iterate right (typeOf (undefined :: a))))
+
+constantArgs :: forall a. Typeable a => Sig -> Constant a -> [Witness]
+constantArgs sig (Constant (Atom { sym = sym })) =
+  map (findWitness sig)
+    (take (symbolArity sym)
+     (unfoldr splitArrow (typeOf (undefined :: a))))
+
+constantRes :: forall a. Typeable a => Sig -> Constant a -> Witness
+constantRes sig (Constant (Atom { sym = sym })) =
+  findWitness sig
+    (iterate (snd . fromMaybe (error msg) . splitArrow)
+       (typeOf (undefined :: a)) !! symbolArity sym)
+  where msg = "Test.QuickSpec.Signature.constantRes: type oversaturated"
+
+saturatedTypes :: Sig -> [Witness]
+saturatedTypes sig =
+  usort $
+    [ constantRes sig k
+    | Some k <- TypeRel.toList (constants sig) ]
+
+inhabitedTypes :: Sig -> [Witness]
+inhabitedTypes sig =
+  concat
+    [ constantApplications sig k
+    | Some k <- TypeRel.toList (constants sig) ]
+
+-- The below functions enumerate all *witnessed* types of a particular
+-- shape---there may be no terms of that type.
+
+witnessArrow :: Typeable a => Sig -> a -> Maybe (Witness, Witness)
+witnessArrow sig x = do
+  (lhs, rhs) <- splitArrow (typeOf x)
+  liftM2 (,) (lookupWitness sig lhs) (lookupWitness sig rhs)
+
+functionWitnesses :: Sig -> [(Witness, Witness)]
+functionWitnesses sig =
+  catMaybes (map (some (witnessArrow sig . witness))
+             (TypeMap.toList (witnesses sig)))
+
+lhsWitnesses :: Typeable a => Sig -> a -> [Witness]
+lhsWitnesses sig x =
+  [ lhs | (lhs, rhs) <- functionWitnesses sig, witnessType rhs == typeOf x ]
+
 findWitness :: Sig -> TypeRep -> Witness
 findWitness sig ty =
-  Map.findWithDefault
-    (error $ "Test.QuickSpec.Generate.witness: type " ++ show ty ++ " not found")
-    ty (types sig `mappend` cotypes sig)
+  fromMaybe (error "Test.QuickSpec.Signature.findWitness: missing type")
+    (lookupWitness sig ty)
+
+lookupWitness :: Sig -> TypeRep -> Maybe Witness
+lookupWitness sig ty = Map.lookup ty (witnesses sig)

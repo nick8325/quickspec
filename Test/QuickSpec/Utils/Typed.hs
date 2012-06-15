@@ -1,8 +1,10 @@
-{-# LANGUAGE Rank2Types, ExistentialQuantification, TypeOperators #-}
+{-# LANGUAGE Rank2Types, ExistentialQuantification, TypeOperators, TypeSynonymInstances, FlexibleInstances #-}
 module Test.QuickSpec.Utils.Typed where
 
 import Control.Monad
 import Test.QuickSpec.Utils.Typeable
+import Data.Ord
+import Data.Function
 
 data Some f = forall a. Typeable a => Some (f a)
 
@@ -11,6 +13,18 @@ type List = []
 
 newtype Witnessed a = Witnessed { witness :: a }
 type Witness = Some Witnessed
+
+-- No Typeable (Witnessed a) instance to save accidentally looking up
+-- Witnessed a instead of a in a TypeMap
+
+instance Eq Witness where
+  (==) = (==) `on` witnessType
+
+instance Ord Witness where
+  compare = comparing witnessType
+
+instance Show Witness where
+  show = show . witnessType
 
 witnessType :: Witness -> TypeRep
 witnessType = some (typeOf . witness)

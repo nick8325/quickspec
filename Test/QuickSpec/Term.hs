@@ -11,12 +11,13 @@ import Test.QuickSpec.Utils
 data Symbol = Symbol {
   index :: Int,
   name :: String,
+  symbolArity :: Int,
   silent :: Bool,
   undef :: Bool,
   symbolType :: TypeRep }
 
-symbol :: Typeable a => String -> a -> Symbol
-symbol x v = Symbol 0 x False False (typeOf v)
+symbol :: Typeable a => String -> Int -> a -> Symbol
+symbol x arity v = Symbol 0 x arity False False (typeOf v)
 
 instance Show Symbol where
   show = name
@@ -110,6 +111,7 @@ vars t = aux t []
 
 data Expr a = Expr {
   term :: Term,
+  arity :: {-# UNPACK #-} !Int,
   eval :: (forall b. Variable b -> b) -> a }
 
 instance Eq (Expr a) where
@@ -142,10 +144,12 @@ valuation = promote (\(Variable x) -> index (sym x) `variant'` value x)
         variant' n = variant (-1 :: Int) . variant' (n-1)
 
 var :: Variable a -> Expr a
-var v@(Variable (Atom x _)) = Expr (Var x) (\env -> env v)
+var v@(Variable (Atom x _)) = Expr (Var x) 0 (\env -> env v)
 
 con :: Constant a -> Expr a
-con (Constant (Atom x v)) = Expr (Const x) (const v)
+con (Constant (Atom x v)) = Expr (Const x) (symbolArity x) (const v)
 
 app :: Expr (a -> b) -> Expr a -> Expr b
-app (Expr t f) (Expr u x) = Expr (App t u) (\env -> f env (x env))
+app (Expr t a f) (Expr u _ x)
+  | a == 0 = error "Test.QuickSpec.Term.app: oversaturated function"
+  | otherwise = Expr (App t u) (a - 1) (\env -> f env (x env))

@@ -23,24 +23,21 @@ terms :: Sig -> TypeRel Expr -> TypeMap (List `O` Expr)
 terms sig base =
   TypeMap.fromList
     [ Some (O (terms' sig base (witness x)))
-    | Some x <- map (findWitness sig) (testableTypes sig) ]
+    | Some x <- saturatedTypes sig,
+      testable sig (witness x) ]
 
 terms' :: Typeable a => Sig -> TypeRel Expr -> a -> [Expr a]
 terms' sig base w =
   map var (TypeRel.lookup w (variables sig)) ++
   map con (TypeRel.lookup w (constants sig)) ++
   [ app f x
-  | Some lhs <- lhsTypes sig w,
+  | Some lhs <- lhsWitnesses sig w,
     let w' = witness lhs,
     x <- TypeRel.lookup w' base,
     not (isUndefined (term x)),
     f <- terms' sig base (const w),
+    arity f > 0,
     not (isUndefined (term f)) ]
-
-lhsTypes :: Typeable a => Sig -> a -> [Witness]
-lhsTypes sig x =
-  [ findWitness sig ty1
-  | (ty1, ty2) <- catMaybes (map arrow (inhabitedTypes sig)), ty2 == typeOf x ]
 
 test :: [(StdGen, Int)] -> Sig ->
         TypeMap (List `O` Expr) -> TypeMap (TestResults `O` Expr)
