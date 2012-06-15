@@ -1,10 +1,12 @@
 {-# LANGUAGE ScopedTypeVariables,DeriveDataTypeable #-}
-module Heaps where
+module Examples.Heaps where
 
+import Prelude hiding (null)
 import Test.QuickSpec
 import Test.QuickCheck
 import Data.Typeable
 import Data.Ord
+import qualified Data.List as L
 
 data Heap a = Nil | Branch Int a (Heap a) (Heap a) deriving Typeable
 
@@ -18,7 +20,7 @@ instance (Ord a, Arbitrary a) => Arbitrary (Heap a) where
   arbitrary = fmap fromList arbitrary
 
 toList :: Ord a => Heap a -> [a]
-toList h | Heaps.null h = []
+toList h | null h = []
          | otherwise = findMin h:toList (deleteMin h)
 
 fromList :: Ord a => [a] -> Heap a
@@ -52,14 +54,28 @@ npl :: Heap a -> Int
 npl Nil = 0
 npl (Branch n _ _ _) = n
 
+mergeLists :: Ord a => [a] -> [a] -> [a]
+mergeLists [] xs = xs
+mergeLists xs [] = xs
+mergeLists (x:xs) (y:ys)
+  | x < y = x:mergeLists xs (y:ys)
+  | otherwise = y:mergeLists (x:xs) ys
+
 heaps :: forall a. (Ord a, Typeable a, Arbitrary a) => a -> [Sig]
 heaps _ = [
   vars ["h", "h1", "h2"] (undefined :: Heap a),
   fun1 "toList" (toList :: Heap a -> [a]),
   fun1 "fromList" (fromList :: [a] -> Heap a),
-  fun1 "null" (Heaps.null :: Heap a -> Bool),
+  fun1 "null" (null :: Heap a -> Bool),
   fun1 "findMin" (findMin :: Heap a -> a),
   fun2 "insert" (insert :: a -> Heap a -> Heap a),
   fun1 "deleteMin" (deleteMin :: Heap a -> Heap a),
   fun2 "merge" (merge :: Heap a -> Heap a -> Heap a),
-  fun0 "nil" (Nil :: Heap a)]
+  fun0 "nil" (Nil :: Heap a),
+
+  -- A few more list functions that are helpful for the heaps example.
+  fun1 "sort" (L.sort :: [a] -> [a]),
+  fun2 "insertList" (L.insert :: a -> [a] -> [a]),
+  fun1 "nullList" (L.null :: [a] -> Bool),
+  fun2 "deleteList" (L.delete :: a -> [a] -> [a]),
+  fun2 "mergeLists" (mergeLists :: [a] -> [a] -> [a])]

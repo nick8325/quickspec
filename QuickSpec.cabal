@@ -39,8 +39,9 @@ Description:
   * 'Test.QuickCheck.Arbitrary' instances for the types you want to test.
 
 Extra-source-files:
-  Example.hs
-  Heaps.hs
+  README
+  examples/Example.hs
+  examples/Heaps.hs
 
 source-repository head
   type:     git
