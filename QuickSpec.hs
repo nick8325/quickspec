@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeOperators #-}
 module QuickSpec where
 
 import Generate
@@ -26,7 +27,7 @@ undefinedsSig sig =
     | Some x <- map (findWitness sig) (inhabitedTypes sig) ]
 
 untypedClasses :: TypeMap (TestResults `O` Expr) -> [[Typed Term]]
-untypedClasses = concatMap (some (map (map (tag term)) . classes)) . TypeMap.toList2
+untypedClasses = concatMap (some (map (map (tag term)) . classes . unO)) . TypeMap.toList
 
 equations :: [[Typed Term]] -> [Equation]
 equations = sort . concatMap (toEquations . map erase)
