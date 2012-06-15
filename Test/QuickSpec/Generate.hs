@@ -1,7 +1,7 @@
 {-# LANGUAGE Rank2Types, TypeOperators #-}
 module Test.QuickSpec.Generate where
 
-import Test.QuickSpec.Signature hiding (var, con)
+import Test.QuickSpec.Signature hiding (con)
 import qualified Test.QuickSpec.TestTree as T
 import Test.QuickSpec.TestTree(TestResults, reps, classes, numTests, cutOff)
 import Test.QuickSpec.Utils.Typed

@@ -117,8 +117,8 @@ instance Monoid Sig where
       maxDepth_ = maxDepth_ s1 `mappend` maxDepth_ s2 }
     where constants' = TypeRel.toList (constants s1) ++
                        TypeRel.toList (constants s2)
-          variables' = TypeRel.toList (variables s1) ++
-                       TypeRel.toList (variables s2)
+          -- Overwrite variables if they're declared twice!
+          variables' = TypeRel.toList (variables s1 `mappend` variables s2)
 
           renumber :: (forall a. Int -> f a -> f a) ->
                       Int -> [Some f] -> TypeRel f
@@ -132,8 +132,8 @@ instance Monoid Sig where
 constantSig :: Typeable a => Constant a -> Sig
 constantSig x = emptySig { constants = TypeRel.singleton x }
 
-variableSig :: forall a. Typeable a => Variable a -> Sig
-variableSig x = emptySig { variables = TypeRel.singleton x }
+variableSig :: forall a. Typeable a => [Variable a] -> Sig
+variableSig x = emptySig { variables = TypeRel.fromList (map Some x) }
 
 observerSig :: forall a. Typeable a => Observer a -> Sig
 observerSig x = emptySig { observers = TypeMap.singleton x }
@@ -206,12 +206,9 @@ silence sig =
   where sig' = signature sig
         silence1 x = x { silent = True }
 
-vars :: (Arbitrary a, Typeable a) => [String] -> a -> Sig
-vars xs v = mconcat [ var x v | x <- xs ]
-
-var :: forall a. (Arbitrary a, Typeable a) => String -> a -> Sig
-var x v = variableSig (Variable (Atom (symbol x 0 v) (arbitrary `asTypeOf` return v)))
-          `mappend` typeSig (undefined :: a)
+vars :: forall a. (Arbitrary a, Typeable a) => [String] -> a -> Sig
+vars xs v = variableSig [ Variable (Atom (symbol x 0 v) (arbitrary `asTypeOf` return v)) | x <- xs ]
+            `mappend` typeSig (undefined :: a)
 
 con, fun0 :: (Ord a, Typeable a) => String -> a -> Sig
 con = fun0
