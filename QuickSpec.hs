@@ -11,7 +11,7 @@ import Term
 import Control.Monad
 import Text.Printf
 import Data.Monoid
-import TestTree
+import TestTree(TestResults, classes, reps)
 import Data.List
 import System.Random
 
@@ -83,7 +83,7 @@ sampleTerms :: Signature a => a -> IO ()
 sampleTerms = runTool $ \sig -> do
   putStrLn "== Testing =="
   r <- generate (updateDepth (maxDepth sig - 1) sig)
-  let univ = concatMap (some2 (map term)) . TypeMap.toList . grow sig .
+  let univ = concatMap (some2 (map term)) . TypeMap.toList . terms sig .
              TypeMap.mapValues2 reps $ r
   printf "Universe contains %d terms.\n\n" (length univ)
 
