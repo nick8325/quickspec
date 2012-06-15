@@ -232,8 +232,12 @@ testable ty sig =
   ty `Map.member` observers sig ||
   ty `Map.member` ords sig
 
-argTypes sig ty =
-  [ ty1 | (ty1, ty2) <- catMaybes (map arrow (inhabitedTypes sig)), ty2 == ty ]
+arrow :: TypeRep -> Maybe (TypeRep, TypeRep)
+arrow ty =
+  case splitTyConApp ty of
+    (c, [lhs, rhs]) | c == arr -> Just (lhs, rhs)
+    _ -> Nothing
+  where (arr, _) = splitTyConApp (typeOf (undefined :: Int -> Int))
 
 findWitness :: Sig -> TypeRep -> Witness
 findWitness sig ty =

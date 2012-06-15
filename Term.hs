@@ -149,11 +149,3 @@ con (Constant (Atom x v)) = Expr (Const x) (const v)
 
 app :: Expr (a -> b) -> Expr a -> Expr b
 app (Expr t f) (Expr u x) = Expr (App t u) (\env -> f env (x env))
-
-arrow :: TypeRep -> Maybe (TypeRep, TypeRep)
-arrow ty =
-  case splitTyConApp ty of
-    (c, [lhs, rhs]) | c == arr -> Just (lhs, rhs)
-    _ -> Nothing
-  where (arr, _) = splitTyConApp (typeOf (undefined :: Int -> Int))
-

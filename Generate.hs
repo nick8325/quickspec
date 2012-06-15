@@ -17,18 +17,24 @@ import Test.QuickCheck.Gen
 import System.Random
 import Control.Spoon
 import MemoValuation
+import Data.Maybe
 
 terms :: Typeable a => Sig -> TypeRel Expr -> a -> [Expr a]
 terms sig base w =
   map var (TypeRel.lookup w (variables sig)) ++
   map con (TypeRel.lookup w (constants sig)) ++
   [ app f x
-  | Some lhs <- map (findWitness sig) (argTypes sig (typeOf w)),
+  | Some lhs <- lhsTypes sig w,
     let w' = witness lhs,
     x <- TypeRel.lookup w' base,
     not (isUndefined (term x)),
     f <- terms sig base (const w),
     not (isUndefined (term f)) ]
+
+lhsTypes :: Typeable a => Sig -> a -> [Witness]
+lhsTypes sig x =
+  [ findWitness sig ty1
+  | (ty1, ty2) <- catMaybes (map arrow (inhabitedTypes sig)), ty2 == typeOf x ]
 
 generate :: Sig -> IO (TypeMap (TestResults `O` Expr))
 generate sig = generate' (maxDepth sig) sig

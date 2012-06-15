@@ -12,6 +12,9 @@ type List = []
 newtype Witnessed a = Witnessed { witness :: a }
 type Witness = Some Witnessed
 
+witnessType :: Witness -> TypeRep
+witnessType = some (typeOf . witness)
+
 data Typed a = Typed { typ :: Witness, erase :: a }
 
 tag :: Typeable a => (f a -> b) -> f a -> Typed b
