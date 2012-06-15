@@ -45,8 +45,8 @@ runTool tool sig_ = do
   let sig = signature sig_ `mappend` undefinedsSig (signature sig_)
   tool sig
 
-quickSpec :: Signature a => a -> IO ()
-quickSpec = runTool $ \sig -> do
+runTests :: Sig -> IO ([Equation], [Typed Term])
+runTests sig = do
   putStrLn "== Testing =="
   r <- generate sig
   let clss = untypedClasses r
@@ -55,7 +55,11 @@ quickSpec = runTool $ \sig -> do
   printf "%d raw equations; %d terms in universe.\n\n"
     (length eqs)
     (length univ)
-  
+  return (eqs, univ)
+
+quickSpec :: Signature a => a -> IO ()
+quickSpec = runTool $ \sig -> do
+  (eqs, univ) <- runTests sig
   putStrLn "== Equations =="
   let pruned = filter (not . all silent . eqnFuns)
                  (prune (maxDepth sig) univ eqs)
@@ -78,11 +82,8 @@ sampleList g n xs | n >= length xs = xs
 
 sampleTerms :: Signature a => a -> IO ()
 sampleTerms = runTool $ \sig -> do
-  putStrLn "== Testing =="
-  r <- generate sig
-  let clss = untypedClasses r
-      univ = concat clss
-      numTerms = 100
+  (_, univ) <- runTests sig
+  let numTerms = 100
 
   printf "\n== Here are %d terms out of a total of %d ==\n" numTerms (length univ)
   g <- newStdGen

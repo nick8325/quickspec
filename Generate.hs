@@ -71,7 +71,7 @@ observe :: Typeable a => a -> Sig -> Observer a
 observe x sig =
   TypeMap.lookup (TypeMap.lookup (error msg) x (ords sig))
                x (observers sig)
-  where msg = "No way of observing values of type " ++ show (typeOf x)
+  where msg = "Generate.observe: no observers found for type " ++ show (typeOf x)
 
 test :: Typeable a => [(StdGen, Int)] -> Sig -> [Expr a] -> TestResults (Expr a)
 test seeds sig ts = test' seeds sig ts (observe undefined sig)
