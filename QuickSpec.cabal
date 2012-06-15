@@ -1,0 +1,51 @@
+Name:                QuickSpec
+Version:             1.0
+Cabal-version:       >=1.6
+Build-type:          Simple
+
+Homepage:            https://github.com/nick8325/quickspec
+Author:              Nick Smallbone
+Maintainer:          nicsma@chalmers.se
+
+License:             BSD3
+License-file:        LICENSE
+Copyright:           2009-2012 Nick Smallbone
+
+Category:            Testing
+
+Synopsis:            Equational laws for free
+Description:
+  QuickSpec automatically finds equational properties of your program.
+  .
+  Give it an API, i.e. a collection of functions, and it will spit out
+  equations about those functions. For example, given @reverse@, @++@
+  and @[]@, QuickSpec finds six laws:
+  .
+  > xs++[] == xs
+  > []++xs == xs
+  > reverse [] == []
+  > (xs++ys)++zs == xs++(ys++zs)
+  > reverse (reverse xs) == xs
+  > reverse xs++reverse ys == reverse (ys++xs)
+  .
+  All you have to provide is:
+  .
+  * Some functions and constants to test. These are the /only/
+    functions that will appear in the equations.
+  .
+  * A collection of variables that can appear in the equations
+    (@xs@, @ys@ and @zs@ in the example above).
+  .
+  * 'Test.QuickCheck.Arbitrary' instances for the types you want to test.
+
+source-repository head
+  type:     git
+  location: git://github.com/nick8325/quickspec.git
+  branch:   master
+
+library
+  Exposed-modules: NaiveEquationalReasoning, TestTree, Utils, Signature, Generate, QuickSpec, MemoValuation, TypeRel, UnionFind, Heaps, Example, Typeable, Typed, CongruenceClosure, TypeMap, Term
+
+  Build-depends:
+    base < 5, containers, transformers, parallel >= 3, QuickCheck,
+    random, spoon >= 0.2, array, ghc-prim
