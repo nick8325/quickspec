@@ -31,26 +31,29 @@ terms sig base w =
     f <- terms sig base (const w),
     not (isUndefined (term f)) ]
 
+grow :: Sig -> TypeRel Expr -> TypeMap (List `O` Expr)
+grow sig base =
+  TypeMap.fromList
+    [ Some (O (terms sig base (witness x)))
+    | Some x <- map (findWitness sig) (testableTypes sig) ]
+
 lhsTypes :: Typeable a => Sig -> a -> [Witness]
 lhsTypes sig x =
   [ findWitness sig ty1
   | (ty1, ty2) <- catMaybes (map arrow (inhabitedTypes sig)), ty2 == typeOf x ]
 
 generate :: Sig -> IO (TypeMap (TestResults `O` Expr))
-generate sig = generate' (maxDepth sig) sig
-
-generate' d sig | d < 0 =
+generate sig | maxDepth sig < 0 =
   error "Generate.generate: maxDepth must be positive"
-generate' 0 sig = return TypeMap.empty
-generate' d sig = unbuffered $ do
-  rs <- fmap (TypeMap.mapValues2 reps) (generate' (d - 1) sig)
+generate sig | maxDepth sig == 0 = return TypeMap.empty
+generate sig = unbuffered $ do
+  let d = maxDepth sig
+  rs <- fmap (TypeMap.mapValues2 reps) (generate (updateDepth (d-1) sig))
   printf "Depth %d: " d
   let count :: ([a] -> a) -> (forall b. f (g b) -> a) ->
                TypeMap (f `O` g) -> a
       count op f = op . map (Typed.some2 f) . TypeMap.toList
-      ts = TypeMap.fromList
-             [ Some (O (terms sig rs (witness x)))
-             | Some x <- map (findWitness sig) (testableTypes sig) ]
+      ts = grow sig rs
   printf "%d terms, " (count sum length ts)
   seeds <- genSeeds
   let cs = fmap (mapSome2 (test seeds sig)) ts

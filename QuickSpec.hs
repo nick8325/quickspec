@@ -37,12 +37,16 @@ prune :: Int -> [Typed Term] -> [Equation] -> [Equation]
 prune d univ eqs = evalEQ (initial d univ) (filterM (fmap not . provable) eqs)
   where provable (t :=: u) = t =:= u
 
-runTests :: Signature a => (Sig -> [Equation] -> [Typed Term] -> IO ()) -> a -> IO ()
-runTests tool sig_ = do
+runTool :: Signature a => (Sig -> IO ()) -> a -> IO ()
+runTool tool sig_ = do
   putStrLn "== API =="
   print (signature sig_)
   let sig = signature sig_ `mappend` undefinedsSig (signature sig_)
 
+  tool sig
+
+quickSpec :: Signature a => a -> IO ()
+quickSpec = runTool $ \sig -> do
   putStrLn "== Testing =="
   r <- generate sig
   let clss = untypedClasses r
@@ -52,10 +56,6 @@ runTests tool sig_ = do
     (length eqs)
     (length univ)
 
-  tool sig eqs univ
-
-quickSpec :: Signature a => a -> IO ()
-quickSpec = runTests $ \sig eqs univ -> do
   putStrLn "== Equations =="
   let pruned = filter (not . all silent . eqnFuns)
                  (prune (maxDepth sig) univ eqs)
@@ -77,12 +77,18 @@ sampleList g n xs | n >= length xs = xs
       where (i, g') = randomR (1, len) g
 
 sampleTerms :: Signature a => a -> IO ()
-sampleTerms = runTests $ \sig _ univ -> do
+sampleTerms = runTool $ \sig -> do
+  putStrLn "== Testing =="
+  r <- generate (updateDepth (maxDepth sig - 1) sig)
+  let univ = concatMap (some2 (map term)) . TypeMap.toList . grow sig .
+             TypeMap.mapValues2 reps $ r
+  printf "Universe contains %d terms.\n\n" (length univ)
+
   let numTerms = 100
 
-  printf "\n== Here are %d terms out of a total of %d ==\n" numTerms (length univ)
+  printf "== Here are %d terms out of a total of %d ==\n" numTerms (length univ)
   g <- newStdGen
   forM_ (zip [1 :: Int ..] (sampleList g numTerms univ)) $ \(i, t) ->
-    printf "%d: %s\n" i (show (erase t))
+    printf "%d: %s\n" i (show t)
 
   putStrLn ""

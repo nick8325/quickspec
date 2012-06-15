@@ -38,6 +38,9 @@ data Sig = Sig {
 maxDepth :: Sig -> Int
 maxDepth = fromMaybe 3 . getFirst . maxDepth_
 
+updateDepth :: Int -> Sig -> Sig
+updateDepth n sig = sig { maxDepth_ = First (Just n) }
+
 instance Show Sig where show = unlines . summarise
 
 summarise :: Sig -> [String]
@@ -122,7 +125,7 @@ ordSig :: Typeable a => Observer a -> Sig
 ordSig x = emptySig { ords = TypeMap.singleton x }
 
 withDepth :: Int -> Sig
-withDepth n = emptySig { maxDepth_ = First (Just n) }
+withDepth n = updateDepth n emptySig
 
 undefinedSig :: forall a. Typeable a => String -> a -> Sig
 undefinedSig x u = constantSig (Constant (Atom ((symbol x u) { undef = True }) u))
