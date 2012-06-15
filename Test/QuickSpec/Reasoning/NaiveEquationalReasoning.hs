@@ -1,9 +1,9 @@
 {-# LANGUAGE TupleSections #-}
-module NaiveEquationalReasoning where
+module Test.QuickSpec.Reasoning.NaiveEquationalReasoning where
 
-import Term
-import CongruenceClosure(CC)
-import qualified CongruenceClosure as CC
+import Test.QuickSpec.Term
+import Test.QuickSpec.Reasoning.CongruenceClosure(CC)
+import qualified Test.QuickSpec.Reasoning.CongruenceClosure as CC
 import Data.Map(Map)
 import qualified Data.Map as Map
 import Data.IntMap(IntMap)
@@ -11,9 +11,9 @@ import qualified Data.IntMap as IntMap
 import Control.Monad
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Strict
-import Utils
-import Typed
-import Typeable
+import Test.QuickSpec.Utils
+import Test.QuickSpec.Utils.Typed
+import Test.QuickSpec.Utils.Typeable
 import Data.Ord
 import Data.List
 

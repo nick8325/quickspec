@@ -4,7 +4,7 @@
 --   1) The lack of an Ord instance in older GHCs,
 --   2) bug #5962 in new GHCs.
 
-module Typeable(TypeRep, T.Typeable, T.Typeable1, T.Typeable2,
+module Test.QuickSpec.Utils.Typeable(TypeRep, T.Typeable, T.Typeable1, T.Typeable2,
                 typeOf, typeOf1, cast, gcast,
                 mkTyConApp, typeRepTyCon, splitTyConApp,
                 mkFunTy, unTypeRep) where

@@ -1,17 +1,17 @@
 {-# LANGUAGE TypeOperators #-}
-module QuickSpec where
+module Test.QuickSpec.Main where
 
-import Generate
-import NaiveEquationalReasoning hiding (universe, maxDepth)
-import Typed
-import TypeMap(TypeMap)
-import qualified TypeMap
-import Signature
-import Term
+import Test.QuickSpec.Generate
+import Test.QuickSpec.Reasoning.NaiveEquationalReasoning hiding (universe, maxDepth)
+import Test.QuickSpec.Utils.Typed
+import Test.QuickSpec.Utils.TypeMap(TypeMap)
+import qualified Test.QuickSpec.Utils.TypeMap as TypeMap
+import Test.QuickSpec.Signature
+import Test.QuickSpec.Term
 import Control.Monad
 import Text.Printf
 import Data.Monoid
-import TestTree(TestResults, classes, reps)
+import Test.QuickSpec.TestTree(TestResults, classes, reps)
 import Data.List
 import System.Random
 

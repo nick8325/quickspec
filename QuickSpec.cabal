@@ -38,13 +38,31 @@ Description:
   .
   * 'Test.QuickCheck.Arbitrary' instances for the types you want to test.
 
+Extra-source-files:
+  Example.hs
+  Heaps.hs
+
 source-repository head
   type:     git
   location: git://github.com/nick8325/quickspec.git
   branch:   master
 
 library
-  Exposed-modules: NaiveEquationalReasoning, TestTree, Utils, Signature, Generate, QuickSpec, MemoValuation, TypeRel, UnionFind, Heaps, Example, Typeable, Typed, CongruenceClosure, TypeMap, Term
+  Exposed-modules:
+    Test.QuickSpec.Main,
+    Test.QuickSpec.Signature,
+    Test.QuickSpec.Term,
+    Test.QuickSpec.Generate,
+    Test.QuickSpec.TestTree,
+    Test.QuickSpec.Reasoning.UnionFind,
+    Test.QuickSpec.Reasoning.CongruenceClosure,
+    Test.QuickSpec.Reasoning.NaiveEquationalReasoning,
+    Test.QuickSpec.Utils,
+    Test.QuickSpec.Utils.MemoValuation,
+    Test.QuickSpec.Utils.Typeable,
+    Test.QuickSpec.Utils.Typed,
+    Test.QuickSpec.Utils.TypeMap,
+    Test.QuickSpec.Utils.TypeRel
 
   Build-depends:
     base < 5, containers, transformers, parallel >= 3, QuickCheck,

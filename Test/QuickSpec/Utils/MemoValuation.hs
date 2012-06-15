@@ -2,16 +2,16 @@
 -- In its own module because it's packed full of dangerous features!
 
 {-# LANGUAGE Rank2Types #-}
-module MemoValuation where
+module Test.QuickSpec.Utils.MemoValuation where
 
-import Term
-import Signature
+import Test.QuickSpec.Term
+import Test.QuickSpec.Signature
 import Data.Array hiding (index)
 import Data.Array.Base(unsafeAt)
 import Unsafe.Coerce
 import GHC.Prim
-import Typed
-import TypeRel
+import Test.QuickSpec.Utils.Typed
+import Test.QuickSpec.Utils.TypeRel
 
 memoValuation :: Sig -> (forall a. Variable a -> a) -> (forall a. Variable a -> a)
 memoValuation sig f = unsafeCoerce . unsafeAt arr . index . sym . unVariable
@@ -19,4 +19,4 @@ memoValuation sig f = unsafeCoerce . unsafeAt arr . index . sym . unVariable
         arr = array (0, maximum (0:map (some (index . sym . unVariable)) vars))
                 [(index (sym (unVariable v)), unsafeCoerce (f v))
                 | Some v <- vars ]
-        vars = TypeRel.toList (variables sig)
+        vars = toList (variables sig)

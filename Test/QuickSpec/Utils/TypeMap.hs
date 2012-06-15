@@ -1,10 +1,10 @@
 {-# LANGUAGE Rank2Types, TypeOperators #-}
-module TypeMap where
+module Test.QuickSpec.Utils.TypeMap where
 
 import qualified Data.Map as Map
 import Data.Map(Map)
-import Typed
-import Typeable
+import Test.QuickSpec.Utils.Typed
+import Test.QuickSpec.Utils.Typeable
 
 type TypeMap f = Map TypeRep (Some f)
 

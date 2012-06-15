@@ -1,4 +1,4 @@
-module UnionFind(UF, Replacement((:>)), newSym, (=:=), rep, evalUF, execUF, runUF, S, isRep, initial) where
+module Test.QuickSpec.Reasoning.UnionFind(UF, Replacement((:>)), newSym, (=:=), rep, evalUF, execUF, runUF, S, isRep, initial) where
 
 import Prelude hiding (min)
 import Control.Monad

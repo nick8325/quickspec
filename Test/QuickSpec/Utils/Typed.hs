@@ -1,8 +1,8 @@
 {-# LANGUAGE Rank2Types, ExistentialQuantification, TypeOperators #-}
-module Typed where
+module Test.QuickSpec.Utils.Typed where
 
 import Control.Monad
-import Typeable
+import Test.QuickSpec.Utils.Typeable
 
 data Some f = forall a. Typeable a => Some (f a)
 

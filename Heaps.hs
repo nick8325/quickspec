@@ -2,7 +2,7 @@
 module Heaps where
 
 import Test.QuickCheck
-import Signature
+import Test.QuickSpec.Signature
 import Data.Typeable
 import Data.Ord
 

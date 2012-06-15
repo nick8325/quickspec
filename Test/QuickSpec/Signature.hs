@@ -1,19 +1,19 @@
 {-# LANGUAGE Rank2Types, ExistentialQuantification, ScopedTypeVariables #-}
-module Signature where
+module Test.QuickSpec.Signature where
 
 import Control.Applicative hiding (some)
-import Typeable
+import Test.QuickSpec.Utils.Typeable
 import Data.Monoid
 import Test.QuickCheck
-import Term hiding (var)
-import Typed
-import qualified TypeMap
-import TypeMap(TypeMap)
-import qualified TypeRel
-import TypeRel(TypeRel)
+import Test.QuickSpec.Term hiding (var)
+import Test.QuickSpec.Utils.Typed
+import qualified Test.QuickSpec.Utils.TypeMap as TypeMap
+import Test.QuickSpec.Utils.TypeMap(TypeMap)
+import qualified Test.QuickSpec.Utils.TypeRel as TypeRel
+import Test.QuickSpec.Utils.TypeRel(TypeRel)
 import Data.List
 import qualified Data.Map as Map
-import Utils
+import Test.QuickSpec.Utils
 import Data.Maybe
 
 class Signature a where

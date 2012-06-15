@@ -1,8 +1,8 @@
-module TestTree(TestTree, terms, union, test,
+module Test.QuickSpec.TestTree(TestTree, terms, union, test,
                TestResults, cutOff, numTests, classes, reps) where
 
 import Data.List(sort)
-import Utils
+import Test.QuickSpec.Utils
 import Control.Exception(assert)
 import Control.Parallel.Strategies
 

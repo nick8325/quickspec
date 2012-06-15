@@ -1,12 +1,12 @@
 {-# LANGUAGE Rank2Types, TypeOperators #-}
-module TypeRel where
+module Test.QuickSpec.Utils.TypeRel where
 
-import qualified TypeMap
-import TypeMap(TypeMap)
-import Typed
-import Typeable
+import qualified Test.QuickSpec.Utils.TypeMap as TypeMap
+import Test.QuickSpec.Utils.TypeMap(TypeMap)
+import Test.QuickSpec.Utils.Typed
+import Test.QuickSpec.Utils.Typeable
 import Data.Maybe
-import Utils
+import Test.QuickSpec.Utils
 
 type TypeRel f = TypeMap (List `O` f)
 

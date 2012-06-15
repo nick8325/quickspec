@@ -1,22 +1,22 @@
 {-# LANGUAGE Rank2Types, TypeOperators #-}
-module Generate where
+module Test.QuickSpec.Generate where
 
-import Signature hiding (var, con)
-import qualified TestTree as T
-import TestTree(TestResults, reps, classes, numTests, cutOff)
-import Typed
-import TypeRel(TypeRel)
-import qualified TypeRel
-import TypeMap(TypeMap)
-import qualified TypeMap
-import Term
+import Test.QuickSpec.Signature hiding (var, con)
+import qualified Test.QuickSpec.TestTree as T
+import Test.QuickSpec.TestTree(TestResults, reps, classes, numTests, cutOff)
+import Test.QuickSpec.Utils.Typed
+import Test.QuickSpec.Utils.TypeRel(TypeRel)
+import qualified Test.QuickSpec.Utils.TypeRel as TypeRel
+import Test.QuickSpec.Utils.TypeMap(TypeMap)
+import qualified Test.QuickSpec.Utils.TypeMap as TypeMap
+import Test.QuickSpec.Term
 import Text.Printf
-import Typeable
-import Utils
+import Test.QuickSpec.Utils.Typeable
+import Test.QuickSpec.Utils
 import Test.QuickCheck.Gen
 import System.Random
 import Control.Spoon
-import MemoValuation
+import Test.QuickSpec.Utils.MemoValuation
 import Data.Maybe
 
 terms :: Sig -> TypeRel Expr -> TypeMap (List `O` Expr)
@@ -73,7 +73,7 @@ generate sig = unbuffered $ do
   printf "Depth %d: " d
   let count :: ([a] -> a) -> (forall b. f (g b) -> a) ->
                TypeMap (f `O` g) -> a
-      count op f = op . map (Typed.some2 f) . TypeMap.toList
+      count op f = op . map (some2 f) . TypeMap.toList
       ts = terms sig rs
   printf "%d terms, " (count sum length ts)
   seeds <- genSeeds

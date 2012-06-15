@@ -1,4 +1,4 @@
-module Utils where
+module Test.QuickSpec.Utils where
 
 import Control.Arrow((&&&))
 import Data.List(groupBy, sortBy, group, sort)

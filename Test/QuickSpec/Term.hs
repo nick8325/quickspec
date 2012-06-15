@@ -1,12 +1,12 @@
 {-# LANGUAGE RankNTypes, ExistentialQuantification, DeriveFunctor #-}
-module Term where
+module Test.QuickSpec.Term where
 
-import Typeable
+import Test.QuickSpec.Utils.Typeable
 import Test.QuickCheck
 import Data.Function
 import Data.Ord
 import Data.Char
-import Utils
+import Test.QuickSpec.Utils
 
 data Symbol = Symbol {
   index :: Int,
