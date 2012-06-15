@@ -229,6 +229,12 @@ observer3 :: (Arbitrary a, Arbitrary b, Arbitrary c,
              (a -> b -> c -> d -> e) -> Sig
 observer3 f = observerSig (Observer (f <$> arbitrary <*> arbitrary <*> arbitrary))
 
+observer4 :: (Arbitrary a, Arbitrary b, Arbitrary c, Arbitrary d,
+              Typeable a, Typeable b, Typeable c, Typeable d, Typeable e, Typeable f,
+              Ord f) =>
+             (a -> b -> c -> d -> e -> f) -> Sig
+observer4 f = observerSig (Observer (f <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary))
+
 inhabitedTypes :: Sig -> [TypeRep]
 inhabitedTypes = usort . map (some (typeOf . witness)) . TypeMap.toList . types
 
