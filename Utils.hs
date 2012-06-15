@@ -31,6 +31,7 @@ merge f c = aux
             GT -> y:aux (x:xs) ys
             EQ -> f x y:aux xs ys
 
+orElse :: Ordering -> Ordering -> Ordering
 EQ `orElse` x = x
 x `orElse` _ = x
 

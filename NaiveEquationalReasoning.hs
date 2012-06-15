@@ -4,7 +4,6 @@ module NaiveEquationalReasoning where
 import Term
 import CongruenceClosure(CC)
 import qualified CongruenceClosure as CC
-import Data.Function
 import Data.Map(Map)
 import qualified Data.Map as Map
 import Data.IntMap(IntMap)

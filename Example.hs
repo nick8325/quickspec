@@ -2,7 +2,6 @@
 
 import QuickSpec
 import Signature
-import Data.Monoid
 import Test.QuickCheck
 import Data.Typeable
 

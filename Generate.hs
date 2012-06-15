@@ -15,11 +15,7 @@ import Typeable
 import Utils
 import Test.QuickCheck.Gen
 import System.Random
-import qualified Data.Map as Map
-import Data.Maybe
 import Control.Spoon
-import Control.Monad
-import Data.Array hiding (index)
 import MemoValuation
 
 terms :: Typeable a => Sig -> TypeRel Expr -> a -> [Expr a]

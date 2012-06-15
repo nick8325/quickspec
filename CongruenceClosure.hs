@@ -11,9 +11,9 @@ import UnionFind(UF, Replacement((:>)))
 import qualified UnionFind as UF
 import Data.Maybe
 import Data.List(foldl')
-import Test.QuickCheck
-import Test.QuickCheck.Arbitrary
-import Test.QuickCheck.Monadic
+-- import Test.QuickCheck
+-- import Test.QuickCheck.Arbitrary
+-- import Test.QuickCheck.Monadic
 import Text.Printf
 
 lookup2 :: Int -> Int -> IntMap (IntMap a) -> Maybe a

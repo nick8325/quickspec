@@ -11,10 +11,7 @@ import Control.Monad
 import Text.Printf
 import Data.Monoid
 import TestTree
-import Data.Typeable
 import Data.List
-import Control.Applicative hiding (some)
-import Utils
 import System.Random
 
 data Equation = Term :=: Term deriving (Eq, Ord)
