@@ -27,13 +27,13 @@ type Universe = IntMap [Int]
 
 type EQ = ReaderT (Map TypeRep Universe, Int) CC
 
-initial :: Int -> [Typed Term] -> Context
+initial :: Int -> [Tagged Term] -> Context
 initial d ts =
   let n = 1+maximum (0:concatMap (map index . symbols . erase) ts)
       (universe, rel) =
         CC.runCC (CC.initial n) $
-          forM (partitionBy (witnessType . typ) ts) $ \xs@(x:_) ->
-            fmap (witnessType (typ x),) (createUniverse (map erase xs))
+          forM (partitionBy (witnessType . tag) ts) $ \xs@(x:_) ->
+            fmap (witnessType (tag x),) (createUniverse (map erase xs))
 
   in Context rel (Map.fromList universe) d
 

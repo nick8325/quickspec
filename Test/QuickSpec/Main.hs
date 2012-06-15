@@ -26,17 +26,17 @@ undefinedsSig sig =
     [ undefinedSig "undefined" (undefined `asTypeOf` witness x)
     | Some x <- map (findWitness sig) (inhabitedTypes sig) ]
 
-untypedClasses :: TypeMap (TestResults `O` Expr) -> [[Typed Term]]
-untypedClasses = concatMap (some (map (map (tag term)) . classes . unO)) . TypeMap.toList
+untypedClasses :: TypeMap (TestResults `O` Expr) -> [[Tagged Term]]
+untypedClasses = concatMap (some (map (map (tagged term)) . classes . unO)) . TypeMap.toList
 
-universe :: [[Typed Term]] -> [Typed Term]
+universe :: [[Tagged Term]] -> [Tagged Term]
 universe css = filter (not . isUndefined . erase) (concat css)
 
-equations :: [[Typed Term]] -> [Equation]
+equations :: [[Tagged Term]] -> [Equation]
 equations = sort . concatMap (toEquations . map erase)
   where toEquations (x:xs) = [y :=: x | y <- xs]
 
-prune :: Int -> [Typed Term] -> [Equation] -> [Equation]
+prune :: Int -> [Tagged Term] -> [Equation] -> [Equation]
 prune d univ eqs = evalEQ (initial d univ) (filterM (fmap not . provable) eqs)
   where provable (t :=: u) = t =:= u
 

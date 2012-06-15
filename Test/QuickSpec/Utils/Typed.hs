@@ -15,10 +15,10 @@ type Witness = Some Witnessed
 witnessType :: Witness -> TypeRep
 witnessType = some (typeOf . witness)
 
-data Typed a = Typed { typ :: Witness, erase :: a }
+data Tagged a = Tagged { tag :: Witness, erase :: a }
 
-tag :: Typeable a => (f a -> b) -> f a -> Typed b
-tag f x = Typed (Some (Witnessed (witness x))) (f x)
+tagged :: Typeable a => (f a -> b) -> f a -> Tagged b
+tagged f x = Tagged (Some (Witnessed (witness x))) (f x)
   where witness :: f a -> a
         witness = undefined
 
