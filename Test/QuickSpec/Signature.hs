@@ -136,8 +136,7 @@ variableSig :: forall a. Typeable a => Variable a -> Sig
 variableSig x = emptySig { variables = TypeRel.singleton x }
 
 observerSig :: forall a. Typeable a => Observer a -> Sig
-observerSig x = emptySig { observers = TypeMap.singleton x } `mappend`
-                typeSig (undefined :: a)
+observerSig x = emptySig { observers = TypeMap.singleton x }
 
 typeSig :: Typeable a => a -> Sig
 typeSig x = emptySig { witnesses = TypeMap.singleton (Witness x) }
