@@ -1,5 +1,3 @@
-Make TypeRep wrapper define its own Ord instance on old GHCs.
-
 Print warnings if two constants with the same name+type.
 
 Give proper errors if use several observers in signature etc.
