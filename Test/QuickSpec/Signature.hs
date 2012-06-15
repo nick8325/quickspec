@@ -47,17 +47,20 @@ summarise :: Sig -> [String]
 summarise sig =
   [ "-- functions --" ] ++ describe showOp (sym . unConstant) constants ++
   [ "", "-- variables --" ] ++ describe id (sym . unVariable) variables ++
-  concat
-  [ [ "", "** the following types are using non-standard equality **" ] ++
-    map show (Map.keys (observers sig))
-  | not (Map.null (observers sig)) ] ++
-  concat
-  [ [""] ++
-    starry [" WARNING: CANNOT NOT TEST THE FOLLOWING TYPES ",
-            "   (add an Ord instance or use 'observe')     "] ++
-    [""] ++
-    map show untestable
-  | not (null untestable) ]
+  warn [ "", "-- the following types are using non-standard equality --" ]
+    (Map.keys (observers sig)) ++
+
+  warn ["",
+        "**** WARNING: no variables of the following types; consider adding some ****"]
+    [ typeOf (witness x)
+    | Some x <- TypeMap.toList (cotypes sig),
+      null (TypeRel.lookup (witness x) (variables sig)) ] ++
+
+  warn ([""] ++
+        starry ["  WARNING: CANNOT NOT TEST THE FOLLOWING TYPES  ",
+                " (use 'fun' instead of 'blind' or use 'observe')"] ++
+        [""])
+    (filter isTerminal (filter (not . flip testable sig) (inhabitedTypes sig)))
 
   where
     describe :: (String -> String) -> (forall a. f a -> Symbol) ->
@@ -65,10 +68,13 @@ summarise sig =
     describe decorate un f =
       [ intercalate ", " (map (decorate . name) xs) ++ " :: " ++ show (symbolType x)
       | xs@(x:_) <- partitionBy symbolType (map (some un) (TypeRel.toList (f sig))) ]
+
+    warn _ [] = []
+    warn msg xs = msg ++ map show (usort xs)
+
     starry xss@(xs:_) = map horizStars $ [stars] ++ xss ++ [stars]
       where stars = replicate (length xs) '*'
             horizStars xs = "****" ++ xs ++ "****"
-    untestable = filter isTerminal (filter (not . flip testable sig) (inhabitedTypes sig))
     isTerminal ty =
       case arrow ty of
         Nothing -> True
