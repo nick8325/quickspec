@@ -65,7 +65,7 @@ genSeeds = do
 
 generate :: Sig -> IO (TypeMap (TestResults `O` Expr))
 generate sig | maxDepth sig < 0 =
-  error "Generate.generate: maxDepth must be positive"
+  error "Test.QuickSpec.Generate.generate: maxDepth must be positive"
 generate sig | maxDepth sig == 0 = return TypeMap.empty
 generate sig = unbuffered $ do
   let d = maxDepth sig

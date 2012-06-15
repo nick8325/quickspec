@@ -18,7 +18,8 @@ data TestTree' a = Tree { rep :: a, rest :: [a], branches :: [TestTree' a] }
 
 -- Precondition: bs must be sorted according to the TestCase.
 tree :: Ord r => [a] -> (a -> r) -> [TestTree' a] -> TestTree' a
-tree [] _ _ = error "TestTree.tree: bug: empty equivalence class"
+tree [] _ _ =
+  error "Test.QuickSpec.TestTree.tree: bug: empty equivalence class"
 tree (x:xs) eval bs =
   assert (isSortedBy (eval . rep) bs) $
     Tree { rep = x, rest = xs, branches = bs }
@@ -47,7 +48,8 @@ test _ [] = Nil
 test tcs xs = NonNil (test' tcs xs)
 
 test' :: Ord r => [a -> r] -> [a] -> TestTree' a
-test' [] _ = error "bug: ran out of test cases"
+test' [] _ =
+  error "Test.QuickSpec.TestTree.test': ran out of test cases"
 test' (tc:tcs) xs = tree xs tc (map (test' tcs) bs)
   where bs = partitionBy tc xs
 

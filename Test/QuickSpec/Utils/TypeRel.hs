@@ -29,10 +29,11 @@ mapValues :: (forall a. Typeable a => f a -> g a) -> TypeRel f -> TypeRel g
 mapValues f = TypeMap.mapValues2 (map f)
 
 gather :: [Some f] -> Some (List `O` f)
-gather [] = error "Typed.sequence: empty list"
+gather [] =
+  error "Test.QuickSpec.Utils.TypeRep.sequence: empty list"
 gather (Some x:xs) = Some (O (x:map gcast' xs))
   where gcast' (Some y) = fromMaybe (error msg) (gcast y)
-        msg = "Typed.gather: heterogeneous list"
+        msg = "Test.QuickSpec.Utils.TypeRep.gather: heterogeneous list"
 
 disperse :: Some (List `O` f) -> [Some f]
 disperse (Some (O xs)) = map Some xs

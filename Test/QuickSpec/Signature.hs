@@ -79,7 +79,7 @@ data Observer a = forall b. Ord b => Observer (Gen (a -> b))
 observe x sig =
   TypeMap.lookup (TypeMap.lookup (error msg) x (ords sig))
                x (observers sig)
-  where msg = "Signature.observe: no observers found for type " ++ show (typeOf x)
+  where msg = "Test.QuickSpec.Signature.observe: no observers found for type " ++ show (typeOf x)
 
 emptySig :: Sig
 emptySig = Sig TypeRel.empty TypeRel.empty TypeMap.empty TypeMap.empty TypeMap.empty TypeMap.empty mempty
@@ -256,5 +256,5 @@ arrow ty =
 findWitness :: Sig -> TypeRep -> Witness
 findWitness sig ty =
   Map.findWithDefault
-    (error $ "Generate.witness: type " ++ show ty ++ " not found")
+    (error $ "Test.QuickSpec.Generate.witness: type " ++ show ty ++ " not found")
     ty (types sig `mappend` cotypes sig)

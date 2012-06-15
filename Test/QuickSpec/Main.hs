@@ -73,7 +73,8 @@ sampleList g n xs | n >= length xs = xs
                   | otherwise = aux g n (length xs) xs
   where
     aux g 0 _ _ = []
-    aux g _ _ [] = error "QuickSpec.sampleList: bug in sampling"
+    aux g _ _ [] =
+      error "Test.QuickSpec.Main.sampleList: bug in sampling"
     aux g size len (x:xs)
       | i <= size = x:aux g' (size-1) (len-1) xs
       | otherwise = aux g' size (len-1) xs

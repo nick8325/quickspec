@@ -81,7 +81,8 @@ substs t univ d = map lookup (sequence (map choose vars))
                holes $ t
 
         choose (x, n) =
-          let m = Map.findWithDefault (error "NaiveEquationalReasoning.substs: empty universe")
+          let m = Map.findWithDefault
+                  (error "Test.QuickSpec.Reasoning.NaiveEquationalReasoning.substs: empty universe")
                   (symbolType x) univ in
           [ (x, t)
           | d' <- [0..d-n],
