@@ -50,8 +50,7 @@ generate' d sig = unbuffered $ do
       count op f = op . map (Typed.some2 f) . TypeMap.toList
       ts = TypeMap.fromList
              [ Some (O (terms sig rs (witness x)))
-             | ty <- testableTypes sig, 
-               Some x <- [findWitness sig ty] ]
+             | Some x <- map (findWitness sig) (testableTypes sig) ]
   printf "%d terms, " (count sum length ts)
   seeds <- genSeeds
   let cs = fmap (mapSome2 (test seeds sig)) ts
