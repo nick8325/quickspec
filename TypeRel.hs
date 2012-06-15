@@ -5,6 +5,8 @@ import qualified TypeMap
 import TypeMap(TypeMap)
 import Typed
 import Typeable
+import Data.Maybe
+import Utils
 
 type TypeRel f = TypeMap (List `O` f)
 
@@ -25,3 +27,15 @@ lookup x m = unO (TypeMap.lookup (O []) x m)
 
 mapValues :: (forall a. Typeable a => f a -> g a) -> TypeRel f -> TypeRel g
 mapValues f = TypeMap.mapValues2 (map f)
+
+gather :: [Some f] -> Some (List `O` f)
+gather [] = error "Typed.sequence: empty list"
+gather (Some x:xs) = Some (O (x:map gcast' xs))
+  where gcast' (Some y) = fromMaybe (error msg) (gcast y)
+        msg = "Typed.gather: heterogeneous list"
+
+disperse :: Some (List `O` f) -> [Some f]
+disperse (Some (O xs)) = map Some xs
+
+classify :: [Some f] -> [Some (List `O` f)]
+classify xs = map gather (partitionBy someType xs)
