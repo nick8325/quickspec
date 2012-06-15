@@ -63,27 +63,27 @@ summarise sig =
 
   warn ["",
         "-- WARNING: the following types are uninhabited --"]
-    [ typeOf (witness w)
+    [ typeOf w
     | Some k <- TypeRel.toList (constants sig),
-      Some w <- constantArgs sig k,
-      Some w `notElem` saturatedTypes sig,
-      null (TypeRel.lookup (witness w) (variables sig)) ] ++
+      ty@(Some (Witness w)) <- constantArgs sig k,
+      ty `notElem` saturatedTypes sig,
+      null (TypeRel.lookup w (variables sig)) ] ++
   warn ["",
         "-- WARNING: there are no variables of the following types; consider adding some --"]
-    [ typeOf (witness w)
+    [ typeOf w
     | Some k <- TypeRel.toList (constants sig),
-      Some w <- constantArgs sig k,
+      ty@(Some (Witness w)) <- constantArgs sig k,
       -- There is a non-variable term of this type and it appears as the
       -- argument to some function
-      Some w `elem` saturatedTypes sig,
-      null (TypeRel.lookup (witness w) (variables sig)) ] ++
+      ty `elem` saturatedTypes sig,
+      null (TypeRel.lookup w (variables sig)) ] ++
   warn ["",
         "-- WARNING: cannot test the following types; ",
         "            consider using 'fun' instead of 'blind' or using 'observe' --"]
-    [ typeOf (witness w)
-    | Some w <- saturatedTypes sig,
+    [ typeOf w
+    | Some (Witness w) <- saturatedTypes sig,
       -- The type is untestable and is the result type of a constant
-      not (testable sig (witness w)) ]
+      not (testable sig w) ]
 
   where
     describe :: (String -> String) -> (forall a. f a -> Symbol) ->
@@ -140,7 +140,7 @@ observerSig x = emptySig { observers = TypeMap.singleton x } `mappend`
                 typeSig (undefined :: a)
 
 typeSig :: Typeable a => a -> Sig
-typeSig x = emptySig { witnesses = TypeMap.singleton (Witnessed x) }
+typeSig x = emptySig { witnesses = TypeMap.singleton (Witness x) }
 
 ordSig :: Typeable a => Observer a -> Sig
 ordSig x = emptySig { ords = TypeMap.singleton x }
@@ -312,8 +312,8 @@ witnessArrow sig x = do
 lhsWitnesses :: Typeable a => Sig -> a -> [Witness]
 lhsWitnesses sig x =
   [ lhs
-  | Some w <- TypeMap.toList (witnesses sig),
-    Just (lhs, rhs) <- [witnessArrow sig (witness w)],
+  | Some (Witness w) <- TypeMap.toList (witnesses sig),
+    Just (lhs, rhs) <- [witnessArrow sig w],
     witnessType rhs == typeOf x ]
 
 findWitness :: Sig -> TypeRep -> Witness

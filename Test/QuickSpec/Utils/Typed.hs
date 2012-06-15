@@ -12,7 +12,7 @@ data Some f = forall a. Typeable a => Some (f a)
 newtype O f g a = O { unO :: f (g a) }
 type List = []
 
-newtype Witnessed a = Witnessed { witness :: a }
+newtype Witnessed a = Witness { witness :: a }
 type Witness = Some Witnessed
 
 -- No Typeable (Witnessed a) instance to save accidentally looking up
@@ -33,7 +33,7 @@ witnessType = some (typeOf . witness)
 data Tagged a = Tagged { tag :: Witness, erase :: a }
 
 tagged :: Typeable a => (f a -> b) -> f a -> Tagged b
-tagged f x = Tagged (Some (Witnessed (witness x))) (f x)
+tagged f x = Tagged (Some (Witness (witness x))) (f x)
   where witness :: f a -> a
         witness = undefined
 

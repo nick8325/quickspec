@@ -22,17 +22,16 @@ import Data.Maybe
 terms :: Sig -> TypeRel Expr -> TypeMap (List `O` Expr)
 terms sig base =
   TypeMap.fromList
-    [ Some (O (terms' sig base (witness x)))
-    | Some x <- saturatedTypes sig,
-      testable sig (witness x) ]
+    [ Some (O (terms' sig base w))
+    | Some (Witness w) <- saturatedTypes sig,
+      testable sig w ]
 
 terms' :: Typeable a => Sig -> TypeRel Expr -> a -> [Expr a]
 terms' sig base w =
   map var (TypeRel.lookup w (variables sig)) ++
   map con (TypeRel.lookup w (constants sig)) ++
   [ app f x
-  | Some lhs <- lhsWitnesses sig w,
-    let w' = witness lhs,
+  | Some (Witness w') <- lhsWitnesses sig w,
     x <- TypeRel.lookup w' base,
     not (isUndefined (term x)),
     f <- terms' sig base (const w),
