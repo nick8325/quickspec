@@ -152,31 +152,31 @@ undefinedSig x u = constantSig (Constant (Atom ((symbol x 0 u) { undef = True })
 
 primCon0 :: forall a. Typeable a => Int -> String -> a -> Sig
 primCon0 n x f = constantSig (Constant (Atom (symbol x n f) f))
-             `mappend` typeSig (undefined :: a)
+                 `mappend` typeSig (undefined :: a)
 
 primCon1 :: forall a b. (Typeable a, Typeable b) =>
           Int -> String -> (a -> b) -> Sig
 primCon1 n x f = primCon0 n x f
-             `mappend` typeSig (undefined :: a)
-             `mappend` typeSig (undefined :: b)
+                 `mappend` typeSig (undefined :: a)
+                 `mappend` typeSig (undefined :: b)
 
 primCon2 :: forall a b c. (Typeable a, Typeable b, Typeable c) =>
           Int -> String -> (a -> b -> c) -> Sig
 primCon2 n x f = primCon1 n x f
-             `mappend` typeSig (undefined :: b)
-             `mappend` typeSig (undefined :: c)
+                 `mappend` typeSig (undefined :: b)
+                 `mappend` typeSig (undefined :: c)
 
 primCon3 :: forall a b c d. (Typeable a, Typeable b, Typeable c, Typeable d) =>
           Int -> String -> (a -> b -> c -> d) -> Sig
 primCon3 n x f = primCon2 n x f
-             `mappend` typeSig (undefined :: c)
-             `mappend` typeSig (undefined :: d)
+                 `mappend` typeSig (undefined :: c)
+                 `mappend` typeSig (undefined :: d)
 
 primCon4 :: forall a b c d e. (Typeable a, Typeable b, Typeable c, Typeable d, Typeable e) =>
           Int -> String -> (a -> b -> c -> d -> e) -> Sig
 primCon4 n x f = primCon3 n x f
-             `mappend` typeSig (undefined :: d)
-             `mappend` typeSig (undefined :: e)
+                 `mappend` typeSig (undefined :: d)
+                 `mappend` typeSig (undefined :: e)
 
 blind0 :: forall a. Typeable a => String -> a -> Sig
 blind0 = primCon0 0
@@ -215,30 +215,32 @@ var x v = variableSig (Variable (Atom (symbol x 0 v) (arbitrary `asTypeOf` retur
 
 con, fun0 :: (Ord a, Typeable a) => String -> a -> Sig
 con = fun0
-fun0 x f = blind0 x f `mappend` ord f
+fun0 x f = blind0 x f
+           `mappend` ord f
 
 fun1 :: (Typeable a,
          Typeable b, Ord b) =>
         String -> (a -> b) -> Sig
-fun1 x f = blind1 x f `mappend` ord (f undefined)
+fun1 x f = blind1 x f
+           `mappend` ord (f undefined)
 
 fun2 :: (Typeable a, Typeable b,
          Typeable c, Ord c) =>
         String -> (a -> b -> c) -> Sig
-fun2 x f = blind2 x f `mappend`
-           ord (f undefined undefined)
+fun2 x f = blind2 x f
+           `mappend` ord (f undefined undefined)
 
 fun3 :: (Typeable a, Typeable b, Typeable c,
          Typeable d, Ord d) =>
         String -> (a -> b -> c -> d) -> Sig
-fun3 x f = blind3 x f `mappend`
-           ord (f undefined undefined undefined)
+fun3 x f = blind3 x f
+           `mappend` ord (f undefined undefined undefined)
 
 fun4 :: (Typeable a, Typeable b, Typeable c, Typeable d,
          Typeable e, Ord e) =>
         String -> (a -> b -> c -> d -> e) -> Sig
-fun4 x f = blind4 x f `mappend`
-           ord (f undefined undefined undefined undefined)
+fun4 x f = blind4 x f
+           `mappend` ord (f undefined undefined undefined undefined)
 
 observer0 :: (Typeable a, Typeable b, Ord b) => (a -> b) -> Sig
 observer0 f = observerSig (Observer (return f))
