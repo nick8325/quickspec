@@ -42,6 +42,27 @@ lhsTypes sig x =
   [ findWitness sig ty1
   | (ty1, ty2) <- catMaybes (map arrow (inhabitedTypes sig)), ty2 == typeOf x ]
 
+test :: [(StdGen, Int)] -> Sig ->
+        TypeMap (List `O` Expr) -> TypeMap (TestResults `O` Expr)
+test seeds sig ts = fmap (mapSome2 (test' seeds sig)) ts
+
+test' :: Typeable a => [(StdGen, Int)] -> Sig -> [Expr a] -> TestResults (Expr a)
+test' seeds sig ts =
+  case observe undefined sig of
+    Observer obs ->
+      let testCase (g, n) =
+            let (g1, g2) = split g
+                val = memoValuation sig (unGen valuation g1 n) in
+            \x -> teaspoon . force . unGen obs g2 n $ eval x val
+          force x = x == x `seq` x
+      in cutOff 100 100 (T.test (map testCase seeds) ts)
+
+genSeeds :: IO [(StdGen, Int)]
+genSeeds = do
+  rnd <- newStdGen
+  let rnds rnd = rnd1 : rnds rnd2 where (rnd1, rnd2) = split rnd
+  return (zip (rnds rnd) (concat (repeat [0,2..20])))
+
 generate :: Sig -> IO (TypeMap (TestResults `O` Expr))
 generate sig | maxDepth sig < 0 =
   error "Generate.generate: maxDepth must be positive"
@@ -62,30 +83,3 @@ generate sig = unbuffered $ do
       (count sum (length . classes) cs)
       (count sum (sum . map (subtract 1 . length) . classes) cs)
   return cs
-
-genSeeds :: IO [(StdGen, Int)]
-genSeeds = do
-  rnd <- newStdGen
-  let rnds rnd = rnd1 : rnds rnd2 where (rnd1, rnd2) = split rnd
-  return (zip (rnds rnd) (concat (repeat [0,2..20])))
-
-observe :: Typeable a => a -> Sig -> Observer a
-observe x sig =
-  TypeMap.lookup (TypeMap.lookup (error msg) x (ords sig))
-               x (observers sig)
-  where msg = "Generate.observe: no observers found for type " ++ show (typeOf x)
-
-test :: [(StdGen, Int)] -> Sig ->
-        TypeMap (List `O` Expr) -> TypeMap (TestResults `O` Expr)
-test seeds sig ts = fmap (mapSome2 (test' seeds sig)) ts
-
-test' :: Typeable a => [(StdGen, Int)] -> Sig -> [Expr a] -> TestResults (Expr a)
-test' seeds sig ts =
-  case observe undefined sig of
-    Observer obs ->
-      let testCase (g, n) =
-            let (g1, g2) = split g
-                val = memoValuation sig (unGen valuation g1 n) in
-            \x -> teaspoon . force . unGen obs g2 n $ eval x val
-          force x = x == x `seq` x
-      in cutOff 100 100 (T.test (map testCase seeds) ts)

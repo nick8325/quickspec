@@ -76,6 +76,11 @@ summarise sig =
 
 data Observer a = forall b. Ord b => Observer (Gen (a -> b))
 
+observe x sig =
+  TypeMap.lookup (TypeMap.lookup (error msg) x (ords sig))
+               x (observers sig)
+  where msg = "Signature.observe: no observers found for type " ++ show (typeOf x)
+
 emptySig :: Sig
 emptySig = Sig TypeRel.empty TypeRel.empty TypeMap.empty TypeMap.empty TypeMap.empty TypeMap.empty mempty
 
