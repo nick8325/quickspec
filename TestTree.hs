@@ -56,12 +56,16 @@ test' (tc:tcs) xs = tree xs tc (map (test' tcs) bs)
 -- invariants we use a different type.
 newtype TestResults a = Results (TestTree a)
 
-cutOff :: Int -> TestTree a -> TestResults a
-cutOff _ Nil = Results Nil
-cutOff n (NonNil t) = Results (NonNil (aux n t))
-  where aux 0 t = t { branches = [] }
-        aux m t@Tree{branches = [t']} = t { branches = [aux (m-1) t'] }
-        aux _ t = t { branches = map (aux n) (branches t) }
+cutOff :: Int -> Int -> TestTree a -> TestResults a
+cutOff _ _ Nil = Results Nil
+cutOff m n (NonNil t) = Results (NonNil (aux m t))
+  where aux 0 t = aux' False n n t
+        aux m t = t { branches = map (aux (m-1)) (branches t) }
+        -- Exponential backoff if we carry on refining a class
+        aux' True 0 n t = t { branches = map (aux' False (n*2-1) (n*2)) (branches t) }
+        aux' False 0 n t = t { branches = [] }
+        aux' x m n t@Tree{branches = [t']} = t { branches = [aux' x (m-1) n t'] }
+        aux' _ m n t = t { branches = map (aux' True (m-1) n) (branches t) }
 
 numTests :: TestResults a -> Int
 numTests (Results Nil) = 0

@@ -76,7 +76,7 @@ test :: Typeable a => [(StdGen, Int)] -> Sig -> [Expr a] -> TestResults (Expr a)
 test seeds sig ts = test' seeds sig ts (observe undefined sig)
 
 test' :: Typeable a => [(StdGen, Int)] -> Sig -> [Expr a] -> Observer a -> TestResults (Expr a)
-test' seeds sig ts (Observer obs) = cutOff 200 (T.test (map testCase seeds) ts)
+test' seeds sig ts (Observer obs) = cutOff 100 100 (T.test (map testCase seeds) ts)
   where
     testCase (g, n) =
       let (g1, g2) = split g
