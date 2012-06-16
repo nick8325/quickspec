@@ -56,8 +56,14 @@ instance Show Sig where show = unlines . summarise
 
 summarise :: Sig -> [String]
 summarise sig =
-  [ "-- functions --" ] ++ describe showOp (sym . unConstant) constants ++
-  [ "", "-- variables --" ] ++ describe id (sym . unVariable) variables ++
+  [ "-- functions --" ] ++
+    describe showOp (sym . unConstant) (not . isSilent) constants ++
+  concat [
+    [ "", "-- background functions --" ] ++
+      describe showOp (sym . unConstant) isSilent constants
+    | not (null (filter (some isSilent) (TypeRel.toList (constants sig)))) ] ++
+  [ "", "-- variables --" ] ++
+    describe id (sym . unVariable) (const True) variables ++
   warn [ "", "-- the following types are using non-standard equality --" ]
     (Map.keys (observers sig)) ++
 
@@ -87,13 +93,16 @@ summarise sig =
 
   where
     describe :: (String -> String) -> (forall a. f a -> Symbol) ->
+                (forall a. f a -> Bool) ->
                 (Sig -> TypeRel f) -> [String]
-    describe decorate un f =
+    describe decorate un p f =
       [ intercalate ", " (map (decorate . name) xs) ++ " :: " ++ show (symbolType x)
-      | xs@(x:_) <- partitionBy symbolType (map (some un) (TypeRel.toList (f sig))) ]
+      | xs@(x:_) <- partitionBy symbolType (map (some un) (filter (some p) (TypeRel.toList (f sig)))) ]
 
     warn _ [] = []
     warn msg xs = msg ++ map show (usort xs)
+
+    isSilent (Constant (Atom { sym = sym })) = silent sym
 
 data Observer a = forall b. Ord b => Observer (Gen (a -> b))
 
