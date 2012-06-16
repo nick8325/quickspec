@@ -40,8 +40,12 @@ Description:
 
 Extra-source-files:
   README
-  examples/Example.hs
+  examples/Arith.hs
+  examples/Bools.hs
+  examples/Composition.hs
   examples/Heaps.hs
+  examples/Lists.hs
+  examples/TinyWM.hs
 
 source-repository head
   type:     git
