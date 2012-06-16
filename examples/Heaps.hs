@@ -1,5 +1,4 @@
 {-# LANGUAGE ScopedTypeVariables,DeriveDataTypeable #-}
-module Examples.Heaps where
 
 import Prelude hiding (null)
 import Test.QuickSpec
@@ -62,20 +61,26 @@ mergeLists (x:xs) (y:ys)
   | otherwise = y:mergeLists (x:xs) ys
 
 heaps :: forall a. (Ord a, Typeable a, Arbitrary a) => a -> [Sig]
-heaps _ = [
-  vars ["h", "h1", "h2"] (undefined :: Heap a),
-  fun1 "toList" (toList :: Heap a -> [a]),
-  fun1 "fromList" (fromList :: [a] -> Heap a),
-  fun1 "null" (null :: Heap a -> Bool),
-  fun1 "findMin" (findMin :: Heap a -> a),
-  fun2 "insert" (insert :: a -> Heap a -> Heap a),
-  fun1 "deleteMin" (deleteMin :: Heap a -> Heap a),
-  fun2 "merge" (merge :: Heap a -> Heap a -> Heap a),
-  fun0 "nil" (Nil :: Heap a),
+heaps a = [
+  prelude a,
 
-  -- A few more list functions that are helpful for the heaps example.
-  fun1 "sort" (L.sort :: [a] -> [a]),
-  fun2 "insertList" (L.insert :: a -> [a] -> [a]),
-  fun1 "nullList" (L.null :: [a] -> Bool),
-  fun2 "deleteList" (L.delete :: a -> [a] -> [a]),
-  fun2 "mergeLists" (mergeLists :: [a] -> [a] -> [a])]
+  ["h", "h1", "h2"] `vars` (undefined :: Heap a),
+
+  "nil"        `fun0` (Nil :: Heap a),
+  "insert"     `fun2` (insert :: a -> Heap a -> Heap a),
+  "findMin"    `fun1` (findMin :: Heap a -> a),
+  "deleteMin"  `fun1` (deleteMin :: Heap a -> Heap a),
+  "merge"      `fun2` (merge :: Heap a -> Heap a -> Heap a),
+  "null"       `fun1` (null :: Heap a -> Bool),
+  "toList"     `fun1` (toList :: Heap a -> [a]),
+  "fromList"   `fun1` (fromList :: [a] -> Heap a),
+
+  -- A few more list functions that are helpful for getting
+  -- laws about toList/fromList.
+  "sort"       `fun1` (L.sort :: [a] -> [a]),
+  "insertList" `fun2` (L.insert :: a -> [a] -> [a]),
+  "nullList"   `fun1` (L.null :: [a] -> Bool),
+  "deleteList" `fun2` (L.delete :: a -> [a] -> [a]),
+  "mergeLists" `fun2` (mergeLists :: [a] -> [a] -> [a])]
+
+main = quickSpec (heaps (undefined :: A))

@@ -53,6 +53,7 @@ library
     Test.QuickSpec,
     Test.QuickSpec.Main,
     Test.QuickSpec.Signature,
+    Test.QuickSpec.Prelude,
     Test.QuickSpec.Term,
     Test.QuickSpec.Generate,
     Test.QuickSpec.TestTree,
