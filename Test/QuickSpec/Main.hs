@@ -26,9 +26,6 @@ undefinedsSig sig =
     [ undefinedSig "undefined" (undefined `asTypeOf` witness x)
     | Some x <- saturatedTypes sig ]
 
-untypedClasses :: TypeMap (TestResults `O` Expr) -> [[Tagged Term]]
-untypedClasses = concatMap (some (map (map (tagged term)) . classes . unO)) . TypeMap.toList
-
 universe :: [[Tagged Term]] -> [Tagged Term]
 universe css = filter (not . isUndefined . erase) (concat css)
 

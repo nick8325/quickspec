@@ -79,3 +79,6 @@ generate sig = unbuffered $ do
       (count sum (length . classes) cs)
       (count sum (sum . map (subtract 1 . length) . classes) cs)
   return cs
+
+untypedClasses :: TypeMap (TestResults `O` Expr) -> [[Tagged Term]]
+untypedClasses = concatMap (some (map (map (tagged term)) . classes . unO)) . TypeMap.toList
