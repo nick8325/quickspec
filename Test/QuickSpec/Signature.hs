@@ -70,17 +70,16 @@ summarise sig =
   warn ["",
         "-- WARNING: the following types are uninhabited --"]
     [ typeOf w
-    | Some k <- TypeRel.toList (constants sig),
-      ty@(Some (Witness w)) <- constantArgs sig k,
-      ty `notElem` saturatedTypes sig,
+    | ty@(Some (Witness w)) <- argumentTypes sig,
+      ty `notElem` inhabitedTypes sig,
       null (TypeRel.lookup w (variables sig)) ] ++
   warn ["",
         "-- WARNING: there are no variables of the following types; consider adding some --"]
     [ typeOf w
-    | Some k <- TypeRel.toList (constants sig),
-      ty@(Some (Witness w)) <- constantArgs sig k,
+    | ty@(Some (Witness w)) <- argumentTypes sig,
       -- There is a non-variable term of this type and it appears as the
       -- argument to some function
+      ty `elem` inhabitedTypes sig,
       null (TypeRel.lookup w (variables sig)) ] ++
   warn ["",
         "-- WARNING: cannot test the following types; ",
@@ -302,8 +301,22 @@ constantRes sig (Constant (Atom { sym = sym })) =
 -- The set of types returned by saturated constants.
 saturatedTypes :: Sig -> [Witness]
 saturatedTypes sig =
-  usort $
+  usort
     [ constantRes sig k
+    | Some k <- TypeRel.toList (constants sig) ]
+
+-- The set of types of which there is a non-variable term.
+inhabitedTypes :: Sig -> [Witness]
+inhabitedTypes sig =
+  usort . concat $
+    [ constantApplications sig k
+    | Some k <- TypeRel.toList (constants sig) ]
+
+-- The set of types that appear as arguments to functions.
+argumentTypes :: Sig -> [Witness]
+argumentTypes sig =
+  usort . concat $
+    [ constantArgs sig k
     | Some k <- TypeRel.toList (constants sig) ]
 
 -- Given a type, find a witness that it's a function.
