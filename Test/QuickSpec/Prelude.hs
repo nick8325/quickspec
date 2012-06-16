@@ -3,7 +3,6 @@ module Test.QuickSpec.Prelude where
 
 import Test.QuickSpec.Signature
 import Test.QuickCheck
-import Test.QuickCheck.Poly
 import Data.Typeable
 
 newtype A = A Int deriving (Eq, Ord, Typeable, Arbitrary, CoArbitrary)
