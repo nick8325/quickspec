@@ -65,11 +65,13 @@ library
     Test.QuickSpec.Reasoning.CongruenceClosure,
     Test.QuickSpec.Reasoning.NaiveEquationalReasoning,
     Test.QuickSpec.Utils,
-    Test.QuickSpec.Utils.MemoValuation,
     Test.QuickSpec.Utils.Typeable,
     Test.QuickSpec.Utils.Typed,
     Test.QuickSpec.Utils.TypeMap,
     Test.QuickSpec.Utils.TypeRel
+  Other-modules:
+    -- Dangerous!
+    Test.QuickSpec.Utils.MemoValuation
 
   Build-depends:
     base < 5, containers, transformers, parallel >= 3, QuickCheck,
