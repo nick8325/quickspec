@@ -81,7 +81,6 @@ summarise sig =
       ty@(Some (Witness w)) <- constantArgs sig k,
       -- There is a non-variable term of this type and it appears as the
       -- argument to some function
-      ty `elem` saturatedTypes sig,
       null (TypeRel.lookup w (variables sig)) ] ++
   warn ["",
         "-- WARNING: cannot test the following types; ",
