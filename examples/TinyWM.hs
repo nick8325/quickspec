@@ -169,17 +169,19 @@ type T = StackSet A
 
 tinywm :: [Sig]
 tinywm = [
-  fun1 "empty" (empty :: Int -> T),
-  fun2 "view" (view :: Int -> T -> T),
-  fun1 "peek" (fromJust . peek :: T -> A),
-  fun2 "rotate" (rotate :: Ordering -> T -> T),
-  fun2 "push" (push :: A -> T -> T),
-  fun2 "shift" (shift :: Int -> T -> T),
-  fun3 "insert" (insert :: A -> Int -> T -> T),
-  fun2 "delete" (delete :: A -> T -> T),
-  fun2 "index" (index :: Int -> T -> [A]),
-  vars ["s"] (undefined :: T),
+  prelude (undefined :: A),
   ordering,
-  prelude (undefined :: A)]
+
+  ["s"] `vars` (undefined :: T),
+
+  "empty"  `fun1` (empty           :: Int -> T),
+  "view"   `fun2` (view            :: Int -> T -> T),
+  "peek"   `fun1` (fromJust . peek :: T -> A),
+  "rotate" `fun2` (rotate          :: Ordering -> T -> T),
+  "push"   `fun2` (push            :: A -> T -> T),
+  "shift"  `fun2` (shift           :: Int -> T -> T),
+  "insert" `fun3` (insert          :: A -> Int -> T -> T),
+  "delete" `fun2` (delete          :: A -> T -> T),
+  "index"  `fun2` (index           :: Int -> T -> [A])]
 
 main = quickSpec tinywm

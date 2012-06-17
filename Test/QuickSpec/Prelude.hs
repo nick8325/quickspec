@@ -21,8 +21,8 @@ arith :: forall a. (Typeable a, Ord a, Num a, Arbitrary a) => a -> Sig
 arith _ = silence [
   ["x", "y", "z"] `vars` (undefined :: a),
 
-  "0" `fun0` (0 :: a),
-  "1" `fun0` (1 :: a),
+  "0" `fun0` (0   :: a),
+  "1" `fun0` (1   :: a),
   "+" `fun2` ((+) :: a -> a -> a),
   "*" `fun2` ((*) :: a -> a -> a)]
 
@@ -30,19 +30,19 @@ lists :: forall a. (Typeable a, Ord a, Arbitrary a) => a -> Sig
 lists _ = silence [
   ["xs", "ys", "zs"] `vars` (undefined :: [a]),
 
-  "[]"      `fun0` ([] :: [a]),
-  ":"       `fun2` ((:) :: a -> [a] -> [a]),
-  "unit"    `fun1` (return :: a -> [a]),
-  "++"      `fun2` ((++) :: [a] -> [a] -> [a]),
+  "[]"      `fun0` ([]      :: [a]),
+  ":"       `fun2` ((:)     :: a -> [a] -> [a]),
+  "unit"    `fun1` (return  :: a -> [a]),
+  "++"      `fun2` ((++)    :: [a] -> [a] -> [a]),
   "reverse" `fun1` (reverse :: [a] -> [a]),
-  "length"  `fun1` (length :: [a] -> Int)]
+  "length"  `fun1` (length  :: [a] -> Int)]
 
 funs :: forall a. (Typeable a, Ord a, Arbitrary a, CoArbitrary a) => a -> Sig
 funs _ = silence [
   ["f", "g", "h"] `vars` (undefined :: a -> a),
 
   "."  `blind2` ((.) :: (a -> a) -> (a -> a) -> (a -> a)),
-  "id" `blind0` (id :: a -> a),
+  "id" `blind0` (id  :: a -> a),
 
   observer1 (\(x :: a) (f :: a -> a) -> f x)
   ]

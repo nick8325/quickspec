@@ -66,21 +66,21 @@ heaps a = [
 
   ["h", "h1", "h2"] `vars` (undefined :: Heap a),
 
-  "nil"        `fun0` (Nil :: Heap a),
-  "insert"     `fun2` (insert :: a -> Heap a -> Heap a),
-  "findMin"    `fun1` (findMin :: Heap a -> a),
-  "deleteMin"  `fun1` (deleteMin :: Heap a -> Heap a),
-  "merge"      `fun2` (merge :: Heap a -> Heap a -> Heap a),
-  "null"       `fun1` (null :: Heap a -> Bool),
-  "toList"     `fun1` (toList :: Heap a -> [a]),
-  "fromList"   `fun1` (fromList :: [a] -> Heap a),
+  "nil"        `fun0` (Nil        :: Heap a),
+  "insert"     `fun2` (insert     :: a -> Heap a -> Heap a),
+  "findMin"    `fun1` (findMin    :: Heap a -> a),
+  "deleteMin"  `fun1` (deleteMin  :: Heap a -> Heap a),
+  "merge"      `fun2` (merge      :: Heap a -> Heap a -> Heap a),
+  "null"       `fun1` (null       :: Heap a -> Bool),
+  "toList"     `fun1` (toList     :: Heap a -> [a]),
+  "fromList"   `fun1` (fromList   :: [a] -> Heap a),
 
   -- A few more list functions that are helpful for getting
   -- laws about toList/fromList.
-  "sort"       `fun1` (L.sort :: [a] -> [a]),
-  "insertList" `fun2` (L.insert :: a -> [a] -> [a]),
-  "nullList"   `fun1` (L.null :: [a] -> Bool),
-  "deleteList" `fun2` (L.delete :: a -> [a] -> [a]),
+  "sort"       `fun1` (L.sort     :: [a] -> [a]),
+  "insertList" `fun2` (L.insert   :: a -> [a] -> [a]),
+  "nullList"   `fun1` (L.null     :: [a] -> Bool),
+  "deleteList" `fun2` (L.delete   :: a -> [a] -> [a]),
   "mergeLists" `fun2` (mergeLists :: [a] -> [a] -> [a])]
 
 main = quickSpec (heaps (undefined :: A))
