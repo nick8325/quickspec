@@ -36,10 +36,10 @@ data Sig = Sig {
   ords :: TypeMap Observer,
 
   -- Witnesses for Typeable. The following types must have witnesses:
-  -- * Any function argument.
-  -- * Any function result.
-  -- * Any partially-applied function type.
-  -- * Any variable type.
+  --  * Any function argument.
+  --  * Any function result.
+  --  * Any partially-applied function type.
+  --  * Any variable type.
   witnesses :: TypeMap Witnessed,
 
   -- Depth of terms in the universe.
