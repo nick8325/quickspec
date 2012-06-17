@@ -1,4 +1,5 @@
--- Based on the paper "Proof-producing Congruence Closure".
+-- | A decision procedure for ground equality,
+--   based on the paper "Proof-producing Congruence Closure".
 
 module Test.QuickSpec.Reasoning.CongruenceClosure(CC, newSym, (=:=), (=?=), rep, evalCC, execCC, runCC, ($$), S, funUse, argUse, lookup, initial, frozen) where
 

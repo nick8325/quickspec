@@ -1,3 +1,6 @@
+-- | Functions for working with existentially-quantified types
+--   and similar.
+
 {-# LANGUAGE Rank2Types, ExistentialQuantification, TypeOperators, TypeSynonymInstances, FlexibleInstances #-}
 module Test.QuickSpec.Utils.Typed where
 

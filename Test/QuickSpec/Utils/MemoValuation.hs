@@ -1,5 +1,5 @@
--- Memoise the variable valuation function for terms.
--- In its own module because it's packed full of dangerous features!
+-- | Memoise the variable valuation function for terms.
+--   In its own module because it's packed full of dangerous features!
 
 {-# LANGUAGE Rank2Types #-}
 module Test.QuickSpec.Utils.MemoValuation where

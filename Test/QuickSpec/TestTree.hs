@@ -1,3 +1,6 @@
+-- | A data structure to represent refining a set of terms into
+--   equivalence classes by testing.
+
 module Test.QuickSpec.TestTree(TestTree, terms, union, test,
                TestResults, cutOff, numTests, classes, reps) where
 

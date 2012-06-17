@@ -1,3 +1,7 @@
+-- | A relation between types and values.
+--   @'TypeRel' f@ relates each type @a@ to a set of values
+--   of type @f a@.
+
 {-# LANGUAGE Rank2Types, TypeOperators #-}
 module Test.QuickSpec.Utils.TypeRel where
 

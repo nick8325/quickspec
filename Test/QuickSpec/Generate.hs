@@ -1,3 +1,5 @@
+-- | The testing loop and term generation of QuickSpec.
+
 {-# LANGUAGE Rank2Types, TypeOperators #-}
 module Test.QuickSpec.Generate where
 

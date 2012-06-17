@@ -1,3 +1,6 @@
+-- | A map from types to values.
+--   @'TypeMap' f@ maps each type @a@ to a value of type @f a@.
+
 {-# LANGUAGE Rank2Types, TypeOperators #-}
 module Test.QuickSpec.Utils.TypeMap where
 

@@ -1,3 +1,5 @@
+-- | A union-find data structure.
+
 module Test.QuickSpec.Reasoning.UnionFind(UF, Replacement((:>)), newSym, (=:=), rep, evalUF, execUF, runUF, S, isRep, initial) where
 
 import Prelude hiding (min)

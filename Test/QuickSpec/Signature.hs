@@ -1,3 +1,5 @@
+-- | Functions for constructing and analysing signatures.
+
 {-# LANGUAGE Rank2Types, ExistentialQuantification, ScopedTypeVariables #-}
 module Test.QuickSpec.Signature where
 

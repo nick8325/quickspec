@@ -1,3 +1,6 @@
+-- | The "prelude": a standard signature containing useful functions
+--   like '++', which can be used as background theory.
+
 {-# LANGUAGE ScopedTypeVariables, DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
 module Test.QuickSpec.Prelude where
 

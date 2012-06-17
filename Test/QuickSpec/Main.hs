@@ -1,3 +1,5 @@
+-- | The main implementation of QuickSpec.
+
 {-# LANGUAGE TypeOperators #-}
 module Test.QuickSpec.Main where
 

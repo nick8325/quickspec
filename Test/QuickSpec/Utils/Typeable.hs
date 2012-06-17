@@ -1,8 +1,10 @@
 {-# LANGUAGE NoMonomorphismRestriction, CPP #-}
 
--- A wrapper around Data.Typeable, to work around:
---   1) The lack of an Ord instance in older GHCs,
---   2) bug #5962 in new GHCs.
+-- | A wrapper around 'Data.Typeable', to work around:
+--
+--   (1) The lack of an 'Ord' instance in older GHCs,
+--
+--   (2) bug #5962 in new GHCs.
 
 module Test.QuickSpec.Utils.Typeable(TypeRep, T.Typeable, T.Typeable1, T.Typeable2,
                 typeOf, typeOf1, cast, gcast,

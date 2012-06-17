@@ -37,6 +37,9 @@ Description:
     (@xs@, @ys@ and @zs@ in the example above).
   .
   * 'Test.QuickCheck.Arbitrary' instances for the types you want to test.
+  .
+  For more information, see the documentation of the main
+  @Test.QuickSpec@ module.
 
 Extra-source-files:
   README

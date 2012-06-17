@@ -1,3 +1,5 @@
+-- | Terms and evaluation.
+
 {-# LANGUAGE RankNTypes, ExistentialQuantification, DeriveFunctor #-}
 module Test.QuickSpec.Term where
 

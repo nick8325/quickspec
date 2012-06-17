@@ -1,3 +1,5 @@
+-- | Equational reasoning built on top of congruence closure.
+
 {-# LANGUAGE TupleSections #-}
 module Test.QuickSpec.Reasoning.NaiveEquationalReasoning where
 

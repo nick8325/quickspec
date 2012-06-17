@@ -1,3 +1,5 @@
+-- | Miscellaneous utility functions.
+
 module Test.QuickSpec.Utils where
 
 import Control.Arrow((&&&))
