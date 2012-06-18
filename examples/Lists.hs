@@ -10,10 +10,13 @@ lists a = [
   arith (undefined :: Int),
   funs (undefined :: a),
 
+  ["x", "y", "z"] `vars` (undefined :: a),
   ["xs", "ys", "zs"] `vars` (undefined :: [a]),
 
   "[]"      `fun0` ([]      :: [a]),
   ":"       `fun2` ((:)     :: a -> [a] -> [a]),
+  "head"    `fun1` (head    :: [a] -> a),
+  "tail"    `fun1` (tail    :: [a] -> [a]),
   "unit"    `fun1` (return  :: a -> [a]),
   "++"      `fun2` ((++)    :: [a] -> [a] -> [a]),
   "length"  `fun1` (length  :: [a] -> Int),

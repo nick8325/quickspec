@@ -35,7 +35,8 @@ lists _ = background [
 
   "[]"      `fun0` ([]      :: [a]),
   ":"       `fun2` ((:)     :: a -> [a] -> [a]),
-  "unit"    `fun1` (return  :: a -> [a]),
+  "head"    `fun1` (head    :: [a] -> a),
+  "tail"    `fun1` (tail    :: [a] -> [a]),
   "++"      `fun2` ((++)    :: [a] -> [a] -> [a]),
   "reverse" `fun1` (reverse :: [a] -> [a]),
   "length"  `fun1` (length  :: [a] -> Int)]
