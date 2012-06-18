@@ -1,3 +1,8 @@
+-- This example requires QuickCheck >= 2.5. For older versions, you will
+-- have to define an Arbitrary Ordering instance, like so:
+--   instance Arbitrary Ordering where
+--     arbitrary = elements [LT, EQ, GT]
+
 -- A window manager example,
 -- taken from http://donsbot.wordpress.com/2007/05/01/roll-your-own-window-manager-part-1-defining-and-testing-a-model
 
