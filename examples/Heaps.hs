@@ -77,10 +77,13 @@ heaps a = [
 
   -- A few more list functions that are helpful for getting
   -- laws about toList/fromList.
+  -- We use "background" to mark the functions as background theory,
+  -- so that we only get laws that involve one of the heap functions.
+  background [
   "sort"       `fun1` (L.sort     :: [a] -> [a]),
   "insertList" `fun2` (L.insert   :: a -> [a] -> [a]),
   "nullList"   `fun1` (L.null     :: [a] -> Bool),
   "deleteList" `fun2` (L.delete   :: a -> [a] -> [a]),
-  "mergeLists" `fun2` (mergeLists :: [a] -> [a] -> [a])]
+  "mergeLists" `fun2` (mergeLists :: [a] -> [a] -> [a])]]
 
 main = quickSpec (heaps (undefined :: A))
