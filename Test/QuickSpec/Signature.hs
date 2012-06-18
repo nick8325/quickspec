@@ -208,8 +208,8 @@ ord x = ordSig (Observer (return id) `observing` x)
 observing :: Observer a -> a -> Observer a
 observing x _ = x
 
-silence :: Signature a => a -> Sig
-silence sig =
+background :: Signature a => a -> Sig
+background sig =
   sig' { constants = TypeRel.mapValues (mapConstant silence1) (constants sig'),
          variables = TypeRel.mapValues (mapVariable silence1) (variables sig') }
   where sig' = signature sig
