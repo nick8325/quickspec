@@ -141,7 +141,7 @@ instance Monoid Sig where
     where constants' = TypeRel.toList (constants s1) ++
                        TypeRel.toList (constants s2)
           -- Overwrite variables if they're declared twice!
-          variables' = TypeRel.toList (variables s1 `mappend` variables s2)
+          variables' = TypeRel.toList (variables s1 `combine` variables s2)
 
           renumber :: (forall a. Int -> f a -> f a) ->
                       Int -> [Some f] -> TypeRel f
@@ -151,6 +151,15 @@ instance Monoid Sig where
 
           alter :: Int -> Symbol -> Symbol
           alter n x = x { index = n }
+
+          combine :: TypeRel Variable -> TypeRel Variable -> TypeRel Variable
+          -- If a signature uses vars several times at the same type,
+          -- the declaration with the highest number of variables "wins"
+          -- and all others are discarded
+          combine = Map.unionWith max_
+            where max_ vs1 vs2
+                    | some2 length vs1 > some2 length vs2 = vs1
+                    | otherwise = vs2
 
 constantSig :: Typeable a => Constant a -> Sig
 constantSig x = emptySig { constants = TypeRel.singleton x }
