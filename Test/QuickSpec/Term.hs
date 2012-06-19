@@ -111,6 +111,11 @@ vars t = aux t []
         aux (App f x) = aux f . aux x
         aux Const{} = id
 
+mapVars :: (Symbol -> Symbol) -> Term -> Term
+mapVars f (Var x) = Var (f x)
+mapVars f (Const x) = Const x
+mapVars f (App t u) = App (mapVars f t) (mapVars f u)
+
 data Expr a = Expr {
   term :: Term,
   arity :: {-# UNPACK #-} !Int,

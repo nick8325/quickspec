@@ -6,9 +6,11 @@ module Test.QuickSpec.Main where
 import Test.QuickSpec.Generate
 import Test.QuickSpec.Reasoning.NaiveEquationalReasoning hiding (universe, maxDepth)
 import Test.QuickSpec.Utils.Typed
+import Test.QuickSpec.Utils.TypeRel(TypeRel)
+import qualified Test.QuickSpec.Utils.TypeRel as TypeRel
 import Test.QuickSpec.Utils.TypeMap(TypeMap)
 import qualified Test.QuickSpec.Utils.TypeMap as TypeMap
-import Test.QuickSpec.Signature
+import Test.QuickSpec.Signature hiding (vars)
 import Test.QuickSpec.Term
 import Control.Monad
 import Text.Printf
@@ -16,11 +18,38 @@ import Data.Monoid
 import Test.QuickSpec.TestTree(TestResults, classes, reps)
 import Data.List
 import System.Random
+import Data.Monoid
+import Data.Maybe
+import Test.QuickSpec.Utils
 
 data Equation = Term :=: Term deriving (Eq, Ord)
 
+showEquation :: Sig -> Equation -> String
+showEquation sig (t :=: u) =
+  show (mapVars f t) ++ " == " ++ show (mapVars f u)
+  where
+    -- Disambiguate variables if we have two variables of the same name
+    f x =
+      fromMaybe (error "Test.QuickSpec.Main.showEquation: variable not found")
+        (find (\y -> index x == index y)
+          (disambiguate [] (usort (vars t ++ vars u))))
+    disambiguate used [] = []
+    disambiguate used (x:xs) = x':disambiguate (name x':used) xs
+      where x' | name x `elem` used = x { name = next }
+               | otherwise = x
+            next = head (filter (`notElem` used) candidates)
+            candidates
+              | null wellTypedNames = error "Test.QuickSpec.Main.showEquation: null allVars"
+              | otherwise = wellTypedNames ++ concat [ map (++ show i) wellTypedNames | i <- [1.. ] ]
+            allVars =
+              map (some (sym . unVariable))
+                (TypeRel.toList (variables sig)) ++
+              vars t ++ vars u
+            wellTypedNames =
+              [ name v | v <- allVars, symbolType v == symbolType x ]
+
 instance Show Equation where
-  show (t :=: u) = show t ++ " == " ++ show u
+  show = showEquation mempty
 
 undefinedsSig :: Sig -> Sig
 undefinedsSig sig =
@@ -66,7 +95,7 @@ quickSpec = runTool $ \sig -> do
                  (prune (maxDepth sig) univ eqs)
       eqnFuns (t :=: u) = funs t ++ funs u
   forM_ (zip [1 :: Int ..] pruned) $ \(i, eq) ->
-    printf "%d: %s\n" i (show eq)
+    printf "%d: %s\n" i (showEquation sig eq)
 
   putStrLn ""
 
