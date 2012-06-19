@@ -60,9 +60,9 @@ instance Show Term where
      showTerm p (Var v) = show v
      showTerm p (Const x) = show x
      showTerm p (Const op `App` x) | isOp (name op) =
-       brack (showTerm 1 x ++ show op)
+       brack (showTerm 1 x ++ name op)
      showTerm p (Const op `App` x `App` y) | isOp (name op) =
-       parenOp p (showTerm 1 x ++ show op ++ showTerm 1 y)
+       parenOp p (showTerm 1 x ++ name op ++ showTerm 1 y)
 
      showTerm p (f `App` x) =
        parenFun p (showTerm 1 f ++ " " ++ showTerm 2 x)
