@@ -22,7 +22,7 @@ symbol :: Typeable a => String -> Int -> a -> Symbol
 symbol x arity v = Symbol 0 x arity False False (typeOf v)
 
 instance Show Symbol where
-  show = name
+  show = showOp . name
 
 instance Eq Symbol where
   (==) = (==) `on` index
@@ -58,7 +58,7 @@ instance Show Term where
                  | otherwise = brack s
 
      showTerm p (Var v) = show v
-     showTerm p (Const x) = showOp (name x)
+     showTerm p (Const x) = show x
      showTerm p (Const op `App` x) | isOp (name op) =
        brack (showTerm 1 x ++ show op)
      showTerm p (Const op `App` x `App` y) | isOp (name op) =

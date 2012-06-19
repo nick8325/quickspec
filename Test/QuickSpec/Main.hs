@@ -45,7 +45,7 @@ prune d univ eqs = evalEQ (initial d univ) (filterM (fmap not . provable) eqs)
 runTool :: Signature a => (Sig -> IO ()) -> a -> IO ()
 runTool tool sig_ = do
   putStrLn "== API =="
-  print (signature sig_)
+  putStr (show (signature sig_))
   let sig = signature sig_ `mappend` undefinedsSig (signature sig_)
 
   tool sig

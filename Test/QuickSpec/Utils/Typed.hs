@@ -60,6 +60,9 @@ someType (Some x) = typeOf (witness x)
   where witness :: f a -> a
         witness = undefined
 
+someWitness :: Some f -> Witness
+someWitness = mapSome (const undefined)
+
 splitArrow :: TypeRep -> Maybe (TypeRep, TypeRep)
 splitArrow ty =
   case splitTyConApp ty of

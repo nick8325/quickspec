@@ -56,53 +56,67 @@ updateDepth n sig = sig { maxDepth_ = First (Just n) }
 
 instance Show Sig where show = unlines . summarise
 
+data Used = Used Witness [Symbol]
+instance Show Used where
+  show (Used w ks) =
+    show w ++ " (used in " ++ intercalate ", " (map show ks) ++ ")"
+
+uses :: Sig -> Witness -> Used
+uses sig w =
+  Used w
+    [ sym (unConstant k)
+    | Some k <- TypeRel.toList (constants sig),
+      w' <- constantArgs sig k,
+      w == w' ]
+
 summarise :: Sig -> [String]
 summarise sig =
-  [ "-- functions --" ] ++
-    describe showOp (sym . unConstant) (not . isSilent) constants ++
-  concat [
-    [ "", "-- background functions --" ] ++
-      describe showOp (sym . unConstant) isSilent constants
-    | not (null (filter (some isSilent) (TypeRel.toList (constants sig)))) ] ++
-  [ "", "-- variables --" ] ++
-    describe id (sym . unVariable) (const True) variables ++
-  warn [ "", "-- the following types are using non-standard equality --" ]
-    (Map.keys (observers sig)) ++
+  section ["-- functions --"]
+    (decls (filter (not . silent) allConstants)) ++
+  section ["-- background functions --"]
+    (decls (filter silent allConstants)) ++
+  section ["-- variables --"]
+    (decls allVariables) ++
+  section ["-- the following types are using non-standard equality --"]
+    (map show (Map.keys (observers sig))) ++
 
-  warn ["",
-        "-- WARNING: the following types are uninhabited --"]
-    [ typeOf w
-    | ty@(Some (Witness w)) <- argumentTypes sig,
-      ty `notElem` inhabitedTypes sig,
-      null (TypeRel.lookup w (variables sig)) ] ++
-  warn ["",
-        "-- WARNING: there are no variables of the following types; consider adding some --"]
-    [ typeOf w
-    | ty@(Some (Witness w)) <- argumentTypes sig,
-      -- There is a non-variable term of this type and it appears as the
-      -- argument to some function
-      ty `elem` inhabitedTypes sig,
-      null (TypeRel.lookup w (variables sig)) ] ++
-  warn ["",
-        "-- WARNING: cannot test the following types; ",
+  section ["-- WARNING: the following types are uninhabited --"]
+    (usort
+     [ show (uses sig ty)
+     | ty <- argumentTypes sig,
+       ty `notElem` inhabitedTypes sig,
+       ty `notElem` variableTypes sig ]) ++
+
+  section ["-- WARNING: there are no variables of the following types; consider adding some --"]
+    (usort
+     [ show ty
+     | ty <- argumentTypes sig,
+       -- There is a non-variable term of this type and it appears as the
+       -- argument to some function
+       ty `elem` inhabitedTypes sig,
+       ty `notElem` variableTypes sig ]) ++
+  section ["-- WARNING: cannot test the following types; ",
         "            consider using 'fun' instead of 'blind' or using 'observe' --"]
-    [ typeOf w
-    | Some (Witness w) <- saturatedTypes sig,
-      -- The type is untestable and is the result type of a constant
-      not (testable sig w) ]
+    (usort
+     [ show ty
+     | ty@(Some (Witness w)) <- saturatedTypes sig,
+       -- The type is untestable and is the result type of a constant
+       not (testable sig w) ])
 
   where
-    describe :: (String -> String) -> (forall a. f a -> Symbol) ->
-                (forall a. f a -> Bool) ->
-                (Sig -> TypeRel f) -> [String]
-    describe decorate un p f =
-      [ intercalate ", " (map (decorate . name) xs) ++ " :: " ++ show (symbolType x)
-      | xs@(x:_) <- partitionBy symbolType (map (some un) (filter (some p) (TypeRel.toList (f sig)))) ]
+    symbols :: (Sig -> TypeRel f) -> (forall a. f a -> Symbol) -> [Symbol]
+    symbols f erase = map (some erase) (TypeRel.toList (f sig))
 
-    warn _ [] = []
-    warn msg xs = msg ++ map show (usort xs)
+    allConstants = symbols constants (sym . unConstant)
+    allVariables = symbols variables (sym . unVariable)
 
-    isSilent (Constant (Atom { sym = sym })) = silent sym
+    section _ [] = []
+    section msg xs = msg ++ xs ++ [""]
+
+    decls xs = map decl (partitionBy symbolType xs)
+
+    decl xs@(x:_) =
+      intercalate ", " (map show xs) ++ " :: " ++ show (symbolType x)
 
 data Observer a = forall b. Ord b => Observer (Gen (a -> b))
 
@@ -320,6 +334,11 @@ argumentTypes sig =
   usort . concat $
     [ constantArgs sig k
     | Some k <- TypeRel.toList (constants sig) ]
+
+-- The set of types inhabited by variables.
+variableTypes :: Sig -> [Witness]
+variableTypes sig =
+  usort (map someWitness (TypeRel.toList (variables sig)))
 
 -- Given a type, find a witness that it's a function.
 witnessArrow :: Typeable a => Sig -> a -> Maybe (Witness, Witness)
