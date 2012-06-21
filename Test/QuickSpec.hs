@@ -14,6 +14,7 @@ module Test.QuickSpec
    without,
 
    A,
+   Two,
    prelude,
    bools,
    arith,

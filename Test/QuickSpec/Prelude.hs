@@ -10,6 +10,15 @@ import Data.Typeable
 
 newtype A = A Int deriving (Eq, Ord, Typeable, Arbitrary, CoArbitrary)
 
+data Two = One | Two deriving (Eq, Ord, Typeable)
+
+instance Arbitrary Two where
+  arbitrary = elements [One, Two]
+
+instance CoArbitrary Two where
+  coarbitrary One = variant 0
+  coarbitrary Two = variant (-1)
+
 bools :: Sig
 bools = background [
   ["x", "y", "z"] `vars` (undefined :: Bool),
