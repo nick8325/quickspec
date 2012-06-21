@@ -25,8 +25,7 @@ terms :: Sig -> TypeRel Expr -> TypeRel Expr
 terms sig base =
   TypeMap.fromList
     [ Some (O (terms' sig base w))
-    | Some (Witness w) <- saturatedTypes sig,
-      testable sig w ]
+    | Some (Witness w) <- usort (saturatedTypes sig ++ variableTypes sig) ]
 
 terms' :: Typeable a => Sig -> TypeRel Expr -> a -> [Expr a]
 terms' sig base w =
