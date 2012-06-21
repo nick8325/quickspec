@@ -1,11 +1,11 @@
 -- | The testing loop and term generation of QuickSpec.
 
-{-# LANGUAGE Rank2Types, TypeOperators #-}
+{-# LANGUAGE Rank2Types, TypeOperators, ScopedTypeVariables #-}
 module Test.QuickSpec.Generate where
 
 import Test.QuickSpec.Signature hiding (con)
 import qualified Test.QuickSpec.TestTree as T
-import Test.QuickSpec.TestTree(TestResults, reps, classes, numTests, cutOff)
+import Test.QuickSpec.TestTree(TestResults, reps, classes, numTests, cutOff, discrete)
 import Test.QuickSpec.Utils.Typed
 import Test.QuickSpec.Utils.TypeRel(TypeRel)
 import qualified Test.QuickSpec.Utils.TypeRel as TypeRel
@@ -44,16 +44,18 @@ test :: [(StdGen, Int)] -> Sig ->
         TypeMap (List `O` Expr) -> TypeMap (TestResults `O` Expr)
 test seeds sig ts = fmap (mapSome2 (test' seeds sig)) ts
 
-test' :: Typeable a => [(StdGen, Int)] -> Sig -> [Expr a] -> TestResults (Expr a)
-test' seeds sig ts =
-  case observe undefined sig of
-    Observer obs ->
-      let testCase (g, n) =
-            let (g1, g2) = split g
-                val = memoValuation sig (unGen valuation g1 n) in
-            \x -> teaspoon . force . unGen obs g2 n $ eval x val
-          force x = x == x `seq` x
-      in cutOff 250 250 (T.test (map testCase seeds) ts)
+test' :: forall a. Typeable a => [(StdGen, Int)] -> Sig -> [Expr a] -> TestResults (Expr a)
+test' seeds sig ts
+  | not (testable sig (undefined :: a)) = discrete ts
+  | otherwise =
+    case observe undefined sig of
+      Observer obs ->
+        let testCase (g, n) =
+              let (g1, g2) = split g
+                  val = memoValuation sig (unGen valuation g1 n) in
+              \x -> teaspoon . force . unGen obs g2 n $ eval x val
+            force x = x == x `seq` x
+        in cutOff 250 250 (T.test (map testCase seeds) ts)
 
 genSeeds :: IO [(StdGen, Int)]
 genSeeds = do

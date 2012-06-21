@@ -2,7 +2,7 @@
 --   equivalence classes by testing.
 
 module Test.QuickSpec.TestTree(TestTree, terms, union, test,
-               TestResults, cutOff, numTests, classes, reps) where
+               TestResults, cutOff, numTests, classes, reps, discrete) where
 
 import Data.List(sort)
 import Test.QuickSpec.Utils
@@ -60,6 +60,14 @@ test' (tc:tcs) xs = tree xs tc (map (test' tcs) bs)
 -- nodes have no branches. Since this breaks one of the TestTree
 -- invariants we use a different type.
 newtype TestResults a = Results (TestTree a)
+
+discrete :: Ord a => [a] -> TestResults a
+discrete xs =
+  case sort xs of
+    [] -> Results Nil
+    (y:ys) ->
+      Results (NonNil (Tree y ys (map singleton (y:ys))))
+      where singleton x = Tree x [] []
 
 cutOff :: Int -> Int -> TestTree a -> TestResults a
 cutOff _ _ Nil = Results Nil
