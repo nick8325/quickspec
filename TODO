@@ -1,0 +1,17 @@
+Port all possible old QS examples to new QS
+Switch from depth to size?!
+For things like modifiers (sortedList etc.): if a type has no terms of depth 1 (only depth 2), terms of that type should have their depth reduced by 1. Brittle, though: what about variables?
+Add definitions and missing terms warnings.
+Add user-accessible term generator like in Erlang QS?
+Add "ask why equation not printed."
+Introduce Equations.hs and typeclass for things with vars in (so that we can disambiguate either terms or equations).
+Add disambiguation in sampleTerms.
+Rename observer0 -> observer1 etc.
+
+This definition doesn't allow us to generate subterms of untestable or unsaturated type!!
+terms :: Sig -> TypeRel Expr -> TypeRel Expr
+terms sig base =
+  TypeMap.fromList
+    [ Some (O (terms' sig base w))
+    | Some (Witness w) <- saturatedTypes sig,
+      testable sig w ]
