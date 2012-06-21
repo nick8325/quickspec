@@ -179,6 +179,12 @@ ordSig x = emptySig { ords = TypeMap.singleton x }
 withDepth :: Int -> Sig
 withDepth n = updateDepth n emptySig
 
+without :: Sig -> [String] -> Sig
+without sig xs = sig { constants = f (constants sig) }
+  where
+    f = TypeRel.fromList . filter p . TypeRel.toList
+    p (Some (Constant k)) = name (sym k) `notElem` xs
+
 undefinedSig :: forall a. Typeable a => String -> a -> Sig
 undefinedSig x u = constantSig (Constant (Atom ((symbol x 0 u) { undef = True }) u))
 
@@ -238,9 +244,12 @@ background sig =
   where sig' = signature sig
         silence1 x = x { silent = True }
 
-vars :: forall a. (Arbitrary a, Typeable a) => [String] -> a -> Sig
-vars xs v = variableSig [ Variable (Atom (symbol x 0 v) (arbitrary `asTypeOf` return v)) | x <- xs ]
+gvars :: forall a. Typeable a => [String] -> Gen a -> Sig
+gvars xs g = variableSig [ Variable (Atom (symbol x 0 (undefined :: a)) g) | x <- xs ]
             `mappend` typeSig (undefined :: a)
+
+vars :: forall a. (Arbitrary a, Typeable a) => [String] -> a -> Sig
+vars xs _ = gvars xs (arbitrary :: Gen a)
 
 con, fun0 :: (Ord a, Typeable a) => String -> a -> Sig
 con = fun0
