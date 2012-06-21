@@ -53,7 +53,7 @@ instance Show Equation where
 
 undefinedsSig :: Sig -> Sig
 undefinedsSig sig =
-  mconcat
+  background
     [ undefinedSig "undefined" (undefined `asTypeOf` witness x)
     | Some x <- saturatedTypes sig ]
 
