@@ -90,13 +90,19 @@ quickSpec = runTool $ \sig -> do
     (length eqs)
     (length univ)
 
-  putStrLn "== Equations =="
   let pruned = filter (not . all silent . eqnFuns)
                  (prune (maxDepth sig) univ eqs)
       eqnFuns (t :=: u) = funs t ++ funs u
-  forM_ (zip [1 :: Int ..] pruned) $ \(i, eq) ->
-    printf "%d: %s\n" i (showEquation sig eq)
+      isGround (t :=: u) = null (vars t) && null (vars u)
+      (ground, nonground) = partition isGround pruned
+  putStrLn "== Ground equations =="
+  forM_ (zip [1 :: Int ..] ground) $ \(i, eq) ->
+    printf "%3d: %s\n" i (showEquation sig eq)
+  putStrLn ""
 
+  putStrLn "== Non-ground equations =="
+  forM_ (zip [length ground + 1 ..] nonground) $ \(i, eq) ->
+    printf "%3d: %s\n" i (showEquation sig eq)
   putStrLn ""
 
 sampleList :: StdGen -> Int -> [a] -> [a]
