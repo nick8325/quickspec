@@ -8,10 +8,7 @@ Introduce Equations.hs and typeclass for things with vars in (so that we can dis
 Add disambiguation in sampleTerms.
 Rename observer0 -> observer1 etc.
 
-This definition doesn't allow us to generate subterms of untestable or unsaturated type!!
-terms :: Sig -> TypeRel Expr -> TypeRel Expr
-terms sig base =
-  TypeMap.fromList
-    [ Some (O (terms' sig base w))
-    | Some (Witness w) <- saturatedTypes sig,
-      testable sig w ]
+Make test return a [[Term]] instead of a TestTree, so that we can get
+rid of TestTree.discrete. Maybe newtype Classes a = Classes [[a]].
+
+Regexes: use Brzozowski derivatives to get a useful specification
