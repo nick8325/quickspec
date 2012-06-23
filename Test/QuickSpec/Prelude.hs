@@ -57,7 +57,7 @@ funs _ = background [
   "."  `blind2` ((.) :: (a -> a) -> (a -> a) -> (a -> a)),
   "id" `blind0` (id  :: a -> a),
 
-  observer1 (\(x :: a) (f :: a -> a) -> f x)
+  observer2 (\(x :: a) (f :: a -> a) -> f x)
   ]
 
 prelude :: (Typeable a, Ord a, Arbitrary a) => a -> Sig

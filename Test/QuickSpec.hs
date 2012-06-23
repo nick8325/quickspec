@@ -8,7 +8,7 @@ module Test.QuickSpec
    con, fun0, fun1, fun2, fun3, fun4,
    vars,
    gvars,
-   observer0, observer1, observer2, observer3, observer4,
+   observer1, observer2, observer3, observer4,
    background,
    withDepth,
    without,

@@ -280,30 +280,24 @@ fun4 :: (Typeable a, Typeable b, Typeable c, Typeable d,
 fun4 x f = blind4 x f
            `mappend` ord (f undefined undefined undefined undefined)
 
-observer0 :: (Typeable a, Typeable b, Ord b) => (a -> b) -> Sig
-observer0 f = observerSig (Observer (return f))
+observer1 :: (Typeable a, Typeable b, Ord b) => (a -> b) -> Sig
+observer1 f = observerSig (Observer (return f))
 
-observer1 :: (Arbitrary a, Typeable a, Typeable b, Typeable c, Ord c) =>
+observer2 :: (Arbitrary a, Typeable a, Typeable b, Typeable c, Ord c) =>
              (a -> b -> c) -> Sig
-observer1 f = observerSig (Observer (f <$> arbitrary))
+observer2 f = observerSig (Observer (f <$> arbitrary))
 
-observer2 :: (Arbitrary a, Arbitrary b,
+observer3 :: (Arbitrary a, Arbitrary b,
               Typeable a, Typeable b, Typeable c, Typeable d,
               Ord d) =>
              (a -> b -> c -> d) -> Sig
-observer2 f = observerSig (Observer (f <$> arbitrary <*> arbitrary))
+observer3 f = observerSig (Observer (f <$> arbitrary <*> arbitrary))
 
-observer3 :: (Arbitrary a, Arbitrary b, Arbitrary c,
+observer4 :: (Arbitrary a, Arbitrary b, Arbitrary c,
               Typeable a, Typeable b, Typeable c, Typeable d, Typeable e,
               Ord e) =>
              (a -> b -> c -> d -> e) -> Sig
-observer3 f = observerSig (Observer (f <$> arbitrary <*> arbitrary <*> arbitrary))
-
-observer4 :: (Arbitrary a, Arbitrary b, Arbitrary c, Arbitrary d,
-              Typeable a, Typeable b, Typeable c, Typeable d, Typeable e, Typeable f,
-              Ord f) =>
-             (a -> b -> c -> d -> e -> f) -> Sig
-observer4 f = observerSig (Observer (f <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary))
+observer4 f = observerSig (Observer (f <$> arbitrary <*> arbitrary <*> arbitrary))
 
 testable :: Typeable a => Sig -> a -> Bool
 testable sig x =

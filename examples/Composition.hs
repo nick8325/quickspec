@@ -18,7 +18,7 @@ composition _ = [
 
   -- Tell QuickSpec how to compare values of function type:
   -- i.e., generate a random argument and apply the function to it.
-  observer1 $ \x (f :: a -> a) -> f x
+  observer2 $ \x (f :: a -> a) -> f x
   ]
 
 main = quickSpec (composition (undefined :: A))
