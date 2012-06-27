@@ -375,3 +375,24 @@ findWitness sig ty =
 
 lookupWitness :: Sig -> TypeRep -> Maybe Witness
 lookupWitness sig ty = Map.lookup ty (witnesses sig)
+
+disambiguate :: Sig -> [Symbol] -> Symbol -> Symbol
+disambiguate sig ss x =
+  fromMaybe (error "Test.QuickSpec.Term.disambiguate: variable not found")
+    (find (\y -> index x == index y)
+      (aux [] (usort ss)))
+  where
+    aux used [] = []
+    aux used (x:xs) = x':aux (name x':used) xs
+      where x' | name x `elem` used = x { name = next }
+               | otherwise = x
+            next = head (filter (`notElem` used) candidates)
+            candidates
+              | null wellTypedNames = error "Test.QuickSpec.Term.disambiguate: null allVars"
+              | otherwise = wellTypedNames ++ concat [ map (++ show i) wellTypedNames | i <- [1.. ] ]
+            allVars =
+              map (some (sym . unVariable))
+                (TypeRel.toList (variables sig)) ++
+              ss
+            wellTypedNames =
+              [ name v | v <- allVars, symbolType v == symbolType x ]

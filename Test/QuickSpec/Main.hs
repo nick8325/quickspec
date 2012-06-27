@@ -28,25 +28,7 @@ showEquation :: Sig -> Equation -> String
 showEquation sig (t :=: u) =
   show (mapVars f t) ++ " == " ++ show (mapVars f u)
   where
-    -- Disambiguate variables if we have two variables of the same name
-    f x =
-      fromMaybe (error "Test.QuickSpec.Main.showEquation: variable not found")
-        (find (\y -> index x == index y)
-          (disambiguate [] (usort (vars t ++ vars u))))
-    disambiguate used [] = []
-    disambiguate used (x:xs) = x':disambiguate (name x':used) xs
-      where x' | name x `elem` used = x { name = next }
-               | otherwise = x
-            next = head (filter (`notElem` used) candidates)
-            candidates
-              | null wellTypedNames = error "Test.QuickSpec.Main.showEquation: null allVars"
-              | otherwise = wellTypedNames ++ concat [ map (++ show i) wellTypedNames | i <- [1.. ] ]
-            allVars =
-              map (some (sym . unVariable))
-                (TypeRel.toList (variables sig)) ++
-              vars t ++ vars u
-            wellTypedNames =
-              [ name v | v <- allVars, symbolType v == symbolType x ]
+    f = disambiguate sig (vars t ++ vars u)
 
 instance Show Equation where
   show = showEquation mempty
