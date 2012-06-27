@@ -376,11 +376,12 @@ findWitness sig ty =
 lookupWitness :: Sig -> TypeRep -> Maybe Witness
 lookupWitness sig ty = Map.lookup ty (witnesses sig)
 
-disambiguate :: Sig -> [Symbol] -> Symbol -> Symbol
-disambiguate sig ss x =
-  fromMaybe (error "Test.QuickSpec.Term.disambiguate: variable not found")
-    (find (\y -> index x == index y)
-      (aux [] (usort ss)))
+disambiguate :: Sig -> [Symbol] -> Term -> Term
+disambiguate sig ss =
+  mapVars (\x ->
+    fromMaybe (error "Test.QuickSpec.Term.disambiguate: variable not found")
+      (find (\y -> index x == index y)
+        (aux [] (usort ss))))
   where
     aux used [] = []
     aux used (x:xs) = x':aux (name x':used) xs

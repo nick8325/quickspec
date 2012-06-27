@@ -26,7 +26,7 @@ data Equation = Term :=: Term deriving (Eq, Ord)
 
 showEquation :: Sig -> Equation -> String
 showEquation sig (t :=: u) =
-  show (mapVars f t) ++ " == " ++ show (mapVars f u)
+  show (f t) ++ " == " ++ show (f u)
   where
     f = disambiguate sig (vars t ++ vars u)
 
@@ -112,6 +112,6 @@ sampleTerms = runTool $ \sig -> do
   printf "== Here are %d terms out of a total of %d ==\n" numTerms (length univ)
   g <- newStdGen
   forM_ (zip [1 :: Int ..] (sampleList g numTerms univ)) $ \(i, t) ->
-    printf "%d: %s\n" i (show t)
+    printf "%d: %s\n" i (show (disambiguate sig (vars t) t))
 
   putStrLn ""
