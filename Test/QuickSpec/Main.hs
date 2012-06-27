@@ -39,9 +39,6 @@ undefinedsSig sig =
     [ undefinedSig "undefined" (undefined `asTypeOf` witness x)
     | Some x <- saturatedTypes sig ]
 
-untypedClasses :: TypeMap (TestResults `O` Expr) -> [[Tagged Term]]
-untypedClasses = concatMap (some (map (map (tagged term)) . classes . unO)) . TypeMap.toList
-
 universe :: [[Tagged Term]] -> [Tagged Term]
 universe css = filter (not . isUndefined . erase) (concat css)
 
@@ -65,7 +62,7 @@ quickSpec :: Signature a => a -> IO ()
 quickSpec = runTool $ \sig -> do
   putStrLn "== Testing =="
   r <- generate sig
-  let clss = untypedClasses r
+  let clss = eraseClasses r
       eqs = equations clss
       univ = universe clss
   printf "%d raw equations; %d terms in universe.\n\n"
