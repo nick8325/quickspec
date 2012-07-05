@@ -21,17 +21,7 @@ import System.Random
 import Data.Monoid
 import Data.Maybe
 import Test.QuickSpec.Utils
-
-data Equation = Term :=: Term deriving (Eq, Ord)
-
-showEquation :: Sig -> Equation -> String
-showEquation sig (t :=: u) =
-  show (f t) ++ " == " ++ show (f u)
-  where
-    f = disambiguate sig (vars t ++ vars u)
-
-instance Show Equation where
-  show = showEquation mempty
+import Test.QuickSpec.Equation
 
 undefinedsSig :: Sig -> Sig
 undefinedsSig sig =
@@ -41,10 +31,6 @@ undefinedsSig sig =
 
 universe :: [[Tagged Term]] -> [Tagged Term]
 universe css = filter (not . isUndefined . erase) (concat css)
-
-equations :: [[Tagged Term]] -> [Equation]
-equations = sort . concatMap (toEquations . map erase)
-  where toEquations (x:xs) = [y :=: x | y <- xs]
 
 prune :: Int -> [Tagged Term] -> [Equation] -> [Equation]
 prune d univ eqs = evalEQ (initial d univ) (filterM (fmap not . provable) eqs)
