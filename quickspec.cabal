@@ -62,6 +62,7 @@ library
     Test.QuickSpec.Signature,
     Test.QuickSpec.Prelude,
     Test.QuickSpec.Term,
+    Test.QuickSpec.Equation,
     Test.QuickSpec.Generate,
     Test.QuickSpec.TestTree,
     Test.QuickSpec.Reasoning.UnionFind,
