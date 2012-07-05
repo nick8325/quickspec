@@ -4,6 +4,7 @@
 module Test.QuickSpec.Reasoning.NaiveEquationalReasoning where
 
 import Test.QuickSpec.Term
+import Test.QuickSpec.Equation
 import Test.QuickSpec.Reasoning.CongruenceClosure(CC)
 import qualified Test.QuickSpec.Reasoning.CongruenceClosure as CC
 import Data.Map(Map)
@@ -63,6 +64,9 @@ t =?= u = liftCC $ do
   y <- flatten u
   x CC.=?= y
 
+unifiable :: Equation -> EQ Bool
+unifiable (t :=: u) = t =?= u
+
 (=:=) :: Term -> Term -> EQ Bool
 t =:= u = do
   (ctx, d) <- ask
@@ -73,6 +77,9 @@ t =:= u = do
       u' <- subst s u
       t' CC.=:= u'
   return b
+
+unify :: Equation -> EQ Bool
+unify (t :=: u) = t =:= u
 
 type Subst = Symbol -> Int
 
