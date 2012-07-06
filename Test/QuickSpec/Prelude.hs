@@ -46,9 +46,7 @@ lists _ = background [
   ":"       `fun2` ((:)     :: a -> [a] -> [a]),
   "head"    `fun1` (head    :: [a] -> a),
   "tail"    `fun1` (tail    :: [a] -> [a]),
-  "++"      `fun2` ((++)    :: [a] -> [a] -> [a]),
-  "reverse" `fun1` (reverse :: [a] -> [a]),
-  "length"  `fun1` (length  :: [a] -> Int)]
+  "++"      `fun2` ((++)    :: [a] -> [a] -> [a])]
 
 funs :: forall a. (Typeable a, Ord a, Arbitrary a, CoArbitrary a) => a -> Sig
 funs _ = background [
