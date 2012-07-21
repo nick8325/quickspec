@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables #-}
+-- A simple booleans example.
 
 import Test.QuickSpec hiding (bools)
 

@@ -1,3 +1,5 @@
+-- Natural number functions.
+
 {-# LANGUAGE ScopedTypeVariables #-}
 
 import Test.QuickSpec hiding (arith)
