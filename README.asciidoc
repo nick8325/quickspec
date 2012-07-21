@@ -1,0 +1,117 @@
+QuickSpec: equational specifications by magic!
+==============================================
+
+Ever wanted to understand what your program really _does_? Got a
+hodgepodge of functions but not sure how they interact? QuickSpec is
+for you! Give it your program -- QuickSpec will find the laws it obeys.
+
+Give QuickSpec `reverse`, `++` and `[]`, for example, and it will find
+six laws:
+
+[source,haskell]
+------------------------------------------------
+xs++[] == xs
+[]++xs == xs
+reverse [] == []
+(xs++ys)++zs == xs++(ys++zs)
+reverse (reverse xs) == xs
+reverse xs++reverse ys == reverse (ys++xs)
+------------------------------------------------
+
+All the things you would expect to hold, and nothing more! Brill!
+
+End sales pitch. It can't be magic: what is the catch?
+
+* QuickSpec can only discover _equations_, not other kinds of laws.
+  Luckily, equations are good at describing Haskell programs.
+* You have to say exactly which functions and constants can appear
+  in the equations. In the example above, we gave
+  `reverse`, `++` and `[]`: nothing else appears in the equations,
+  not `:` for example.
+* QuickSpec will only discover equations about small(ish) terms.
+
+Installing
+----------
+
+`cabal install`. What a surprise!
+
+Tutorial 1: Booleans -- the basics
+----------------------------------
+
+Let's start by testing the boolean operators.
+
+To run QuickSpec, we must define a _signature_, the set of all
+functions we want to test, together with the variables that can appear
+in the generated equations.
+
+[source,haskell]
+------------------------------------------------
+bools = [
+  ["x", "y", "z"] `vars` (undefined :: Bool),
+
+  "||"    `fun2` (||),
+  "&&"    `fun2` (&&),
+  "not"   `fun1` not,
+  "True"  `fun0` True,
+  "False" `fun0` False]
+------------------------------------------------
+
+[source,haskell]
+------------------------------------------------
+import Test.QuickSpec hiding (bools)
+main = quickSpec bools
+------------------------------------------------
+
+You can find this code in link:examples/Bools.hs[examples/Bools.hs] in
+the QuickSpec distribution. Go on, run it!
+You will see that QuickSpec prints out:
+
+1. The signature it's testing. If something fishy is happening, check
+   that the functions and types match up with what you expect!
+2. A summary of its testing -- more on this in the next section.
+3. The equations it found -- the exciting bit!
+   Ground equations (those without any variables) are printed
+   separately, because they tend to be boring.
+
+Peering through what QuickSpec found, you should see the familiar
+laws of Boolean algebra.
+
+(The only weird thing that QuickSpec discovers is (FIXME make it print
+x||(y||z) for LHS). `y||(x||z) = x||(y||z)`. What is that? Well, it is
+a funny way of stating that `||` is associative -- when `||` is
+commutative this law is equivalent to associativity of `||`.)
+
+In principle, that's all there is to it! But you need a few more
+techniques to become fluent in QuickSpec.
+
+QuickSpec's not magic
+~~~~~~~~~~~~~~~~~~~~~
+
+------------------------------------------------
+Depth 3: 412 terms, 500 tests, 53 classes, 359 raw equations.
+359 raw equations; 411 terms in universe.
+------------------------------------------------
+
+Examples
+--------
+
+Have a look at the examples that come with QuickSpec.
+I know you won't, but a quick peek will really help before trying your
+own!
+
+link:examples/Bools.hs[Booleans -- the basics]
+
+link:examples/Arith.hs[Natural numbers -- polymorphic functions]
+
+link:examples/Lists.hs[List functions -- the prelude, and higher-order functions]
+
+link:examples/Heaps.hs[Binary heaps -- Hoare-style specifications]
+
+link:examples/Composition.hs[Function composition -- testing without an Ord instance]
+
+link:examples/Arrays.hs[Arrays -- custom generators]
+
+link:examples/TinyWM.hs[A tiny window manager]
+
+Where from here?
+----------------
