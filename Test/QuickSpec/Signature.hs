@@ -381,13 +381,11 @@ disambiguate sig ss =
   mapVars (\x ->
     fromMaybe (error "Test.QuickSpec.Term.disambiguate: variable not found")
       (find (\y -> index x == index y)
-        (aux [] (usort ss))))
+        (aux [] (nub ss))))
   where
     aux used [] = []
-    aux used (x:xs) = x':aux (name x':used) xs
-      where x' | name x `elem` used = x { name = next }
-               | otherwise = x
-            next = head (filter (`notElem` used) candidates)
+    aux used (x:xs) = x { name = next }:aux (next:used) xs
+      where next = head (filter (`notElem` used) candidates)
             candidates
               | null wellTypedNames = error "Test.QuickSpec.Term.disambiguate: null allVars"
               | otherwise = wellTypedNames ++ concat [ map (++ show i) wellTypedNames | i <- [1.. ] ]
