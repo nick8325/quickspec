@@ -3,7 +3,7 @@ QuickSpec: equational specifications by magic!
 
 (Hello!
 
-QuickSpec is more or less finished, but the documentation isn't!
+QuickSpec is more or less ready, but the documentation isn't!
 You probably oughtn't read this README yet.
 You may want to try looking at the examples directory,
 as well as
