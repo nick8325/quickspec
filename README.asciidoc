@@ -1,6 +1,14 @@
 QuickSpec: equational specifications by magic!
 ==============================================
 
+(Hello!
+
+QuickSpec is more or less finished, but the documentation isn't!
+You probably oughtn't read this README yet.
+You may want to try looking at the examples directory,
+as well as
+http://publications.lib.chalmers.se/records/fulltext/local_125255.pdf[our paper about it].)
+
 Ever wanted to understand what your program really _does_? Got a
 hodgepodge of functions but not sure how they interact? QuickSpec is
 for you! Give it your program -- QuickSpec will find the laws it obeys.
@@ -63,7 +71,7 @@ main = quickSpec bools
 ------------------------------------------------
 
 You can find this code in link:examples/Bools.hs[examples/Bools.hs] in
-the QuickSpec distribution. Go on, run it!
+the QuickSpec distribution. Go on, run it! (Compile it or else it'll go slow.)
 You will see that QuickSpec prints out:
 
 1. The signature it's testing. If something fishy is happening, check
@@ -96,8 +104,6 @@ Examples
 --------
 
 Have a look at the examples that come with QuickSpec.
-I know you won't, but a quick peek will really help before trying your
-own!
 
 link:examples/Bools.hs[Booleans -- the basics]
 
