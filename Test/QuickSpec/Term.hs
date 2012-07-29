@@ -99,6 +99,17 @@ holes t = holes' 0 t []
         holes' d Const{} = id
         holes' d (App f x) = holes' d f . holes' (d+1) x
 
+functor :: Term -> Symbol
+functor (Var x) = x
+functor (Const x) = x
+functor (App f x) = functor f
+
+args :: Term -> [Term]
+args = reverse . args'
+  where args' Var{} = []
+        args' Const{} = []
+        args' (App f x) = x:args' f
+
 funs :: Term -> [Symbol]
 funs t = aux t []
   where aux (Const x) = (x:)

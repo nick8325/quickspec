@@ -36,6 +36,32 @@ prune :: Int -> [Tagged Term] -> [Equation] -> [Equation]
 prune d univ eqs = evalEQ (initial d univ) (filterM (fmap not . provable) eqs)
   where provable (t :=: u) = t =:= u
 
+defines :: Equation -> Maybe Symbol
+defines (t :=: u) = do
+  let isVar Var{} = True
+      isVar _ = False
+
+      acyclic t =
+        all acyclic (args t) &&
+        case functor t == functor u of
+          True -> usort (map Var (vars t)) `isProperSubsetOf` args u
+          False -> True
+      xs `isProperSubsetOf` ys = xs `isSubsetOf` ys && sort xs /= sort ys
+      xs `isSubsetOf` ys = sort xs `isSublistOf` sort ys
+      [] `isSublistOf` _ = True
+      (x:xs) `isSublistOf` [] = False
+      (x:xs) `isSublistOf` (y:ys)
+        | x == y = xs `isSublistOf` ys
+        | otherwise = (x:xs) `isSublistOf` ys
+
+  guard (all isVar (args u) && usort (args u) == args u &&
+         acyclic t && vars t `isSubsetOf` vars u)
+
+  return (functor u)
+
+definitions :: [Equation] -> [Equation]
+definitions es = [ e | e <- es, defines e /= Nothing ]
+
 runTool :: Signature a => (Sig -> IO ()) -> a -> IO ()
 runTool tool sig_ = do
   putStrLn "== API =="
@@ -54,6 +80,8 @@ quickSpec = runTool $ \sig -> do
   printf "%d raw equations; %d terms in universe.\n\n"
     (length eqs)
     (length univ)
+
+  mapM_ (print . showEquation sig) (definitions eqs)
 
   let pruned = filter (not . all silent . eqnFuns)
                  (prune (maxDepth sig) univ eqs)
