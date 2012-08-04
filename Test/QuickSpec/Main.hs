@@ -81,8 +81,6 @@ quickSpec = runTool $ \sig -> do
     (length eqs)
     (length univ)
 
-  mapM_ (print . showEquation sig) (definitions eqs)
-
   let pruned = filter (not . all silent . eqnFuns)
                  (prune (maxDepth sig) univ eqs)
       eqnFuns (t :=: u) = funs t ++ funs u
