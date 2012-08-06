@@ -16,7 +16,6 @@ for you! Give it your program -- QuickSpec will find the laws it obeys.
 Give QuickSpec `reverse`, `++` and `[]`, for example, and it will find
 six laws:
 
-[source,haskell]
 ------------------------------------------------
 xs++[] == xs
 []++xs == xs
@@ -52,7 +51,6 @@ To run QuickSpec, we must define a _signature_, the set of all
 functions we want to test, together with the variables that can appear
 in the generated equations.
 
-[source,haskell]
 ------------------------------------------------
 bools = [
   ["x", "y", "z"] `vars` (undefined :: Bool),
@@ -64,7 +62,6 @@ bools = [
   "False" `fun0` False]
 ------------------------------------------------
 
-[source,haskell]
 ------------------------------------------------
 import Test.QuickSpec hiding (bools)
 main = quickSpec bools
