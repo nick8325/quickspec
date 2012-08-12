@@ -4,10 +4,7 @@ module Test.QuickSpec.Equation where
 
 import Test.QuickSpec.Term
 import Test.QuickSpec.Signature hiding (vars)
-import Test.QuickSpec.Utils
 import Test.QuickSpec.Utils.Typed
-import qualified Test.QuickSpec.Utils.TypeRel as TypeRel
-import Data.Maybe
 import Data.Monoid
 import Data.List
 

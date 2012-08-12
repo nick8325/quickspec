@@ -19,7 +19,6 @@ import Test.QuickCheck.Gen
 import System.Random
 import Control.Spoon
 import Test.QuickSpec.Utils.MemoValuation
-import Data.Maybe
 
 terms :: Sig -> TypeRel Expr -> TypeRel Expr
 terms sig base =

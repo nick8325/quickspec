@@ -6,9 +6,6 @@ module Test.QuickSpec.Main where
 import Test.QuickSpec.Generate
 import Test.QuickSpec.Reasoning.NaiveEquationalReasoning hiding (universe, maxDepth)
 import Test.QuickSpec.Utils.Typed
-import Test.QuickSpec.Utils.TypeRel(TypeRel)
-import qualified Test.QuickSpec.Utils.TypeRel as TypeRel
-import Test.QuickSpec.Utils.TypeMap(TypeMap)
 import qualified Test.QuickSpec.Utils.TypeMap as TypeMap
 import Test.QuickSpec.Signature hiding (vars)
 import Test.QuickSpec.Term
