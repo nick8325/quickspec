@@ -29,9 +29,20 @@ undefinedsSig sig =
 universe :: [[Tagged Term]] -> [Tagged Term]
 universe css = filter (not . isUndefined . erase) (concat css)
 
-prune :: Int -> [Tagged Term] -> [Equation] -> [Equation]
-prune d univ eqs = evalEQ (initial d univ) (filterM (fmap not . provable) eqs)
-  where provable (t :=: u) = t =:= u
+prune :: Int -> [Tagged Term] -> [Term] -> [Equation] -> [Equation]
+prune d univ reps eqs = evalEQ (initial d univ) (filterM (fmap not . provable) eqs)
+  where
+    provable (t :=: u) = do
+      res <- t =?= u
+      if res then return True else do
+        state <- get
+        -- Check that we won't unify two representatives---if we do
+        -- the equation is false
+        t =:= u
+        reps' <- mapM rep reps
+        if sort reps' == usort reps' then return False else do
+          put state
+          return True
 
 defines :: Equation -> Maybe Symbol
 defines (t :=: u) = do
@@ -72,6 +83,7 @@ quickSpec = runTool $ \sig -> do
   putStrLn "== Testing =="
   r <- generate sig
   let clss = eraseClasses r
+      reps = map (erase . head) clss
       eqs = equations clss
       univ = universe clss
   printf "%d raw equations; %d terms in universe.\n\n"
@@ -79,7 +91,7 @@ quickSpec = runTool $ \sig -> do
     (length univ)
 
   let pruned = filter (not . all silent . eqnFuns)
-                 (prune (maxDepth sig) univ eqs)
+                 (prune (maxDepth sig) univ reps eqs)
       eqnFuns (t :=: u) = funs t ++ funs u
       isGround (t :=: u) = null (vars t) && null (vars u)
       (ground, nonground) = partition isGround pruned

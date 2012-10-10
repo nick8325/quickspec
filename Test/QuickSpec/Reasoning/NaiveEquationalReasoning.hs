@@ -14,6 +14,7 @@ import qualified Data.IntMap as IntMap
 import Control.Monad
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Strict
+import qualified Control.Monad.Trans.State.Strict as S
 import Test.QuickSpec.Utils
 import Test.QuickSpec.Utils.Typed
 import Test.QuickSpec.Utils.Typeable
@@ -111,3 +112,12 @@ subst s (App f x) = do
 
 flatten :: Term -> CC Int
 flatten = subst index
+
+get :: EQ CC.S
+get = liftCC S.get
+
+put :: CC.S -> EQ ()
+put x = liftCC (S.put x)
+
+rep :: Term -> EQ Int
+rep x = liftCC (flatten x >>= CC.rep)
