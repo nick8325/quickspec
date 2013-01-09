@@ -11,6 +11,7 @@ module Test.QuickSpec
    observer1, observer2, observer3, observer4,
    background,
    withDepth,
+   withTests,
    without,
 
    A,

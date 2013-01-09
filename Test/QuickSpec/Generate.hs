@@ -53,7 +53,10 @@ test' seeds sig ts
                   val = memoValuation sig (unGen valuation g1 n) in
               \x -> teaspoon . force . unGen obs g2 n $ eval x val
             force x = x == x `seq` x
-        in cutOff 250 250 (T.test (map testCase seeds) ts)
+        in cutOff base increment (T.test (map testCase seeds) ts)
+  where
+    base = minTests sig `div` 2
+    increment = minTests sig - base
 
 genSeeds :: IO [(StdGen, Int)]
 genSeeds = do

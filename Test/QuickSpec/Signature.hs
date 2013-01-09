@@ -45,7 +45,10 @@ data Sig = Sig {
   witnesses :: TypeMap Witnessed,
 
   -- Depth of terms in the universe.
-  maxDepth_ :: First Int
+  maxDepth_ :: First Int,
+
+  -- Minimum number of tests to run.
+  minTests_ :: First Int
   }
 
 maxDepth :: Sig -> Int
@@ -53,6 +56,12 @@ maxDepth = fromMaybe 3 . getFirst . maxDepth_
 
 updateDepth :: Int -> Sig -> Sig
 updateDepth n sig = sig { maxDepth_ = First (Just n) }
+
+minTests :: Sig -> Int
+minTests = fromMaybe 500 . getFirst . minTests_
+
+updateMinTests :: Int -> Sig -> Sig
+updateMinTests n sig = sig { minTests_ = First (Just n) }
 
 instance Show Sig where show = unlines . summarise
 
@@ -126,7 +135,7 @@ observe x sig =
   where msg = "Test.QuickSpec.Signature.observe: no observers found for type " ++ show (typeOf x)
 
 emptySig :: Sig
-emptySig = Sig TypeRel.empty TypeRel.empty TypeMap.empty TypeMap.empty TypeMap.empty mempty
+emptySig = Sig TypeRel.empty TypeRel.empty TypeMap.empty TypeMap.empty TypeMap.empty mempty mempty
 
 instance Monoid Sig where
   mempty = emptySig
@@ -137,7 +146,8 @@ instance Monoid Sig where
       observers = observers s1 `mappend` observers s2,
       ords = ords s1 `mappend` ords s2,
       witnesses = witnesses s1 `mappend` witnesses s2,
-      maxDepth_ = maxDepth_ s1 `mappend` maxDepth_ s2 }
+      maxDepth_ = maxDepth_ s1 `mappend` maxDepth_ s2,
+      minTests_ = minTests_ s1 `mappend` minTests_ s2 }
     where constants' = TypeRel.toList (constants s1) ++
                        TypeRel.toList (constants s2)
           -- Overwrite variables if they're declared twice!
@@ -178,6 +188,9 @@ ordSig x = emptySig { ords = TypeMap.singleton x }
 
 withDepth :: Int -> Sig
 withDepth n = updateDepth n emptySig
+
+withTests :: Int -> Sig
+withTests n = updateMinTests n emptySig
 
 without :: Sig -> [String] -> Sig
 without sig xs = sig { constants = f (constants sig) }
