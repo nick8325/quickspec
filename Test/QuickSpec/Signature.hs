@@ -192,11 +192,13 @@ withDepth n = updateDepth n emptySig
 withTests :: Int -> Sig
 withTests n = updateMinTests n emptySig
 
-without :: Sig -> [String] -> Sig
-without sig xs = sig { constants = f (constants sig) }
+without :: Signature a => a -> [String] -> Sig
+without sig xs = sig' { constants = f p (constants sig'), variables = f q (variables sig') }
   where
-    f = TypeRel.fromList . filter p . TypeRel.toList
+    sig' = signature sig
+    f p = TypeRel.fromList . filter p . TypeRel.toList
     p (Some (Constant k)) = name (sym k) `notElem` xs
+    q (Some (Variable v)) = name (sym v) `notElem` xs
 
 undefinedSig :: forall a. Typeable a => String -> a -> Sig
 undefinedSig x u = constantSig (Constant (Atom ((symbol x 0 u) { undef = True }) u))
