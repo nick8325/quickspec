@@ -62,7 +62,7 @@ genSeeds :: IO [(StdGen, Int)]
 genSeeds = do
   rnd <- newStdGen
   let rnds rnd = rnd1 : rnds rnd2 where (rnd1, rnd2) = split rnd
-  return (zip (rnds rnd) (concat (repeat [0,2..20])))
+  return (zip (rnds rnd) (concat (repeat [0,2..100])))
 
 generate :: Sig -> IO (TypeMap (TestResults `O` Expr))
 generate sig | maxDepth sig < 0 =
