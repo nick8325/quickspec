@@ -7,7 +7,6 @@ module Test.QuickSpec.TestTree(TestTree, terms, union, test,
 import Data.List(sort)
 import Test.QuickSpec.Utils
 import Control.Exception(assert)
-import Control.Parallel.Strategies
 
 -- Invariant: the children of a TestTree are sorted according to the
 -- parent's test. We exploit this in defining merge.
@@ -93,7 +92,7 @@ unsortedClasses :: TestResults a -> [[a]]
 unsortedClasses (Results Nil) = []
 unsortedClasses (Results (NonNil t)) = aux t
   where aux Tree{rep = x, rest = xs, branches = []} = [x:xs]
-        aux Tree{branches = bs} = concat (parMap rseq aux bs)
+        aux Tree{branches = bs} = concatMap aux bs
 
 reps :: Ord a => TestResults a -> [a]
 reps = map head . classes

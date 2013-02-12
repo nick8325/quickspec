@@ -78,5 +78,5 @@ library
     Test.QuickSpec.Utils.MemoValuation
 
   Build-depends:
-    base < 5, containers, transformers, parallel >= 3, QuickCheck,
+    base < 5, containers, transformers, QuickCheck,
     random, spoon >= 0.2, array, ghc-prim
