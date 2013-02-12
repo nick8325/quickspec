@@ -72,7 +72,8 @@ library
     Test.QuickSpec.Utils.Typeable,
     Test.QuickSpec.Utils.Typed,
     Test.QuickSpec.Utils.TypeMap,
-    Test.QuickSpec.Utils.TypeRel
+    Test.QuickSpec.Utils.TypeRel,
+    Test.QuickSpec.Approximate
   Other-modules:
     -- Dangerous!
     Test.QuickSpec.Utils.MemoValuation
