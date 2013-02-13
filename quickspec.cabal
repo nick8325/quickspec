@@ -80,4 +80,4 @@ library
 
   Build-depends:
     base < 5, containers, transformers, QuickCheck,
-    random, spoon >= 0.2, array, ghc-prim
+    random, spoon >= 0.2, array, ghc-prim, data-default
