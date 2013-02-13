@@ -51,8 +51,7 @@ test' seeds sig ts
         let testCase (g, n) =
               let (g1, g2) = split g
                   val = memoValuation sig (unGen valuation g1 n) in
-              \x -> teaspoon . force . unGen obs g2 n $ eval x val
-            force x = x == x `seq` x
+              \x -> spoony . unGen obs g2 n $ eval x val
         in cutOff base increment (T.test (map testCase seeds) ts)
   where
     base = minTests sig `div` 2

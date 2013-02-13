@@ -7,6 +7,7 @@ import Data.List(groupBy, sortBy, group, sort)
 import Data.Ord(comparing)
 import System.IO
 import Control.Exception
+import Control.Spoon
 
 repeatM :: Monad m => m a -> m [a]
 repeatM = sequence . repeat
@@ -44,3 +45,6 @@ unbuffered x = do
     (hSetBuffering stdout NoBuffering)
     (hSetBuffering stdout buf)
     x
+
+spoony :: Eq a => a -> Maybe a
+spoony x = teaspoon ((x == x) `seq` x)
