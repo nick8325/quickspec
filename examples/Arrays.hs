@@ -12,13 +12,12 @@ put ix v arr = arr // [(ix, v)]
 arrays :: forall a. (Typeable a, Ord a, Arbitrary a) => a -> [Sig]
 arrays a = [
   -- Don't include head, or functions on natural numbers---they
-  -- generate too many irrelevant terms (FIXME: show sampleTerms).
+  -- generate too many irrelevant terms.
   prelude (undefined :: a) `without` ["head", "*", "0", "1"],
   lists (undefined :: Int) `without` ["head"],
 
   ["x", "y", "z"] `vars` (undefined :: a),
   ["a"]           `vars` (undefined :: Array Int a),
-  -- FIXME describe gvars.
   ["r"]           `gvars` genRange,
 
   "!"             `fun2` ((!)       :: Array Int a -> Int -> a),

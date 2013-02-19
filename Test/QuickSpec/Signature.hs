@@ -19,6 +19,7 @@ import Test.QuickSpec.Utils
 import Data.Maybe
 import Control.Monad
 
+-- | The class of things that can be used as a signature.
 class Signature a where
   signature :: a -> Sig
 
@@ -28,6 +29,7 @@ instance Signature Sig where
 instance Signature a => Signature [a] where
   signature = mconcat . map signature
 
+-- | A signature.
 data Sig = Sig {
   -- Constants, variables and observation functions.
   constants :: TypeRel Constant,
@@ -186,12 +188,23 @@ typeSig x = emptySig { witnesses = TypeMap.singleton (Witness x) }
 ordSig :: Typeable a => Observer a -> Sig
 ordSig x = emptySig { ords = TypeMap.singleton x }
 
+-- | If @withDepth n@ is in your signature,
+--   QuickSpec will consider terms of up to depth @n@
+--   (the default is 3).
 withDepth :: Int -> Sig
 withDepth n = updateDepth n emptySig
 
+-- | If @withTests n@ is in your signature,
+--   QuickSpec will run at least @n@ tests
+--   (the default is 500).
 withTests :: Int -> Sig
 withTests n = updateMinTests n emptySig
 
+-- | @sig \`without\` xs@ will remove the functions
+--   in @xs@ from the signature @sig@.
+--   Useful when you want to use `Test.QuickSpec.prelude`
+--   but exclude some functions.
+--   Example: @`prelude` (undefined :: A) \`without\` [\"head\", \"tail\"]@.
 without :: Signature a => a -> [String] -> Sig
 without sig xs = sig' { constants = f p (constants sig'), variables = f q (variables sig') }
   where
@@ -231,17 +244,22 @@ primCon4 n x f = primCon3 n x f
                  `mappend` typeSig (undefined :: d)
                  `mappend` typeSig (undefined :: e)
 
+-- | A constant.
 blind0 :: forall a. Typeable a => String -> a -> Sig
 blind0 = primCon0 0
+-- | A unary function.
 blind1 :: forall a b. (Typeable a, Typeable b) =>
           String -> (a -> b) -> Sig
 blind1 = primCon1 1
+-- | A binary function.
 blind2 :: forall a b c. (Typeable a, Typeable b, Typeable c) =>
           String -> (a -> b -> c) -> Sig
 blind2 = primCon2 2
+-- | A ternary function.
 blind3 :: forall a b c d. (Typeable a, Typeable b, Typeable c, Typeable d) =>
           String -> (a -> b -> c -> d) -> Sig
 blind3 = primCon3 3
+-- | A function of arity 4.
 blind4 :: forall a b c d e. (Typeable a, Typeable b, Typeable c, Typeable d, Typeable e) =>
           String -> (a -> b -> c -> d -> e) -> Sig
 blind4 = primCon4 4
@@ -252,6 +270,11 @@ ord x = ordSig (Observer (return id) `observing` x)
 observing :: Observer a -> a -> Observer a
 observing x _ = x
 
+-- | Mark all the functions in a signature as background functions.
+--
+-- QuickSpec will only print a law if it contains at least one non-background function.
+--
+-- The functions in e.g. `Test.QuickSpec.prelude` are declared as background functions.
 background :: Signature a => a -> Sig
 background sig =
   sig' { constants = TypeRel.mapValues (mapConstant silence1) (constants sig'),
@@ -259,55 +282,73 @@ background sig =
   where sig' = signature sig
         silence1 x = x { silent = True }
 
+-- | Similar to `vars`, but takes a generator as a parameter.
+--
+-- @gvars xs (arbitrary :: Gen a)@ is the same as
+-- @vars xs (undefined :: a)@.
 gvars :: forall a. Typeable a => [String] -> Gen a -> Sig
 gvars xs g = variableSig [ Variable (Atom (symbol x 0 (undefined :: a)) g) | x <- xs ]
             `mappend` typeSig (undefined :: a)
 
+-- | Declare a set of variables of a particular type.
+--
+-- For example, @vars [\"x\",\"y\",\"z\"] (undefined :: Int)@
+-- defines three variables, @x@, @y@ and @z@, of type `Int`.
 vars :: forall a. (Arbitrary a, Typeable a) => [String] -> a -> Sig
 vars xs _ = gvars xs (arbitrary :: Gen a)
 
 con, fun0 :: (Ord a, Typeable a) => String -> a -> Sig
+-- | A constant. The same as `fun0`.
 con = fun0
+-- | A constant. The same as `con`.
 fun0 x f = blind0 x f
            `mappend` ord f
 
+-- | A unary function.
 fun1 :: (Typeable a,
          Typeable b, Ord b) =>
         String -> (a -> b) -> Sig
 fun1 x f = blind1 x f
            `mappend` ord (f undefined)
 
+-- | A binary function.
 fun2 :: (Typeable a, Typeable b,
          Typeable c, Ord c) =>
         String -> (a -> b -> c) -> Sig
 fun2 x f = blind2 x f
            `mappend` ord (f undefined undefined)
 
+-- | A ternary function.
 fun3 :: (Typeable a, Typeable b, Typeable c,
          Typeable d, Ord d) =>
         String -> (a -> b -> c -> d) -> Sig
 fun3 x f = blind3 x f
            `mappend` ord (f undefined undefined undefined)
 
+-- | A function of four arguments.
 fun4 :: (Typeable a, Typeable b, Typeable c, Typeable d,
          Typeable e, Ord e) =>
         String -> (a -> b -> c -> d -> e) -> Sig
 fun4 x f = blind4 x f
            `mappend` ord (f undefined undefined undefined undefined)
 
+-- | An observation function of arity 1.
 observer1 :: (Typeable a, Typeable b, Ord b) => (a -> b) -> Sig
 observer1 f = observerSig (Observer (return f))
 
+-- | An observation function of arity 2.
 observer2 :: (Arbitrary a, Typeable a, Typeable b, Typeable c, Ord c) =>
              (a -> b -> c) -> Sig
 observer2 f = observerSig (Observer (f <$> arbitrary))
 
+-- | An observation function of arity 3.
 observer3 :: (Arbitrary a, Arbitrary b,
               Typeable a, Typeable b, Typeable c, Typeable d,
               Ord d) =>
              (a -> b -> c -> d) -> Sig
 observer3 f = observerSig (Observer (f <$> arbitrary <*> arbitrary))
 
+-- | An observation function of arity 4.
 observer4 :: (Arbitrary a, Arbitrary b, Arbitrary c,
               Typeable a, Typeable b, Typeable c, Typeable d, Typeable e,
               Ord e) =>

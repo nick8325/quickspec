@@ -78,6 +78,7 @@ runTool tool sig_ = do
 
   tool sig
 
+-- | Run QuickSpec on a signature.
 quickSpec :: Signature a => a -> IO ()
 quickSpec = runTool $ \sig -> do
   putStrLn "== Testing =="
@@ -117,6 +118,8 @@ sampleList g n xs | n >= length xs = xs
       | otherwise = aux g' size (len-1) xs
       where (i, g') = randomR (1, len) g
 
+-- | Generate random terms from a signature. Useful when QuickSpec is
+--   generating too many terms and you want to know what they look like.
 sampleTerms :: Signature a => a -> IO ()
 sampleTerms = runTool $ \sig -> do
   putStrLn "== Testing =="

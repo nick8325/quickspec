@@ -1,5 +1,5 @@
 Name:                quickspec
-Version:             1.0
+Version:             0.9
 Cabal-version:       >=1.6
 Build-type:          Simple
 
@@ -9,7 +9,7 @@ Maintainer:          nicsma@chalmers.se
 
 License:             BSD3
 License-file:        LICENSE
-Copyright:           2009-2012 Nick Smallbone
+Copyright:           2009-2013 Nick Smallbone
 
 Category:            Testing
 
@@ -36,10 +36,16 @@ Description:
   * A collection of variables that can appear in the equations
     (@xs@, @ys@ and @zs@ in the example above).
   .
-  * 'Test.QuickCheck.Arbitrary' instances for the types you want to test.
+  * 'Test.QuickCheck.Arbitrary' and 'Data.Typeable.Typeable' instances for the types you want to test.
   .
-  For more information, see the documentation of the main
-  @Test.QuickSpec@ module.
+  Consider this a pre-release. Everything is complete but undocumented
+  :) The best place to start is the examples at
+  <http://github.com/nick8325/quickspec/tree/master/examples>. There
+  is also a paper at
+  <http://www.cse.chalmers.se/~nicsma/quickspec.pdf>.
+  Everything you need should be in the module "Test.QuickSpec".
+  .
+  If you want help, email me!
 
 Extra-source-files:
   README
