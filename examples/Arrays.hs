@@ -35,7 +35,7 @@ instance Arbitrary a => Arbitrary (Array Int a) where
 genRange :: Gen (Int, Int)
 genRange = do
   low <- choose (-2, 2)
-  high <- fmap (low +) (choose (-1, 4))
+  high <- fmap (low +) (choose (-1, 2))
   return (low, high)
 
 main = quickSpec (arrays (undefined :: Two))
