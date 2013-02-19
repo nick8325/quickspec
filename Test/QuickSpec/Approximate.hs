@@ -13,20 +13,18 @@ import Control.Spoon
 import System.Random
 import Data.Monoid
 
-newtype Plug = Plug { unPlug :: forall a. Partial a => a -> Gen a }
+newtype Plug = Plug { unPlug :: forall a. Partial a => Gen a -> Gen a }
 type GP = ReaderT Plug Gen
 
-plug :: Partial a => a -> GP a
-plug x = do
-  f <- ask
-  ReaderT (\_ -> unPlug f x)
+plug :: Partial a => GP a -> GP a
+plug x = ReaderT (\plug -> unPlug plug (runReaderT x plug))
 
 class (Typeable a, Arbitrary a, Eq a) => Partial a where
   unlifted :: a -> GP a
   unlifted x = return x
 
 lifted :: Partial a => a -> GP a
-lifted x = unlifted x >>= plug
+lifted x = plug (unlifted x)
 
 instance Partial ()
 instance Partial Int
@@ -40,11 +38,15 @@ instance Partial a => Partial [a] where
 approximate :: Partial a => (StdGen, Int) -> a -> a
 approximate (g, n) x = unGen (runReaderT (lifted x) (Plug plug)) g n
   where
-    plug :: forall a. Partial a => a -> Gen a
+    plug :: forall a. Partial a => Gen a -> Gen a
     plug x =
-      case spoony x of
-        Nothing -> return (unGen arbitrary g n)
-        Just y -> return y
+      sized $ \m ->
+        if m == 0 then return (unGen arbitrary g n)
+        else resize (m-1) $ do
+          y <- x
+          case spoony y of
+            Just z -> return z
+            Nothing -> return (unGen arbitrary g n)
 
 pobserver :: (Ord a, Partial a) => a -> Sig
 pobserver x = observerSig (Observer (MkGen f))
@@ -53,7 +55,7 @@ pobserver x = observerSig (Observer (MkGen f))
 genPartial :: Partial a => a -> Gen a
 genPartial x = runReaderT (lifted x) (Plug plug)
   where
-    plug x = frequency [(1, undefined), (3, return x)]
+    plug x = frequency [(1, undefined), (3, x)]
 
 pvars :: (Ord a, Partial a) => [String] -> a -> Sig
 pvars xs w = 
