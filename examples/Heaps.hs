@@ -72,14 +72,18 @@ heaps a = [
   "deleteMin"  `fun1` (deleteMin  :: Heap a -> Heap a),
   "merge"      `fun2` (merge      :: Heap a -> Heap a -> Heap a),
   "null"       `fun1` (null       :: Heap a -> Bool),
-  "toList"     `fun1` (toList     :: Heap a -> [a]),
   "fromList"   `fun1` (fromList   :: [a] -> Heap a),
 
   -- A few more list functions that are helpful for getting
   -- laws about toList/fromList.
   -- We use "background" to mark the functions as background theory,
   -- so that we only get laws that involve one of the heap functions.
+  -- toList is marked as background to make the presentation of the
+  -- equations a bit prettier: laws about e.g. findMin and toList
+  -- will appear in QuickSpec's "Equations about findMin" section
+  -- rather than "Equations about several functions".
   background [
+  "toList"     `fun1` (toList     :: Heap a -> [a]),
   "sort"       `fun1` (L.sort     :: [a] -> [a]),
   "insertList" `fun2` (L.insert   :: a -> [a] -> [a]),
   "nullList"   `fun1` (L.null     :: [a] -> Bool),
