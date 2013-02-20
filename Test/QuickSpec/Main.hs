@@ -78,6 +78,23 @@ runTool tool sig_ = do
 
   tool sig
 
+data Target = Target Symbol | NoTarget deriving (Eq, Ord)
+
+target :: Equation -> Target
+target (t :=: u) =
+  case usort (filter p (funs t ++ funs u)) of
+    [f] -> Target f
+    _ -> NoTarget
+  where p x = not (silent x) && symbolArity x > 0
+
+innerZip :: [a] -> [[b]] -> [[(a,b)]]
+innerZip [] _ = []
+innerZip _ [] = []
+innerZip xs ([]:yss) = []:innerZip xs yss
+innerZip (x:xs) ((y:ys):yss) =
+  let (zs:zss) = innerZip xs (ys:yss)
+  in ((x,y):zs):zss
+
 -- | Run QuickSpec on a signature.
 quickSpec :: Signature a => a -> IO ()
 quickSpec = runTool $ \sig -> do
@@ -95,16 +112,15 @@ quickSpec = runTool $ \sig -> do
                  (prune (maxDepth sig) univ reps eqs)
       eqnFuns (t :=: u) = funs t ++ funs u
       isGround (t :=: u) = null (vars t) && null (vars u)
-      (ground, nonground) = partition isGround pruned
-  putStrLn "== Ground equations =="
-  forM_ (zip [1 :: Int ..] ground) $ \(i, eq) ->
-    printf "%3d: %s\n" i (showEquation sig eq)
-  putStrLn ""
+      byTarget = innerZip [1 :: Int ..] (partitionBy target pruned)
 
-  putStrLn "== Non-ground equations =="
-  forM_ (zip [length ground + 1 ..] nonground) $ \(i, eq) ->
-    printf "%3d: %s\n" i (showEquation sig eq)
-  putStrLn ""
+  forM_ byTarget $ \eqs@((_,eq):_) -> do
+    case target eq of
+      NoTarget -> putStrLn "== Equations about several functions =="
+      Target f -> printf "== Equations about %s ==\n" (show f)
+    forM_ eqs $ \(i, eq) ->
+      printf "%3d: %s\n" i (showEquation sig eq)
+    putStrLn ""
 
 sampleList :: StdGen -> Int -> [a] -> [a]
 sampleList g n xs | n >= length xs = xs
