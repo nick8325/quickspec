@@ -65,8 +65,8 @@ t =?= u = liftCC $ do
   y <- flatten u
   x CC.=?= y
 
-unifiable :: Equation -> EQ Bool
-unifiable (t :=: u) = t =?= u
+equal :: Equation -> EQ Bool
+equal (t :=: u) = t =?= u
 
 (=:=) :: Term -> Term -> EQ Bool
 t =:= u = do
