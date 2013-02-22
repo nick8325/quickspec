@@ -23,23 +23,28 @@ import Data.List
 
 data Context = Context {
   rel :: CC.S,
-  universe :: Map TypeRep Universe,
-  maxDepth :: Int
+  maxDepth :: Int,
+  universe :: IntMap Universe
   }
 
 type Universe = IntMap [Int]
 
-type EQ = ReaderT (Map TypeRep Universe, Int) CC
+type EQ = ReaderT (Int, IntMap Universe) CC
 
-initial :: Int -> [Tagged Term] -> Context
-initial d ts =
-  let n = 1+maximum (0:concatMap (map index . symbols . erase) ts)
+initial :: Int -> [Symbol] -> [Tagged Term] -> Context
+initial d syms ts =
+  let n = 1+maximum (0:map index syms)
       (universe, rel) =
         CC.runCC (CC.initial n) $
           forM (partitionBy (witnessType . tag) ts) $ \xs@(x:_) ->
             fmap (witnessType (tag x),) (createUniverse (map erase xs))
+      univMap = Map.fromList universe
 
-  in Context rel (Map.fromList universe) d
+  in Context rel d . IntMap.fromList $ [
+    (index sym,
+     Map.findWithDefault (error "NaiveEquationalReasoning: type not found")
+       (symbolType sym) univMap)
+    | sym <- syms ]
 
 createUniverse :: [Term] -> CC Universe
 createUniverse ts = fmap IntMap.fromList (mapM createTerms tss)
@@ -48,7 +53,7 @@ createUniverse ts = fmap IntMap.fromList (mapM createTerms tss)
 
 runEQ :: Context -> EQ a -> (a, Context)
 runEQ ctx x = (y, ctx { rel = rel' })
-  where (y, rel') = runState (runReaderT x (universe ctx, maxDepth ctx)) (rel ctx)
+  where (y, rel') = runState (runReaderT x (maxDepth ctx, universe ctx)) (rel ctx)
 
 evalEQ :: Context -> EQ a -> a
 evalEQ ctx x = fst (runEQ ctx x)
@@ -70,7 +75,7 @@ equal (t :=: u) = t =?= u
 
 (=:=) :: Term -> Term -> EQ Bool
 t =:= u = do
-  (ctx, d) <- ask
+  (d, ctx) <- ask
   b <- t =?= u
   unless b $
     forM_ (substs t ctx d ++ substs u ctx d) $ \s -> liftCC $ do
@@ -84,16 +89,16 @@ unify (t :=: u) = t =:= u
 
 type Subst = Symbol -> Int
 
-substs :: Term -> Map TypeRep Universe -> Int -> [Subst]
+substs :: Term -> IntMap Universe -> Int -> [Subst]
 substs t univ d = map lookup (sequence (map choose vars))
   where vars = map (maximumBy (comparing snd)) .
                partitionBy fst .
                holes $ t
 
         choose (x, n) =
-          let m = Map.findWithDefault
+          let m = IntMap.findWithDefault
                   (error "Test.QuickSpec.Reasoning.NaiveEquationalReasoning.substs: empty universe")
-                  (symbolType x) univ in
+                  (index x) univ in
           [ (x, t)
           | d' <- [0..d-n],
             t <- IntMap.findWithDefault [] d' m ]

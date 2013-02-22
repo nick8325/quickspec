@@ -7,6 +7,7 @@ import Test.QuickSpec.Generate
 import Test.QuickSpec.Reasoning.NaiveEquationalReasoning hiding (universe, maxDepth)
 import Test.QuickSpec.Utils.Typed
 import qualified Test.QuickSpec.Utils.TypeMap as TypeMap
+import qualified Test.QuickSpec.Utils.TypeRel as TypeRel
 import Test.QuickSpec.Signature hiding (vars)
 import Test.QuickSpec.Term
 import Control.Monad
@@ -29,8 +30,8 @@ undefinedsSig sig =
 universe :: [[Tagged Term]] -> [Tagged Term]
 universe css = filter (not . isUndefined . erase) (concat css)
 
-prune :: Int -> [Tagged Term] -> [Term] -> [Equation] -> [Equation]
-prune d univ reps eqs = evalEQ (initial d univ) (filterM (fmap not . provable) eqs)
+prune :: Context -> [Term] -> [Equation] -> [Equation]
+prune ctx reps eqs = evalEQ ctx (filterM (fmap not . provable) eqs)
   where
     provable (t :=: u) = do
       res <- t =?= u
@@ -104,12 +105,16 @@ quickSpec = runTool $ \sig -> do
       reps = map (erase . head) clss
       eqs = equations clss
       univ = universe clss
+      syms =
+        map (some (sym . unConstant)) (TypeRel.toList (constants sig)) ++
+        map (some (sym . unVariable)) (TypeRel.toList (variables sig))
   printf "%d raw equations; %d terms in universe.\n\n"
     (length eqs)
     (length univ)
 
-  let pruned = filter (not . all silent . eqnFuns)
-                 (prune (maxDepth sig) univ reps eqs)
+  let ctx = initial (maxDepth sig) syms univ
+      pruned = filter (not . all silent . eqnFuns)
+                 (prune ctx reps eqs)
       eqnFuns (t :=: u) = funs t ++ funs u
       isGround (t :=: u) = null (vars t) && null (vars u)
       byTarget = innerZip [1 :: Int ..] (partitionBy target pruned)
