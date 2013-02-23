@@ -78,6 +78,16 @@ unify (pre :\/: eq) = do
       Just i | i `notElem` pre -> return True
       _ -> EQ.unify eq
 
+precondition :: Equation -> PEQ Precondition
+precondition eq = do
+  Context _ partial <- S.get
+  fmap concat . liftEQ (IntMap.keys partial) $ \n ->
+    case n of
+      Nothing -> return []
+      Just i -> do
+        r <- EQ.equal eq
+        if r then return [i] else return []
+
 get :: PEQ Context
 get = S.get
 
