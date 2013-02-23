@@ -74,7 +74,10 @@ equal :: Equation -> EQ Bool
 equal (t :=: u) = t =?= u
 
 (=:=) :: Term -> Term -> EQ Bool
-t =:= u = do
+t =:= u = unify (t :=: u)
+
+unify :: Equation -> EQ Bool
+unify (t :=: u) = do
   (d, ctx) <- ask
   b <- t =?= u
   unless b $
@@ -83,9 +86,6 @@ t =:= u = do
       u' <- subst s u
       t' CC.=:= u'
   return b
-
-unify :: Equation -> EQ Bool
-unify (t :=: u) = t =:= u
 
 type Subst = Symbol -> Int
 
