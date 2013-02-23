@@ -1,5 +1,5 @@
 Name:                quickspec
-Version:             0.9
+Version:             0.9.1
 Cabal-version:       >=1.6
 Build-type:          Simple
 
@@ -74,6 +74,7 @@ library
     Test.QuickSpec.Reasoning.UnionFind,
     Test.QuickSpec.Reasoning.CongruenceClosure,
     Test.QuickSpec.Reasoning.NaiveEquationalReasoning,
+    Test.QuickSpec.Reasoning.PartialEquationalReasoning,
     Test.QuickSpec.Utils,
     Test.QuickSpec.Utils.Typeable,
     Test.QuickSpec.Utils.Typed,
