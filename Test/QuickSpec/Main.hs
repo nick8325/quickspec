@@ -100,11 +100,11 @@ innerZip (x:xs) ((y:ys):yss) =
 quickSpec :: Signature a => a -> IO ()
 quickSpec = runTool $ \sig -> do
   putStrLn "== Testing =="
-  r <- generate (const totalGen) sig
+  r <- generate (const partialGen) sig
   let clss = eraseClasses r
       reps = map (erase . head) clss
       eqs = equations clss
-      univ = universe clss
+      univ = map head clss
       syms =
         map (some (sym . unConstant)) (TypeRel.toList (constants sig)) ++
         map (some (sym . unVariable)) (TypeRel.toList (variables sig))
