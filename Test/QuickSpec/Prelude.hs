@@ -5,15 +5,16 @@
 module Test.QuickSpec.Prelude where
 
 import Test.QuickSpec.Signature
+import Test.QuickSpec.Approximate
 import Test.QuickCheck
 import Data.Typeable
 
 -- | Just a type.
 --   You can instantiate your polymorphic functions at this type
 --   to include them in a signature.
-newtype A = A Int deriving (Eq, Ord, Typeable, Arbitrary, CoArbitrary)
-newtype B = B Int deriving (Eq, Ord, Typeable, Arbitrary, CoArbitrary)
-newtype C = C Int deriving (Eq, Ord, Typeable, Arbitrary, CoArbitrary)
+newtype A = A Int deriving (Eq, Ord, Typeable, Arbitrary, CoArbitrary, Partial)
+newtype B = B Int deriving (Eq, Ord, Typeable, Arbitrary, CoArbitrary, Partial)
+newtype C = C Int deriving (Eq, Ord, Typeable, Arbitrary, CoArbitrary, Partial)
 
 -- | A type with two elements.
 --   Use this instead of @A@ if testing doesn't work well because

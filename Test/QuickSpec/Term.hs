@@ -150,6 +150,8 @@ data PGen a = PGen {
   partialGen :: Gen a
   }
 
+type Strategy = forall a. Symbol -> PGen a -> Gen a
+
 instance Functor PGen where
   fmap f (PGen tot par) = PGen (fmap f tot) (fmap f par)
 
@@ -163,8 +165,8 @@ mapConstant :: (Symbol -> Symbol) -> Constant a -> Constant a
 mapConstant f (Constant v) = Constant v { sym = f (sym v) }
 
 -- Generate a random variable valuation
-valuation :: (Symbol -> PGen a -> Gen a) -> Gen (Variable a -> a)
-valuation ctx = promote (\(Variable x) -> index (sym x) `variant'` ctx (sym x) (value x))
+valuation :: Strategy -> Gen (Variable a -> a)
+valuation strat = promote (\(Variable x) -> index (sym x) `variant'` strat (sym x) (value x))
   where -- work around the fact that split doesn't work
         variant' 0 = variant (0 :: Int)
         variant' n = variant (-1 :: Int) . variant' (n-1)
