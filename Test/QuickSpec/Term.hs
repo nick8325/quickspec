@@ -150,6 +150,9 @@ data PGen a = PGen {
   partialGen :: Gen a
   }
 
+pgen :: Gen a -> PGen a
+pgen g = PGen g g
+
 type Strategy = forall a. Symbol -> PGen a -> Gen a
 
 instance Functor PGen where

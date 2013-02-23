@@ -15,7 +15,7 @@ import qualified Control.Monad.State as S
 
 data PEquation = Precondition :\/: Equation
 type Precondition = [Int]
-data Totality = Partial | Total Precondition | Variable
+data Totality = Partial | Total Precondition | Variable deriving Show
 
 infix 5 :\/:
 

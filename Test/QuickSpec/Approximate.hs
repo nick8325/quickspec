@@ -50,7 +50,7 @@ approximate (g, n) x = unGen (runReaderT (lifted x) (Plug plug)) g n
             Nothing -> return (unGen arbitrary g n)
 
 pobserver :: (Ord a, Partial a) => a -> Sig
-pobserver x = observerSig (Observer (MkGen f))
+pobserver x = observerSig (Observer (PGen (return id) (MkGen f)))
   where f g n y = approximate (g, n `max` 50) (y `asTypeOf` x)
 
 genPartial :: Partial a => a -> Gen a

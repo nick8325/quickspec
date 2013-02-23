@@ -52,7 +52,7 @@ test' strat seeds sig ts
         let testCase (g, n) =
               let (g1, g2) = split g
                   val = memoValuation sig (unGen (valuation strat) g1 n) in
-              \x -> spoony . unGen obs g2 n $ eval x val
+              \x -> spoony . unGen (partialGen obs) g2 n $ eval x val
         in cutOff base increment (T.test (map testCase seeds) ts)
   where
     base = minTests sig `div` 2

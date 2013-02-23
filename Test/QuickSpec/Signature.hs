@@ -134,7 +134,7 @@ summarise sig =
     decl xs@(x:_) =
       intercalate ", " (map show xs) ++ " :: " ++ show (symbolType x)
 
-data Observer a = forall b. Ord b => Observer (Gen (a -> b))
+data Observer a = forall b. Ord b => Observer (PGen (a -> b))
 
 observe x sig =
   TypeMap.lookup (TypeMap.lookup (error msg) x (ords sig))
@@ -285,7 +285,7 @@ blind4 :: forall a b c d e. (Typeable a, Typeable b, Typeable c, Typeable d, Typ
 blind4 = primCon4 4
 
 ord :: (Ord a, Typeable a) => a -> Sig
-ord x = ordSig (Observer (return id) `observing` x)
+ord x = ordSig (Observer (pgen (return id)) `observing` x)
 
 observing :: Observer a -> a -> Observer a
 observing x _ = x
@@ -307,7 +307,7 @@ background sig =
 -- @gvars xs (arbitrary :: Gen a)@ is the same as
 -- @vars xs (undefined :: a)@.
 gvars :: forall a. Typeable a => [String] -> Gen a -> Sig
-gvars xs g = variableSig [ Variable (Atom (symbol x 0 (undefined :: a)) (PGen g g)) | x <- xs ]
+gvars xs g = variableSig [ Variable (Atom (symbol x 0 (undefined :: a)) (pgen g)) | x <- xs ]
              `mappend` totalSig g
              `mappend` typeSig (undefined :: a)
 
@@ -355,26 +355,26 @@ fun4 x f = blind4 x f
 
 -- | An observation function of arity 1.
 observer1 :: (Typeable a, Typeable b, Ord b) => (a -> b) -> Sig
-observer1 f = observerSig (Observer (return f))
+observer1 f = observerSig (Observer (pgen (return f)))
 
 -- | An observation function of arity 2.
 observer2 :: (Arbitrary a, Typeable a, Typeable b, Typeable c, Ord c) =>
              (a -> b -> c) -> Sig
-observer2 f = observerSig (Observer (f <$> arbitrary))
+observer2 f = observerSig (Observer (pgen (f <$> arbitrary)))
 
 -- | An observation function of arity 3.
 observer3 :: (Arbitrary a, Arbitrary b,
               Typeable a, Typeable b, Typeable c, Typeable d,
               Ord d) =>
              (a -> b -> c -> d) -> Sig
-observer3 f = observerSig (Observer (f <$> arbitrary <*> arbitrary))
+observer3 f = observerSig (Observer (pgen (f <$> arbitrary <*> arbitrary)))
 
 -- | An observation function of arity 4.
 observer4 :: (Arbitrary a, Arbitrary b, Arbitrary c,
               Typeable a, Typeable b, Typeable c, Typeable d, Typeable e,
               Ord e) =>
              (a -> b -> c -> d -> e) -> Sig
-observer4 f = observerSig (Observer (f <$> arbitrary <*> arbitrary <*> arbitrary))
+observer4 f = observerSig (Observer (pgen (f <$> arbitrary <*> arbitrary <*> arbitrary)))
 
 testable :: Typeable a => Sig -> a -> Bool
 testable sig x =

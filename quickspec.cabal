@@ -75,6 +75,7 @@ library
     Test.QuickSpec.Reasoning.CongruenceClosure,
     Test.QuickSpec.Reasoning.NaiveEquationalReasoning,
     Test.QuickSpec.Reasoning.PartialEquationalReasoning,
+    Test.QuickSpec.TestTotality,
     Test.QuickSpec.Utils,
     Test.QuickSpec.Utils.Typeable,
     Test.QuickSpec.Utils.Typed,
