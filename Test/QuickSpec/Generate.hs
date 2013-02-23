@@ -58,11 +58,11 @@ test' strat seeds sig ts
     base = minTests sig `div` 2
     increment = minTests sig - base
 
-genSeeds :: IO [(StdGen, Int)]
-genSeeds = do
+genSeeds :: Int -> IO [(StdGen, Int)]
+genSeeds maxSize = do
   rnd <- newStdGen
   let rnds rnd = rnd1 : rnds rnd2 where (rnd1, rnd2) = split rnd
-  return (zip (rnds rnd) (concat (repeat [0,2..100])))
+  return (zip (rnds rnd) (concat (repeat [0,2..maxSize])))
 
 generate :: Strategy -> Sig -> IO (TypeMap (TestResults `O` Expr))
 generate strat sig | maxDepth sig < 0 =
@@ -77,7 +77,7 @@ generate strat sig = unbuffered $ do
       count op f = op . map (some2 f) . TypeMap.toList
       ts = terms sig rs
   printf "%d terms, " (count sum length ts)
-  seeds <- genSeeds
+  seeds <- genSeeds (maxQuickCheckSize sig)
   let cs = test (const totalGen) seeds sig ts
   printf "%d tests, %d classes, %d raw equations.\n"
       (count (maximum . (0:)) numTests cs)

@@ -52,7 +52,10 @@ data Sig = Sig {
   maxDepth_ :: First Int,
 
   -- Minimum number of tests to run.
-  minTests_ :: First Int
+  minTests_ :: First Int,
+  
+  -- Maximum size parameter to pass to QuickCheck.
+  maxQuickCheckSize_ :: First Int
   }
 
 maxDepth :: Sig -> Int
@@ -64,8 +67,8 @@ updateDepth n sig = sig { maxDepth_ = First (Just n) }
 minTests :: Sig -> Int
 minTests = fromMaybe 500 . getFirst . minTests_
 
-updateMinTests :: Int -> Sig -> Sig
-updateMinTests n sig = sig { minTests_ = First (Just n) }
+maxQuickCheckSize :: Sig -> Int
+maxQuickCheckSize = fromMaybe 20 . getFirst . maxQuickCheckSize_
 
 instance Show Sig where show = unlines . summarise
 
@@ -139,7 +142,7 @@ observe x sig =
   where msg = "Test.QuickSpec.Signature.observe: no observers found for type " ++ show (typeOf x)
 
 emptySig :: Sig
-emptySig = Sig TypeRel.empty TypeRel.empty TypeMap.empty TypeMap.empty TypeMap.empty TypeMap.empty TypeMap.empty mempty mempty
+emptySig = Sig TypeRel.empty TypeRel.empty TypeMap.empty TypeMap.empty TypeMap.empty TypeMap.empty TypeMap.empty mempty mempty mempty
 
 instance Monoid Sig where
   mempty = emptySig
@@ -153,7 +156,8 @@ instance Monoid Sig where
       ords = ords s1 `mappend` ords s2,
       witnesses = witnesses s1 `mappend` witnesses s2,
       maxDepth_ = maxDepth_ s1 `mappend` maxDepth_ s2,
-      minTests_ = minTests_ s1 `mappend` minTests_ s2 }
+      minTests_ = minTests_ s1 `mappend` minTests_ s2,
+      maxQuickCheckSize_ = maxQuickCheckSize_ s1 `mappend` maxQuickCheckSize_ s2 }
     where constants' = TypeRel.toList (constants s1) ++
                        TypeRel.toList (constants s2)
           -- Overwrite variables if they're declared twice!
@@ -208,7 +212,13 @@ withDepth n = updateDepth n emptySig
 --   QuickSpec will run at least @n@ tests
 --   (the default is 500).
 withTests :: Int -> Sig
-withTests n = updateMinTests n emptySig
+withTests n = emptySig { minTests_ = First (Just n) }
+
+-- | If @withQuickCheckSize n@ is in your signature,
+--   QuickSpec will generate test data of up to size @n@
+--   (the default is 20).
+withQuickCheckSize :: Int -> Sig
+withQuickCheckSize n = emptySig { maxQuickCheckSize_ = First (Just n) }
 
 -- | @sig \`without\` xs@ will remove the functions
 --   in @xs@ from the signature @sig@.
