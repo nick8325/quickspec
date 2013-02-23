@@ -31,9 +31,11 @@ instance Signature a => Signature [a] where
 
 -- | A signature.
 data Sig = Sig {
-  -- Constants, variables and observation functions.
+  -- Constants, variables, generators and observation functions.
   constants :: TypeRel Constant,
   variables :: TypeRel Variable,
+  total     :: TypeMap Gen,
+  partial   :: TypeMap Gen,
   observers :: TypeMap Observer,
 
   -- Ord instances, added whenever the 'fun' family of functions is used.
@@ -137,7 +139,7 @@ observe x sig =
   where msg = "Test.QuickSpec.Signature.observe: no observers found for type " ++ show (typeOf x)
 
 emptySig :: Sig
-emptySig = Sig TypeRel.empty TypeRel.empty TypeMap.empty TypeMap.empty TypeMap.empty mempty mempty
+emptySig = Sig TypeRel.empty TypeRel.empty TypeMap.empty TypeMap.empty TypeMap.empty TypeMap.empty TypeMap.empty mempty mempty
 
 instance Monoid Sig where
   mempty = emptySig
@@ -146,6 +148,8 @@ instance Monoid Sig where
       constants = renumber (mapConstant . alter) 0 constants',
       variables = renumber (mapVariable . alter) (length constants') variables',
       observers = observers s1 `mappend` observers s2,
+      total = total s1 `mappend` total s2,
+      partial = partial s1 `mappend` partial s2,
       ords = ords s1 `mappend` ords s2,
       witnesses = witnesses s1 `mappend` witnesses s2,
       maxDepth_ = maxDepth_ s1 `mappend` maxDepth_ s2,
@@ -178,6 +182,12 @@ constantSig x = emptySig { constants = TypeRel.singleton x }
 
 variableSig :: forall a. Typeable a => [Variable a] -> Sig
 variableSig x = emptySig { variables = TypeRel.fromList (map Some x) }
+
+totalSig :: forall a. Typeable a => Gen a -> Sig
+totalSig g = emptySig { total = TypeMap.singleton g }
+
+partialSig :: forall a. Typeable a => Gen a -> Sig
+partialSig g = emptySig { partial = TypeMap.singleton g }
 
 observerSig :: forall a. Typeable a => Observer a -> Sig
 observerSig x = emptySig { observers = TypeMap.singleton x }
@@ -287,8 +297,9 @@ background sig =
 -- @gvars xs (arbitrary :: Gen a)@ is the same as
 -- @vars xs (undefined :: a)@.
 gvars :: forall a. Typeable a => [String] -> Gen a -> Sig
-gvars xs g = variableSig [ Variable (Atom (symbol x 0 (undefined :: a)) g) | x <- xs ]
-            `mappend` typeSig (undefined :: a)
+gvars xs g = variableSig [ Variable (Atom (symbol x 0 (undefined :: a)) (PGen g g)) | x <- xs ]
+             `mappend` totalSig g
+             `mappend` typeSig (undefined :: a)
 
 -- | Declare a set of variables of a particular type.
 --

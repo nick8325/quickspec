@@ -145,7 +145,15 @@ data Atom a = Atom {
   sym :: Symbol,
   value :: a } deriving Functor
 
-newtype Variable a = Variable { unVariable :: Atom (Gen a) } deriving Functor
+data PGen a = PGen {
+  totalGen :: Gen a,
+  partialGen :: Gen a
+  }
+
+instance Functor PGen where
+  fmap f (PGen tot par) = PGen (fmap f tot) (fmap f par)
+
+newtype Variable a = Variable { unVariable :: Atom (PGen a) } deriving Functor
 newtype Constant a = Constant { unConstant :: Atom a } deriving Functor
 
 mapVariable :: (Symbol -> Symbol) -> Variable a -> Variable a
@@ -155,8 +163,8 @@ mapConstant :: (Symbol -> Symbol) -> Constant a -> Constant a
 mapConstant f (Constant v) = Constant v { sym = f (sym v) }
 
 -- Generate a random variable valuation
-valuation :: Gen (Variable a -> a)
-valuation = promote (\(Variable x) -> index (sym x) `variant'` value x)
+valuation :: (Symbol -> PGen a -> Gen a) -> Gen (Variable a -> a)
+valuation ctx = promote (\(Variable x) -> index (sym x) `variant'` ctx (sym x) (value x))
   where -- work around the fact that split doesn't work
         variant' 0 = variant (0 :: Int)
         variant' n = variant (-1 :: Int) . variant' (n-1)

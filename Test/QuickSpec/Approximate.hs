@@ -5,6 +5,7 @@ module Test.QuickSpec.Approximate where
 import Test.QuickCheck
 import Test.QuickCheck.Gen
 import Test.QuickSpec.Signature
+import Test.QuickSpec.Term
 import Test.QuickSpec.Utils
 import Test.QuickSpec.Utils.Typeable
 import Control.Monad
@@ -60,4 +61,10 @@ genPartial x = runReaderT (lifted x) (Plug plug)
 pvars :: (Ord a, Partial a) => [String] -> a -> Sig
 pvars xs w = 
   pobserver w
-  `mappend` gvars xs ((arbitrary `asTypeOf` return w) >>= genPartial)
+  `mappend` variableSig [ Variable (Atom (symbol x 0 w) (PGen g g')) | x <- xs ]
+  `mappend` totalSig g
+  `mappend` partialSig g'
+  `mappend` typeSig w
+  where
+    g = arbitrary `asTypeOf` return w
+    g' = g >>= genPartial

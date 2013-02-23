@@ -50,7 +50,7 @@ test' seeds sig ts
       Observer obs ->
         let testCase (g, n) =
               let (g1, g2) = split g
-                  val = memoValuation sig (unGen valuation g1 n) in
+                  val = memoValuation sig (unGen (valuation (const totalGen)) g1 n) in
               \x -> spoony . unGen obs g2 n $ eval x val
         in cutOff base increment (T.test (map testCase seeds) ts)
   where
