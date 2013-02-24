@@ -472,3 +472,8 @@ disambiguate sig ss =
               ss
             wellTypedNames =
               [ name v | v <- allVars, symbolType v == symbolType x ]
+
+symbols :: Sig -> [Symbol]
+symbols sig =
+  map (some (sym . unConstant)) (TypeRel.toList (constants sig)) ++
+  map (some (sym . unVariable)) (TypeRel.toList (variables sig))

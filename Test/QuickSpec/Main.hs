@@ -9,7 +9,7 @@ import Test.QuickSpec.Utils.Typed
 import qualified Test.QuickSpec.Utils.TypeMap as TypeMap
 import qualified Test.QuickSpec.Utils.TypeRel as TypeRel
 import Test.QuickSpec.Signature hiding (vars)
-import Test.QuickSpec.Term
+import Test.QuickSpec.Term hiding (symbols)
 import Control.Monad
 import Text.Printf
 import Data.Monoid
@@ -105,14 +105,11 @@ quickSpec = runTool $ \sig -> do
       reps = map (erase . head) clss
       eqs = equations clss
       univ = map head clss
-      syms =
-        map (some (sym . unConstant)) (TypeRel.toList (constants sig)) ++
-        map (some (sym . unVariable)) (TypeRel.toList (variables sig))
   printf "%d raw equations; %d terms in universe.\n\n"
     (length eqs)
     (length univ)
 
-  let ctx = initial (maxDepth sig) syms univ
+  let ctx = initial (maxDepth sig) (symbols sig) univ
       pruned = filter (not . all silent . eqnFuns)
                  (prune ctx reps eqs)
       eqnFuns (t :=: u) = funs t ++ funs u
