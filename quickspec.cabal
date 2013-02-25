@@ -62,6 +62,7 @@ source-repository head
   branch:   master
 
 library
+  hs-source-dirs: src
   Exposed-modules:
     Test.QuickSpec,
     Test.QuickSpec.Main,
