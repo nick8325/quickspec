@@ -4,7 +4,8 @@
 module Test.QuickSpec.Reasoning.PartialEquationalReasoning where
 
 import Test.QuickSpec.Equation
-import Test.QuickSpec.Term hiding (Variable)
+import Test.QuickSpec.Term hiding (Variable, vars)
+import qualified Test.QuickSpec.Term as Term
 import Test.QuickSpec.Utils.Typed
 import qualified Test.QuickSpec.Reasoning.NaiveEquationalReasoning as EQ
 import Test.QuickSpec.Reasoning.NaiveEquationalReasoning(EQ, evalEQ, runEQ)
@@ -12,23 +13,25 @@ import Data.IntMap(IntMap)
 import qualified Data.IntMap as IntMap
 import Control.Monad.State
 import qualified Control.Monad.State as S
+import Data.List
 
 data PEquation = Precondition :\/: Equation
-type Precondition = [Int]
+type Precondition = [Symbol]
 data Totality = Partial | Total Precondition | Variable deriving Show
 
 infix 5 :\/:
 
 data Context = Context {
   total :: EQ.Context,
-  partial :: IntMap EQ.Context
+  partial :: IntMap EQ.Context,
+  vars :: IntMap Symbol
   }
 
 type PEQ = State Context
 
 initial :: Int -> [(Symbol, Totality)] -> [Tagged Term] -> Context
 initial d syms univ
-  | ok syms = Context total partial
+  | ok syms = Context total partial vars
   | otherwise = error "PartialEquationalReasoning.initial: bad input"
   where
     ok syms = and (zipWith (==) [0..] (map (index . fst) syms))
@@ -45,8 +48,9 @@ initial d syms univ
            (error "PartialEquationalReasoning.initial: type not found")
            (index x) totality of
         Partial -> False
-        Total pre -> and [ isTotal ctx [] arg || i `elem` pre | (i, arg) <- zip [0..] args ]
+        Total pre -> and [ isTotal ctx [] arg || i `elem` map index pre | (i, arg) <- zip [0..] args ]
         Variable -> error "PartialEquationalReasoning.initial: inappropriate term"
+    vars = IntMap.fromList [(index s, s) | (s, Variable) <- syms]
       
 runPEQ :: Context -> PEQ a -> (a, Context)
 runPEQ = flip runState
@@ -57,36 +61,45 @@ evalPEQ ctx x = fst (runPEQ ctx x)
 execPEQ :: Context -> PEQ a -> Context
 execPEQ ctx x = snd (runPEQ ctx x)
 
-liftEQ :: Precondition -> (Maybe Int -> EQ a) -> PEQ [a]
+liftEQ :: [Int] -> (Maybe Int -> EQ a) -> PEQ [a]
 liftEQ pre x = do
-  Context total partial <- S.get
+  Context total partial vars <- S.get
   let (totalRes, total') = runEQ total (x Nothing)
       (partialRes, partial') = IntMap.mapAccumWithKey f [] partial
       f rs i ctx
         | i `elem` pre = runEQ ctx (fmap (:rs) (x (Just i)))
         | otherwise = (rs, ctx)
-  S.put (Context total' partial')
+  S.put (Context total' partial' vars)
   return (totalRes:partialRes)
 
 equal :: PEquation -> PEQ Bool
 equal (pre :\/: t :=: u) = liftM2 (==) (rep pre t) (rep pre u) 
 
+irrelevant :: Equation -> PEQ Precondition
+irrelevant (t :=: u) = do
+  vs <- gets (IntMap.elems . vars)
+  -- OBS: if a var doesn't appear in both t and u then it's irrelevant
+  return (vs \\ (Term.vars t ++ Term.vars u))
+
 unify :: PEquation -> PEQ Bool
 unify (pre :\/: eq) = do
-  fmap and . liftEQ pre $ \n -> 
+  irr <- irrelevant eq
+  fmap and . liftEQ (map index (pre ++ irr)) $ \n -> 
     case n of
-      Just i | i `notElem` pre -> return True
+      Just i | i `notElem` map index pre -> return True
       _ -> EQ.unify eq
 
 precondition :: Equation -> PEQ Precondition
 precondition eq = do
-  Context _ partial <- S.get
+  Context _ partial vars <- S.get
   fmap concat . liftEQ (IntMap.keys partial) $ \n ->
     case n of
       Nothing -> return []
       Just i -> do
         r <- EQ.equal eq
-        if r then return [i] else return []
+        if r then
+           return [IntMap.findWithDefault (error "precondition: var not found") i vars]
+          else return []
 
 get :: PEQ Context
 get = S.get
@@ -95,4 +108,4 @@ put :: Context -> PEQ ()
 put = S.put
 
 rep :: Precondition -> Term -> PEQ [Int]
-rep pre t = liftEQ pre (const (EQ.rep t))
+rep pre t = liftEQ (map index pre) (const (EQ.rep t))
