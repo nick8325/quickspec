@@ -16,14 +16,14 @@ module Test.QuickSpec
    --
    -- | You can add @f@ to the signature by using @\"f\" \`funN\` f@,
    -- where @N@ is the arity of the function. For example,
-   -- 
+   --
    -- > "&&" `fun2` (&&)
    --
    -- will add the binary function @(`&&`)@ to the signature.
    --
    -- If f is polymorphic, you must explicitly give it a monomorphic type.
    -- This module exports types `A`, `B` and `C` for that purpose.
-   -- 
+   --
    -- For example:
    --
    -- > "++" `fun2` ((++) :: [A] -> [A] -> [A])

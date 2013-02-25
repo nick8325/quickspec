@@ -54,7 +54,7 @@ testTotality sig = do
               case cast f `asTypeOf` Just (\x -> (x `asTypeOf` arg) `seq` (undefined `asTypeOf` res)) of
                 Nothing -> error "testTotal: cast failed"
                 Just g -> testTotal (g x) (map pred args)
-    
+
     varTotality :: Variable a -> (Symbol, Totality)
     varTotality (Variable x) = (sym x, PEQ.Variable)
 

@@ -73,7 +73,7 @@ initial d syms univ
         Total pre -> and [ isTotal ctx [] arg || i `elem` pre | (i, arg) <- zip [0..] args ]
         Variable -> error "PartialEquationalReasoning.initial: inappropriate term"
     vars = IntMap.fromList [(index s, s) | (s, Variable) <- syms]
-      
+
 runPEQ :: Context -> PEQ a -> (a, Context)
 runPEQ = flip runState
 
@@ -95,7 +95,7 @@ liftEQ pre x = do
   return (totalRes:partialRes)
 
 equal :: PEquation -> PEQ Bool
-equal (pre :\/: t :=: u) = liftM2 (==) (rep pre t) (rep pre u) 
+equal (pre :\/: t :=: u) = liftM2 (==) (rep pre t) (rep pre u)
 
 irrelevant :: Equation -> PEQ Precondition
 irrelevant (t :=: u) = do
@@ -105,7 +105,7 @@ irrelevant (t :=: u) = do
 unify :: PEquation -> PEQ Bool
 unify (pre :\/: eq) = do
   irr <- irrelevant eq
-  fmap and . liftEQ (map index (pre ++ irr)) $ \n -> 
+  fmap and . liftEQ (map index (pre ++ irr)) $ \n ->
     case n of
       Just i | i `notElem` map index pre -> return True
       _ -> EQ.unify eq

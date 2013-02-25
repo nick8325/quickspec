@@ -53,7 +53,7 @@ data Sig = Sig {
 
   -- Minimum number of tests to run.
   minTests_ :: First Int,
-  
+
   -- Maximum size parameter to pass to QuickCheck.
   maxQuickCheckSize_ :: First Int
   }
