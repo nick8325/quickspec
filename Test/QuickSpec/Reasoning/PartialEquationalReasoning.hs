@@ -16,6 +16,8 @@ import qualified Control.Monad.State as S
 import Data.List
 import Data.Ord
 import Test.QuickSpec.Utils
+import Test.QuickSpec.Signature hiding (vars)
+import Data.Monoid
 
 data PEquation = Precondition :\/: Equation
 type Precondition = [Symbol]
@@ -27,6 +29,17 @@ instance Eq PEquation where
 instance Ord PEquation where
   compare = comparing stamp
     where stamp (pre :\/: eq) = (eq, length pre, usort pre)
+
+instance Show PEquation where
+  show = showPEquation mempty
+
+showPEquation :: Sig -> PEquation -> String
+showPEquation sig (pre :\/: t :=: u) =
+  showPre ((Term.vars t ++ Term.vars u) \\ pre) ++
+  show (f t) ++ " == " ++ show (f u)
+  where f = disambiguate sig (Term.vars t ++ Term.vars u ++ pre)
+        showPre [] = ""
+        showPre xs = intercalate " && " [ "total(" ++ show (f (Var x)) ++ ")" | x <- xs ] ++ " => "
 
 infix 5 :\/:
 
