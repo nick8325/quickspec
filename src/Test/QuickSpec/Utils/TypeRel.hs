@@ -2,9 +2,10 @@
 --   @'TypeRel' f@ relates each type @a@ to a set of values
 --   of type @f a@.
 
-{-# LANGUAGE Rank2Types, TypeOperators #-}
+{-# LANGUAGE CPP, Rank2Types, TypeOperators #-}
 module Test.QuickSpec.Utils.TypeRel where
 
+#include "../errors.h"
 import qualified Test.QuickSpec.Utils.TypeMap as TypeMap
 import Test.QuickSpec.Utils.TypeMap(TypeMap)
 import Test.QuickSpec.Utils.Typed
@@ -33,11 +34,11 @@ mapValues :: (forall a. Typeable a => f a -> g a) -> TypeRel f -> TypeRel g
 mapValues f = TypeMap.mapValues2 (map f)
 
 gather :: [Some f] -> Some (List `O` f)
-gather [] =
-  error "Test.QuickSpec.Utils.TypeRep.sequence: empty list"
+gather [] = ERROR "empty list"
 gather (Some x:xs) = Some (O (x:map gcast' xs))
-  where gcast' (Some y) = fromMaybe (error msg) (gcast y)
-        msg = "Test.QuickSpec.Utils.TypeRep.gather: heterogeneous list"
+  where gcast' (Some y) =
+          fromMaybe (ERROR msg) (gcast y)
+        msg = "heterogeneous list"
 
 disperse :: Some (List `O` f) -> [Some f]
 disperse (Some (O xs)) = map Some xs

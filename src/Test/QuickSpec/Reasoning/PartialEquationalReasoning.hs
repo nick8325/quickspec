@@ -1,8 +1,10 @@
 -- | Equational reasoning that deals with partial functions.
 --   Only used in HipSpec at the moment.
 
+{-# LANGUAGE CPP #-}
 module Test.QuickSpec.Reasoning.PartialEquationalReasoning where
 
+#include "../errors.h"
 import Test.QuickSpec.Equation
 import Test.QuickSpec.Term hiding (Variable, vars)
 import qualified Test.QuickSpec.Term as Term
@@ -54,7 +56,7 @@ type PEQ = State Context
 initial :: Int -> [(Symbol, Totality)] -> [Tagged Term] -> Context
 initial d syms univ
   | ok syms = Context total partial vars
-  | otherwise = error "PartialEquationalReasoning.initial: bad input"
+  | otherwise = __
   where
     ok syms = and (zipWith (==) [0..] (map (index . fst) syms))
     total = EQ.initial d (map fst syms) (filter (isTotal Nothing [] . erase) univ)
@@ -67,11 +69,11 @@ initial d syms univ
     isTotal ctx args (App f x) = isTotal ctx (x:args) f
     isTotal ctx args (Const x) =
       case IntMap.findWithDefault
-           (error "PartialEquationalReasoning.initial: type not found")
+           (ERROR "type not found")
            (index x) totality of
         Partial -> False
         Total pre -> and [ isTotal ctx [] arg || i `elem` pre | (i, arg) <- zip [0..] args ]
-        Variable -> error "PartialEquationalReasoning.initial: inappropriate term"
+        Variable -> __
     vars = IntMap.fromList [(index s, s) | (s, Variable) <- syms]
 
 runPEQ :: Context -> PEQ a -> (a, Context)
@@ -119,7 +121,7 @@ precondition eq = do
       Just i -> do
         r <- EQ.equal eq
         if r then
-           return [IntMap.findWithDefault (error "precondition: var not found") i vars]
+           return [IntMap.findWithDefault (ERROR "precondition: var not found") i vars]
           else return []
 
 get :: PEQ Context

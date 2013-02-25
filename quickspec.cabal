@@ -55,6 +55,7 @@ Extra-source-files:
   examples/Heaps.hs
   examples/Lists.hs
   examples/TinyWM.hs
+  src/Test/QuickSpec/errors.h
 
 source-repository head
   type:     git

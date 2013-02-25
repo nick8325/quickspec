@@ -1,8 +1,9 @@
 -- | Functions for constructing and analysing signatures.
 
-{-# LANGUAGE Rank2Types, ExistentialQuantification, ScopedTypeVariables #-}
+{-# LANGUAGE CPP, Rank2Types, ExistentialQuantification, ScopedTypeVariables #-}
 module Test.QuickSpec.Signature where
 
+#include "errors.h"
 import Control.Applicative hiding (some)
 import Test.QuickSpec.Utils.Typeable
 import Data.Monoid
@@ -137,9 +138,9 @@ summarise sig =
 data Observer a = forall b. Ord b => Observer (PGen (a -> b))
 
 observe x sig =
-  TypeMap.lookup (TypeMap.lookup (error msg) x (ords sig))
+  TypeMap.lookup (TypeMap.lookup (ERROR msg) x (ords sig))
                x (observers sig)
-  where msg = "Test.QuickSpec.Signature.observe: no observers found for type " ++ show (typeOf x)
+  where msg = "no observers found for type " ++ show (typeOf x)
 
 emptySig :: Sig
 emptySig = Sig TypeRel.empty TypeRel.empty TypeMap.empty TypeMap.empty TypeMap.empty TypeMap.empty TypeMap.empty mempty mempty mempty
@@ -399,9 +400,9 @@ constantArgs sig (Constant (Atom { sym = sym })) =
 constantRes :: forall a. Typeable a => Sig -> Constant a -> Witness
 constantRes sig (Constant (Atom { sym = sym })) =
   findWitness sig
-    (iterate (snd . fromMaybe (error msg) . splitArrow)
+    (iterate (snd . fromMaybe (ERROR msg) . splitArrow)
        (typeOf (undefined :: a)) !! symbolArity sym)
-  where msg = "Test.QuickSpec.Signature.constantRes: type oversaturated"
+  where msg = "constantRes: type oversaturated"
 
 -- The set of types returned by saturated constants.
 saturatedTypes :: Sig -> [Witness]
@@ -446,9 +447,7 @@ lhsWitnesses sig x =
     witnessType rhs == typeOf x ]
 
 findWitness :: Sig -> TypeRep -> Witness
-findWitness sig ty =
-  fromMaybe (error "Test.QuickSpec.Signature.findWitness: missing type")
-    (lookupWitness sig ty)
+findWitness sig ty = fromMaybe (ERROR "missing type") (lookupWitness sig ty)
 
 lookupWitness :: Sig -> TypeRep -> Maybe Witness
 lookupWitness sig ty = Map.lookup ty (witnesses sig)
@@ -456,7 +455,7 @@ lookupWitness sig ty = Map.lookup ty (witnesses sig)
 disambiguate :: Sig -> [Symbol] -> Term -> Term
 disambiguate sig ss =
   mapVars (\x ->
-    fromMaybe (error "Test.QuickSpec.Term.disambiguate: variable not found")
+    fromMaybe (ERROR "variable not found")
       (find (\y -> index x == index y)
         (aux [] (nub ss))))
   where
@@ -464,7 +463,7 @@ disambiguate sig ss =
     aux used (x:xs) = x { name = next }:aux (next:used) xs
       where next = head (filter (`notElem` used) candidates)
             candidates
-              | null wellTypedNames = error "Test.QuickSpec.Term.disambiguate: null allVars"
+              | null wellTypedNames = ERROR "null allVars"
               | otherwise = wellTypedNames ++ concat [ map (++ show i) wellTypedNames | i <- [1.. ] ]
             allVars =
               map (some (sym . unVariable))

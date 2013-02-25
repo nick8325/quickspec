@@ -1,9 +1,10 @@
 -- | Functions for working with existentially-quantified types
 --   and similar.
 
-{-# LANGUAGE Rank2Types, ExistentialQuantification, TypeOperators, TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE CPP, Rank2Types, ExistentialQuantification, TypeOperators, TypeSynonymInstances, FlexibleInstances #-}
 module Test.QuickSpec.Utils.Typed where
 
+#include "../errors.h"
 import Control.Monad
 import Test.QuickSpec.Utils.Typeable
 import Data.Ord
@@ -71,6 +72,6 @@ splitArrow ty =
   where (arr, _) = splitTyConApp (typeOf (undefined :: Int -> Int))
 
 rightArrow :: TypeRep -> TypeRep
-rightArrow ty = snd (fromMaybe (error msg) (splitArrow ty))
+rightArrow ty = snd (fromMaybe (ERROR msg) (splitArrow ty))
   where
-    msg = "Test.QuickSpec.Utils.Typed.rightArrow: type oversaturated"
+    msg = "type oversaturated"

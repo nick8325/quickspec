@@ -1,8 +1,9 @@
 -- | The testing loop and term generation of QuickSpec.
 
-{-# LANGUAGE Rank2Types, TypeOperators, ScopedTypeVariables #-}
+{-# LANGUAGE CPP, Rank2Types, TypeOperators, ScopedTypeVariables #-}
 module Test.QuickSpec.Generate where
 
+#include "errors.h"
 import Test.QuickSpec.Signature hiding (con)
 import qualified Test.QuickSpec.TestTree as T
 import Test.QuickSpec.TestTree(TestResults, reps, classes, numTests, cutOff, discrete)
@@ -66,7 +67,7 @@ genSeeds maxSize = do
 
 generate :: Strategy -> Sig -> IO (TypeMap (TestResults `O` Expr))
 generate strat sig | maxDepth sig < 0 =
-  error "Test.QuickSpec.Generate.generate: maxDepth must be positive"
+  ERROR "generate: maxDepth must be positive"
 generate strat sig | maxDepth sig == 0 = return TypeMap.empty
 generate strat sig = unbuffered $ do
   let d = maxDepth sig

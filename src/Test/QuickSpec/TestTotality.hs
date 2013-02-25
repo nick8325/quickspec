@@ -1,9 +1,10 @@
 -- | Test whether functions are total.
 --   Used by HipSpec.
 
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE CPP, TupleSections #-}
 module Test.QuickSpec.TestTotality where
 
+#include "errors.h"
 import Prelude hiding (lookup)
 import Test.QuickSpec.Reasoning.PartialEquationalReasoning hiding (Variable, total, partial)
 import qualified Test.QuickSpec.Reasoning.PartialEquationalReasoning as PEQ
@@ -49,10 +50,9 @@ testTotality sig = do
           if 0 `elem` args && typeOf res `Map.notMember` partial sig
             then return False
             else do
-              x <- TypeMap.lookup (error "TestTotality") arg
+              x <- TypeMap.lookup __ arg
                    (if 0 `elem` args then partial sig else total sig)
               case cast f `asTypeOf` Just (\x -> (x `asTypeOf` arg) `seq` (undefined `asTypeOf` res)) of
-                Nothing -> error "testTotal: cast failed"
                 Just g -> testTotal (g x) (map pred args)
 
     varTotality :: Variable a -> (Symbol, Totality)

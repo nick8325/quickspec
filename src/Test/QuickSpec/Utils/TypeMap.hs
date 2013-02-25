@@ -29,8 +29,6 @@ lookup def x m =
     Nothing -> def
     Just (Some y) ->
       case gcast y of
-        Nothing ->
-          error "Test.QuickSpec.Utils.TypeMap.lookup: type error"
         Just z -> z
 
 mapValues :: (forall a. Typeable a => f a -> g a) -> TypeMap f -> TypeMap g

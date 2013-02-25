@@ -1,8 +1,9 @@
 -- | Terms and evaluation.
 
-{-# LANGUAGE RankNTypes, ExistentialQuantification, DeriveFunctor #-}
+{-# LANGUAGE CPP, RankNTypes, ExistentialQuantification, DeriveFunctor #-}
 module Test.QuickSpec.Term where
 
+#include "errors.h"
 import Test.QuickSpec.Utils.Typeable
 import Test.QuickCheck
 import Data.Function
@@ -182,5 +183,5 @@ con (Constant (Atom x v)) = Expr (Const x) (symbolArity x) (const v)
 
 app :: Expr (a -> b) -> Expr a -> Expr b
 app (Expr t a f) (Expr u _ x)
-  | a == 0 = error "Test.QuickSpec.Term.app: oversaturated function"
+  | a == 0 = ERROR "oversaturated function"
   | otherwise = Expr (App t u) (a - 1) (\env -> f env (x env))

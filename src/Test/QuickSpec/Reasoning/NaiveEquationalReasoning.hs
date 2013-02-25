@@ -1,7 +1,9 @@
 -- | Equational reasoning built on top of congruence closure.
 
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE CPP, TupleSections #-}
 module Test.QuickSpec.Reasoning.NaiveEquationalReasoning where
+
+#include "../errors.h"
 
 import Test.QuickSpec.Term
 import Test.QuickSpec.Equation
@@ -42,8 +44,7 @@ initial d syms ts =
 
   in Context rel d . IntMap.fromList $ [
     (index sym,
-     Map.findWithDefault (error "NaiveEquationalReasoning: type not found")
-       (symbolType sym) univMap)
+     Map.findWithDefault (ERROR "type not found") (symbolType sym) univMap)
     | sym <- syms ]
 
 createUniverse :: [Term] -> CC Universe
@@ -96,8 +97,7 @@ substs t univ d = map lookup (sequence (map choose vars))
                holes $ t
 
         choose (x, n) =
-          let m = IntMap.findWithDefault
-                  (error "Test.QuickSpec.Reasoning.NaiveEquationalReasoning.substs: empty universe")
+          let m = IntMap.findWithDefault (ERROR "empty universe")
                   (index x) univ in
           [ (x, t)
           | d' <- [0..d-n],

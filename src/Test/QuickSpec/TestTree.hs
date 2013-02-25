@@ -1,9 +1,11 @@
 -- | A data structure to represent refining a set of terms into
 --   equivalence classes by testing.
 
+{-# LANGUAGE CPP #-}
 module Test.QuickSpec.TestTree(TestTree, terms, union, test,
                TestResults, cutOff, numTests, classes, reps, discrete) where
 
+#include "errors.h"
 import Data.List(sort)
 import Test.QuickSpec.Utils
 import Control.Exception(assert)
@@ -20,8 +22,7 @@ data TestTree' a = Tree { rep :: a, rest :: [a], branches :: [TestTree' a] }
 
 -- Precondition: bs must be sorted according to the TestCase.
 tree :: Ord r => [a] -> (a -> r) -> [TestTree' a] -> TestTree' a
-tree [] _ _ =
-  error "Test.QuickSpec.TestTree.tree: bug: empty equivalence class"
+tree [] _ _ = ERROR "empty equivalence class"
 tree (x:xs) eval bs =
   assert (isSortedBy (eval . rep) bs) $
     Tree { rep = x, rest = xs, branches = bs }
