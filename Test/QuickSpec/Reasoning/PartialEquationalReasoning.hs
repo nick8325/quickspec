@@ -14,10 +14,19 @@ import qualified Data.IntMap as IntMap
 import Control.Monad.State
 import qualified Control.Monad.State as S
 import Data.List
+import Data.Ord
+import Test.QuickSpec.Utils
 
 data PEquation = Precondition :\/: Equation
 type Precondition = [Symbol]
 data Totality = Partial | Total [Int] | Variable deriving Show
+
+instance Eq PEquation where
+  e1 == e2 = e1 `compare` e2 == EQ
+
+instance Ord PEquation where
+  compare = comparing stamp
+    where stamp (pre :\/: eq) = (eq, length pre, usort pre)
 
 infix 5 :\/:
 
