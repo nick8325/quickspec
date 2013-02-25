@@ -26,3 +26,5 @@ things we know are equal to it---classify lists of terms instead of
 terms. Maybe, instead of classifying terms, classify TestTrees, so we
 can do the whole incremental thingy safely. Plus have some combinators
 for constructing sets of terms incrementally.
+
+In PER, don't generate congruence closures for variables that can't be partial.
