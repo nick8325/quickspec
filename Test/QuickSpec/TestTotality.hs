@@ -13,7 +13,7 @@ import Test.QuickSpec.Utils.Typed
 import Test.QuickSpec.Utils.Typeable
 import Test.QuickSpec.Utils
 import Test.QuickSpec.Signature
-import Test.QuickSpec.Term
+import Test.QuickSpec.Term hiding (symbols)
 import Test.QuickCheck
 import Test.QuickCheck.Gen
 import System.Random
@@ -31,19 +31,13 @@ testTotality sig = do
   where
     constTotality :: Typeable a => Constant a -> IO (Symbol, Totality)
     constTotality (Constant x) = fmap (sym x,) (isTotal (symbolArity (sym x)) (value x))
-  
+
     isTotal :: Typeable a => Int -> a -> IO Totality
     isTotal arity x = do
-      b <- always (testTotal x [])
+      b <- always sig (testTotal x [])
       if not b then return Partial
-        else fmap Total . flip filterM [0..arity-1] $ \i -> always (testTotal x [i])
-    
-    always :: Gen Bool -> IO Bool
-    always x = do
-      gens <- replicateM 100 newStdGen
-      let sizes = cycle [0,2..maxQuickCheckSize sig]
-      return (and [unGen x g n | (g, n) <- zip gens sizes])
-  
+        else fmap (Total . map (symbols sig !!)) . flip filterM [0..arity-1] $ \i -> always sig (testTotal x [i])
+
     testTotal :: Typeable a => a -> [Int] -> Gen Bool
     testTotal f args =
       case witnessArrow sig f of
@@ -63,3 +57,9 @@ testTotality sig = do
     
     varTotality :: Variable a -> (Symbol, Totality)
     varTotality (Variable x) = (sym x, PEQ.Variable)
+
+always :: Sig -> Gen Bool -> IO Bool
+always sig x = do
+  gens <- replicateM 100 newStdGen
+  let sizes = cycle [0,2..maxQuickCheckSize sig]
+  return (and [unGen x g n | (g, n) <- zip gens sizes])
