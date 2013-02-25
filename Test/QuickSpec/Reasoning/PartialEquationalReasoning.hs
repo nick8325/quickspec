@@ -78,8 +78,7 @@ equal (pre :\/: t :=: u) = liftM2 (==) (rep pre t) (rep pre u)
 irrelevant :: Equation -> PEQ Precondition
 irrelevant (t :=: u) = do
   vs <- gets (IntMap.elems . vars)
-  -- OBS: if a var doesn't appear in both t and u then it's irrelevant
-  return (vs \\ (Term.vars t ++ Term.vars u))
+  return (vs \\ (Term.vars t `intersect` Term.vars u))
 
 unify :: PEquation -> PEQ Bool
 unify (pre :\/: eq) = do
