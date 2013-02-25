@@ -17,7 +17,7 @@ import Data.List
 
 data PEquation = Precondition :\/: Equation
 type Precondition = [Symbol]
-data Totality = Partial | Total Precondition | Variable deriving Show
+data Totality = Partial | Total [Int] | Variable deriving Show
 
 infix 5 :\/:
 
@@ -48,7 +48,7 @@ initial d syms univ
            (error "PartialEquationalReasoning.initial: type not found")
            (index x) totality of
         Partial -> False
-        Total pre -> and [ isTotal ctx [] arg || i `elem` map index pre | (i, arg) <- zip [0..] args ]
+        Total pre -> and [ isTotal ctx [] arg || i `elem` pre | (i, arg) <- zip [0..] args ]
         Variable -> error "PartialEquationalReasoning.initial: inappropriate term"
     vars = IntMap.fromList [(index s, s) | (s, Variable) <- syms]
       

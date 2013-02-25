@@ -36,7 +36,7 @@ testTotality sig = do
     isTotal arity x = do
       b <- always sig (testTotal x [])
       if not b then return Partial
-        else fmap (Total . map (symbols sig !!)) . flip filterM [0..arity-1] $ \i -> always sig (testTotal x [i])
+        else fmap Total . flip filterM [0..arity-1] $ \i -> always sig (testTotal x [i])
 
     testTotal :: Typeable a => a -> [Int] -> Gen Bool
     testTotal f args =
