@@ -75,7 +75,7 @@ showOp op | isOp op = "(" ++ op ++ ")"
 isOp :: String -> Bool
 isOp "[]" = False
 isOp xs = not (all isIdent xs)
-  where isIdent x = isAlphaNum x || x == '\''
+  where isIdent x = isAlphaNum x || x == '\'' || x == '_'
 
 isUndefined :: Term -> Bool
 isUndefined (Const Symbol { undef = True }) = True
