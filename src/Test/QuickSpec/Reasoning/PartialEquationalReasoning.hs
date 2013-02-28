@@ -23,7 +23,7 @@ import Data.Monoid
 
 data PEquation = Precondition :\/: Equation
 type Precondition = [Symbol]
-data Totality = Partial | Total [Int] | Variable deriving Show
+data Totality = Partial | Total [Int] | Variable deriving (Eq, Ord, Show)
 
 instance Eq PEquation where
   e1 == e2 = e1 `compare` e2 == EQ
