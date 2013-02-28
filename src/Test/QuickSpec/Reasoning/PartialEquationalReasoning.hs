@@ -37,11 +37,17 @@ instance Show PEquation where
 
 showPEquation :: Sig -> PEquation -> String
 showPEquation sig (pre :\/: t :=: u) =
-  showPre ((Term.vars t ++ Term.vars u) \\ pre) ++
-  show (f t) ++ " == " ++ show (f u)
+  show (f t) ++ " == " ++ show (f u) ++
+  showPre (map (f . Var) pre)
   where f = disambiguate sig (Term.vars t ++ Term.vars u ++ pre)
         showPre [] = ""
-        showPre xs = intercalate " && " [ "total(" ++ show (f (Var x)) ++ ")" | x <- xs ] ++ " => "
+        showPre xs = " (even when " ++ conjunction (map show xs) ++ " " ++ plural xs "is" "are" ++ " partial)"
+        plural xs x y
+          | length xs == 1 = x
+          | otherwise = y
+        conjunction [x] = x
+        conjunction xs =
+          intercalate ", " (init xs) ++ " and " ++ last xs
 
 infix 5 :\/:
 
