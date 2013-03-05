@@ -41,7 +41,7 @@ showPEquation sig (pre :\/: t :=: u) =
   showPre (map (f . Var) pre)
   where f = disambiguate sig (Term.vars t ++ Term.vars u ++ pre)
         showPre [] = ""
-        showPre xs = " (even when " ++ conjunction (map show xs) ++ " " ++ plural xs "is" "are" ++ " partial)"
+        showPre xs = " when " ++ conjunction (map show xs) ++ " " ++ plural xs "is" "are" ++ " partial"
         plural xs x y
           | length xs == 1 = x
           | otherwise = y
