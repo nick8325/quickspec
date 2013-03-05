@@ -58,6 +58,18 @@ testTotality sig = do
     varTotality :: Variable a -> (Symbol, Totality)
     varTotality (Variable x) = (sym x, PEQ.Variable)
 
+testEquation :: Typeable a => Sig -> Expr a -> Expr a -> Symbol -> IO Bool
+testEquation sig e1 e2 s =
+  case observe undefined sig of
+    Observer obs ->
+      always sig $ do
+        let strat s' = if s == s' then partialGen else totalGen
+        obs' <- partialGen obs
+        -- Hack around "value restriction" for lambdas
+        MkGen $ \g n ->
+          let v = unGen (valuation strat) g n
+          in spoony (obs' (eval e1 v)) == spoony (obs' (eval e2 v))
+
 always :: Sig -> Gen Bool -> IO Bool
 always sig x = do
   gens <- replicateM 100 newStdGen
