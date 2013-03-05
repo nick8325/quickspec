@@ -32,8 +32,8 @@ undefinedsSig sig =
 universe :: [[Tagged Term]] -> [Tagged Term]
 universe css = filter (not . isUndefined . erase) (concat css)
 
-prune :: Context -> [Term] -> [Some TypedEquation] -> [Some TypedEquation]
-prune ctx reps eqs = evalEQ ctx (filterM (fmap not . provable . some eraseEquation) eqs)
+prune :: Context -> [Term] -> (a -> Equation) -> [a] -> [a]
+prune ctx reps erase eqs = evalEQ ctx (filterM (fmap not . provable . erase) eqs)
   where
     provable (t :=: u) = do
       res <- t =?= u
@@ -112,8 +112,8 @@ quickSpec = runTool $ \sig -> do
 
   let ctx = initial (maxDepth sig) (symbols sig) reps
       pruned = filter (not . all silent . eqnFuns)
-                 (map (some eraseEquation)
-                  (prune ctx (map erase reps) eqs))
+                 (prune ctx (map erase reps) id
+                   (map (some eraseEquation) eqs))
       eqnFuns (t :=: u) = funs t ++ funs u
       isGround (t :=: u) = null (vars t) && null (vars u)
       byTarget = innerZip [1 :: Int ..] (partitionBy target pruned)
