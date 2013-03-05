@@ -16,6 +16,8 @@ data Some f = forall a. Typeable a => Some (f a)
 newtype O f g a = O { unO :: f (g a) }
 type List = []
 
+type Several f = Some (List `O` f)
+
 newtype Witnessed a = Witness { witness :: a }
 type Witness = Some Witnessed
 
@@ -43,6 +45,9 @@ tagged f x = Tagged (Some (Witness (witness x))) (f x)
 
 some :: (forall a. Typeable a => f a -> b) -> Some f -> b
 some f (Some x) = f x
+
+several :: (forall a. Typeable a => [f a] -> b) -> Several f -> b
+several f (Some (O xs)) = f xs
 
 some2 :: (forall a. Typeable a => f (g a) -> b) -> Some (f `O` g) -> b
 some2 f = some (f . unO)

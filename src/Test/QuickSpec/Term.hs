@@ -1,6 +1,6 @@
 -- | Terms and evaluation.
 
-{-# LANGUAGE CPP, RankNTypes, ExistentialQuantification, DeriveFunctor #-}
+{-# LANGUAGE CPP, RankNTypes, ExistentialQuantification, DeriveFunctor, DeriveDataTypeable #-}
 module Test.QuickSpec.Term where
 
 #include "errors.h"
@@ -132,6 +132,7 @@ data Expr a = Expr {
   term :: Term,
   arity :: {-# UNPACK #-} !Int,
   eval :: (forall b. Variable b -> b) -> a }
+  deriving Typeable
 
 instance Eq (Expr a) where
   (==) = (==) `on` term

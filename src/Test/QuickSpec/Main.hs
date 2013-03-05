@@ -32,8 +32,8 @@ undefinedsSig sig =
 universe :: [[Tagged Term]] -> [Tagged Term]
 universe css = filter (not . isUndefined . erase) (concat css)
 
-prune :: Context -> [Term] -> [Equation] -> [Equation]
-prune ctx reps eqs = evalEQ ctx (filterM (fmap not . provable) eqs)
+prune :: Context -> [Term] -> [Some TypedEquation] -> [Some TypedEquation]
+prune ctx reps eqs = evalEQ ctx (filterM (fmap not . provable . some eraseEquation) eqs)
   where
     provable (t :=: u) = do
       res <- t =?= u
@@ -103,17 +103,17 @@ quickSpec :: Signature a => a -> IO ()
 quickSpec = runTool $ \sig -> do
   putStrLn "== Testing =="
   r <- generate (const partialGen) sig
-  let clss = eraseClasses r
-      reps = map (erase . head) clss
+  let clss = concatMap (some2 (map (Some . O) . classes)) (TypeMap.toList r)
+      reps = map (some2 (tagged term . head)) clss
       eqs = equations clss
-      univ = map head clss
   printf "%d raw equations; %d terms in universe.\n\n"
     (length eqs)
-    (length univ)
+    (length reps)
 
-  let ctx = initial (maxDepth sig) (symbols sig) univ
+  let ctx = initial (maxDepth sig) (symbols sig) reps
       pruned = filter (not . all silent . eqnFuns)
-                 (prune ctx reps eqs)
+                 (map (some eraseEquation)
+                  (prune ctx (map erase reps) eqs))
       eqnFuns (t :=: u) = funs t ++ funs u
       isGround (t :=: u) = null (vars t) && null (vars u)
       byTarget = innerZip [1 :: Int ..] (partitionBy target pruned)
