@@ -36,8 +36,8 @@ instance Partial a => Partial [a] where
   unlifted [] = return []
   unlifted (x:xs) = liftM2 (:) (lifted x) (lifted xs)
 
-approximate :: Partial a => (StdGen, Int) -> a -> a
-approximate (g, n) x = unGen (runReaderT (lifted x) (Plug plug)) g n
+approximate :: Partial a => (forall a. Partial a => a -> Maybe a) -> (StdGen, Int) -> a -> a
+approximate eval (g, n) x = unGen (runReaderT (lifted x) (Plug plug)) g n
   where
     plug :: forall a. Partial a => Gen a -> Gen a
     plug x =
@@ -45,13 +45,14 @@ approximate (g, n) x = unGen (runReaderT (lifted x) (Plug plug)) g n
         if m == 0 then return (unGen arbitrary g n)
         else resize (m-1) $ do
           y <- x
-          case spoony y of
+          case eval y of
             Just z -> return z
             Nothing -> return (unGen arbitrary g n)
 
 pobserver :: (Ord a, Partial a) => a -> Sig
-pobserver x = observerSig (Observer (PGen (return id) (MkGen f)))
-  where f g n y = approximate (g, n `max` 50) (y `asTypeOf` x)
+pobserver x = observerSig (Observer (PGen (MkGen tot) (MkGen part)))
+  where tot g n y = approximate Just (g, n `max` 10) (y `asTypeOf` x)
+        part g n y = approximate spoony (g, n `max` 10) (y `asTypeOf` x)
 
 genPartial :: Partial a => a -> Gen a
 genPartial x = runReaderT (lifted x) (Plug plug)
