@@ -44,7 +44,7 @@ initial d syms ts =
 
   in Context rel d . IntMap.fromList $ [
     (index sym,
-     Map.findWithDefault (ERROR "type not found") (symbolType sym) univMap)
+     Map.findWithDefault IntMap.empty (symbolType sym) univMap)
     | sym <- syms ]
 
 createUniverse :: [Term] -> CC Universe
