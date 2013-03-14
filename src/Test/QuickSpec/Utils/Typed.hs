@@ -1,7 +1,7 @@
 -- | Functions for working with existentially-quantified types
 --   and similar.
 
-{-# LANGUAGE CPP, Rank2Types, ExistentialQuantification, TypeOperators, TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE CPP, Rank2Types, ExistentialQuantification, TypeOperators, TypeSynonymInstances, FlexibleInstances, PatternGuards #-}
 module Test.QuickSpec.Utils.Typed where
 
 #include "../errors.h"
@@ -10,6 +10,8 @@ import Test.QuickSpec.Utils.Typeable
 import Data.Ord
 import Data.Function
 import Data.Maybe
+import Data.Typeable (TyCon)
+import Test.QuickSpec.Utils (usort)
 
 data Some f = forall a. Typeable a => Some (f a)
 
@@ -80,3 +82,10 @@ rightArrow :: TypeRep -> TypeRep
 rightArrow ty = snd (fromMaybe (ERROR msg) (splitArrow ty))
   where
     msg = "type oversaturated"
+
+typeRepTyCons :: TypeRep -> [TyCon]
+typeRepTyCons = usort . go where
+  go ty
+    | Just (t1,t2) <- splitArrow ty = go t1 ++ go t2
+    | (ty_con,ts) <- splitTyConApp ty = ty_con:concatMap go ts
+
