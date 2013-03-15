@@ -3,7 +3,7 @@
 
 {-# LANGUAGE CPP #-}
 module Test.QuickSpec.TestTree(TestTree, terms, union, test,
-               TestResults, cutOff, numTests, numEvaluations,
+               TestResults, cutOff, numTests, numResults,
                classes, reps, discrete) where
 
 #include "errors.h"
@@ -92,9 +92,9 @@ numTests (Results (NonNil t)) = aux t
   where aux Tree{branches = []} = 0
         aux Tree{branches = bs} = 1 + maximum (map aux bs)
 
-numEvaluations :: TestResults a -> Int
-numEvaluations (Results Nil) = 0
-numEvaluations (Results (NonNil t)) = aux t
+numResults :: TestResults a -> Int
+numResults (Results Nil) = 0
+numResults (Results (NonNil t)) = aux t
   where aux Tree{rest = []} = 0
         aux Tree{rest = xs, branches = ts} =
           1 + length xs + sum (map aux ts)
