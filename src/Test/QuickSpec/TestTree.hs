@@ -3,7 +3,8 @@
 
 {-# LANGUAGE CPP #-}
 module Test.QuickSpec.TestTree(TestTree, terms, union, test,
-               TestResults, cutOff, numTests, classes, reps, discrete) where
+               TestResults, cutOff, numTests, numEvaluations,
+               classes, reps, discrete) where
 
 #include "errors.h"
 import Data.List(sort)
@@ -53,6 +54,9 @@ test tcs xs = NonNil (test' tcs xs)
 test' :: Ord r => [a -> r] -> [a] -> TestTree' a
 test' [] _ =
   error "Test.QuickSpec.TestTree.test': ran out of test cases"
+test' (tc:tcs) [] =
+  error "Test.QuickSpec.TestTree.test': found an empty equivalence class"
+test' (tc:tcs) xs@[_] = tree xs tc [test' tcs xs]
 test' (tc:tcs) xs = tree xs tc (map (test' tcs) bs)
   where bs = partitionBy tc xs
 
@@ -72,9 +76,11 @@ discrete xs =
 cutOff :: Int -> Int -> TestTree a -> TestResults a
 cutOff _ _ Nil = Results Nil
 cutOff m n (NonNil t) = Results (NonNil (aux m t))
-  where aux 0 t = aux' False n n t
+  where aux _ t@Tree{rest = []} = t { branches = [] }
+        aux 0 t = aux' False n n t
         aux m t = t { branches = map (aux (m-1)) (branches t) }
         -- Exponential backoff if we carry on refining a class
+        aux' _ _ _ t@Tree{rest = []} = t { branches = [] }
         aux' True 0 n t = t { branches = map (aux' False (n*2-1) (n*2)) (branches t) }
         aux' False 0 n t = t { branches = [] }
         aux' x m n t@Tree{branches = [t']} = t { branches = [aux' x (m-1) n t'] }
@@ -85,6 +91,13 @@ numTests (Results Nil) = 0
 numTests (Results (NonNil t)) = aux t
   where aux Tree{branches = []} = 0
         aux Tree{branches = bs} = 1 + maximum (map aux bs)
+
+numEvaluations :: TestResults a -> Int
+numEvaluations (Results Nil) = 0
+numEvaluations (Results (NonNil t)) = aux t
+  where aux Tree{rest = []} = 0
+        aux Tree{rest = xs, branches = ts} =
+          1 + length xs + sum (map aux ts)
 
 classes :: Ord a => TestResults a -> [[a]]
 classes = sort . map sort . unsortedClasses

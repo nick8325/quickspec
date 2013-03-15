@@ -6,7 +6,7 @@ module Test.QuickSpec.Generate where
 #include "errors.h"
 import Test.QuickSpec.Signature hiding (con)
 import qualified Test.QuickSpec.TestTree as T
-import Test.QuickSpec.TestTree(TestResults, reps, classes, numTests, cutOff, discrete)
+import Test.QuickSpec.TestTree(TestResults, reps, classes, numTests, numEvaluations, cutOff, discrete)
 import Test.QuickSpec.Utils.Typed
 import Test.QuickSpec.Utils.TypeRel(TypeRel)
 import qualified Test.QuickSpec.Utils.TypeRel as TypeRel
@@ -80,8 +80,9 @@ generate strat sig = unbuffered $ do
   printf "%d terms, " (count sum length ts)
   seeds <- genSeeds (maxQuickCheckSize sig)
   let cs = test strat seeds sig ts
-  printf "%d tests, %d classes, %d raw equations.\n"
+  printf "%d tests, %d evaluations, %d classes, %d raw equations.\n"
       (count (maximum . (0:)) numTests cs)
+      (count sum numEvaluations cs)
       (count sum (length . classes) cs)
       (count sum (sum . map (subtract 1 . length) . classes) cs)
   return cs
