@@ -149,8 +149,8 @@ instance Monoid Sig where
   mempty = emptySig
   s1 `mappend` s2 =
     Sig {
-      constants = renumber (mapConstant . alter) 0 constants',
-      variables = renumber (mapVariable . alter) (length constants') variables',
+      constants = renumber (mapConstant . alter) (length variables') constants',
+      variables = renumber (mapVariable . alter) 0 variables',
       observers = observers s1 `mappend` observers s2,
       total = total s1 `mappend` total s2,
       partial = partial s1 `mappend` partial s2,
