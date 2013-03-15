@@ -6,6 +6,7 @@ module Test.QuickSpec.Term where
 #include "errors.h"
 import Test.QuickSpec.Utils.Typeable
 import Test.QuickCheck
+import Test.QuickCheck.Gen
 import Data.Function
 import Data.Ord
 import Data.Char
@@ -131,7 +132,7 @@ mapVars f (App t u) = App (mapVars f t) (mapVars f u)
 data Expr a = Expr {
   term :: Term,
   arity :: {-# UNPACK #-} !Int,
-  eval :: (forall b. Variable b -> b) -> a }
+  eval :: Valuation -> a }
   deriving Typeable
 
 instance Eq (Expr a) where
@@ -170,14 +171,19 @@ mapConstant :: (Symbol -> Symbol) -> Constant a -> Constant a
 mapConstant f (Constant v) = Constant v { sym = f (sym v) }
 
 -- Generate a random variable valuation
-valuation :: Strategy -> Gen (Variable a -> a)
-valuation strat = promote (\(Variable x) -> index (sym x) `variant'` strat (sym x) (value x))
+newtype Valuation = Valuation { unValuation :: forall a. Variable a -> a }
+
+promoteVal :: (forall a. Gen (Variable a -> a)) -> Gen Valuation
+promoteVal g = MkGen (\r n -> Valuation (unGen g r n))
+
+valuation :: Strategy -> Gen Valuation
+valuation strat = promoteVal (promote (\(Variable x) -> index (sym x) `variant'` strat (sym x) (value x)))
   where -- work around the fact that split doesn't work
         variant' 0 = variant (0 :: Int)
         variant' n = variant (-1 :: Int) . variant' (n-1)
 
 var :: Variable a -> Expr a
-var v@(Variable (Atom x _)) = Expr (Var x) (symbolArity x) (\env -> env v)
+var v@(Variable (Atom x _)) = Expr (Var x) (symbolArity x) (\env -> unValuation env v)
 
 con :: Constant a -> Expr a
 con (Constant (Atom x v)) = Expr (Const x) (symbolArity x) (const v)

@@ -13,8 +13,8 @@ import GHC.Prim
 import Test.QuickSpec.Utils.Typed
 import Test.QuickSpec.Utils.TypeRel
 
-memoValuation :: Sig -> (forall a. Variable a -> a) -> (forall a. Variable a -> a)
-memoValuation sig f = unsafeCoerce . unsafeAt arr . index . sym . unVariable
+memoValuation :: Sig -> Valuation -> Valuation
+memoValuation sig (Valuation f) = Valuation (unsafeCoerce . unsafeAt arr . index . sym . unVariable)
   where arr :: Array Int Any
         arr = array (0, maximum (0:map (some (index . sym . unVariable)) vars))
                 [(index (sym (unVariable v)), unsafeCoerce (f v))

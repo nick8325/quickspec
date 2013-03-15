@@ -65,10 +65,8 @@ testEquation sig e1 e2 s =
       always sig $ do
         let strat s' = if s == s' then partialGen else totalGen
         obs' <- partialGen obs
-        -- Hack around "value restriction" for lambdas
-        MkGen $ \g n ->
-          let v = unGen (valuation strat) g n
-          in spoony (obs' (eval e1 v)) == spoony (obs' (eval e2 v))
+        v <- valuation strat
+        return (spoony (obs' (eval e1 v)) == spoony (obs' (eval e2 v)))
 
 always :: Sig -> Gen Bool -> IO Bool
 always sig x = do
