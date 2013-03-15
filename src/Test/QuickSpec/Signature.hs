@@ -8,7 +8,7 @@ import Control.Applicative hiding (some)
 import Test.QuickSpec.Utils.Typeable
 import Data.Monoid
 import Test.QuickCheck
-import Test.QuickSpec.Term hiding (var)
+import Test.QuickSpec.Term hiding (var, vars)
 import Test.QuickSpec.Utils.Typed
 import qualified Test.QuickSpec.Utils.TypeMap as TypeMap
 import Test.QuickSpec.Utils.TypeMap(TypeMap)
@@ -303,21 +303,49 @@ background sig =
   where sig' = signature sig
         silence1 x = x { silent = True }
 
+primVars0 :: forall a. Typeable a => Int -> [String] -> PGen a -> Sig
+primVars0 n xs g = variableSig [ Variable (Atom (symbol x n (undefined :: a)) g) | x <- xs ]
+             `mappend` totalSig (totalGen g)
+             `mappend` partialSig (partialGen g)
+             `mappend` typeSig (undefined :: a)
+
+primVars1 :: forall a b. (Typeable a, Typeable b) => Int -> [String] -> PGen (a -> b) -> Sig
+primVars1 n xs g = primVars0 n xs g
+             `mappend` typeSig (undefined :: a)
+             `mappend` typeSig (undefined :: b)
+
+primVars2 :: forall a b c. (Typeable a, Typeable b, Typeable c) => Int -> [String] -> PGen (a -> b -> c) -> Sig
+primVars2 n xs g = primVars1 n xs g
+             `mappend` typeSig (undefined :: b)
+             `mappend` typeSig (undefined :: c)
+
 -- | Similar to `vars`, but takes a generator as a parameter.
 --
 -- @gvars xs (arbitrary :: Gen a)@ is the same as
 -- @vars xs (undefined :: a)@.
-gvars :: forall a. Typeable a => [String] -> Gen a -> Sig
-gvars xs g = variableSig [ Variable (Atom (symbol x 0 (undefined :: a)) (pgen g)) | x <- xs ]
-             `mappend` totalSig g
-             `mappend` typeSig (undefined :: a)
+gvars, gvars0 :: forall a. Typeable a => [String] -> Gen a -> Sig
+gvars xs g = primVars0 0 xs (pgen g)
+gvars0 = gvars
+
+gvars1 :: forall a b. (Typeable a, Typeable b) => [String] -> Gen (a -> b) -> Sig
+gvars1 xs g = primVars1 1 xs (pgen g)
+
+gvars2 :: forall a b c. (Typeable a, Typeable b, Typeable c) => [String] -> Gen (a -> b -> c) -> Sig
+gvars2 xs g = primVars2 2 xs (pgen g)
 
 -- | Declare a set of variables of a particular type.
 --
 -- For example, @vars [\"x\",\"y\",\"z\"] (undefined :: Int)@
 -- defines three variables, @x@, @y@ and @z@, of type `Int`.
-vars :: forall a. (Arbitrary a, Typeable a) => [String] -> a -> Sig
+vars, vars0 :: forall a. (Arbitrary a, Typeable a) => [String] -> a -> Sig
 vars xs _ = gvars xs (arbitrary :: Gen a)
+vars0 = vars
+
+vars1 :: forall a b. (CoArbitrary a, Typeable a, Arbitrary b, Typeable b) => [String] -> (a -> b) -> Sig
+vars1 xs _ = gvars1 xs (arbitrary :: Gen (a -> b))
+
+vars2 :: forall a b c. (CoArbitrary a, Typeable a, CoArbitrary b, Typeable b, Arbitrary c, Typeable c) => [String] -> (a -> b -> c) -> Sig
+vars2 xs _ = gvars2 xs (arbitrary :: Gen (a -> b -> c))
 
 con, fun0 :: (Ord a, Typeable a) => String -> a -> Sig
 -- | A constant. The same as `fun0`.

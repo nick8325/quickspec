@@ -177,7 +177,7 @@ valuation strat = promote (\(Variable x) -> index (sym x) `variant'` strat (sym 
         variant' n = variant (-1 :: Int) . variant' (n-1)
 
 var :: Variable a -> Expr a
-var v@(Variable (Atom x _)) = Expr (Var x) 0 (\env -> env v)
+var v@(Variable (Atom x _)) = Expr (Var x) (symbolArity x) (\env -> env v)
 
 con :: Constant a -> Expr a
 con (Constant (Atom x v)) = Expr (Const x) (symbolArity x) (const v)

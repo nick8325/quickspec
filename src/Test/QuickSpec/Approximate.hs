@@ -60,12 +60,7 @@ genPartial x = runReaderT (lifted x) (Plug plug)
     plug x = frequency [(1, undefined), (3, x)]
 
 pvars :: (Ord a, Partial a) => [String] -> a -> Sig
-pvars xs w =
-  pobserver w
-  `mappend` variableSig [ Variable (Atom (symbol x 0 w) (PGen g g')) | x <- xs ]
-  `mappend` totalSig g
-  `mappend` partialSig g'
-  `mappend` typeSig w
+pvars xs w = pobserver w `mappend` primVars0 0 xs (PGen g g')
   where
     g = arbitrary `asTypeOf` return w
     g' = g >>= genPartial
