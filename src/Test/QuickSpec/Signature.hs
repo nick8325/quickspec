@@ -1,6 +1,6 @@
 -- | Functions for constructing and analysing signatures.
 
-{-# LANGUAGE CPP, Rank2Types, ExistentialQuantification, ScopedTypeVariables #-}
+{-# LANGUAGE CPP, Rank2Types, ExistentialQuantification, ScopedTypeVariables, DeriveDataTypeable #-}
 module Test.QuickSpec.Signature where
 
 #include "errors.h"
@@ -57,7 +57,7 @@ data Sig = Sig {
 
   -- Maximum size parameter to pass to QuickCheck.
   maxQuickCheckSize_ :: First Int
-  }
+  } deriving Typeable
 
 maxDepth :: Sig -> Int
 maxDepth = fromMaybe 3 . getFirst . maxDepth_
