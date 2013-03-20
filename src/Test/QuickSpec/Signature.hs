@@ -71,7 +71,7 @@ minTests = fromMaybe 500 . getFirst . minTests_
 maxQuickCheckSize :: Sig -> Int
 maxQuickCheckSize = fromMaybe 20 . getFirst . maxQuickCheckSize_
 
-instance Show Sig where show = unlines . summarise
+instance Show Sig where show = show . summarise
 
 data Used = Used Witness [Symbol]
 instance Show Used where
@@ -86,39 +86,87 @@ uses sig w =
       w' <- constantArgs sig k,
       w == w' ]
 
-summarise :: Sig -> [String]
+data Summary = Summary {
+  summaryFunctions :: [Symbol],
+  summaryBackground :: [Symbol],
+  summaryVariables :: [Symbol],
+  summaryObserved :: [TypeRep],
+  summaryUninhabited :: [Used],
+  summaryNoVars :: [TypeRep],
+  summaryUntestable :: [TypeRep],
+  summaryDepth :: Maybe Int,
+  summaryTests :: Maybe Int,
+  summaryQuickCheckSize :: Maybe Int
+  }
+
+instance Show Summary where
+  show summary = unlines $
+    section ["-- functions --"] (decls (summaryFunctions summary)) ++
+    section ["-- background functions --"] (decls (summaryBackground summary)) ++
+    section ["-- variables --"] (decls (summaryVariables summary)) ++
+    section ["-- the following types are using non-standard equality --"]
+      (map show (summaryObserved summary)) ++
+    section ["-- WARNING: the following types are uninhabited --"]
+      (map show (summaryUninhabited summary)) ++
+    section ["-- WARNING: there are no variables of the following types; consider adding some --"]
+      (map show (summaryNoVars summary)) ++
+    section ["-- WARNING: cannot test the following types; ",
+             "            consider using 'fun' instead of 'blind' or using 'observe' --"]
+      (map show (summaryUntestable summary))
+    where
+      section _ [] = []
+      section msg xs = msg ++ xs ++ [""]
+
+      decls xs = map decl (partitionBy symbolType xs)
+
+      decl xs@(x:_) =
+        intercalate ", " (map show xs) ++ " :: " ++ show (symbolType x)
+
+sigToHaskell :: Signature a => a -> String
+sigToHaskell sig = "signature [\n" ++ intercalate ",\n" (map ("  " ++) ls) ++ "]"
+  where
+    summary = summarise (signature sig)
+    ls =
+      [ function s | s <- summaryFunctions summary ] ++
+      [ background s | s <- summaryBackground summary ] ++
+      [ variable ss | ss <- partitionBy symbolType (summaryVariables summary) ] ++
+      [ "withDepth " ++ show n | Just n <- [summaryDepth summary] ] ++
+      [ "withTests " ++ show n | Just n <- [summaryTests summary] ] ++
+      [ "withQuickCheckSize " ++ show n | Just n <- [summaryQuickCheckSize summary] ]
+    function s = "\"" ++ show s ++ "\" `fun" ++ show (symbolArity s) ++ "` (" ++
+                 show s ++ " :: " ++ show (symbolType s) ++ ")"
+    background s = "background $ " ++ function s
+    variable ss@(s:_) =
+      show (map name ss) ++ " `vars" ++ show (symbolArity s) ++
+      "` (undefined :: " ++ show (symbolType s) ++ ")"
+
+summarise :: Sig -> Summary
 summarise sig =
-  section ["-- functions --"]
-    (decls (filter (not . silent) allConstants)) ++
-  section ["-- background functions --"]
-    (decls (filter silent allConstants)) ++
-  section ["-- variables --"]
-    (decls allVariables) ++
-  section ["-- the following types are using non-standard equality --"]
-    (map show (Map.keys (observers sig))) ++
-
-  section ["-- WARNING: the following types are uninhabited --"]
-    (usort
-     [ show (uses sig ty)
-     | ty <- argumentTypes sig,
-       ty `notElem` inhabitedTypes sig,
-       ty `notElem` variableTypes sig ]) ++
-
-  section ["-- WARNING: there are no variables of the following types; consider adding some --"]
-    (usort
-     [ show ty
-     | ty <- argumentTypes sig,
-       -- There is a non-variable term of this type and it appears as the
-       -- argument to some function
-       ty `elem` inhabitedTypes sig,
-       ty `notElem` variableTypes sig ]) ++
-  section ["-- WARNING: cannot test the following types; ",
-        "            consider using 'fun' instead of 'blind' or using 'observe' --"]
-    (usort
-     [ show ty
-     | ty@(Some (Witness w)) <- saturatedTypes sig,
-       -- The type is untestable and is the result type of a constant
-       not (testable sig w) ])
+  Summary {
+    summaryFunctions = filter (not . silent) allConstants,
+    summaryBackground = filter silent allConstants,
+    summaryVariables = allVariables,
+    summaryObserved = Map.keys (observers sig),
+    summaryUninhabited =
+      [ uses sig ty
+      | ty <- argumentTypes sig,
+        ty `notElem` inhabitedTypes sig,
+        ty `notElem` variableTypes sig ],
+    summaryNoVars =
+      [ witnessType ty
+      | ty <- argumentTypes sig,
+        -- There is a non-variable term of this type and it appears as the
+        -- argument to some function
+        ty `elem` inhabitedTypes sig,
+        ty `notElem` variableTypes sig ],
+    summaryUntestable =
+      [ witnessType ty
+      | ty@(Some (Witness w)) <- saturatedTypes sig,
+        -- The type is untestable and is the result type of a constant
+        not (testable sig w) ],
+    summaryDepth = getFirst (maxDepth_ sig),
+    summaryTests = getFirst (minTests_ sig),
+    summaryQuickCheckSize = getFirst (maxQuickCheckSize_ sig) }
 
   where
     symbols :: (Sig -> TypeRel f) -> (forall a. f a -> Symbol) -> [Symbol]
@@ -126,14 +174,6 @@ summarise sig =
 
     allConstants = symbols constants (sym . unConstant)
     allVariables = symbols variables (sym . unVariable)
-
-    section _ [] = []
-    section msg xs = msg ++ xs ++ [""]
-
-    decls xs = map decl (partitionBy symbolType xs)
-
-    decl xs@(x:_) =
-      intercalate ", " (map show xs) ++ " :: " ++ show (symbolType x)
 
 data Observer a = forall b. Ord b => Observer (PGen (a -> b))
 
