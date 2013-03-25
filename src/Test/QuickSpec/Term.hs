@@ -10,6 +10,7 @@ import Test.QuickCheck.Gen
 import Data.Function
 import Data.Ord
 import Data.Char
+import Data.Either
 import Test.QuickSpec.Utils
 
 data Symbol = Symbol {
@@ -82,15 +83,22 @@ isUndefined :: Term -> Bool
 isUndefined (Const Symbol { undef = True }) = True
 isUndefined _ = False
 
-symbols :: Term -> [Symbol]
-symbols t = symbols' t []
-  where symbols' (Var x) = (x:)
-        symbols' (Const x) = (x:)
-        symbols' (App f x) = symbols' f . symbols' x
+-- Var to the Left, Const to the Right
+symbols' :: Term -> [Either Symbol Symbol]
+symbols' t = go t []
+  where go (Var x) = (Left x:)
+        go (Const x) = (Right x:)
+        go (App f x) = go f . go x
+
+symbols,termVariables,termConstants :: Term -> [Symbol]
+symbols = uncurry (++) . partitionEithers . symbols'
+termVariables = lefts . symbols'
+termConstants = rights . symbols'
 
 depth, size :: Term -> Int
 depth (App f x) = depth f `max` (1 + depth x)
 depth _ = 1
+
 size (App f x) = size f + size x
 size (Var _) = 0
 size (Const _) = 1
