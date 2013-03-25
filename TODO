@@ -28,3 +28,8 @@ can do the whole incremental thingy safely. Plus have some combinators
 for constructing sets of terms incrementally.
 
 In PER, don't generate congruence closures for variables that can't be partial.
+
+If an equation is false (e.g., has false instances), the depth
+optimisation doesn't work properly on that equation! We neglect to
+generate terms that we should. So in the false equation detection in
+pruning, we should print a nasty error if that happens.
