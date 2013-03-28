@@ -68,6 +68,7 @@ module Test.QuickSpec
    -- * Modifying a signature
    background,
    withDepth,
+   withSize,
    withTests,
    withQuickCheckSize,
    without,

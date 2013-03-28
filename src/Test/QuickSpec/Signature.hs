@@ -52,6 +52,9 @@ data Sig = Sig {
   -- Depth of terms in the universe.
   maxDepth_ :: First Int,
 
+  -- Size of terms in the universe.
+  maxSize_ :: First Int,
+
   -- Minimum number of tests to run.
   minTests_ :: First Int,
 
@@ -62,8 +65,14 @@ data Sig = Sig {
 maxDepth :: Sig -> Int
 maxDepth = fromMaybe 3 . getFirst . maxDepth_
 
+maxSize :: Sig -> Int
+maxSize = fromMaybe 100 . getFirst . maxSize_
+
 updateDepth :: Int -> Sig -> Sig
 updateDepth n sig = sig { maxDepth_ = First (Just n) }
+
+updateSize :: Int -> Sig -> Sig
+updateSize n sig = sig { maxSize_ = First (Just n) }
 
 minTests :: Sig -> Int
 minTests = fromMaybe 500 . getFirst . minTests_
@@ -95,6 +104,7 @@ data Summary = Summary {
   summaryNoVars :: [TypeRep],
   summaryUntestable :: [TypeRep],
   summaryDepth :: Maybe Int,
+  summarySize :: Maybe Int,
   summaryTests :: Maybe Int,
   summaryQuickCheckSize :: Maybe Int
   }
@@ -131,6 +141,7 @@ sigToHaskell sig = "signature [\n" ++ intercalate ",\n" (map ("  " ++) ls) ++ "]
       [ background s | s <- summaryBackground summary ] ++
       [ variable ss | ss <- partitionBy symbolType (summaryVariables summary) ] ++
       [ "withDepth " ++ show n | Just n <- [summaryDepth summary] ] ++
+      [ "withSize " ++ show n | Just n <- [summarySize summary] ] ++
       [ "withTests " ++ show n | Just n <- [summaryTests summary] ] ++
       [ "withQuickCheckSize " ++ show n | Just n <- [summaryQuickCheckSize summary] ]
     function s = "\"" ++ show s ++ "\" `fun" ++ show (symbolArity s) ++ "` (" ++
@@ -165,6 +176,7 @@ summarise sig =
         -- The type is untestable and is the result type of a constant
         not (testable sig w) ],
     summaryDepth = getFirst (maxDepth_ sig),
+    summarySize = getFirst (maxSize_ sig),
     summaryTests = getFirst (minTests_ sig),
     summaryQuickCheckSize = getFirst (maxQuickCheckSize_ sig) }
 
@@ -183,7 +195,7 @@ observe x sig =
   where msg = "no observers found for type " ++ show (typeOf x)
 
 emptySig :: Sig
-emptySig = Sig TypeRel.empty TypeRel.empty TypeMap.empty TypeMap.empty TypeMap.empty TypeMap.empty TypeMap.empty mempty mempty mempty
+emptySig = Sig TypeRel.empty TypeRel.empty TypeMap.empty TypeMap.empty TypeMap.empty TypeMap.empty TypeMap.empty mempty mempty mempty mempty
 
 instance Monoid Sig where
   mempty = emptySig
@@ -197,6 +209,7 @@ instance Monoid Sig where
       ords = ords s1 `mappend` ords s2,
       witnesses = witnesses s1 `mappend` witnesses s2,
       maxDepth_ = maxDepth_ s1 `mappend` maxDepth_ s2,
+      maxSize_ = maxSize_ s1 `mappend` maxSize_ s2,
       minTests_ = minTests_ s1 `mappend` minTests_ s2,
       maxQuickCheckSize_ = maxQuickCheckSize_ s1 `mappend` maxQuickCheckSize_ s2 }
     where constants' = TypeRel.toList (constants s1) ++
@@ -248,6 +261,12 @@ ordSig x = emptySig { ords = TypeMap.singleton x }
 --   (the default is 3).
 withDepth :: Int -> Sig
 withDepth n = updateDepth n emptySig
+
+-- | If @withSize n@ is in your signature,
+--   QuickSpec will consider terms of up to size @n@
+--   (the default is 100).
+withSize :: Int -> Sig
+withSize n = updateSize n emptySig
 
 -- | If @withTests n@ is in your signature,
 --   QuickSpec will run at least @n@ tests

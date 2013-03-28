@@ -83,7 +83,7 @@ generate strat sig = unbuffered $ do
   printf "%d terms, " (count sum length ts)
   seeds <- genSeeds (maxQuickCheckSize sig)
   let cs = test (map (toValuation strat sig) seeds) sig ts
-  printf "%d tests, %d results, %d classes, %d raw equations.\n"
+  printf "%d tests, %d evaluations, %d classes, %d raw equations.\n"
       (count (maximum . (0:)) numTests cs)
       (count sum numResults cs)
       (count sum (length . classes) cs)
