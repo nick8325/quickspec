@@ -13,7 +13,7 @@ data Equation = Term :=: Term deriving (Eq, Ord)
 
 showEquation :: Sig -> Equation -> String
 showEquation sig (t :=: u) =
-  show (f t) ++ " == " ++ show (f u)
+  show (mapVars f t) ++ " == " ++ show (mapVars f u)
   where f = disambiguate sig (vars t ++ vars u)
 
 instance Show Equation where

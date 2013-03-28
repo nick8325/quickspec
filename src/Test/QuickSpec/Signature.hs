@@ -539,12 +539,12 @@ findWitness sig ty = fromMaybe (ERROR "missing type") (lookupWitness sig ty)
 lookupWitness :: Sig -> TypeRep -> Maybe Witness
 lookupWitness sig ty = Map.lookup ty (witnesses sig)
 
-disambiguate :: Sig -> [Symbol] -> Term -> Term
+disambiguate :: Sig -> [Symbol] -> Symbol -> Symbol
 disambiguate sig ss =
-  mapVars (\x ->
+  \x ->
     fromMaybe (ERROR "variable not found")
       (find (\y -> index x == index y)
-        (aux [] (nub ss))))
+        (aux [] (nub ss)))
   where
     aux used [] = []
     aux used (x:xs) = x { name = next }:aux (next:used) xs

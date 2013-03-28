@@ -37,8 +37,8 @@ instance Show PEquation where
 
 showPEquation :: Sig -> PEquation -> String
 showPEquation sig (pre :\/: t :=: u) =
-  show (f t) ++ " == " ++ show (f u) ++
-  showPre (map (f . Var) pre)
+  show (mapVars f t) ++ " == " ++ show (mapVars f u) ++
+  showPre (map f pre)
   where f = disambiguate sig (Term.vars t ++ Term.vars u ++ pre)
         showPre [] = ""
         showPre xs = " when " ++ conjunction (map show xs) ++ " " ++ plural xs "is" "are" ++ " partial"
