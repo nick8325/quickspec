@@ -69,6 +69,7 @@ module Test.QuickSpec
    background,
    withDepth,
    withTests,
+   withQuickCheckSize,
    without,
 
    -- * The standard QuickSpec prelude, to include in your own signatures
