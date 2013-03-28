@@ -29,7 +29,7 @@ terms sig base =
 
 terms' :: Typeable a => Sig -> TypeRel Expr -> a -> [Expr a]
 terms' sig base w =
-  filter (\t -> size (term t) <= maxSize sig) $
+  filter (\t -> size 1 (term t) <= maxSize sig) $
   map var (TypeRel.lookup w (variables sig)) ++
   map con (TypeRel.lookup w (constants sig)) ++
   [ app f x

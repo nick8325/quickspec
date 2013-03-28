@@ -42,7 +42,7 @@ infixl 5 `App`
 instance Ord Term where
   compare = comparing stamp
     where
-      stamp t = (depth t, size t, -occur t, body t)
+      stamp t = (depth t, size 0 t, -occur t, body t)
 
       occur t = length (usort (vars t))
 
@@ -88,12 +88,14 @@ symbols t = symbols' t []
         symbols' (Const x) = (x:)
         symbols' (App f x) = symbols' f . symbols' x
 
-depth, size :: Term -> Int
+depth :: Term -> Int
 depth (App f x) = depth f `max` (1 + depth x)
 depth _ = 1
-size (App f x) = size f + size x
-size (Var _) = 0
-size (Const _) = 1
+
+size :: Int -> Term -> Int
+size v (App f x) = size v f + size v x
+size v (Var _) = v
+size v (Const _) = 1
 
 holes :: Term -> [(Symbol, Int)]
 holes t = holes' 0 t []
