@@ -64,6 +64,7 @@ source-repository head
 
 library
   hs-source-dirs: src
+  include-dirs: src/Test/QuickSpec/
   Exposed-modules:
     Test.QuickSpec,
     Test.QuickSpec.Main,

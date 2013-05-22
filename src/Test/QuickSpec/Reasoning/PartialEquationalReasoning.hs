@@ -4,7 +4,7 @@
 {-# LANGUAGE CPP #-}
 module Test.QuickSpec.Reasoning.PartialEquationalReasoning where
 
-#include "../errors.h"
+#include "errors.h"
 import Test.QuickSpec.Equation
 import Test.QuickSpec.Term hiding (Variable, vars)
 import qualified Test.QuickSpec.Term as Term

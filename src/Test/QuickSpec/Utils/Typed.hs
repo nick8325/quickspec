@@ -4,7 +4,7 @@
 {-# LANGUAGE CPP, Rank2Types, ExistentialQuantification, TypeOperators, TypeSynonymInstances, FlexibleInstances, PatternGuards #-}
 module Test.QuickSpec.Utils.Typed where
 
-#include "../errors.h"
+#include "errors.h"
 import Control.Monad
 import Test.QuickSpec.Utils.Typeable
 import Data.Ord

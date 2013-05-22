@@ -3,7 +3,7 @@
 {-# LANGUAGE CPP, TupleSections #-}
 module Test.QuickSpec.Reasoning.NaiveEquationalReasoning where
 
-#include "../errors.h"
+#include "errors.h"
 
 import Test.QuickSpec.Term
 import Test.QuickSpec.Equation

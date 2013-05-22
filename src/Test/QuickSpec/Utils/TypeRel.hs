@@ -5,7 +5,7 @@
 {-# LANGUAGE CPP, Rank2Types, TypeOperators #-}
 module Test.QuickSpec.Utils.TypeRel where
 
-#include "../errors.h"
+#include "errors.h"
 import qualified Test.QuickSpec.Utils.TypeMap as TypeMap
 import Test.QuickSpec.Utils.TypeMap(TypeMap)
 import Test.QuickSpec.Utils.Typed
