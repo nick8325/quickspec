@@ -33,3 +33,7 @@ If an equation is false (e.g., has false instances), the depth
 optimisation doesn't work properly on that equation! We neglect to
 generate terms that we should. So in the false equation detection in
 pruning, we should print a nasty error if that happens.
+
+Improve heuristics for Rene's example.
+
+Add "ask why an equation is not printed".
