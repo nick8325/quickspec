@@ -111,9 +111,13 @@ quickSpec = runTool $ \sig -> do
     (length reps)
 
   let ctx = initial (maxDepth sig) (symbols sig) reps
-      pruned = filter (not . all silent . eqnFuns)
+      allEqs = map (some eraseEquation) eqs
+      isBackground = all silent . eqnFuns
+      (background, foreground) =
+        partition isBackground allEqs
+      pruned = filter (not . isBackground)
                  (prune ctx (map erase reps) id
-                   (map (some eraseEquation) eqs))
+                   (background ++ foreground))
       eqnFuns (t :=: u) = funs t ++ funs u
       isGround (t :=: u) = null (vars t) && null (vars u)
       byTarget = innerZip [1 :: Int ..] (partitionBy target pruned)
