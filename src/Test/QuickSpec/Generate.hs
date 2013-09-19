@@ -23,21 +23,24 @@ import Control.Spoon
 import Test.QuickSpec.Utils.MemoValuation
 
 terms :: Sig -> TypeRel Expr -> TypeRel Expr
-terms sig base =
+terms = termsSatisfying (const True)
+
+termsSatisfying :: (Term -> Bool) -> Sig -> TypeRel Expr -> TypeRel Expr
+termsSatisfying p sig base =
   TypeMap.fromList
-    [ Some (O (terms' sig base w))
+    [ Some (O (terms' p sig base w))
     | Some (Witness w) <- usort (saturatedTypes sig ++ variableTypes sig) ]
 
-terms' :: Typeable a => Sig -> TypeRel Expr -> a -> [Expr a]
-terms' sig base w =
-  filter (\t -> size 1 (term t) <= maxSize sig) $
+terms' :: Typeable a => (Term -> Bool) -> Sig -> TypeRel Expr -> a -> [Expr a]
+terms' p sig base w =
+  filter (\t -> size 1 (term t) <= maxSize sig && p (term t)) $
   map var (TypeRel.lookup w (variables sig)) ++
   map con (TypeRel.lookup w (constants sig)) ++
   [ app f x
   | Some (Witness w') <- lhsWitnesses sig w,
     x <- TypeRel.lookup w' base,
     not (isUndefined (term x)),
-    f <- terms' sig base (const w),
+    f <- terms' p sig base (const w),
     arity f > 0,
     not (isUndefined (term f)) ]
 
@@ -71,17 +74,20 @@ toValuation strat sig (g, n) =
   in (memoValuation sig (unGen (valuation strat) g1 n), g2, n)
 
 generate :: Strategy -> Sig -> IO (TypeMap (TestResults `O` Expr))
-generate strat sig | maxDepth sig < 0 =
+generate strat sig = generateTermsSatisfying (const True) strat sig
+
+generateTermsSatisfying :: (Term -> Bool) -> Strategy -> Sig -> IO (TypeMap (TestResults `O` Expr))
+generateTermsSatisfying p strat sig | maxDepth sig < 0 =
   ERROR "generate: maxDepth must be positive"
-generate strat sig | maxDepth sig == 0 = return TypeMap.empty
-generate strat sig = unbuffered $ do
+generateTermsSatisfying p strat sig | maxDepth sig == 0 = return TypeMap.empty
+generateTermsSatisfying p strat sig = unbuffered $ do
   let d = maxDepth sig
   rs <- fmap (TypeMap.mapValues2 reps) (generate (const partialGen) (updateDepth (d-1) sig))
   printf "Depth %d: " d
   let count :: ([a] -> a) -> (forall b. f (g b) -> a) ->
                TypeMap (f `O` g) -> a
       count op f = op . map (some2 f) . TypeMap.toList
-      ts = terms sig rs
+      ts = termsSatisfying p sig rs
   printf "%d terms, " (count sum length ts)
   seeds <- genSeeds (maxQuickCheckSize sig)
   let cs = test (map (toValuation strat sig) seeds) sig ts
