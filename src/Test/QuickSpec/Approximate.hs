@@ -4,6 +4,7 @@ module Test.QuickSpec.Approximate where
 
 import Test.QuickCheck
 import Test.QuickCheck.Gen
+import Test.QuickCheck.Random
 import Test.QuickSpec.Signature
 import Test.QuickSpec.Term
 import Test.QuickSpec.Utils
@@ -36,7 +37,7 @@ instance Partial a => Partial [a] where
   unlifted [] = return []
   unlifted (x:xs) = liftM2 (:) (lifted x) (lifted xs)
 
-approximate :: Partial a => (forall a. Partial a => a -> Maybe a) -> StdGen -> Int -> a -> a
+approximate :: Partial a => (forall a. Partial a => a -> Maybe a) -> QCGen -> Int -> a -> a
 approximate eval g n x = unGen (runReaderT (lifted x) (Plug plug)) g n
   where
     plug :: forall a. Partial a => Gen a -> Gen a

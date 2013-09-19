@@ -17,6 +17,7 @@ import Text.Printf
 import Test.QuickSpec.Utils.Typeable
 import Test.QuickSpec.Utils
 import Test.QuickCheck.Gen
+import Test.QuickCheck.Random
 import System.Random
 import Control.Spoon
 import Test.QuickSpec.Utils.MemoValuation
@@ -40,12 +41,12 @@ terms' sig base w =
     arity f > 0,
     not (isUndefined (term f)) ]
 
-test :: [(Valuation, StdGen, Int)] -> Sig ->
+test :: [(Valuation, QCGen, Int)] -> Sig ->
         TypeMap (List `O` Expr) -> TypeMap (TestResults `O` Expr)
 test vals sig ts = fmap (mapSome2 (test' vals sig)) ts
 
 test' :: forall a. Typeable a =>
-         [(Valuation, StdGen, Int)] -> Sig -> [Expr a] -> TestResults (Expr a)
+         [(Valuation, QCGen, Int)] -> Sig -> [Expr a] -> TestResults (Expr a)
 test' vals sig ts
   | not (testable sig (undefined :: a)) = discrete ts
   | otherwise =
@@ -58,13 +59,13 @@ test' vals sig ts
     base = minTests sig `div` 2
     increment = minTests sig - base
 
-genSeeds :: Int -> IO [(StdGen, Int)]
+genSeeds :: Int -> IO [(QCGen, Int)]
 genSeeds maxSize = do
-  rnd <- newStdGen
+  rnd <- newQCGen
   let rnds rnd = rnd1 : rnds rnd2 where (rnd1, rnd2) = split rnd
   return (zip (rnds rnd) (concat (repeat [0,2..maxSize])))
 
-toValuation :: Strategy -> Sig -> (StdGen, Int) -> (Valuation, StdGen, Int)
+toValuation :: Strategy -> Sig -> (QCGen, Int) -> (Valuation, QCGen, Int)
 toValuation strat sig (g, n) =
   let (g1, g2) = split g
   in (memoValuation sig (unGen (valuation strat) g1 n), g2, n)

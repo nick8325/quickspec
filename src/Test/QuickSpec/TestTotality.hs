@@ -17,6 +17,7 @@ import Test.QuickSpec.Signature
 import Test.QuickSpec.Term hiding (symbols)
 import Test.QuickCheck
 import Test.QuickCheck.Gen
+import Test.QuickCheck.Random
 import System.Random
 import Control.Monad
 import Data.List hiding (lookup)
@@ -70,6 +71,6 @@ testEquation sig e1 e2 s =
 
 always :: Sig -> Gen Bool -> IO Bool
 always sig x = do
-  gens <- replicateM 100 newStdGen
+  gens <- replicateM 100 newQCGen
   let sizes = cycle [0,2..maxQuickCheckSize sig]
   return (and [unGen x g n | (g, n) <- zip gens sizes])
