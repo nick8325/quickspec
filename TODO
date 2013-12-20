@@ -1,3 +1,33 @@
+Alpha-equivalence stuff: once we have classes, take each
+representative and see which variables we can replace with underscores
+(i.e. their value is irrelevant). This should be very quick because
+normally we won't be able to get rid of any variables. Then the extra
+terms we need to generate are only the ones we get by permuting the
+variables (e.g., no need for x+z). Incidentally, we will know that two
+terms can only be equal if they have exactly the same set of
+variables. Does that help? P.S. This story is not quite true.
+For example, x-x=y-y is an equation. Problem is, we can't exactly
+"underscore" a variable that appears twice in a term. Nonetheless, we
+don't need to permute that variable, and can represent the
+"underscore" information by an equation like x-x=y-y.
+
+Note to self: the problem with mixing size and depth.
+Currently, we don't instantiate variables with just any old term but
+only with representatives. Because the terms are ordered by depth,
+this is OK, because we cannot go out of the universe by replacing a
+non-representative subterm with a representative. If we mix depth and
+size, we might need to keep several "instantiation representatives"
+for each class and try all (or rather, try in sequence until one works).
+Ickier. Better approach: keep only one representative plus all
+size/depth combos that it "stands for" (at CC level this is identical,
+anyway).
+
+Many terms live in their own equivalence class. This is almost free
+EXCEPT that we still instantiate equations with these terms.
+Do we need to? I suspect the answer is yes, because we generate terms
+with these singleton terms as subterms. However, for terms of maximum
+depth, we probably don't need to use them in instances.
+
 Port all possible old QS examples to new QS
 Switch from depth to size?!
 For things like modifiers (sortedList etc.): if a type has no terms of depth 1 (only depth 2), terms of that type should have their depth reduced by 1. Brittle, though: what about variables?
