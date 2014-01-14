@@ -55,19 +55,6 @@ pobserver x = observerSig (Observer (PGen (MkGen tot) (MkGen part)))
   where tot g n y = approximate Just g n (y `asTypeOf` x)
         part g n y = approximate spoony g n (y `asTypeOf` x)
 
-blanchette :: (Typeable a, Ord a, Arbitrary a) => a -> Sig
-blanchette a = observerSig (Observer (pgen protect))
-  where
-    protect = do
-      -- HACK HACK HACK
-      def <- variant' 100 arbitrary
-      return $ \x ->
-        case spoony (x `asTypeOf` a) of
-          Just y -> y
-          Nothing -> def
-    variant' 0 = variant (0 :: Int)
-    variant' n = variant (-1 :: Int) . variant' (n-1)
-
 genPartial :: Partial a => a -> Gen a
 genPartial x = runReaderT (lifted x) (Plug plug)
   where
