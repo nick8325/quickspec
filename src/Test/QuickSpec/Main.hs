@@ -114,10 +114,14 @@ quickSpec = runTool $ \sig -> do
   let ctx = initial (maxDepth sig) (symbols sig) univ
       allEqs = map (some eraseEquation) eqs
       isBackground = all silent . eqnFuns
+      keep eq = not (isBackground eq) || absurd eq
+      absurd (t :=: u) = absurd1 t u || absurd1 u t
+      absurd1 (Var x) t = x `notElem` vars t
+      absurd1 _ _ = False
       (background, foreground) =
         partition isBackground allEqs
-      pruned = filter (not . isBackground)
-                 (prune ctx (map erase reps) id
+      pruned = filter keep
+                 (prune ctx (filter (not . isUndefined) (map erase reps)) id
                    (background ++ foreground))
       eqnFuns (t :=: u) = funs t ++ funs u
       isGround (t :=: u) = null (vars t) && null (vars u)
