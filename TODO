@@ -1,6 +1,12 @@
 Is there some very narrow condition for when we need to substitute all
 possible values, not just representatives? Is x==y the only
-problematic case?
+problematic case? I *think* the reasoning is as follows:
+  1. Suppose we have an equation t[x] = u[x],
+     a representative r and non-representative n.
+  2. We only need to substitute t[r] = u[r] and not t[n] = u[n],
+     because the pruning will prove r = n.
+  3. But this assumes that we can't use t[n] = u[n] to prove r = n.
+  4. At this point the reasoning breaks down, it's clearly nonsense :-\
 
 Alpha-equivalence stuff: once we have classes, take each
 representative and see which variables we can replace with underscores
