@@ -1,3 +1,7 @@
+Is there some very narrow condition for when we need to substitute all
+possible values, not just representatives? Is x==y the only
+problematic case?
+
 Alpha-equivalence stuff: once we have classes, take each
 representative and see which variables we can replace with underscores
 (i.e. their value is irrelevant). This should be very quick because
