@@ -104,13 +104,14 @@ quickSpec = runTool $ \sig -> do
   putStrLn "== Testing =="
   r <- generate (const partialGen) sig
   let clss = concatMap (some2 (map (Some . O) . classes)) (TypeMap.toList r)
+      univ = concatMap (some2 (map (tagged term))) clss
       reps = map (some2 (tagged term . head)) clss
       eqs = equations clss
   printf "%d raw equations; %d terms in universe.\n\n"
     (length eqs)
     (length reps)
 
-  let ctx = initial (maxDepth sig) (symbols sig) reps
+  let ctx = initial (maxDepth sig) (symbols sig) univ
       allEqs = map (some eraseEquation) eqs
       isBackground = all silent . eqnFuns
       (background, foreground) =
