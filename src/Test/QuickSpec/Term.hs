@@ -10,6 +10,7 @@ import Test.QuickCheck.Gen
 import Data.Function
 import Data.Ord
 import Data.Char
+import Data.List
 import Test.QuickSpec.Utils
 
 data Symbol = Symbol {
@@ -51,7 +52,7 @@ instance Ord Term where
       body (App f x) = Right (f, x)
 
 instance Show Term where
-  showsPrec p t = showString (showTerm p t)
+  showsPrec p t = showString (showTerm p (hideImplicit t))
    where
      brack s = "(" ++ s ++ ")"
      parenFun p s | p < 2 = s
@@ -68,6 +69,14 @@ instance Show Term where
 
      showTerm p (f `App` x) =
        parenFun p (showTerm 1 f ++ " " ++ showTerm 2 x)
+
+     hideImplicit (f `App` x)
+       | isImplicit x = f
+       | otherwise = hideImplicit f `App` hideImplicit x
+     hideImplicit t = t
+
+     isImplicit (Var v) | "_" `isPrefixOf` name v = True
+     isImplicit _ = False
 
 showOp :: String -> String
 showOp op | isOp op = "(" ++ op ++ ")"
