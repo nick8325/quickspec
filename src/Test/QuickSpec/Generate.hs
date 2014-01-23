@@ -73,25 +73,28 @@ toValuation strat sig (g, n) =
   let (g1, g2) = split g
   in (memoValuation sig (unGen (valuation strat) g1 n), g2, n)
 
-generate :: Strategy -> Sig -> IO (TypeMap (TestResults `O` Expr))
-generate strat sig = generateTermsSatisfying (const True) strat sig
+generate :: Bool -> Strategy -> Sig -> IO (TypeMap (TestResults `O` Expr))
+generate shutUp strat sig = generateTermsSatisfying shutUp (const True) strat sig
 
-generateTermsSatisfying :: (Term -> Bool) -> Strategy -> Sig -> IO (TypeMap (TestResults `O` Expr))
-generateTermsSatisfying p strat sig | maxDepth sig < 0 =
+generateTermsSatisfying :: Bool -> (Term -> Bool) -> Strategy -> Sig -> IO (TypeMap (TestResults `O` Expr))
+generateTermsSatisfying shutUp p strat sig | maxDepth sig < 0 =
   ERROR "generate: maxDepth must be positive"
-generateTermsSatisfying p strat sig | maxDepth sig == 0 = return TypeMap.empty
-generateTermsSatisfying p strat sig = unbuffered $ do
+generateTermsSatisfying shutUp p strat sig | maxDepth sig == 0 = return TypeMap.empty
+generateTermsSatisfying shutUp p strat sig = unbuffered $ do
   let d = maxDepth sig
-  rs <- fmap (TypeMap.mapValues2 reps) (generate (const partialGen) (updateDepth (d-1) sig))
-  printf "Depth %d: " d
+      quietly x | shutUp = return ()
+                | otherwise = x
+  rs <- fmap (TypeMap.mapValues2 reps) (generate shutUp (const partialGen) (updateDepth (d-1) sig))
+  quietly $ printf "Depth %d: " d
   let count :: ([a] -> a) -> (forall b. f (g b) -> a) ->
                TypeMap (f `O` g) -> a
       count op f = op . map (some2 f) . TypeMap.toList
       ts = termsSatisfying p sig rs
-  printf "%d terms, " (count sum length ts)
+  quietly $ printf "%d terms, " (count sum length ts)
   seeds <- genSeeds (maxQuickCheckSize sig)
   let cs = test (map (toValuation strat sig) seeds) sig ts
-  printf "%d tests, %d evaluations, %d classes, %d raw equations.\n"
+  quietly $
+    printf "%d tests, %d evaluations, %d classes, %d raw equations.\n"
       (count (maximum . (0:)) numTests cs)
       (count sum numResults cs)
       (count sum (length . classes) cs)

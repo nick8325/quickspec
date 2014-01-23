@@ -102,7 +102,7 @@ innerZip (x:xs) ((y:ys):yss) =
 quickSpec :: Signature a => a -> IO ()
 quickSpec = runTool $ \sig -> do
   putStrLn "== Testing =="
-  r <- generate (const partialGen) sig
+  r <- generate False (const partialGen) sig
   let clss = concatMap (some2 (map (Some . O) . classes)) (TypeMap.toList r)
       univ = concatMap (some2 (map (tagged term))) clss
       reps = map (some2 (tagged term . head)) clss
@@ -151,7 +151,7 @@ sampleList g n xs | n >= length xs = xs
 sampleTerms :: Signature a => a -> IO ()
 sampleTerms = runTool $ \sig -> do
   putStrLn "== Testing =="
-  r <- generate (const partialGen) (updateDepth (maxDepth sig - 1) sig)
+  r <- generate False (const partialGen) (updateDepth (maxDepth sig - 1) sig)
   let univ = sort . concatMap (some2 (map term)) . TypeMap.toList . terms sig .
              TypeMap.mapValues2 reps $ r
   printf "Universe contains %d terms.\n\n" (length univ)
