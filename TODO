@@ -46,8 +46,6 @@ Add user-accessible term generator like in Erlang QS?
 Add "ask why equation not printed."
 
 Regexes: use Brzozowski derivatives to get a useful specification
-Print out "i+j==j+i" instead of "j+i==i+j" by making disambiguate
-alpha-convert everything.
 
 Fix loss of completeness with depth optimisation when testing at depth
 n splits two terms that were tested equal at depth n-1
