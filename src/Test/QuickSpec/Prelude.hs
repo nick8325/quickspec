@@ -12,14 +12,14 @@ import Data.Typeable
 -- | Just a type.
 --   You can instantiate your polymorphic functions at this type
 --   to include them in a signature.
-newtype A = A Int deriving (Eq, Ord, Typeable, Arbitrary, CoArbitrary, Partial)
-newtype B = B Int deriving (Eq, Ord, Typeable, Arbitrary, CoArbitrary, Partial)
-newtype C = C Int deriving (Eq, Ord, Typeable, Arbitrary, CoArbitrary, Partial)
+newtype A = A Int deriving (Eq, Ord, Typeable, Arbitrary, CoArbitrary, Partial, Show)
+newtype B = B Int deriving (Eq, Ord, Typeable, Arbitrary, CoArbitrary, Partial, Show)
+newtype C = C Int deriving (Eq, Ord, Typeable, Arbitrary, CoArbitrary, Partial, Show)
 
 -- | A type with two elements.
 --   Use this instead of @A@ if testing doesn't work well because
 --   the domain of @A@ is too large.
-data Two = One | Two deriving (Eq, Ord, Typeable)
+data Two = One | Two deriving (Eq, Ord, Typeable, Show)
 
 instance Arbitrary Two where
   arbitrary = elements [One, Two]
