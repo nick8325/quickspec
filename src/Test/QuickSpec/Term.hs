@@ -7,6 +7,7 @@ module Test.QuickSpec.Term where
 import Test.QuickSpec.Utils.Typeable
 import Test.QuickCheck
 import Test.QuickCheck.Gen
+import Test.QuickCheck.Gen.Unsafe
 import Data.Function
 import Data.Ord
 import Data.Char
@@ -185,7 +186,9 @@ mapConstant f (Constant v) = Constant v { sym = f (sym v) }
 newtype Valuation = Valuation { unValuation :: forall a. Variable a -> a }
 
 promoteVal :: (forall a. Gen (Variable a -> a)) -> Gen Valuation
-promoteVal g = MkGen (\r n -> Valuation (unGen g r n))
+promoteVal g = do
+  Capture eval <- capture
+  return (Valuation (eval g))
 
 valuation :: Strategy -> Gen Valuation
 valuation strat = promoteVal (promote (\(Variable x) -> index (sym x) `variant'` strat (sym x) (value x)))
