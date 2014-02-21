@@ -16,7 +16,7 @@ import Test.QuickSpec.Term
 import Text.Printf
 import Test.QuickSpec.Utils.Typeable
 import Test.QuickSpec.Utils
-import Test.QuickCheck.Gen
+import Test.QuickCheck.Gen hiding (generate)
 import Test.QuickCheck.Random
 import System.Random
 import Control.Spoon
