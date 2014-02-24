@@ -185,13 +185,13 @@ mapConstant f (Constant v) = Constant v { sym = f (sym v) }
 -- Generate a random variable valuation
 newtype Valuation = Valuation { unValuation :: forall a. Variable a -> a }
 
-promoteVal :: (forall a. Gen (Variable a -> a)) -> Gen Valuation
+promoteVal :: (forall a. Variable a -> Gen a) -> Gen Valuation
 promoteVal g = do
   Capture eval <- capture
-  return (Valuation (eval g))
+  return (Valuation (eval . g))
 
 valuation :: Strategy -> Gen Valuation
-valuation strat = promoteVal (promote (\(Variable x) -> index (sym x) `variant` strat (sym x) (value x)))
+valuation strat = promoteVal (\(Variable x) -> index (sym x) `variant` strat (sym x) (value x))
 
 var :: Variable a -> Expr a
 var v@(Variable (Atom x _)) = Expr (Var x) (symbolArity x) (\env -> unValuation env v)
