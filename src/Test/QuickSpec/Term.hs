@@ -191,10 +191,7 @@ promoteVal g = do
   return (Valuation (eval g))
 
 valuation :: Strategy -> Gen Valuation
-valuation strat = promoteVal (promote (\(Variable x) -> index (sym x) `variant'` strat (sym x) (value x)))
-  where -- work around the fact that split doesn't work
-        variant' 0 = variant (0 :: Int)
-        variant' n = variant (-1 :: Int) . variant' (n-1)
+valuation strat = promoteVal (promote (\(Variable x) -> index (sym x) `variant` strat (sym x) (value x)))
 
 var :: Variable a -> Expr a
 var v@(Variable (Atom x _)) = Expr (Var x) (symbolArity x) (\env -> unValuation env v)
