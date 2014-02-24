@@ -324,6 +324,12 @@ primCon4 n x f = primCon3 n x f
                  `mappend` typeSig (undefined :: d)
                  `mappend` typeSig (undefined :: e)
 
+primCon5 :: forall a b c d e f. (Typeable a, Typeable b, Typeable c, Typeable d, Typeable e, Typeable f) =>
+          Int -> String -> (a -> b -> c -> d -> e -> f) -> Sig
+primCon5 n x f = primCon4 n x f
+                 `mappend` typeSig (undefined :: e)
+                 `mappend` typeSig (undefined :: f)
+
 -- | A constant.
 blind0 :: forall a. Typeable a => String -> a -> Sig
 blind0 = primCon0 0
@@ -343,6 +349,10 @@ blind3 = primCon3 3
 blind4 :: forall a b c d e. (Typeable a, Typeable b, Typeable c, Typeable d, Typeable e) =>
           String -> (a -> b -> c -> d -> e) -> Sig
 blind4 = primCon4 4
+-- | A function of arity 5.
+blind5 :: forall a b c d e f. (Typeable a, Typeable b, Typeable c, Typeable d, Typeable e, Typeable f) =>
+          String -> (a -> b -> c -> d -> e -> f) -> Sig
+blind5 = primCon5 5
 
 ord :: (Ord a, Typeable a) => a -> Sig
 ord x = ordSig (Observer (pgen (return id)) `observing` x)
@@ -440,6 +450,13 @@ fun4 :: (Typeable a, Typeable b, Typeable c, Typeable d,
         String -> (a -> b -> c -> d -> e) -> Sig
 fun4 x f = blind4 x f
            `mappend` ord (f undefined undefined undefined undefined)
+
+-- | A function of five arguments.
+fun5 :: (Typeable a, Typeable b, Typeable c, Typeable d,
+         Typeable e, Typeable f, Ord f) =>
+        String -> (a -> b -> c -> d -> e -> f) -> Sig
+fun5 x f = blind5 x f
+           `mappend` ord (f undefined undefined undefined undefined undefined)
 
 -- | An observation function of arity 1.
 observer1 :: (Typeable a, Typeable b, Ord b) => (a -> b) -> Sig

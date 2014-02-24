@@ -33,14 +33,14 @@ module Test.QuickSpec
    -- If you want to get equations over a type that isn't in `Ord`,
    -- you must use the `observerN` family of functions (below)
    -- to define an observation function for that type.
-   con, fun0, fun1, fun2, fun3, fun4,
+   con, fun0, fun1, fun2, fun3, fun4, fun5,
    -- * Adding functions whose results are not in `Ord`
    --
    -- | These functions work the same as `funN` (above),
    --   but don't use `Ord` to compare the results of the functions.
    --   Instead you can use the `observerN` family of functions (below)
    --   to define an observation function.
-   blind0, blind1, blind2, blind3, blind4,
+   blind0, blind1, blind2, blind3, blind4, blind5,
    -- * Adding variables to a signature
    vars,
    gvars,
