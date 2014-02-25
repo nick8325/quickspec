@@ -141,6 +141,11 @@ mapVars f (Var x) = Var (f x)
 mapVars f (Const x) = Const x
 mapVars f (App t u) = App (mapVars f t) (mapVars f u)
 
+mapConsts :: (Symbol -> Symbol) -> Term -> Term
+mapConsts f (Var x) = Var x
+mapConsts f (Const x) = Const (f x)
+mapConsts f (App t u) = App (mapConsts f t) (mapConsts f u)
+
 data Expr a = Expr {
   term :: Term,
   arity :: {-# UNPACK #-} !Int,
