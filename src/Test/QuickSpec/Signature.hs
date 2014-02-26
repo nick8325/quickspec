@@ -568,13 +568,15 @@ disambiguate sig ss =
       where next = head (filter (`notElem` used) candidates)
             candidates
               | null wellTypedNames = ERROR "null allVars"
-              | otherwise = wellTypedNames ++ concat [ map (++ show i) wellTypedNames | i <- [1.. ] ]
+              | otherwise = concat [ map (++ suffix) wellTypedNames | suffix <- suffixes ]
             allVars =
               map (some (sym . unVariable))
                 (TypeRel.toList (variables sig)) ++
               ss
             wellTypedNames =
               [ name v | v <- allVars, symbolType v == symbolType x ]
+            suffixes =
+              concat ([sequence (replicate n ['a'..'z']) | n <- [0..]])
 
 constantSymbols, variableSymbols, symbols :: Sig -> [Symbol]
 constantSymbols sig =
