@@ -1,7 +1,7 @@
 -- | The \"prelude\": a standard signature containing useful functions
 --   like '++', which can be used as background theory.
 
-{-# LANGUAGE ScopedTypeVariables, DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ScopedTypeVariables, DeriveDataTypeable, GeneralizedNewtypeDeriving, StandaloneDeriving, CPP #-}
 module Test.QuickSpec.Prelude where
 
 import Test.QuickSpec.Signature
@@ -12,9 +12,16 @@ import Data.Typeable
 -- | Just a type.
 --   You can instantiate your polymorphic functions at this type
 --   to include them in a signature.
-newtype A = A Int deriving (Eq, Ord, Typeable, Arbitrary, CoArbitrary, Partial, Show)
-newtype B = B Int deriving (Eq, Ord, Typeable, Arbitrary, CoArbitrary, Partial, Show)
-newtype C = C Int deriving (Eq, Ord, Typeable, Arbitrary, CoArbitrary, Partial, Show)
+newtype A = A Int deriving (Eq, Ord, Typeable, Arbitrary, CoArbitrary, Show)
+newtype B = B Int deriving (Eq, Ord, Typeable, Arbitrary, CoArbitrary, Show)
+newtype C = C Int deriving (Eq, Ord, Typeable, Arbitrary, CoArbitrary, Show)
+
+-- 7.8.1 barfs at these instances because of the Role annotations
+#if __GLASGOW_HASKELL__ < 708
+deriving instance Partial A
+deriving instance Partial B
+deriving instance Partial C
+#endif
 
 -- | A type with two elements.
 --   Use this instead of @A@ if testing doesn't work well because
