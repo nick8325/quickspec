@@ -12,9 +12,13 @@ import Data.Typeable
 -- | Just a type.
 --   You can instantiate your polymorphic functions at this type
 --   to include them in a signature.
-newtype A = A Int deriving (Eq, Ord, Typeable, Arbitrary, CoArbitrary, Partial, Show)
-newtype B = B Int deriving (Eq, Ord, Typeable, Arbitrary, CoArbitrary, Partial, Show)
-newtype C = C Int deriving (Eq, Ord, Typeable, Arbitrary, CoArbitrary, Partial, Show)
+newtype A = A Int deriving (Eq, Ord, Typeable, Arbitrary, CoArbitrary, Show)
+newtype B = B Int deriving (Eq, Ord, Typeable, Arbitrary, CoArbitrary, Show)
+newtype C = C Int deriving (Eq, Ord, Typeable, Arbitrary, CoArbitrary, Show)
+
+instance Partial A where unlifted (A x) = fmap A (unlifted x)
+instance Partial B where unlifted (B x) = fmap B (unlifted x)
+instance Partial C where unlifted (C x) = fmap C (unlifted x)
 
 -- | A type with two elements.
 --   Use this instead of @A@ if testing doesn't work well because
