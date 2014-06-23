@@ -91,4 +91,4 @@ library
 
   Build-depends:
     base < 5, containers, transformers, QuickCheck >= 2.7,
-    random, spoon >= 0.2, array, ghc-prim, mtl
+    random, spoon >= 0.2, array, ghc-prim

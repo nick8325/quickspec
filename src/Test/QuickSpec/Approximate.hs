@@ -10,7 +10,7 @@ import Test.QuickSpec.Term
 import Test.QuickSpec.Utils
 import Test.QuickSpec.Utils.Typeable
 import Control.Monad
-import Control.Monad.Reader
+import Control.Monad.Trans.Reader
 import Control.Spoon
 import System.Random
 import Data.Monoid

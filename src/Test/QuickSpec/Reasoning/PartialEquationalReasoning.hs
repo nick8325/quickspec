@@ -13,13 +13,14 @@ import qualified Test.QuickSpec.Reasoning.NaiveEquationalReasoning as EQ
 import Test.QuickSpec.Reasoning.NaiveEquationalReasoning(EQ, evalEQ, runEQ)
 import Data.IntMap(IntMap)
 import qualified Data.IntMap as IntMap
-import Control.Monad.State
-import qualified Control.Monad.State as S
+import Control.Monad.Trans.State
+import qualified Control.Monad.Trans.State as S
 import Data.List
 import Data.Ord
 import Test.QuickSpec.Utils
 import Test.QuickSpec.Signature hiding (vars)
 import Data.Monoid
+import Control.Monad
 
 data PEquation = Precondition :\/: Equation
 type Precondition = [Symbol]
