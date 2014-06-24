@@ -1,6 +1,6 @@
 Name:                quickspec
 Version:             0.9.4
-Cabal-version:       >=1.6
+Cabal-version:       >= 1.6
 Build-type:          Simple
 
 Homepage:            https://github.com/nick8325/quickspec
@@ -13,47 +13,37 @@ Copyright:           2009-2013 Nick Smallbone
 
 Category:            Testing
 
-Synopsis:            Equational laws for free
+Synopsis:            Equational laws for free!
 Description:
-  QuickSpec automatically finds equational properties of your program.
+  QuickSpec automatically finds equational laws about your program.
   .
   Give it an API, i.e. a collection of functions, and it will spit out
   equations about those functions. For example, given @reverse@, @++@
-  and @[]@, QuickSpec finds six laws:
+  and @[]@, QuickSpec finds six laws, which are exactly the ones you
+  might write by hand:
   .
   > xs++[] == xs
   > []++xs == xs
-  > reverse [] == []
   > (xs++ys)++zs == xs++(ys++zs)
+  > reverse [] == []
   > reverse (reverse xs) == xs
   > reverse xs++reverse ys == reverse (ys++xs)
   .
-  All you have to provide is:
+  The laws that QuickSpec generates are not proved correct, but have
+  passed at least 200 QuickCheck tests.
   .
-  * Some functions and constants to test. These are the /only/
-    functions that will appear in the equations.
-  .
-  * A collection of variables that can appear in the equations
-    (@xs@, @ys@ and @zs@ in the example above).
-  .
-  * 'Test.QuickCheck.Arbitrary' and 'Data.Typeable.Typeable' instances for the types you want to test.
-  .
-  Consider this a pre-release. Everything is complete but undocumented
-  :) The best place to start is the examples at
-  <http://github.com/nick8325/quickspec/tree/master/examples>. There
-  is also a paper at
-  <http://www.cse.chalmers.se/~nicsma/quickspec.pdf>.
-  Everything you need should be in the module "Test.QuickSpec".
-  .
-  If you want help, email me!
+  For more information, see the @README@ file at
+  https://github.com/nick8325/quickspec/blob/master/README.asciidoc.
 
 Extra-source-files:
-  README
+  README.asciidoc
   examples/Arith.hs
+  examples/Arrays.hs
   examples/Bools.hs
   examples/Composition.hs
   examples/Heaps.hs
   examples/Lists.hs
+  examples/PrettyPrinting.hs
   examples/TinyWM.hs
   src/Test/QuickSpec/errors.h
 

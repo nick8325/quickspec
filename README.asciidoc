@@ -1,17 +1,14 @@
-QuickSpec: equational specifications by magic!
-==============================================
+QuickSpec: equational laws for free!
+====================================
 
-(Hello!
-
-QuickSpec is more or less ready, but the documentation isn't!
-You probably oughtn't read this README yet.
-You may want to try looking at the examples directory,
-as well as
-http://publications.lib.chalmers.se/records/fulltext/local_125255.pdf[our paper about it].)
-
-Ever wanted to understand what your program really _does_? Got a
-hodgepodge of functions but not sure how they interact? QuickSpec is
+Ever get that nagging feeling that your code must satisfy some
+algebraic properties, but not sure what they are? Want to write some
+QuickCheck properties, but not sure where to start? QuickSpec might be
 for you! Give it your program -- QuickSpec will find the laws it obeys.
+
+QuickSpec takes any hodgepodge of functions, and tests those functions
+to work out the relationship between them. It then spits out what it
+discovered as a list of equations.
 
 Give QuickSpec `reverse`, `++` and `[]`, for example, and it will find
 six laws:
@@ -19,37 +16,59 @@ six laws:
 ------------------------------------------------
 xs++[] == xs
 []++xs == xs
-reverse [] == []
 (xs++ys)++zs == xs++(ys++zs)
+reverse [] == []
 reverse (reverse xs) == xs
 reverse xs++reverse ys == reverse (ys++xs)
 ------------------------------------------------
 
-All the things you would expect to hold, and nothing more! Brill!
+All the laws you would expect to hold, and nothing more -- and all
+discovered automatically! Brill!
 
-End sales pitch. It can't be magic: what is the catch?
+Enough of the sales pitch. It isn't magic, and QuickSpec has a number
+of limitations:
 
 * QuickSpec can only discover _equations_, not other kinds of laws.
-  Luckily, equations are good at describing Haskell programs.
-* You have to say exactly which functions and constants can appear
-  in the equations. In the example above, we gave
-  `reverse`, `++` and `[]`: nothing else appears in the equations,
-  not `:` for example.
-* QuickSpec will only discover equations about small(ish) terms.
+  Luckily, equations cover a lot of what you would normally want to
+  say about Haskell programs. Often, even if a law you want isn't
+  equational, QuickSpec will discover equational special cases of that
+  law which suggest the general case.
+* You have to tell QuickSpec exactly which functions and constants it
+  should consider when generating laws. In the example above, we gave
+  `reverse`, `++` and `[]`, and those are the _only_ functions that
+  appear in the six equations. For example, we don't get the equation
+  `(x:xs)++ys == x:(xs++ys)`, because we didn't include +:+ in the
+  functions we gave to QuickSpec. A large part of using QuickSpec
+  effectively is working out which functions might appear in laws.
+* QuickSpec exhaustively enumerates terms, so it will only discover
+  equations about small(ish) terms -- in fact, terms up to a fixed
+  depth. You can adjust the maximum depth but, as QuickSpec exhaustively
+  enumerates terms, there is an exponential blowup as you increase the
+  depth.
+* QuickSpec only tests the laws, it doesn't try to prove them.
+  So while the generated laws are very likely to be true, there is
+  still a chance that they are false, especially if your test data
+  generation is not up to scratch.
+
+Despite these limitations, QuickSpec works quite well on many examples.
+
+The rest of this +README+ is a QuickSpec tutorial. You can also read our
+http://www.cse.chalmers.se/~nicsma/papers/quickspec.pdf[paper]
+for more in-depth information.
 
 Installing
 ----------
 
-`cabal install`. What a surprise!
+Install QuickSpec in the usual way -- `cabal install quickspec`.
 
 Tutorial 1: Booleans -- the basics
 ----------------------------------
 
-Let's start by testing the boolean operators.
+Let's start by testing some boolean operators.
 
-To run QuickSpec, we must define a _signature_, the set of all
+To run QuickSpec, we must define a _signature_, which specifies which
 functions we want to test, together with the variables that can appear
-in the generated equations.
+in the generated equations. Here is our signature:
 
 ------------------------------------------------
 bools = [
@@ -61,6 +80,17 @@ bools = [
   "True"  `fun0` True,
   "False" `fun0` False]
 ------------------------------------------------
+
+In the signature, we define three variables (+x+, +y+ and +z+) of type
++Bool+, using the +vars+ combinator, which takes two parameters: a list
+of variable names, and the type we want those variables to have.
+We also give give QuickSpec the functions +||+, +&&+, +not+, +True+ and
++False+, using the +fun0/fun1/fun2+ combinators. These take two parameters:
+the name of the function, and the function itself. The integer, +0+,
++1+ or +2+ here, is the arity of the function.
+
+Having written this signature, we can invoke QuickSpec just by calling
+the function +quickSpec+:
 
 ------------------------------------------------
 import Test.QuickSpec hiding (bools)
@@ -75,19 +105,16 @@ You will see that QuickSpec prints out:
    that the functions and types match up with what you expect!
 2. A summary of its testing -- more on this in the next section.
 3. The equations it found -- the exciting bit!
-   Ground equations (those without any variables) are printed
-   separately, because they tend to be boring.
+   The equations are grouped according to which function they
+   talk about, with equations that relate several functions at the end.
 
-Peering through what QuickSpec found, you should see the familiar
-laws of Boolean algebra.
-
-(The only weird thing that QuickSpec discovers is (FIXME make it print
-x||(y||z) for LHS). `y||(x||z) = x||(y||z)`. What is that? Well, it is
-a funny way of stating that `||` is associative -- when `||` is
-commutative this law is equivalent to associativity of `||`.)
-
-In principle, that's all there is to it! But you need a few more
-techniques to become fluent in QuickSpec.
+Peering through what QuickSpec found, you should see the familiar laws
+of Boolean algebra. The only oddity is the equation +x||(y||z) ==
+y||(x||z)+. This is QuickSpec's rather eccentric way of expressing
+that +||+ is associative -- in the presence of the law +x||y == y||x+,
+it's equivalent to associativity, and QuickSpec happens to choose this
+formulation rather than the more traditional one. All the other laws
+are just as we would expect, though. Not bad for 5 minutes' work!
 
 QuickSpec's not magic
 ~~~~~~~~~~~~~~~~~~~~~
