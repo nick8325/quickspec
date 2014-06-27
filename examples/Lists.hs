@@ -7,18 +7,11 @@ import Data.Typeable
 lists :: forall a. (Typeable a, Ord a, Arbitrary a, CoArbitrary a) =>
          a -> [Sig]
 lists a = [
-  arith (undefined :: Int),
+  prelude (undefined :: a) `without` ["++"],
   funs (undefined :: a),
 
-  ["x", "y", "z"] `vars` (undefined :: a),
-  ["xs", "ys", "zs"] `vars` (undefined :: [a]),
-
-  "[]"      `fun0` ([]      :: [a]),
-  ":"       `fun2` ((:)     :: a -> [a] -> [a]),
-
-  "head"    `fun1` (head    :: [a] -> a),
-  "tail"    `fun1` (tail    :: [a] -> [a]),
   "unit"    `fun1` (return  :: a -> [a]),
+  -- Don't take ++ from the prelude because we want to see laws about it
   "++"      `fun2` ((++)    :: [a] -> [a] -> [a]),
   "length"  `fun1` (length  :: [a] -> Int),
   "reverse" `fun1` (reverse :: [a] -> [a]),
