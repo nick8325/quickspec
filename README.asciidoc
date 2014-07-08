@@ -244,6 +244,8 @@ of the above example which also tests `map`.
 Advanced: function composition -- testing types with no `Ord` instance
 ----------------------------------------------------------------------
 
+WARNING: this section isn't finished.
+
 IMPORTANT: You can skip this section unless you need to test a type
 with no `Ord` instance.
 
@@ -319,6 +321,8 @@ observations must satisfy the following properties:
 
 Common pitfalls
 ---------------
+
+WARNING: this section isn't finished.
 
 *I get laws which seem to be false!*
 If a law really is false, it means that QuickCheck didn't discover the
