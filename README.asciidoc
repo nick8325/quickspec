@@ -1,3 +1,9 @@
+:replacements.DOCS: http://hackage.haskell.org/package/quickspec-0.9.5/docs/Test-QuickSpec.html
+:replacements.PAPER: http://www.cse.chalmers.se/~nicsma/papers/quickspec.pdf
+:replacements.FUN: http://hackage.haskell.org/package/quickspec-0.9.5/docs/Test-QuickSpec.html#v:
+:replacements.TYPE: http://hackage.haskell.org/package/quickspec-0.9.5/docs/Test-QuickSpec.html#t:
+:replacements.EXAMPLE: link:examples/
+
 QuickSpec: equational laws for free!
 ====================================
 
@@ -25,8 +31,8 @@ reverse xs++reverse ys == reverse (ys++xs)
 All the laws you would expect to hold, and nothing more -- and all
 discovered automatically! Brill!
 
-Enough of the sales pitch. It isn't magic, and QuickSpec has a number
-of limitations:
+Where's the catch? While QuickSpec is pretty nifty, it isn't magic,
+and has a number of limitations:
 
 * QuickSpec can only discover _equations_, not other kinds of laws.
   Luckily, equations cover a lot of what you would normally want to
@@ -39,30 +45,31 @@ of limitations:
   appear in the six equations. For example, we don't get the equation
   `(x:xs)++ys == x:(xs++ys)`, because we didn't include +:+ in the
   functions we gave to QuickSpec. A large part of using QuickSpec
-  effectively is working out which functions might appear in laws.
+  effectively is choosing which functions to consider in laws.
 * QuickSpec exhaustively enumerates terms, so it will only discover
   equations about small(ish) terms -- in fact, terms up to a fixed
   depth. You can adjust the maximum depth but, as QuickSpec exhaustively
   enumerates terms, there is an exponential blowup as you increase the
-  depth.
+  depth. Likewise, there is an exponential blowup as you give QuickSpec
+  more functions to consider (though it doesn't blow up as badly as
+  you might think!)
 * QuickSpec only tests the laws, it doesn't try to prove them.
   So while the generated laws are very likely to be true, there is
   still a chance that they are false, especially if your test data
   generation is not up to scratch.
 
-Despite these limitations, QuickSpec works quite well on many examples.
+Despite these limitations, QuickSpec works well on many examples.
 
-The rest of this +README+ is a QuickSpec tutorial. You can also read our
-http://www.cse.chalmers.se/~nicsma/papers/quickspec.pdf[paper]
-for more in-depth information.
+The rest of this +README+ introduces QuickSpec through a couple of short examples.
+You can look at the bottom of this file for links to more examples, Haddock documentation and our paper about QuickSpec.
 
 Installing
 ----------
 
 Install QuickSpec in the usual way -- `cabal install quickspec`.
 
-Tutorial 1: Booleans -- the basics
-----------------------------------
+Booleans -- the basics
+----------------------
 
 Let's start by testing some boolean operators.
 
@@ -70,6 +77,7 @@ To run QuickSpec, we must define a _signature_, which specifies which
 functions we want to test, together with the variables that can appear
 in the generated equations. Here is our signature:
 
+[source,haskell]
 ------------------------------------------------
 bools = [
   ["x", "y", "z"] `vars` (undefined :: Bool),
@@ -82,28 +90,34 @@ bools = [
 ------------------------------------------------
 
 In the signature, we define three variables (+x+, +y+ and +z+) of type
-+Bool+, using the +vars+ combinator, which takes two parameters: a list
-of variable names, and the type we want those variables to have.
-We also give give QuickSpec the functions +||+, +&&+, +not+, +True+ and
-+False+, using the +fun0/fun1/fun2+ combinators. These take two parameters:
-the name of the function, and the function itself. The integer, +0+,
-+1+ or +2+ here, is the arity of the function.
++Bool+, using the FUNvars[`vars`] combinator, which takes two
+parameters: a list of variable names, and the type we want those
+variables to have. We also give give QuickSpec the functions +||+,
++&&+, +not+, +True+ and +False+, using the
+FUNfun0[`fun0`]/FUNfun1[`fun1`]/FUNfun2[`fun2`] combinators. These
+take two parameters: the name of the function, and the function
+itself. The integer, +0+, +1+ or +2+ here, is the arity of the
+function.
 
 Having written this signature, we can invoke QuickSpec just by calling
-the function +quickSpec+:
+the function FUNquickSpec[`quickSpec`]:
 
+[source,haskell]
 ------------------------------------------------
 import Test.QuickSpec hiding (bools)
 main = quickSpec bools
 ------------------------------------------------
 
-You can find this code in link:examples/Bools.hs[examples/Bools.hs] in
+You can find this code in EXAMPLEBools.hs[examples/Bools.hs] in
 the QuickSpec distribution. Go on, run it! (Compile it or else it'll go slow.)
 You will see that QuickSpec prints out:
 
-1. The signature it's testing. If something fishy is happening, check
-   that the functions and types match up with what you expect!
-2. A summary of its testing -- more on this in the next section.
+1. The signature it's testing, i.e. the types of all functions and
+   variables. If something fishy is happening, check that the
+   functions and types match up with what you expect! QuickSpec will
+   also print a warning here if something seems fishy about the
+   signature, e.g. if there are no variables of a certain type.
+2. A summary of how much testing it did.
 3. The equations it found -- the exciting bit!
    The equations are grouped according to which function they
    talk about, with equations that relate several functions at the end.
@@ -116,32 +130,277 @@ it's equivalent to associativity, and QuickSpec happens to choose this
 formulation rather than the more traditional one. All the other laws
 are just as we would expect, though. Not bad for 5 minutes' work!
 
-QuickSpec's not magic
-~~~~~~~~~~~~~~~~~~~~~
+Lists -- polymorphic functions and the prelude
+----------------------------------------------
 
-------------------------------------------------
-Depth 3: 412 terms, 500 tests, 53 classes, 359 raw equations.
-359 raw equations; 411 terms in universe.
-------------------------------------------------
+Now let's try testing some list functions -- perhaps just `reverse`,
+`++` and `[]`. We might start by writing a signature by analogy with
+the earlier booleans example:
 
-Examples
---------
+[source,haskell]
+----
+lists = [
+  ["xs", "ys", "zs"] `vars` (undefined :: [a]),
 
-Have a look at the examples that come with QuickSpec.
+  "[]"      `fun0` [],
+  "reverse" `fun1` reverse,
+  "++"      `fun2` (++)]
+----
 
-link:examples/Bools.hs[Booleans -- the basics]
+Unfortunately, QuickSpec only supports _monomorphic_ functions. The
+functions and variables in the `lists` signature are polymorphic,
+and GHC complains:
 
-link:examples/Arith.hs[Natural numbers -- polymorphic functions]
+----
+No instance for (Arbitrary a0) arising from a use of `vars'
+The type variable `a0' is ambiguous
+----
 
-link:examples/Lists.hs[List functions -- the prelude, and higher-order functions]
+The solution is to monomorphise the signature ourselves. QuickSpec
+provides types called TYPEA[`A`], TYPEB[`B`] and TYPEC[`C`] for that
+purpose, so we simply specialise all type variables to TYPEA[`A`]:
 
-link:examples/Heaps.hs[Binary heaps -- Hoare-style specifications]
+[source,haskell]
+----
+lists = [
+  ["xs", "ys", "zs"] `vars` (undefined :: [A]),
 
-link:examples/Composition.hs[Function composition -- testing without an Ord instance]
+  "[]"      `fun0` ([] :: [A]),
+  "reverse" `fun1` (reverse :: [A] -> [A]),
+  "++"      `fun2` ((++) :: [A] -> [A] -> [A])]
+----
 
-link:examples/Arrays.hs[Arrays -- custom generators]
+Having done that, we get the six laws from the beginning of this file.
 
-link:examples/TinyWM.hs[A tiny window manager]
+Perhaps we now decide we want laws about `length` too. We want to keep
+our existing list functions in the signature, so that we get laws
+relating them to `length`, but on the other hand we only want to see
+new laws, i.e. the ones that mention `length`. We can do this by
+marking the existing functions as _background functions_, and the
+resulting signature looks as follows:
 
-Where from here?
-----------------
+[source,haskell]
+----
+lists = [
+  ["xs", "ys", "zs"] `vars` (undefined :: [A]),
+
+  background [
+    "[]"      `fun0` ([] :: [A]),
+    "reverse" `fun1` (reverse :: [A] -> [A]),
+    "++"      `fun2` ((++) :: [A] -> [A] -> [A])],
+  "length" `fun1` (length :: [A] -> Int)]
+----
+
+QuickSpec will only print an equation if it involves at least one
+non-background function, in this case `length`. Running QuickSpec
+again we get the following two laws:
+
+----
+length (reverse xs) == length xs
+length (xs++ys) == length (ys++xs)
+----
+
+The first equation is all very well and good, but the second one is a
+bit unsatisfying. Wouldn't we rather get
+`length (xs++ys) = length xs + length ys`? To get that equation, we need to add
+`(+) :: Int -> Int -> Int` to the signature. Adding it as a background
+function gives us the law we want.
+
+You often need a wide variety of background functions to get good
+equations out of QuickSpec, and it gets a bit tedious declaring them
+all by hand. To help you with this QuickSpec provides a _prelude_, a
+predefined set of background functions which you can import into your
+own signature. The prelude is very minimal, but includes basic boolean,
+arithmetic and list functions. We can write our lists signature using
+the prelude as follows:
+
+[source,haskell]
+----
+lists = [
+  prelude (undefined :: A) `without` ["[]", ":"],
+
+  background [
+    "reverse" `fun1` (reverse :: [A] -> [A])],
+  "length" `fun1` (length :: [A] -> Int)]
+----
+
+A call to FUNprelude[`prelude`] +(undefined :&colon; a)+ will declare the following
+background functions:
+  * The boolean connectives `||`, `&&`, `not`, `True` and `False`.
+  * The arithmetic operations `0`, `1`, `+` and `*` over type `Int`.
+  * The list operations `[]`, `:`, `++`, `head` and `tail` over type `[a]`.
+  * Three variables each of type `Bool`, `Int`, `a` and `[a]`.
+
+In the example above we used the FUNwithout[`without`] combinator to
+leave out `[]` and `:` from the prelude, so as to get fewer laws.
+QuickSpec also provides the combinators FUNbools[`bools`],
+FUNarith[`arith`] and FUNlists[`lists`], which import only their
+respective part of the prelude, for when you want more control -- see
+the DOCS[documentation] for more information.
+
+In EXAMPLELists.hs[Lists.hs] you can find an extended version
+of the above example which also tests `map`.
+
+Advanced: function composition -- testing types with no `Ord` instance
+----------------------------------------------------------------------
+
+IMPORTANT: You can skip this section unless you need to test a type
+with no `Ord` instance.
+
+Suppose we want to get QuickSpec to discover the laws of function
+composition -- things like `id . f == f`.
+
+If we just define a signature containing `id` and `(.)` (and suitable
+variables), the output is rather disappointing:
+
+----
+(f . g) x == f (g x)
+id x == x
+----
+
+This is because QuickSpec is giving us laws about _fully saturated_
+applications of `(.)` and `id`, that is, `(.)` applied to three
+arguments and `id` applied to one argument. In the laws we are after,
+we only want to apply `(.)` to two arguments, and we don't want to
+apply `id` to an argument at all. To fix this we can declare `(.)`
+to have arity 2 and `id` to have arity 1, so that QuickSpec won't
+fully apply them:
+
+----
+composition = [
+  vars ["f", "g", "h"] (undefined :: A -> A),
+  fun2 "."   ((.) :: (A -> A) -> (A -> A) -> (A -> A)),
+  fun0 "id"  (id  :: A -> A),
+  ]
+----
+
+Unfortunately, we get the following error message:
+
+----
+Could not deduce (Ord (A -> A)) arising from a use of `fun2'
+----
+
+To test a law like `id . f == f`, QuickSpec generates a random value
+for `f` and then just evaluates the expression `id . f == f` to get
+either `True` or `False`.
+
+The error message complains that we are trying to generate laws about
+terms of the type `A -> A` (i.e. functions), but as there is no `Ord`
+instance for functions QuickSpec has no way of testing the laws.
+QuickSpec tests a law like `id . f == f` by generating random values
+for `f` and seeing if the resulting left-hand side and right-hand side
+evaluate to the same value; it can only do this if it has an `Ord`
+instance for the values in question. As there is no way to tell if
+two functions are equal, it seems we are stuck!
+
+Hang on, though. We can still _test_ if two functions are equal:
+generate a random argument and apply the two functions to it, and see
+if they both give the same result. If they don't, they're certainly
+not equal. Repeat the process a few times, for several random
+arguments, and if both functions always seem to give the same result
+then they're probably equal.
+
+
+
+This is a common situation -- we have a type, we cannot directly
+compare values of that type, but we can make random _observations_
+and compare those. For our example, observing a function consists
+of applying the function to a random argument. QuickSpec supports
+finding equations over types that you can observe. The
+observations must satisfy the following properties:
+
+* The observation returns a value of a type that we can directly
+  compare for equality.
+* If two values are different, there is an observation that
+  distinguishes them.
+* If an observation distinguishes two values, they are not equal.
+
+
+
+Common pitfalls
+---------------
+
+*I get laws which seem to be false!*
+If a law really is false, it means that QuickCheck didn't discover the
+counterexample to it. Possible solutions include:
+
+  * Improve the test data generation. If you can't change the
+    Arbitrary` instance for your type, you can use the
+    FUNgvars[`gvars`] combinator, which is like FUNvars[`vars`]
+    but allows you to specify the generator.
+  * If you are testing a polymorphic function, try instantiating it
+    with the QuickSpec type TYPETwo[`Two`] instead of TYPEA[`A`].
+    TYPETwo[`Two`] is a type that has only two elements, which may
+    make it easier to hit counterexamples.
+  * Use the FUNwithTests[`withTests`] combinator to increase the
+    number of tests.
+
+*QuickSpec runs for a very long time without terminating!*
+QuickSpec works by enumerating all terms up to a certain depth,
+and therefore suffers from exponential blowup. Check the output
+where it reports how many terms it generated:
+
+----
+== Testing ==
+Depth 1: 6 terms, 4 tests, 18 evaluations, 6 classes, 0 raw equations.
+Depth 2: 61 terms, 500 tests, 28568 evaluations, 15 classes, 46 raw equations.
+Depth 3: 412 terms, 500 tests, 205912 evaluations, 53 classes, 359 raw equations.
+----
+
+Here it's generated 412 terms. If the number gets much above 100,000
+then you will probably run into trouble. This can be caused by one of
+several things:
+  * Too many functions in the signature.
+
+*I only get ground instances of the laws I want!*
+
+Perhaps you forgot to add
+
+no variables
+
+*Law not found*
+
+Is it true? Is it provable? Are all necessary functions in the signature?
+Do the types match up so that the term is well-typed?
+
+*Get false laws*
+
+Tweak test data generators
+
+*Exponential blowup*
+
+*I want to test a datatype with no `Ord` instance, such as functions*
+
+see function composition
+
+
+
+
+A common mistake when using QuickSpec is to forget to define any
+variables of a certain type. In that case, you will typically get lots
+of special cases instead of the law you really want. For example,
+
+----
+True||True == True
+True||False == True
+False||True == True
+False||False == False
+----
+
+Where to go from here?
+--------------------
+
+Have a look at the examples that come with QuickSpec:
+
+* link:examples/Bools.hs[Booleans]
+* link:examples/Arith.hs[Arithmetic]
+* link:examples/Lists.hs[List functions]
+* link:examples/Heaps.hs[Binary heaps]
+* link:examples/Composition.hs[Function composition]
+* link:examples/Arrays.hs[Arrays]
+* link:examples/TinyWM.hs[A tiny window manager]
+* link:examples/PrettyPrinting.hs[Pretty-printing combinators]
+
+Read our PAPER[paper].
+
+Read the DOCS[Haddock documentation] for things to tweak.

@@ -1,8 +1,9 @@
 -- | The main QuickSpec module.
 --
--- This will not make sense if you haven't seen some examples!
--- Look at <http://github.com/nick8325/quickspec/tree/master/examples>,
--- or read the paper at <http://www.cse.chalmers.se/~nicsma/quickspec.pdf>.
+-- Look at the introduction (<https://github.com/nick8325/quickspec/blob/master/README.asciidoc>),
+-- read the examples (<http://github.com/nick8325/quickspec/tree/master/examples>),
+-- or read the paper (<http://www.cse.chalmers.se/~nicsma/quickspec.pdf>)
+-- before venturing in here.
 
 module Test.QuickSpec
   (-- * Running QuickSpec

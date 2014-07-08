@@ -86,6 +86,8 @@ funs _ = background [
 -- Contains boolean, arithmetic and list functions,
 -- and some variables.
 -- Instantiate it as e.g. @prelude (undefined :: `A`)@.
+-- For more precise control over what gets included,
+-- see 'bools', 'arith', 'lists', 'funs' and 'without'.
 prelude :: (Typeable a, Ord a, Arbitrary a) => a -> Sig
 prelude a = background [
   ["x", "y", "z"] `vars` a,

@@ -18,6 +18,8 @@ arrays a = [
 
   ["x", "y", "z"] `vars` (undefined :: a),
   ["a"]           `vars` (undefined :: Array Int a),
+  -- Generate ranges using a custom generator to improve test data
+  -- distribution.
   ["r"]           `gvars` genRange,
 
   "!"             `fun2` ((!)       :: Array Int a -> Int -> a),
@@ -38,4 +40,5 @@ genRange = do
   high <- fmap (low +) (choose (-1, 2))
   return (low, high)
 
+-- Use Two instead of A to improve the chance of getting the right test data.
 main = quickSpec (arrays (undefined :: Two))
