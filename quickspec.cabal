@@ -57,6 +57,7 @@ library
   include-dirs: src
   Exposed-modules:
     Test.QuickSpec.Utils
+    Test.QuickSpec.Type
 
   Build-depends:
-    base < 5, containers, transformers, QuickCheck >= 2.7, spoon >= 0.2
+    base < 5, containers, transformers, QuickCheck >= 2.7, spoon >= 0.2, term-rewriting
