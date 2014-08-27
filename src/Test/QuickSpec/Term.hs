@@ -9,11 +9,26 @@ import Data.Rewriting.Term hiding (map)
 import qualified Data.Rewriting.Term as T
 import qualified Data.Typeable as Ty
 import qualified Data.Typeable.Internal as Ty
+import Control.Monad.Trans.State.Strict
 
 -- Terms.
 type Tm = Term Constant Variable
 newtype Constant = Constant { conName :: String } deriving Show
 newtype Variable = Variable { varNumber :: Int } deriving Show
+
+-- A schema is a term with holes where the variables should be.
+type Schema = Term Constant ()
+schema :: Tm -> Schema
+schema = rename (const ())
+
+-- You can instantiate a schema either by making all the variables
+-- the same or by making them all different.
+leastGeneral, mostGeneral :: Schema -> Tm
+leastGeneral = rename (const (Variable 0))
+mostGeneral s = evalState (aux s) 0
+  where
+    aux (Var ()) = do { n <- get; put $! n+1; return (Var (Variable n)) }
+    aux (Fun f xs) = fmap (Fun f) (mapM aux xs)
 
 -- An expression is a term plus its value.
 data Expr = Expr {
