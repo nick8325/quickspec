@@ -86,14 +86,14 @@ data Value f = Value {
 instance Show (Value f) where
   show x = show (toTypeRep (typeOfValue x))
 
-fromAny :: Any -> a
+fromAny :: f Any -> f a
 fromAny = unsafeCoerce
 
-toAny :: a -> Any
+toAny :: f a -> f Any
 toAny = unsafeCoerce
 
-toValue :: forall f a. (Typeable a, Typeable f, Applicative f) => f a -> Value f
-toValue x = Value (typeOf (undefined :: a)) (fmap toAny x)
+toValue :: forall f a. Typeable a => f a -> Value f
+toValue x = Value (typeOf (undefined :: a)) (toAny x)
 
 apply :: Applicative f => Value f -> Value f -> Value f
 apply f x =
@@ -123,10 +123,10 @@ freshen t u = rename (n+) u
     n = maximum (0:vars t)
 
 applyValue :: Applicative f => Value f -> Value f -> f Any
-applyValue f x = fmap fromAny (value f) <*> value x
+applyValue f x = fromAny (value f) <*> value x
 
-fromValue :: forall f a. (Typeable a, Applicative f) => Value f -> Maybe (f a)
+fromValue :: forall f a. Typeable a => Value f -> Maybe (f a)
 fromValue x = do
   let ty = typeOf (undefined :: a)
   _ <- match (typeOfValue x) ty
-  return (fmap fromAny (value x))
+  return (fromAny (value x))
