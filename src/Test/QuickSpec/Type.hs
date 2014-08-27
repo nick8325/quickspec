@@ -3,7 +3,7 @@
 module Test.QuickSpec.Type(
   -- Types.
   Typeable,
-  Type, TyCon(..),
+  Type, TyCon(..), TyVar(..),
   typeOf,
   fromTypeRep,
   toTypeRep,
@@ -28,15 +28,16 @@ import Unsafe.Coerce
 import Control.Applicative
 
 -- A (possibly polymorphic) type.
-type Type = Term TyCon Int
+type Type = Term TyCon TyVar
 data TyCon = Arrow | TyCon Ty.TyCon deriving (Eq, Ord, Show)
+newtype TyVar = TyVar { unTyVar :: Int } deriving (Eq, Ord, Show)
 
 -- Type variables.
-type A = TyVar Zero
-type B = TyVar (Succ Zero)
-type C = TyVar (Succ (Succ Zero))
-type D = TyVar (Succ (Succ (Succ Zero)))
-newtype TyVar a = TyVar Any deriving Typeable
+type A = TyVarNumber Zero
+type B = TyVarNumber (Succ Zero)
+type C = TyVarNumber (Succ (Succ Zero))
+type D = TyVarNumber (Succ (Succ (Succ Zero)))
+newtype TyVarNumber a = TyVarNumber Any deriving Typeable
 data Zero deriving Typeable
 data Succ a deriving Typeable
 
@@ -46,7 +47,7 @@ typeOf x = fromTypeRep (Ty.typeOf x)
 fromTypeRep :: Ty.TypeRep -> Type
 fromTypeRep ty =
   case Ty.splitTyConApp ty of
-    (tyVar, [ty]) | tyVar == varTyCon -> Var (fromTyVar ty)
+    (tyVar, [ty]) | tyVar == varTyCon -> Var (TyVar (fromTyVar ty))
     (tyCon, tys) -> Fun (fromTyCon tyCon) (map fromTypeRep tys)
   where
     fromTyCon tyCon
@@ -59,7 +60,7 @@ fromTypeRep ty =
 
 arrowTyCon, varTyCon, succTyCon, zeroTyCon :: Ty.TyCon
 arrowTyCon = con (undefined :: () -> ())
-varTyCon   = con (undefined :: TyVar ())
+varTyCon   = con (undefined :: TyVarNumber ())
 succTyCon  = con (undefined :: Succ ())
 zeroTyCon  = con (undefined :: Zero)
 
@@ -72,7 +73,7 @@ toTypeRep (Fun tyCon tys) = Ty.mkTyConApp (toTyCon tyCon) (map toTypeRep tys)
   where
     toTyCon Arrow = arrowTyCon
     toTyCon (TyCon tyCon) = tyCon
-toTypeRep (Var n) = Ty.mkTyConApp varTyCon [toTyVar n]
+toTypeRep (Var (TyVar n)) = Ty.mkTyConApp varTyCon [toTyVar n]
   where
     toTyVar 0 = Ty.mkTyConApp zeroTyCon []
     toTyVar n = Ty.mkTyConApp succTyCon [toTyVar (n-1)]
@@ -118,9 +119,9 @@ applyType (Var _) t = Just t
 applyType _ _ = Nothing
 
 -- Rename a type so as to make its variables not clash with another type
-freshen t u = rename (n+) u
+freshen t u = rename (TyVar . (n+) . unTyVar) u
   where
-    n = maximum (0:vars t)
+    n = maximum (0:map unTyVar (vars t))
 
 applyValue :: Applicative f => Value f -> Value f -> f Any
 applyValue f x = fromAny (value f) <*> value x
