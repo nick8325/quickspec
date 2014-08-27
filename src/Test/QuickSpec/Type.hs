@@ -1,9 +1,8 @@
 -- Polymorphic types and dynamic values.
-{-# LANGUAGE DeriveDataTypeable, CPP, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE DeriveDataTypeable, CPP, ScopedTypeVariables, EmptyDataDecls, TypeFamilies, TypeSynonymInstances, FlexibleInstances #-}
 module Test.QuickSpec.Type(
   -- Types.
   Typeable,
-  Apply(..), apply, canApply,
   Type, TyCon(..), TyVar(..),
   A, B, C, D,
   typeOf,
@@ -13,14 +12,11 @@ module Test.QuickSpec.Type(
   Value,
   toValue,
   fromValue,
-  typeOfValue)
-  where
+  typeOfValue) where
 
 #include "errors.h"
 
-import Data.Rewriting.Term hiding (map)
-import Data.Rewriting.Substitution hiding (apply)
-import qualified Data.Rewriting.Substitution as T
+import Test.QuickSpec.Base
 import Data.Typeable(Typeable)
 import qualified Data.Typeable as Ty
 import GHC.Exts(Any)
@@ -30,6 +26,7 @@ import Data.Maybe
 
 -- A (possibly polymorphic) type.
 type Type = Term TyCon TyVar
+
 data TyCon = Arrow | TyCon Ty.TyCon deriving (Eq, Ord, Show)
 newtype TyVar = TyVar { tyVarNumber :: Int } deriving (Eq, Ord, Show)
 
@@ -97,19 +94,6 @@ toAny = unsafeCoerce
 toValue :: forall f a. Typeable a => f a -> Value f
 toValue x = Value (typeOf (undefined :: a)) (toAny x)
 
-class Apply a where
-  tryApply :: a -> a -> Maybe a
-
-infixl `apply`
-apply :: Apply a => a -> a -> a
-apply f x =
-  case tryApply f x of
-    Nothing -> ERROR "apply: ill-typed term"
-    Just y -> y
-
-canApply :: Apply a => a -> a -> Bool
-canApply f x = isJust (tryApply f x)
-
 instance Applicative f => Apply (Value f) where
   tryApply f x = do
     y <- tryApply (typeOfValue f) (typeOfValue x)
@@ -121,7 +105,7 @@ instance Apply Type where
   -- Polymorphic application
   tryApply (Fun Arrow [arg, res]) t = do
     s <- unify arg (freshen arg t)
-    return (T.apply s res)
+    return (subst s res)
   -- Rare case: type variable
   tryApply (Var _) t = Just t
   tryApply _ _ = Nothing

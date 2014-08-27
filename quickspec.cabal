@@ -57,6 +57,7 @@ library
   include-dirs: src
   Exposed-modules:
     Test.QuickSpec.Utils
+    Test.QuickSpec.Base
     Test.QuickSpec.Type
     Test.QuickSpec.Term
 
