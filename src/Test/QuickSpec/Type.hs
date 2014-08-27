@@ -1,19 +1,18 @@
 -- Polymorphic types and dynamic values.
-{-# LANGUAGE DeriveDataTypeable, CPP, ScopedTypeVariables, EmptyDataDecls #-}
+{-# LANGUAGE DeriveDataTypeable, CPP, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances #-}
 module Test.QuickSpec.Type(
   -- Types.
   Typeable,
+  Apply(..),
   Type, TyCon(..), TyVar(..),
   typeOf,
   fromTypeRep,
   toTypeRep,
-  applyType,
   -- Dynamic values.
   Value,
   toValue,
   fromValue,
-  typeOfValue,
-  apply, tryApply)
+  typeOfValue)
   where
 
 #include "errors.h"
@@ -26,6 +25,7 @@ import qualified Data.Typeable as Ty
 import GHC.Exts(Any)
 import Unsafe.Coerce
 import Control.Applicative
+import Data.Maybe
 
 -- A (possibly polymorphic) type.
 type Type = Term TyCon TyVar
@@ -96,35 +96,38 @@ toAny = unsafeCoerce
 toValue :: forall f a. Typeable a => f a -> Value f
 toValue x = Value (typeOf (undefined :: a)) (toAny x)
 
-apply :: Applicative f => Value f -> Value f -> Value f
+class Apply a where
+  tryApply :: a -> a -> Maybe a
+
+apply :: Apply a => a -> a -> a
 apply f x =
   case tryApply f x of
-    Nothing -> ERROR "apply: incompatible types"
+    Nothing -> ERROR "apply: ill-typed term"
     Just y -> y
 
-tryApply :: Applicative f => Value f -> Value f -> Maybe (Value f)
-tryApply f x = do
-  y <- applyType (typeOfValue f) (typeOfValue x)
-  return (Value y (applyValue f x))
+canApply :: Apply a => a -> a -> Bool
+canApply f x = isJust (tryApply f x)
 
-applyType :: Type -> Type -> Maybe Type
--- Common case: monomorphic application
-applyType (Fun Arrow [t, u]) v | t == v = Just u
--- Polymorphic application
-applyType (Fun Arrow [arg, res]) t = do
-  s <- unify arg (freshen arg t)
-  return (T.apply s res)
--- Rare case: type variable
-applyType (Var _) t = Just t
-applyType _ _ = Nothing
+instance Applicative f => Apply (Value f) where
+  tryApply f x = do
+    y <- tryApply (typeOfValue f) (typeOfValue x)
+    return (Value y (fromAny (value f) <*> value x))
+
+instance Apply Type where
+  -- Common case: monomorphic application
+  tryApply (Fun Arrow [t, u]) v | t == v = Just u
+  -- Polymorphic application
+  tryApply (Fun Arrow [arg, res]) t = do
+    s <- unify arg (freshen arg t)
+    return (T.apply s res)
+  -- Rare case: type variable
+  tryApply (Var _) t = Just t
+  tryApply _ _ = Nothing
 
 -- Rename a type so as to make its variables not clash with another type
 freshen t u = rename (TyVar . (n+) . tyVarNumber) u
   where
     n = maximum (0:map tyVarNumber (vars t))
-
-applyValue :: Applicative f => Value f -> Value f -> f Any
-applyValue f x = fromAny (value f) <*> value x
 
 fromValue :: forall f a. Typeable a => Value f -> Maybe (f a)
 fromValue x = do
