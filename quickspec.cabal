@@ -56,29 +56,7 @@ library
   hs-source-dirs: src
   include-dirs: src
   Exposed-modules:
-    Test.QuickSpec,
-    Test.QuickSpec.Main,
-    Test.QuickSpec.Signature,
-    Test.QuickSpec.Prelude,
-    Test.QuickSpec.Term,
-    Test.QuickSpec.Equation,
-    Test.QuickSpec.Generate,
-    Test.QuickSpec.TestTree,
-    Test.QuickSpec.Reasoning.UnionFind,
-    Test.QuickSpec.Reasoning.CongruenceClosure,
-    Test.QuickSpec.Reasoning.NaiveEquationalReasoning,
-    Test.QuickSpec.Reasoning.PartialEquationalReasoning,
-    Test.QuickSpec.TestTotality,
-    Test.QuickSpec.Utils,
-    Test.QuickSpec.Utils.Typeable,
-    Test.QuickSpec.Utils.Typed,
-    Test.QuickSpec.Utils.TypeMap,
-    Test.QuickSpec.Utils.TypeRel,
-    Test.QuickSpec.Approximate
-  Other-modules:
-    -- Dangerous!
-    Test.QuickSpec.Utils.MemoValuation
+    Test.QuickSpec.Utils
 
   Build-depends:
-    base < 5, containers, transformers, QuickCheck >= 2.7,
-    random, spoon >= 0.2, array, ghc-prim
+    base < 5, containers, transformers, QuickCheck >= 2.7, spoon >= 0.2

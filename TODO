@@ -1,3 +1,5 @@
+Really take care of partiality.
+
 Two things after testing alpha-renamed terms:
   * Generate all permutations of representatives
   * Check for ignored variables
