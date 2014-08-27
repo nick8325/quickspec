@@ -30,7 +30,7 @@ import Control.Applicative
 -- A (possibly polymorphic) type.
 type Type = Term TyCon TyVar
 data TyCon = Arrow | TyCon Ty.TyCon deriving (Eq, Ord, Show)
-newtype TyVar = TyVar { unTyVar :: Int } deriving (Eq, Ord, Show)
+newtype TyVar = TyVar { tyVarNumber :: Int } deriving (Eq, Ord, Show)
 
 -- Type variables.
 type A = TyVarNumber Zero
@@ -119,9 +119,9 @@ applyType (Var _) t = Just t
 applyType _ _ = Nothing
 
 -- Rename a type so as to make its variables not clash with another type
-freshen t u = rename (TyVar . (n+) . unTyVar) u
+freshen t u = rename (TyVar . (n+) . tyVarNumber) u
   where
-    n = maximum (0:map unTyVar (vars t))
+    n = maximum (0:map tyVarNumber (vars t))
 
 applyValue :: Applicative f => Value f -> Value f -> f Any
 applyValue f x = fromAny (value f) <*> value x
