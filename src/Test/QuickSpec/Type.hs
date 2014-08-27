@@ -4,6 +4,7 @@ module Test.QuickSpec.Type(
   -- Types.
   Typeable,
   Type, TyCon(..), TyVar(..),
+  TyVars(..), renameTyVars,
   A, B, C, D,
   typeOf,
   fromTypeRep,
@@ -104,16 +105,33 @@ instance Apply Type where
   tryApply (Fun Arrow [t, u]) v | t == v = Just u
   -- Polymorphic application
   tryApply (Fun Arrow [arg, res]) t = do
-    s <- unify arg (freshen arg t)
+    s <- unify arg (renameTyVars arg t)
     return (subst s res)
   -- Rare case: type variable
   tryApply (Var _) t = Just t
   tryApply _ _ = Nothing
 
+class TyVars a where
+  tyVars :: a -> [TyVar]
+  mapTyVars :: (TyVar -> TyVar) -> a -> a
+
+instance TyVars Type where
+  tyVars = vars
+  mapTyVars = rename
+
+instance TyVars a => TyVars [a] where
+  tyVars xs = concatMap tyVars xs
+  mapTyVars f xs = map (mapTyVars f) xs
+
+instance (TyVars a, TyVars b) => TyVars (a, b) where
+  tyVars (x, y) = tyVars x ++ tyVars y
+  mapTyVars f (x, y) = (mapTyVars f x, mapTyVars f y)
+
 -- Rename a type so as to make its variables not clash with another type
-freshen t u = rename (TyVar . (n+) . tyVarNumber) u
+renameTyVars :: (TyVars a, TyVars b) => a -> b -> b
+renameTyVars t u = mapTyVars (TyVar . (n+) . tyVarNumber) u
   where
-    n = maximum (0:map tyVarNumber (vars t))
+    n = maximum (0:map tyVarNumber (tyVars t))
 
 fromValue :: forall f a. Typeable a => Value f -> Maybe (f a)
 fromValue x = do
