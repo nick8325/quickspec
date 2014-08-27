@@ -3,8 +3,9 @@
 module Test.QuickSpec.Type(
   -- Types.
   Typeable,
-  Apply(..),
+  Apply(..), apply, canApply,
   Type, TyCon(..), TyVar(..),
+  A, B, C, D,
   typeOf,
   fromTypeRep,
   toTypeRep,
@@ -85,7 +86,7 @@ data Value f = Value {
   }
 
 instance Show (Value f) where
-  show x = show (toTypeRep (typeOfValue x))
+  show x = "<<" ++ show (toTypeRep (typeOfValue x)) ++ ">>"
 
 fromAny :: f Any -> f a
 fromAny = unsafeCoerce
@@ -99,6 +100,7 @@ toValue x = Value (typeOf (undefined :: a)) (toAny x)
 class Apply a where
   tryApply :: a -> a -> Maybe a
 
+infixl `apply`
 apply :: Apply a => a -> a -> a
 apply f x =
   case tryApply f x of
