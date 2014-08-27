@@ -45,7 +45,7 @@ Extra-source-files:
   examples/Lists.hs
   examples/PrettyPrinting.hs
   examples/TinyWM.hs
-  src/Test/QuickSpec/errors.h
+  src/errors.h
 
 source-repository head
   type:     git
@@ -54,7 +54,7 @@ source-repository head
 
 library
   hs-source-dirs: src
-  include-dirs: src/Test/QuickSpec/
+  include-dirs: src
   Exposed-modules:
     Test.QuickSpec,
     Test.QuickSpec.Main,
