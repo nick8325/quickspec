@@ -1,3 +1,61 @@
+Two things after testing alpha-renamed terms:
+  * Generate all permutations of representatives
+  * Check for ignored variables
+Is there any way to avoid generating some of these?
+E.g., if t[x->u] can be reduced, then x in t can't be ignored.
+
+Testing tree: collapse levels that don't refine any classes,
+compute a minimal test suite for distinguishing terms,
+make conversion to classes more efficient
+
+Idea for term generation:
+  * Koen/Moa: enumerate terms in order of size.
+    If we generate a term, and we know that term is equal
+    to a smaller term, discard it. Otherwise, add it to testing
+    tree; if it's equal to some other term, print an equation.
+    Has the property: the only generated terms are singleton terms
+    and ones that appear in printed equations.
+    Concretely use QS's old pruning for discarding terms:
+    if we already have t = u, and generate v such that tS = v and uS <
+    v, then throw away v.
+  * When we generate a new representative, also need to generate
+    all renamings, plus check if any variables are unused.
+  * Easy refinement: combine with commutativity.
+    When we check a term, apply all possible commutativity laws first,
+    then a law, then commutativity again.
+    If the final result is simpler then discard term.
+    N.B. commutativity doesn't change depth or size or num vars, so only need
+    to try applying commutativity at end if
+    (depth u, size u, numVars u) <= (depth t, size t, numVars t)
+    where t = initial term, u = final term
+  * Refinement: use schemas.
+    Let's use the word *schema* for a term with all variables replaced
+    by holes, and *skeleton* for a term with all variables unified.
+    A term has a schema and a skeleton.
+    Have an equivalence relation on *skeletons*. For each equivalence
+    class, an equivalence relation on all terms whose skeletons are
+    in that class.
+    Enumerate schemas in order of size.
+    Instantiate the schema with all variables different and see if
+    we can simplify it; if so, throw away the schema.
+    (If not, we need to add at least that instance to the test tree
+    so what follows is necessary work.)
+    Now take the skeleton of that schema and put it in the test tree.
+    See what class it ends up in, generate all instances of the schema
+    and stick in that class.
+
+    Maybe the one-variable stuff is just an optimisation, checking the
+    schema once is the important thing. Would be interesting to know
+    how big each class of skeletons is - one-variable stuff helps if
+    most classes have more than one element.
+
+    Could be useful though because it allows us to avoid generating
+    terms at all in the common case, if we don't want to discover
+    commutativity. Also we can perhaps check for commutativity cheaply?
+
+    Extra trick: if we can simplify the skeleton, we can put it in its
+    class without testing! But probably this is the uncommon case of an unpruned law.
+
 Is there some very narrow condition for when we need to substitute all
 possible values, not just representatives? Is x==y the only
 problematic case? I *think* the reasoning is as follows:
