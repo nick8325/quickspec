@@ -41,34 +41,33 @@ size Var{} = 0
 size (Fun f xs) = 1+sum (map size xs)
 
 -- Ordinary terms.
-class (Ord ctx, Ord (VariableOf ctx), Apply ctx, TyVars ctx) => Context ctx where
+class (Ord ctx, Ord (VariableOf ctx), TyVars ctx) => Context ctx where
   type VariableOf ctx
+  ctxEqualise :: ctx -> ctx -> Maybe (ctx, [(Type, Type)])
 
 newtype TermContext = TermContext (Map Variable Type) deriving (Eq, Ord)
-instance Apply TermContext where
-  tryApply (TermContext m1) (TermContext m2) = do
-    guard (Map.null (Map.intersection m1 m2))
-    return (TermContext (Map.union m1 m2))
 instance TyVars TermContext where
   tyVars (TermContext m) = concatMap tyVars (Map.elems m)
-  mapTyVars f (TermContext m) = TermContext (fmap (mapTyVars f) m)
+  tySubst f (TermContext m) = TermContext (fmap (tySubst f) m)
 instance Context TermContext where
   type VariableOf TermContext = Variable
+  ctxEqualise (TermContext m1) (TermContext m2) = do
+    guard (Map.null (Map.intersection m1 m2))
+    let m = TermContext (Map.union m1 m2)
+    return (m, [])
 
 -- A schema is a term with holes where the variables should be.
 type Schema = TmIn SchemaContext
 
 newtype SchemaContext = SchemaContext [Type] deriving (Eq, Ord, TyVars)
-instance Apply SchemaContext where
-  tryApply (SchemaContext xs) (SchemaContext ys) = return (SchemaContext (xs ++ ys))
 instance Context SchemaContext where
   type VariableOf SchemaContext = ()
+  ctxEqualise (SchemaContext xs) (SchemaContext ys) =
+    return (SchemaContext (xs++ys), [])
 
 schema :: Tm -> Schema
 schema t@Tm{context = TermContext m} = Tm {
   term = rename (const ()) (term t),
-  -- We represent a schema as a term with an empty context
-  -- (which is filled in when we instantiate the schema).
   context = SchemaContext (Map.elems m),
   typ = typ t
   }

@@ -5,6 +5,7 @@ module Test.QuickSpec.Type(
   Typeable,
   Type, TyCon(..), TyVar(..),
   TyVars(..), freshTyVar,
+  Apply(..), tryApply, canApply, apply,
   A, B, C, D,
   typeOf,
   fromTypeRep,
