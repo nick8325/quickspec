@@ -26,7 +26,7 @@ deriving instance Context ctx => Eq (TmIn ctx)
 
 type Tm = TmIn TermContext
 newtype Constant = Constant { conName :: String } deriving (Show, Eq, Ord)
-newtype Variable = Variable { varNumber :: Int } deriving (Show, Eq, Ord)
+newtype Variable = Variable { varNumber :: Int } deriving (Show, Eq, Ord, Enum)
 
 instance Context ctx => Ord (TmIn ctx) where
   compare = comparing $ \t -> (measure (term t), term t, context t, typ t)
@@ -74,31 +74,20 @@ schema t@Tm{context = TermContext m} = Tm {
 
 -- You can instantiate a schema either by making all the variables
 -- the same or by making them all different.
--- leastGeneral, mostGeneral :: Schema -> Tm
--- leastGeneral (Schema t) = rename (const (Variable 0)) t
--- mostGeneral (Schema t) = evalState (aux t) 0
---   where
---     aux (Var ()) = do { n <- get; put $! n+1; return (Var (Variable n)) }
---     aux (Fun f xs) = fmap (Fun f) (mapM aux xs)
-
--- -- An expression is a term plus its value.
--- data Expr = Expr {
---   term :: Tm,
---   value :: Value Gen
---   } deriving Show
-
--- -- Build expressions for constants or variables.
--- constantExpr :: Typeable a => String -> a -> Expr
--- constantExpr name x = Expr (Fun (Constant name) []) (toValue (return x))
-
--- variableExpr :: (Typeable a, Arbitrary a) => Int -> a -> Expr
--- variableExpr n x = Expr (Var (Variable n)) (toValue gen)
---   where
---     gen = variant n (arbitrary `asTypeOf` return x)
-
--- -- Build expressions for application.
--- instance Apply Expr where
---   tryApply t@Expr{term = Fun f xs} u = do
---     v <- tryApply (value t) (value u)
---     return (Expr (Fun f (xs ++ [term u])) v)
---   tryApply _ _ = Nothing
+leastGeneral, mostGeneral :: Schema -> Tm
+leastGeneral s@Tm{context = SchemaContext xs} =
+  s { term = evalState (aux (term s)) xs,
+      context = TermContext (Map.fromList (zip [Variable 0..] tys)) }
+  where
+    tys = usort xs
+    names = Map.fromList (zip tys [Variable 0..])
+    aux (Var ()) = do
+      (ty:tys) <- get
+      put tys
+      return (Var (Map.findWithDefault __ ty names))
+mostGeneral s@Tm{context = SchemaContext xs} =
+  s { term = evalState (aux (term s)) 0,
+      context = TermContext (Map.fromList (zip [Variable 0..] xs)) }
+  where
+    aux (Var ()) = do { n <- get; put $! n+1; return (Var (Variable n)) }
+    aux (Fun f xs) = fmap (Fun f) (mapM aux xs)
