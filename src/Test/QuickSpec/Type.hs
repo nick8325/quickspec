@@ -4,7 +4,7 @@ module Test.QuickSpec.Type(
   -- Types.
   Typeable,
   Type, TyCon(..), TyVar(..),
-  TyVars(..), renameTyVars,
+  TyVars(..), freshTyVar,
   A, B, C, D,
   typeOf,
   fromTypeRep,
@@ -77,6 +77,55 @@ toTypeRep (Var (TyVar n)) = Ty.mkTyConApp varTyCon [toTyVar n]
     toTyVar 0 = Ty.mkTyConApp zeroTyCon []
     toTyVar n = Ty.mkTyConApp succTyCon [toTyVar (n-1)]
 
+-- Typechecking applications.
+class TyVars a where
+  tyVars :: a -> [TyVar]
+  tySubst :: (TyVar -> Type) -> a -> a
+
+instance TyVars Type where
+  tyVars = vars
+  tySubst = subst'
+
+instance TyVars a => TyVars [a] where
+  tyVars xs = concatMap tyVars xs
+  tySubst f xs = map (tySubst f) xs
+
+instance (TyVars a, TyVars b) => TyVars (a, b) where
+  tyVars (x, y) = tyVars x ++ tyVars y
+  tySubst f (x, y) = (tySubst f x, tySubst f y)
+
+class TyVars a => Apply a where
+  tyApply :: TyVar -> a -> a -> Maybe (a, a, [(Type, Type)])
+  tyGroundApply :: a -> a -> a
+
+instance Apply Type where
+  tyApply tv t u = Just (t, u, [(t, Fun Arrow [u, Var tv])])
+  tyGroundApply (Fun Arrow [arg, res]) t | t == arg = res
+
+freshTyVar :: Apply a => a -> TyVar
+freshTyVar x = TyVar (1+n)
+  where
+    n = maximum (0:map tyVarNumber (tyVars x))
+
+tryApply :: Apply a => a -> a -> Maybe a
+tryApply f x = do
+  let tv@(TyVar n) = freshTyVar f
+      x' = tySubst (Var . TyVar . (n+1+) . tyVarNumber) x
+  (f', x'', cs) <- tyApply tv f x'
+  s <- unifyMany cs
+  let sub = tySubst (subst s . Var)
+  return (sub f' `tyGroundApply` sub x'')
+
+infixl `apply`
+apply :: Apply a => a -> a -> a
+apply f x =
+  case tryApply f x of
+    Nothing -> ERROR "apply: ill-typed term"
+    Just y -> y
+
+canApply :: Apply a => a -> a -> Bool
+canApply f x = isJust (tryApply f x)
+
 -- Dynamic values inside an applicative functor.
 data Value f = Value {
   typeOfValue :: Type,
@@ -95,43 +144,19 @@ toAny = unsafeCoerce
 toValue :: forall f a. Typeable a => f a -> Value f
 toValue x = Value (typeOf (undefined :: a)) (toAny x)
 
+instance TyVars (Value f) where
+  tyVars = tyVars . typeOfValue
+  tySubst f x = x { typeOfValue = tySubst f (typeOfValue x) }
+
 instance Applicative f => Apply (Value f) where
-  tryApply f x = do
-    y <- tryApply (typeOfValue f) (typeOfValue x)
-    return (Value y (fromAny (value f) <*> value x))
-
-instance Apply Type where
-  -- Common case: monomorphic application
-  tryApply (Fun Arrow [t, u]) v | t == v = Just u
-  -- Polymorphic application
-  tryApply (Fun Arrow [arg, res]) t = do
-    s <- unify arg (renameTyVars arg t)
-    return (subst s res)
-  -- Rare case: type variable
-  tryApply (Var _) t = Just t
-  tryApply _ _ = Nothing
-
-class TyVars a where
-  tyVars :: a -> [TyVar]
-  mapTyVars :: (TyVar -> TyVar) -> a -> a
-
-instance TyVars Type where
-  tyVars = vars
-  mapTyVars = rename
-
-instance TyVars a => TyVars [a] where
-  tyVars xs = concatMap tyVars xs
-  mapTyVars f xs = map (mapTyVars f) xs
-
-instance (TyVars a, TyVars b) => TyVars (a, b) where
-  tyVars (x, y) = tyVars x ++ tyVars y
-  mapTyVars f (x, y) = (mapTyVars f x, mapTyVars f y)
-
--- Rename a type so as to make its variables not clash with another type
-renameTyVars :: (TyVars a, TyVars b) => a -> b -> b
-renameTyVars t u = mapTyVars (TyVar . (n+) . tyVarNumber) u
-  where
-    n = maximum (0:map tyVarNumber (tyVars t))
+  tyApply tv f x = do
+    (f', x', cs) <- tyApply tv (typeOfValue f) (typeOfValue x)
+    return (f { typeOfValue = f' },
+            x { typeOfValue = x' },
+            cs)
+  tyGroundApply f x =
+    (Value $! tyGroundApply (typeOfValue f) (typeOfValue x))
+    (fromAny (value f) <*> value x)
 
 fromValue :: forall f a. Typeable a => Value f -> Maybe (f a)
 fromValue x = do
