@@ -45,7 +45,26 @@ class (Ord ctx, Ord (VariableOf ctx), TyVars ctx) => Context ctx where
   type VariableOf ctx
   ctxEqualise :: ctx -> ctx -> Maybe (ctx, [(Type, Type)])
 
-newtype TermContext = TermContext (Map Variable Type) deriving (Eq, Ord)
+instance TyVars ctx => TyVars (TmIn ctx) where
+  tyVars t = tyVars (typ t) ++ tyVars (context t)
+  tySubst f t =
+    t { context = tySubst f (context t),
+        typ = tySubst f (typ t) }
+instance Context ctx => Apply (TmIn ctx) where
+  tyApply tv f x = do
+    (ctx, cs) <- ctxEqualise (context f) (context x)
+    (f', x', cs') <- tyApply tv (typ f) (typ x)
+    return (f { context = ctx, typ = f' },
+            x { context = ctx, typ = x' },
+            cs ++ cs')
+  tyGroundApply f x | context f == context x =
+    Tm { term = app (term f) (term x),
+         context = context f,
+         typ = tyGroundApply (typ f) (typ x) }
+    where
+      app (Fun f xs) t = Fun f (xs ++ [t])
+
+newtype TermContext = TermContext (Map Variable Type) deriving (Eq, Ord, Show)
 instance TyVars TermContext where
   tyVars (TermContext m) = concatMap tyVars (Map.elems m)
   tySubst f (TermContext m) = TermContext (fmap (tySubst f) m)
@@ -59,7 +78,7 @@ instance Context TermContext where
 -- A schema is a term with holes where the variables should be.
 type Schema = TmIn SchemaContext
 
-newtype SchemaContext = SchemaContext [Type] deriving (Eq, Ord, TyVars)
+newtype SchemaContext = SchemaContext [Type] deriving (Eq, Ord, TyVars, Show)
 instance Context SchemaContext where
   type VariableOf SchemaContext = ()
   ctxEqualise (SchemaContext xs) (SchemaContext ys) =
@@ -85,9 +104,19 @@ leastGeneral s@Tm{context = SchemaContext xs} =
       (ty:tys) <- get
       put tys
       return (Var (Map.findWithDefault __ ty names))
+    aux (Fun f xs) = fmap (Fun f) (mapM aux xs)
 mostGeneral s@Tm{context = SchemaContext xs} =
   s { term = evalState (aux (term s)) 0,
       context = TermContext (Map.fromList (zip [Variable 0..] xs)) }
   where
     aux (Var ()) = do { n <- get; put $! n+1; return (Var (Variable n)) }
     aux (Fun f xs) = fmap (Fun f) (mapM aux xs)
+
+con :: String -> Type -> Schema
+con c ty = Tm { term = Fun (Constant c) [], context = SchemaContext [], typ = ty }
+
+var :: Type -> Schema
+var ty = Tm { term = Var (), context = SchemaContext [ty], typ = ty }
+
+showIt :: (Show ctx, Show (VariableOf ctx)) => TmIn ctx -> String
+showIt x = unlines [show (context x), show (typ x), show (term x)]
