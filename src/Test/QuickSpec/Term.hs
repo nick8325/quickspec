@@ -1,5 +1,5 @@
 -- Terms and evaluation.
-{-# LANGUAGE CPP, TypeFamilies, FlexibleContexts, StandaloneDeriving, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE CPP, GeneralizedNewtypeDeriving #-}
 module Test.QuickSpec.Term where
 
 #include "errors.h"
@@ -15,20 +15,23 @@ import Data.Ord
 import Data.Map(Map)
 import qualified Data.Map as Map
 
--- Typed terms, parametrised over the type of contexts
--- (which is different between terms and schemes).
-data TmIn ctx = Tm {
-  term    :: Term Constant (VariableOf ctx),
-  context :: ctx,
+-- Typed terms, parametrised over the type of variables
+-- (which is different between terms and schemas).
+data TmOf v = Tm {
+  term    :: Term Constant v,
+  context :: Map v Type,
   typ     :: Type
-  }
-deriving instance Context ctx => Eq (TmIn ctx)
+  } deriving (Eq, Show)
 
-type Tm = TmIn TermContext
+type Tm = TmOf Variable
 newtype Constant = Constant { conName :: String } deriving (Show, Eq, Ord)
 newtype Variable = Variable { varNumber :: Int } deriving (Show, Eq, Ord, Enum)
 
-instance Context ctx => Ord (TmIn ctx) where
+instance TyVars Variable where
+  tyVars _ = []
+  tySubst _ x = x
+
+instance Ord v => Ord (TmOf v) where
   compare = comparing $ \t -> (measure (term t), term t, context t, typ t)
 
 -- Term ordering - size, generality, skeleton.
@@ -41,18 +44,16 @@ size Var{} = 0
 size (Fun f xs) = 1+sum (map size xs)
 
 -- Ordinary terms.
-class (Ord ctx, Ord (VariableOf ctx), TyVars ctx) => Context ctx where
-  type VariableOf ctx
-  ctxEqualise :: ctx -> ctx -> Maybe (ctx, [(Type, Type)])
-
-instance TyVars ctx => TyVars (TmIn ctx) where
-  tyVars t = tyVars (typ t) ++ tyVars (context t)
+instance TyVars v => TyVars (TmOf v) where
+  tyVars t = tyVars (typ t) ++ tyVars (Map.elems (context t))
   tySubst f t =
-    t { context = tySubst f (context t),
+    t { term = rename (tySubst f) (term t),
+        context = fmap (tySubst f) (context t),
         typ = tySubst f (typ t) }
-instance Context ctx => Apply (TmIn ctx) where
+
+instance (Ord v, TyVars v) => Apply (TmOf v) where
   tyApply tv f x = do
-    (ctx, cs) <- ctxEqualise (context f) (context x)
+    (ctx, cs) <- equaliseContexts (context f) (context x)
     (f', x', cs') <- tyApply tv (typ f) (typ x)
     return (f { context = ctx, typ = f' },
             x { context = ctx, typ = x' },
@@ -64,59 +65,40 @@ instance Context ctx => Apply (TmIn ctx) where
     where
       app (Fun f xs) t = Fun f (xs ++ [t])
 
-newtype TermContext = TermContext (Map Variable Type) deriving (Eq, Ord, Show)
-instance TyVars TermContext where
-  tyVars (TermContext m) = concatMap tyVars (Map.elems m)
-  tySubst f (TermContext m) = TermContext (fmap (tySubst f) m)
-instance Context TermContext where
-  type VariableOf TermContext = Variable
-  ctxEqualise (TermContext m1) (TermContext m2) = do
-    guard (Map.null (Map.intersection m1 m2))
-    let m = TermContext (Map.union m1 m2)
-    return (m, [])
+equaliseContexts m1 m2 = do
+  guard (Map.null (Map.intersection m1 m2))
+  return (Map.union m1 m2, [])
 
 -- A schema is a term with holes where the variables should be.
-type Schema = TmIn SchemaContext
-
-newtype SchemaContext = SchemaContext [Type] deriving (Eq, Ord, TyVars, Show)
-instance Context SchemaContext where
-  type VariableOf SchemaContext = ()
-  ctxEqualise (SchemaContext xs) (SchemaContext ys) =
-    return (SchemaContext (xs++ys), [])
+type Schema = TmOf Type
 
 schema :: Tm -> Schema
-schema t@Tm{context = TermContext m} = Tm {
-  term = rename (const ()) (term t),
-  context = SchemaContext (Map.elems m),
-  typ = typ t
-  }
+schema t =
+  Tm { term = rename f (term t),
+       context = Map.empty,
+       typ = typ t }
+  where
+    f x = Map.findWithDefault __ x (context t)
 
 -- You can instantiate a schema either by making all the variables
 -- the same or by making them all different.
 leastGeneral, mostGeneral :: Schema -> Tm
-leastGeneral s@Tm{context = SchemaContext xs} =
-  s { term = evalState (aux (term s)) xs,
-      context = TermContext (Map.fromList (zip [Variable 0..] tys)) }
+leastGeneral s =
+  s { term = rename f (term s),
+      context = Map.fromList (zip [Variable 0..] tys) }
   where
-    tys = usort xs
+    tys = usort (vars (term s))
     names = Map.fromList (zip tys [Variable 0..])
-    aux (Var ()) = do
-      (ty:tys) <- get
-      put tys
-      return (Var (Map.findWithDefault __ ty names))
-    aux (Fun f xs) = fmap (Fun f) (mapM aux xs)
-mostGeneral s@Tm{context = SchemaContext xs} =
+    f x = Map.findWithDefault __ x names
+mostGeneral s =
   s { term = evalState (aux (term s)) 0,
-      context = TermContext (Map.fromList (zip [Variable 0..] xs)) }
+      context = Map.fromList (zip [Variable 0..] (vars (term s))) }
   where
-    aux (Var ()) = do { n <- get; put $! n+1; return (Var (Variable n)) }
+    aux (Var _) = do { n <- get; put $! n+1; return (Var (Variable n)) }
     aux (Fun f xs) = fmap (Fun f) (mapM aux xs)
 
 con :: String -> Type -> Schema
-con c ty = Tm { term = Fun (Constant c) [], context = SchemaContext [], typ = ty }
+con c ty = Tm { term = Fun (Constant c) [], context = Map.empty, typ = ty }
 
 var :: Type -> Schema
-var ty = Tm { term = Var (), context = SchemaContext [ty], typ = ty }
-
-showIt :: (Show ctx, Show (VariableOf ctx)) => TmIn ctx -> String
-showIt x = unlines [show (context x), show (typ x), show (term x)]
+var ty = Tm { term = Var ty, context = Map.empty, typ = ty }
