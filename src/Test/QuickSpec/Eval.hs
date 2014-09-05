@@ -9,18 +9,25 @@ data Interpreted a = Interpreted {
   interpretation :: Value Gen
   }
 
-icon :: Typeable a => String -> a -> Interpreted Schema
+icon :: Typeable a => String -> a -> Interpreted (TmOf v)
 icon name x =
   Interpreted {
     it = con name (typeOf x),
     interpretation = toValue (return x)
     }
 
-ivar :: (Typeable a, Arbitrary a) => a -> Interpreted Schema
-ivar x =
+ihole :: (Typeable a, Arbitrary a) => a -> Interpreted Schema
+ihole x =
   Interpreted {
-    it = var (typeOf x),
+    it = hole (typeOf x),
     interpretation = toValue (arbitrary `asTypeOf` return x)
+    }
+
+ivar :: (Typeable a, Arbitrary a) => a -> Int -> Interpreted Tm
+ivar x n =
+  Interpreted {
+    it = var (typeOf x) n,
+    interpretation = toValue (variant n arbitrary `asTypeOf` return x)
     }
 
 instance TyVars a => TyVars (Interpreted a) where

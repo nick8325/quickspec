@@ -99,8 +99,11 @@ mostGeneral s =
     aux (Var _) = do { n <- get; put $! n+1; return (Var (Variable n)) }
     aux (Fun f xs) = fmap (Fun f) (mapM aux xs)
 
-con :: String -> Type -> Schema
+con :: String -> Type -> TmOf v
 con c ty = Tm { term = Fun (Constant c) [], context = Map.empty, typ = ty }
 
-var :: Type -> Schema
-var ty = Tm { term = Var ty, context = Map.empty, typ = ty }
+hole :: Type -> Schema
+hole ty = Tm { term = Var ty, context = Map.empty, typ = ty }
+
+var :: Type -> Int -> Tm
+var ty n = Tm { term = Var (Variable n), context = Map.fromList [(Variable n, ty)], typ = ty }
