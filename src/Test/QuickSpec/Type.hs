@@ -1,5 +1,5 @@
 -- Polymorphic types and dynamic values.
-{-# LANGUAGE DeriveDataTypeable, CPP, ScopedTypeVariables, EmptyDataDecls, TypeFamilies, TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE DeriveDataTypeable, CPP, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances, GeneralizedNewtypeDeriving #-}
 module Test.QuickSpec.Type(
   -- Types.
   Typeable,
@@ -25,12 +25,15 @@ import GHC.Exts(Any)
 import Unsafe.Coerce
 import Control.Applicative
 import Data.Maybe
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.State.Strict
+import Control.Monad.Trans.Writer.Strict
 
 -- A (possibly polymorphic) type.
 type Type = Term TyCon TyVar
 
 data TyCon = Arrow | TyCon Ty.TyCon deriving (Eq, Ord, Show)
-newtype TyVar = TyVar { tyVarNumber :: Int } deriving (Eq, Ord, Show)
+newtype TyVar = TyVar { tyVarNumber :: Int } deriving (Eq, Ord, Show, Enum)
 
 -- Type variables.
 type A = TyVarNumber Zero
@@ -96,23 +99,37 @@ instance (TyVars a, TyVars b) => TyVars (a, b) where
   tySubst f (x, y) = (tySubst f x, tySubst f y)
 
 class TyVars a => Apply a where
-  tyApply :: TyVar -> a -> a -> Maybe (a, a, [(Type, Type)])
+  tyApply :: a -> a -> ApplyM (a, a)
   tyGroundApply :: a -> a -> a
 
+type ApplyM = StateT TyVar (WriterT [(Type, Type)] Maybe)
+evalApply :: ApplyM a -> TyVar -> Maybe (a, [(Type, Type)])
+evalApply x tv = runWriterT (evalStateT x tv)
+freshTyVar :: ApplyM TyVar
+freshTyVar = do
+  tv <- get
+  put $! succ tv
+  return tv
+
 instance Apply Type where
-  tyApply tv t u = Just (t, u, [(t, Fun Arrow [u, Var tv])])
+  tyApply t u = do
+    tv <- freshTyVar
+    lift (tell [(t, Fun Arrow [u, Var tv])])
+    return (t, u)
   tyGroundApply (Fun Arrow [arg, res]) t | t == arg = res
 
-freshTyVar :: Apply a => a -> TyVar
-freshTyVar x = TyVar (1+n)
+freshTyVarFor :: Apply a => a -> TyVar
+freshTyVarFor x = TyVar (1+n)
   where
     n = maximum (0:map tyVarNumber (tyVars x))
 
 tryApply :: Apply a => a -> a -> Maybe a
 tryApply f x = do
-  let tv@(TyVar n) = freshTyVar f
+  let TyVar n = freshTyVarFor f
       x' = tySubst (Var . TyVar . (n+1+) . tyVarNumber) x
-  (f', x'', cs) <- tyApply tv f x'
+      TyVar m = freshTyVarFor x'
+      tv = TyVar (m `max` n)
+  ((f', x''), cs) <- evalApply (tyApply f x') tv
   s <- unifyMany cs
   let sub = tySubst (subst s . Var)
   return (sub f' `tyGroundApply` sub x'')
@@ -150,11 +167,9 @@ instance TyVars (Value f) where
   tySubst f x = x { typeOfValue = tySubst f (typeOfValue x) }
 
 instance Applicative f => Apply (Value f) where
-  tyApply tv f x = do
-    (f', x', cs) <- tyApply tv (typeOfValue f) (typeOfValue x)
-    return (f { typeOfValue = f' },
-            x { typeOfValue = x' },
-            cs)
+  tyApply f x = do
+    (f', x') <- tyApply (typeOfValue f) (typeOfValue x)
+    return (f { typeOfValue = f' }, x { typeOfValue = x' })
   tyGroundApply f x =
     (Value $! tyGroundApply (typeOfValue f) (typeOfValue x))
     (fromAny (value f) <*> value x)

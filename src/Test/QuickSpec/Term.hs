@@ -14,6 +14,8 @@ import Control.Monad.Trans.State.Strict
 import Data.Ord
 import Data.Map(Map)
 import qualified Data.Map as Map
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.Writer.Strict
 
 -- Typed terms, parametrised over the type of variables
 -- (which is different between terms and schemas).
@@ -52,12 +54,12 @@ instance TyVars v => TyVars (TmOf v) where
         typ = tySubst f (typ t) }
 
 instance (Ord v, TyVars v) => Apply (TmOf v) where
-  tyApply tv f x = do
-    (ctx, cs) <- equaliseContexts (context f) (context x)
-    (f', x', cs') <- tyApply tv (typ f) (typ x)
+  tyApply f x = do
+    (ctx, cs) <- lift (lift (equaliseContexts (context f) (context x)))
+    lift (tell cs)
+    (f', x') <- tyApply (typ f) (typ x)
     return (f { context = ctx, typ = f' },
-            x { context = ctx, typ = x' },
-            cs ++ cs')
+            x { context = ctx, typ = x' })
   tyGroundApply f x | context f == context x =
     Tm { term = app (term f) (term x),
          context = context f,
