@@ -16,7 +16,11 @@ import Control.Exception(assert)
 --
 -- A TestTree is always infinite, and branches t is always a
 -- refinement of t (it may be trivial, so that length (branches t) == 1).
-data TestTree a = Tree { rep :: a, rest :: [a], branches :: [TestTree a] }
+data TestTree a =
+  Tree {
+    rep :: a,
+    rest :: [a],
+    branches :: [TestTree a] }
 
 -- Precondition: bs must be sorted according to the TestCase.
 tree :: Ord r => [a] -> (a -> r) -> [TestTree a] -> TestTree a
@@ -33,16 +37,16 @@ terms Tree{rep = x, rest = xs} = x:xs
 union :: Ord r => [a -> r] -> TestTree a -> TestTree a -> TestTree a
 union (eval:evals) t1 t2 =
   tree (terms t1 ++ terms t2) eval
-         (merge (union evals) (eval . rep) (branches t1) (branches t2))
+    (merge (union evals) (eval . rep)
+      (branches t1) (branches t2))
 
 test :: Ord r => [a -> r] -> [a] -> TestTree a
-test [] _ =
-  error "Test.QuickSpec.TestTree.test: ran out of test cases"
-test (tc:tcs) [] =
-  error "Test.QuickSpec.TestTree.test: found an empty equivalence class"
+test []       _      = ERROR "ran out of test cases"
+test (tc:tcs) []     = ERROR "found an empty equivalence class"
 test (tc:tcs) xs@[_] = tree xs tc [test tcs xs]
-test (tc:tcs) xs = tree xs tc (map (test tcs) bs)
-  where bs = partitionBy tc xs
+test (tc:tcs) xs     = tree xs tc (map (test tcs) bs)
+  where
+    bs = partitionBy tc xs
 
 -- A TestTree with finite depth, represented as a TestTree where some
 -- nodes have no branches. Since this breaks one of the TestTree
@@ -50,43 +54,55 @@ test (tc:tcs) xs = tree xs tc (map (test tcs) bs)
 newtype TestResults a = Results (TestTree a)
 
 discrete :: Ord a => [a] -> TestResults a
+discrete [] = ERROR "empty list"
 discrete xs =
-  case sort xs of
-    [] -> error "Test.QuickSpec.TestTree.discrete: empty list"
-    y:ys ->
-      Results (Tree y ys (map singleton (y:ys)))
-      where singleton x = Tree x [] []
+  Results (Tree y ys (map singleton (y:ys)))
+  where
+    y:ys = sort xs
+    singleton x = Tree x [] []
 
 cutOff :: Int -> Int -> TestTree a -> TestResults a
 cutOff m n t = Results (aux m t)
-  where aux _ t@Tree{rest = []} = t { branches = [] }
-        aux 0 t = aux' False n n t
-        aux m t = t { branches = map (aux (m-1)) (branches t) }
-        -- Exponential backoff if we carry on refining a class
-        aux' _ _ _ t@Tree{rest = []} = t { branches = [] }
-        aux' True 0 n t = t { branches = map (aux' False (n*2-1) (n*2)) (branches t) }
-        aux' False 0 n t = t { branches = [] }
-        aux' x m n t@Tree{branches = [t']} = t { branches = [aux' x (m-1) n t'] }
-        aux' _ m n t = t { branches = map (aux' True (m-1) n) (branches t) }
+  where
+    aux _ t@Tree{rest = []} =
+      t { branches = [] }
+    aux 0 t =
+      aux' False n n t
+    aux m t =
+      t { branches = map (aux (m-1)) (branches t) }
+    -- Exponential backoff if we carry on refining a class
+    aux' _ _ _ t@Tree{rest = []} =
+      t { branches = [] }
+    aux' True 0 n t =
+      t { branches = map (aux' False (n*2-1) (n*2)) (branches t) }
+    aux' False 0 n t =
+      t { branches = [] }
+    aux' x m n t@Tree{branches = [t']} =
+      t { branches = [aux' x (m-1) n t'] }
+    aux' _ m n t =
+      t { branches = map (aux' True (m-1) n) (branches t) }
 
 numTests :: TestResults a -> Int
 numTests (Results t) = aux t
-  where aux Tree{branches = []} = 0
-        aux Tree{branches = bs} = 1 + maximum (map aux bs)
+  where
+    aux Tree{branches = []} = 0
+    aux Tree{branches = bs} = 1 + maximum (map aux bs)
 
 numResults :: TestResults a -> Int
 numResults (Results t) = aux t
-  where aux Tree{rest = []} = 0
-        aux Tree{rest = xs, branches = ts} =
-          1 + length xs + sum (map aux ts)
+  where
+    aux Tree{rest = []} = 0
+    aux Tree{rest = xs, branches = ts} =
+      1 + length xs + sum (map aux ts)
 
 classes :: Ord a => TestResults a -> [[a]]
 classes = sort . map sort . unsortedClasses
 
 unsortedClasses :: TestResults a -> [[a]]
 unsortedClasses (Results t) = aux t
-  where aux Tree{rep = x, rest = xs, branches = []} = [x:xs]
-        aux Tree{branches = bs} = concatMap aux bs
+  where
+    aux Tree{rep = x, rest = xs, branches = []} = [x:xs]
+    aux Tree{branches = bs} = concatMap aux bs
 
 reps :: Ord a => TestResults a -> [a]
 reps = map head . classes
