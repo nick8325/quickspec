@@ -42,7 +42,7 @@ union (eval:evals) t1 t2 =
 
 test :: Ord r => [a -> r] -> [a] -> TestTree a
 test []       _      = ERROR "ran out of test cases"
-test (tc:tcs) []     = ERROR "found an empty equivalence class"
+test (_:_) []        = ERROR "found an empty equivalence class"
 test (tc:tcs) xs@[_] = tree xs tc [test tcs xs]
 test (tc:tcs) xs     = tree xs tc (map (test tcs) bs)
   where
@@ -75,7 +75,7 @@ cutOff m n t = Results (aux m t)
       t { branches = [] }
     aux' True 0 n t =
       t { branches = map (aux' False (n*2-1) (n*2)) (branches t) }
-    aux' False 0 n t =
+    aux' False 0 _n t =
       t { branches = [] }
     aux' x m n t@Tree{branches = [t']} =
       t { branches = [aux' x (m-1) n t'] }

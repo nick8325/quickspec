@@ -1,5 +1,7 @@
 -- Polymorphic types and dynamic values.
 {-# LANGUAGE DeriveDataTypeable, CPP, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances, GeneralizedNewtypeDeriving, Rank2Types #-}
+-- To avoid a warning about TyVarNumber's constructor being unused:
+{-# OPTIONS_GHC -fno-warn-unused-binds #-}
 module Test.QuickSpec.Type(
   -- Types.
   Typeable,

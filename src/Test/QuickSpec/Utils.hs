@@ -3,7 +3,7 @@
 module Test.QuickSpec.Utils where
 
 import Control.Arrow((&&&))
-import Data.List(groupBy, sortBy, group, sort)
+import Data.List(groupBy, sortBy)
 import Data.Ord(comparing)
 import System.IO
 import Control.Exception

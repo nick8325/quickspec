@@ -1,5 +1,6 @@
 -- Signatures, collecting and finding witnesses, etc.
 {-# LANGUAGE CPP, ConstraintKinds, ExistentialQuantification, ScopedTypeVariables, DeriveDataTypeable, StandaloneDeriving #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Test.QuickSpec.Signature where
 
 #include "errors.h"

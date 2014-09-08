@@ -8,8 +8,6 @@ import Test.QuickSpec.Base
 import Test.QuickSpec.Type
 import Test.QuickCheck
 import Test.QuickCheck.Gen
-import qualified Data.Typeable as Ty
-import qualified Data.Typeable.Internal as Ty
 import Control.Monad
 import Control.Monad.Trans.State.Strict
 import Data.Ord
@@ -18,7 +16,6 @@ import qualified Data.Map as Map
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer.Strict
 import Data.Functor.Identity
-import Data.Ord
 import Control.Applicative
 
 -- Typed terms, parametrised over the type of variables.
@@ -55,7 +52,7 @@ measure t = (size t, length (usort (vars t)), rename (const ()) t)
 
 size :: Tm f v -> Int
 size Var{} = 0
-size (Fun f xs) = 1+sum (map size xs)
+size (Fun _f xs) = 1+sum (map size xs)
 
 -- How to apply terms.
 instance TyVars v => TyVars (TermOf v) where
@@ -79,6 +76,8 @@ instance (Ord v, TyVars v) => Apply (TermOf v) where
     where
       app (Fun f xs) t = Fun f (xs ++ [t])
 
+equaliseContexts :: Ord v => Map v VarType -> Map v VarType ->
+                    Maybe (Map v VarType, [(Type, Type)])
 equaliseContexts m1 m2 = do
   guard (Map.null (Map.intersection m1 m2))
   return (Map.union m1 m2, [])

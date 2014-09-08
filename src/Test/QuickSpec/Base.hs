@@ -3,7 +3,7 @@
 
 {-# LANGUAGE CPP #-}
 module Test.QuickSpec.Base(
-  Tm(..),
+  Tm,
   module Data.Rewriting.Term, foldTerm, mapTerm,
   module Data.Rewriting.Substitution, subst, subst', unifyMany) where
 
@@ -13,11 +13,6 @@ import Data.Rewriting.Term hiding (Term, fold, map, fromString, parse, parseIO, 
 import qualified Data.Rewriting.Term as T
 import Data.Rewriting.Substitution hiding (apply, fromString, parse, parseIO)
 import qualified Data.Rewriting.Substitution as T
-import qualified Data.Rewriting.Substitution.Type as T
-import Data.Maybe
-import Data.Either
-import qualified Data.Map as M
-import Control.Monad
 
 -- Renamings of functionality from term-rewriting.
 type Tm = T.Term
