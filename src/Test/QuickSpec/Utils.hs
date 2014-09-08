@@ -13,7 +13,11 @@ repeatM :: Monad m => m a -> m [a]
 repeatM = sequence . repeat
 
 partitionBy :: Ord b => (a -> b) -> [a] -> [[a]]
-partitionBy value = map (map fst) . groupBy (\x y -> snd x == snd y) . sortBy (comparing snd) . map (id &&& value)
+partitionBy value =
+  map (map fst) .
+  groupBy (\x y -> snd x == snd y) .
+  sortBy (comparing snd) .
+  map (id &&& value)
 
 isSorted :: Ord a => [a] -> Bool
 isSorted xs = and (zipWith (<=) xs (tail xs))
@@ -29,17 +33,18 @@ usortBy f = map head . groupBy (\x y -> f x y == EQ) . sortBy f
 
 merge :: Ord b => (a -> a -> a) -> (a -> b) -> [a] -> [a] -> [a]
 merge f c = aux
-  where aux [] ys = ys
-        aux xs [] = xs
-        aux (x:xs) (y:ys) =
-          case comparing c x y of
-            LT -> x:aux xs (y:ys)
-            GT -> y:aux (x:xs) ys
-            EQ -> f x y:aux xs ys
+  where
+    aux [] ys = ys
+    aux xs [] = xs
+    aux (x:xs) (y:ys) =
+      case comparing c x y of
+        LT -> x:aux xs (y:ys)
+        GT -> y:aux (x:xs) ys
+        EQ -> f x y:aux xs ys
 
 orElse :: Ordering -> Ordering -> Ordering
 EQ `orElse` x = x
-x `orElse` _ = x
+x  `orElse` _ = x
 
 unbuffered :: IO a -> IO a
 unbuffered x = do

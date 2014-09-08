@@ -13,10 +13,10 @@ import Data.Typeable
 import Control.Monad
 
 data Instance = forall c. Typeable c => Instance (Dict c)
-data Signature = Signature {
-  constants :: [Constant],
-  instances :: [Instance]
-  }
+data Signature =
+  Signature {
+    constants :: [Constant],
+    instances :: [Instance] }
 
 instance Monoid Signature where
   mempty = Signature [] []

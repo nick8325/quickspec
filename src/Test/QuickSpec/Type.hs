@@ -147,10 +147,10 @@ canApply :: Apply a => a -> a -> Bool
 canApply f x = isJust (tryApply f x)
 
 -- Dynamic values inside an applicative functor.
-data Value f = Value {
-  typeOfValue :: Type,
-  value :: f Any
-  }
+data Value f =
+  Value {
+    typeOfValue :: Type,
+    value :: f Any }
 
 -- XXX this is convenient for term generation, but is it too dangerous?
 instance Eq (Value f) where

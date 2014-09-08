@@ -23,17 +23,22 @@ import Control.Applicative
 
 -- Typed terms, parametrised over the type of variables.
 type Term = TermOf Variable
-data TermOf v = Term {
-  term    :: Tm Constant v,
-  context :: Map v VarType,
-  typ     :: Type
-  } deriving (Eq, Show)
+data TermOf v =
+  Term {
+    term    :: Tm Constant v,
+    context :: Map v VarType,
+    typ     :: Type }
+  deriving (Eq, Show)
 type VarType = Value Gen
 
 -- Constants and variables.
 -- Constants have values, while variables do not have values (their
 -- generators are stored in the context).
-data Constant = Constant { conName :: String, conValue :: Value Identity } deriving (Show, Eq, Ord)
+data Constant =
+  Constant {
+    conName  :: String,
+    conValue :: Value Identity }
+  deriving (Show, Eq, Ord)
 
 newtype Variable = Variable { varNumber :: Int } deriving (Show, Eq, Ord, Enum)
 instance TyVars Variable where
