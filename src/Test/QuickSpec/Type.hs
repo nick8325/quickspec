@@ -32,7 +32,7 @@ import Control.Monad.Trans.Writer.Strict
 import Data.Ord
 
 -- A (possibly polymorphic) type.
-type Type = Term TyCon TyVar
+type Type = Tm TyCon TyVar
 
 data TyCon = Arrow | TyCon Ty.TyCon deriving (Eq, Ord, Show)
 newtype TyVar = TyVar { tyVarNumber :: Int } deriving (Eq, Ord, Show, Enum)
