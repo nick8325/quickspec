@@ -7,6 +7,7 @@ import Test.QuickSpec.Utils
 import Test.QuickSpec.Base
 import Test.QuickSpec.Type
 import Test.QuickCheck
+import Test.QuickCheck.Gen
 import qualified Data.Typeable as Ty
 import qualified Data.Typeable.Internal as Ty
 import Control.Monad
@@ -18,34 +19,22 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer.Strict
 import Data.Functor.Identity
 import Data.Ord
-
--- Contexts, parametrised over the type of variables
--- (which is different between terms and schemas).
-newtype Context v = Context { unContext :: Map v VarType } deriving Show
-type VarType = Value Gen
-
-instance Ord v => Eq (Context v) where
-  x == y = compare x y == EQ
-instance Ord v => Ord (Context v) where
-  compare = comparing (\(Context x) -> fmap typeOfValue x)
+import Control.Applicative
 
 -- Typed terms, parametrised over the type of variables.
 type Tm = TmOf Variable
 data TmOf v = Tm {
   term    :: TermOf v,
-  context :: Context v,
+  context :: Map v VarType,
   typ     :: Type
   } deriving (Eq, Show)
 type TermOf = Term Constant
+type VarType = Value Gen
 
 -- Constants and variables.
 -- Constants have values, while variables do not have values (their
 -- generators are stored in the context).
-data Constant = Constant { conName :: String, conValue :: Value Identity } deriving Show
-instance Eq Constant where
-  x == y = compare x y == EQ
-instance Ord Constant where
-  compare = comparing (\x -> (conName x, typeOfValue (conValue x)))
+data Constant = Constant { conName :: String, conValue :: Value Identity } deriving (Show, Eq, Ord)
 
 newtype Variable = Variable { varNumber :: Int } deriving (Show, Eq, Ord, Enum)
 instance TyVars Variable where
@@ -66,10 +55,10 @@ size (Fun f xs) = 1+sum (map size xs)
 
 -- How to apply terms.
 instance TyVars v => TyVars (TmOf v) where
-  tyVars t = tyVars (typ t) ++ tyVars (Map.elems (unContext (context t)))
+  tyVars t = tyVars (typ t) ++ tyVars (Map.elems (context t))
   tySubst f t =
     t { term = rename (tySubst f) (term t),
-        context = Context (fmap (tySubst f) (unContext (context t))),
+        context = fmap (tySubst f) (context t),
         typ = tySubst f (typ t) }
 
 instance (Ord v, TyVars v) => Apply (TmOf v) where
@@ -86,9 +75,9 @@ instance (Ord v, TyVars v) => Apply (TmOf v) where
     where
       app (Fun f xs) t = Fun f (xs ++ [t])
 
-equaliseContexts (Context m1) (Context m2) = do
+equaliseContexts m1 m2 = do
   guard (Map.null (Map.intersection m1 m2))
-  return (Context (Map.union m1 m2), [])
+  return (Map.union m1 m2, [])
 
 -- A schema is a term with holes where the variables should be.
 type Schema = TmOf VarType
@@ -96,44 +85,67 @@ type Schema = TmOf VarType
 schema :: Tm -> Schema
 schema t =
   Tm { term = rename f (term t),
-       context = Context Map.empty,
+       context = Map.empty,
        typ = typ t }
   where
-    f x = Map.findWithDefault __ x (unContext (context t))
+    f x = Map.findWithDefault __ x (context t)
 
 -- You can instantiate a schema either by making all the variables
 -- the same or by making them all different.
 leastGeneral, mostGeneral :: Schema -> Tm
 leastGeneral s =
   s { term = rename f (term s),
-      context = Context (Map.fromList (zip [Variable 0..] tys)) }
+      context = Map.fromList (zip [Variable 0..] tys) }
   where
-    tys = usortBy (comparing typeOfValue) (vars (term s))
-    names = Map.fromList (zip (map typeOfValue tys) [Variable 0..])
-    f x = Map.findWithDefault __ (typeOfValue x) names
+    tys = usort (vars (term s))
+    names = Map.fromList (zip tys [Variable 0..])
+    f x = Map.findWithDefault __ x names
 mostGeneral s =
   s { term = evalState (aux (term s)) 0,
-      context = Context (Map.fromList (zip [Variable 0..] (vars (term s)))) }
+      context = Map.fromList (zipWith f [0..] (vars (term s))) }
   where
     aux (Var _) = do { n <- get; put $! n+1; return (Var (Variable n)) }
     aux (Fun f xs) = fmap (Fun f) (mapM aux xs)
+    f n x = (Variable n, injectValue (variant n) x)
 
 con :: String -> Value Identity -> TmOf v
 con c x =
   Tm { term = Fun (Constant c x) [],
-       context = Context Map.empty,
+       context = Map.empty,
        typ = typeOfValue x }
 
 hole :: Value Gen -> Schema
 hole x =
   Tm { term = Var x,
-       context = Context Map.empty,
+       context = Map.empty,
        typ = typeOfValue x }
 
 var :: Value Gen -> Int -> Tm
 var x n =
   Tm { term = Var (Variable n),
-       context = Context (Map.singleton (Variable n) x'),
+       context = Map.singleton (Variable n) x',
        typ = typeOfValue x }
   where
     x' = injectValue (variant n) x
+
+evaluateTerm :: Applicative f => (v -> Value f) -> TermOf v -> Value f
+evaluateTerm env (Var v) = env v
+evaluateTerm env (Fun f xs) =
+  foldl apply x (map (evaluateTerm env) xs)
+  where
+    x = injectValue (pure . runIdentity) (conValue f)
+
+evaluateSchema :: Schema -> Value Gen
+evaluateSchema t = evaluateTerm id (term t)
+
+evaluateTm :: Tm -> Value Gen
+evaluateTm t =
+  -- The evaluation itself doesn't happen in the Gen monad but in the
+  -- (StdGen, Int) reader monad. This is to avoid splitting the seed,
+  -- which would cause different occurrences of the same variable
+  -- to get different values!
+  toGen (evaluateTerm f (term t))
+  where
+    f x = fromGen (Map.findWithDefault __ x (context t))
+    toGen = injectValue (MkGen . curry)
+    fromGen = injectValue (uncurry . unGen)

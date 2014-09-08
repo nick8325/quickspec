@@ -29,6 +29,7 @@ import Data.Maybe
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Writer.Strict
+import Data.Ord
 
 -- A (possibly polymorphic) type.
 type Type = Term TyCon TyVar
@@ -150,6 +151,12 @@ data Value f = Value {
   typeOfValue :: Type,
   value :: f Any
   }
+
+-- XXX this is convenient for term generation, but is it too dangerous?
+instance Eq (Value f) where
+  x == y = x `compare` y == EQ
+instance Ord (Value f) where
+  compare = comparing typeOfValue
 
 instance Show (Value f) where
   show x = "<<" ++ show (toTypeRep (typeOfValue x)) ++ ">>"
