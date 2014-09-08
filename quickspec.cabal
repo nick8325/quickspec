@@ -60,6 +60,7 @@ library
     Test.QuickSpec.Base
     Test.QuickSpec.Type
     Test.QuickSpec.Term
+    Test.QuickSpec.Signature
 
   Build-depends:
-    base < 5, containers, transformers, QuickCheck >= 2.7, spoon >= 0.2, term-rewriting
+    base < 5, containers, transformers, QuickCheck >= 2.7, spoon >= 0.2, term-rewriting, constraints
