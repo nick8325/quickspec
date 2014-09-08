@@ -1,5 +1,5 @@
 -- Imports the relevant parts of the term-rewriting package
--- and provides a few basic abstractions on top.
+-- and provides a few things on top.
 
 {-# LANGUAGE CPP #-}
 module Test.QuickSpec.Base(
@@ -19,6 +19,7 @@ import Data.Either
 import qualified Data.Map as M
 import Control.Monad
 
+-- Renamings of functionality from term-rewriting.
 type Tm = T.Term
 
 foldTerm :: (v -> a) -> (f -> [a] -> a) -> Tm f v -> a
@@ -34,20 +35,8 @@ subst' :: (v -> Tm f v) -> Tm f v -> Tm f v
 subst' s (Var x) = s x
 subst' s (Fun f xs) = Fun f (map (subst' s) xs)
 
-unifyMany :: (Eq f, Ord v) => [(Tm f v, Tm f v)] -> Maybe (Subst f v)
-unifyMany xs =
-  case concat [ funs t ++ funs u | (t, u) <- xs ] of
-    [] -> fmap hither (unifyWith () (thither xs))
-    (f:_) -> unifyWith f xs
-  where
-    hither :: Subst () v -> Subst f v
-    hither = T.fromMap . fmap castVar . T.toMap
-
-    thither :: [(Tm f v, Tm f v)] -> [(Tm () v, Tm () v)]
-    thither xs = [(castVar t, castVar u) | (t, u) <- xs ]
-
-    castVar :: Tm f v -> Tm f' v
-    castVar (Var x) = Var x
-
-unifyWith :: (Eq f, Ord v) => f -> [(Tm f v, Tm f v)] -> Maybe (Subst f v)
-unifyWith f xs = unify (Fun f (map fst xs)) (Fun f (map snd xs))
+-- Unify several pairs of terms at once.
+-- The first argument is a dummy function symbol which can be any
+-- (non-bottom) value.
+unifyMany :: (Eq f, Ord v) => f -> [(Tm f v, Tm f v)] -> Maybe (Subst f v)
+unifyMany f xs = unify (Fun f (map fst xs)) (Fun f (map snd xs))

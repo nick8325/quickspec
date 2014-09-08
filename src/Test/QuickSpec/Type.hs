@@ -132,7 +132,7 @@ tryApply f x = do
       TyVar m = freshTyVarFor x'
       tv = TyVar (m `max` n)
   ((f', x''), cs) <- evalApply (tyApply f x') tv
-  s <- unifyMany cs
+  s <- unifyMany Arrow cs
   let sub = tySubst (subst s . Var)
   return (sub f' `tyGroundApply` sub x'')
 
