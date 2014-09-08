@@ -1,5 +1,5 @@
 -- Polymorphic types and dynamic values.
-{-# LANGUAGE DeriveDataTypeable, CPP, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DeriveDataTypeable, CPP, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances, GeneralizedNewtypeDeriving, Rank2Types #-}
 module Test.QuickSpec.Type(
   -- Types.
   Typeable,
@@ -14,7 +14,8 @@ module Test.QuickSpec.Type(
   Value,
   toValue,
   fromValue,
-  typeOfValue) where
+  typeOfValue,
+  injectValue) where
 
 #include "errors.h"
 
@@ -179,3 +180,6 @@ fromValue x = do
   let ty = typeOf (undefined :: a)
   _ <- match (typeOfValue x) ty
   return (fromAny (value x))
+
+injectValue :: (forall a. f a -> g a) -> Value f -> Value g
+injectValue f (Value ty x) = Value ty (f x)

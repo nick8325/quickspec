@@ -3,6 +3,8 @@ module Test.QuickSpec.Eval where
 import Test.QuickSpec.Type
 import Test.QuickSpec.Term 
 import Test.QuickCheck
+import qualified Data.Typeable as T
+import qualified Data.Typeable.Internal as T
 
 data Interpreted a = Interpreted {
   it :: a,
@@ -20,8 +22,12 @@ ihole :: (Typeable a, Arbitrary a) => a -> Interpreted Schema
 ihole x =
   Interpreted {
     it = hole (typeOf x),
-    interpretation = toValue (arbitrary `asTypeOf` return x)
+    interpretation = toValue (coarbitrary (T.typeOf x) arbitrary `asTypeOf` return x)
     }
+instance CoArbitrary T.TypeRep where
+  coarbitrary (T.TypeRep x _ _) = coarbitrary x
+instance CoArbitrary T.Fingerprint where
+  coarbitrary (T.Fingerprint x y) = coarbitrary (x, y)
 
 ivar :: (Typeable a, Arbitrary a) => a -> Int -> Interpreted Tm
 ivar x n =

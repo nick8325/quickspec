@@ -22,7 +22,10 @@ isSortedBy :: Ord b => (a -> b) -> [a] -> Bool
 isSortedBy f xs = isSorted (map f xs)
 
 usort :: Ord a => [a] -> [a]
-usort = map head . group . sort
+usort = usortBy compare
+
+usortBy :: (a -> a -> Ordering) ->[a] -> [a]
+usortBy f = map head . groupBy (\x y -> f x y == EQ) . sortBy f
 
 merge :: Ord b => (a -> a -> a) -> (a -> b) -> [a] -> [a] -> [a]
 merge f c = aux

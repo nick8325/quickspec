@@ -16,19 +16,38 @@ import Data.Map(Map)
 import qualified Data.Map as Map
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer.Strict
+import Data.Functor.Identity
+import Data.Ord
 
--- Typed terms, parametrised over the type of variables
+-- Contexts, parametrised over the type of variables
 -- (which is different between terms and schemas).
+newtype Context v = Context { unContext :: Map v VarType } deriving Show
+type VarType = Value Gen
+
+instance Ord v => Eq (Context v) where
+  x == y = compare x y == EQ
+instance Ord v => Ord (Context v) where
+  compare = comparing (\(Context x) -> fmap typeOfValue x)
+
+-- Typed terms, parametrised over the type of variables.
+type Tm = TmOf Variable
 data TmOf v = Tm {
-  term    :: Term Constant v,
-  context :: Map v Type,
+  term    :: TermOf v,
+  context :: Context v,
   typ     :: Type
   } deriving (Eq, Show)
+type TermOf = Term Constant
 
-type Tm = TmOf Variable
-newtype Constant = Constant { conName :: String } deriving (Show, Eq, Ord)
+-- Constants and variables.
+-- Constants have values, while variables do not have values (their
+-- generators are stored in the context).
+data Constant = Constant { conName :: String, conValue :: Value Identity } deriving Show
+instance Eq Constant where
+  x == y = compare x y == EQ
+instance Ord Constant where
+  compare = comparing (\x -> (conName x, typeOfValue (conValue x)))
+
 newtype Variable = Variable { varNumber :: Int } deriving (Show, Eq, Ord, Enum)
-
 instance TyVars Variable where
   tyVars _ = []
   tySubst _ x = x
@@ -45,12 +64,12 @@ size :: Term f v -> Int
 size Var{} = 0
 size (Fun f xs) = 1+sum (map size xs)
 
--- Ordinary terms.
+-- How to apply terms.
 instance TyVars v => TyVars (TmOf v) where
-  tyVars t = tyVars (typ t) ++ tyVars (Map.elems (context t))
+  tyVars t = tyVars (typ t) ++ tyVars (Map.elems (unContext (context t)))
   tySubst f t =
     t { term = rename (tySubst f) (term t),
-        context = fmap (tySubst f) (context t),
+        context = Context (fmap (tySubst f) (unContext (context t))),
         typ = tySubst f (typ t) }
 
 instance (Ord v, TyVars v) => Apply (TmOf v) where
@@ -67,43 +86,54 @@ instance (Ord v, TyVars v) => Apply (TmOf v) where
     where
       app (Fun f xs) t = Fun f (xs ++ [t])
 
-equaliseContexts m1 m2 = do
+equaliseContexts (Context m1) (Context m2) = do
   guard (Map.null (Map.intersection m1 m2))
-  return (Map.union m1 m2, [])
+  return (Context (Map.union m1 m2), [])
 
 -- A schema is a term with holes where the variables should be.
-type Schema = TmOf Type
+type Schema = TmOf VarType
 
 schema :: Tm -> Schema
 schema t =
   Tm { term = rename f (term t),
-       context = Map.empty,
+       context = Context Map.empty,
        typ = typ t }
   where
-    f x = Map.findWithDefault __ x (context t)
+    f x = Map.findWithDefault __ x (unContext (context t))
 
 -- You can instantiate a schema either by making all the variables
 -- the same or by making them all different.
 leastGeneral, mostGeneral :: Schema -> Tm
 leastGeneral s =
   s { term = rename f (term s),
-      context = Map.fromList (zip [Variable 0..] tys) }
+      context = Context (Map.fromList (zip [Variable 0..] tys)) }
   where
-    tys = usort (vars (term s))
-    names = Map.fromList (zip tys [Variable 0..])
-    f x = Map.findWithDefault __ x names
+    tys = usortBy (comparing typeOfValue) (vars (term s))
+    names = Map.fromList (zip (map typeOfValue tys) [Variable 0..])
+    f x = Map.findWithDefault __ (typeOfValue x) names
 mostGeneral s =
   s { term = evalState (aux (term s)) 0,
-      context = Map.fromList (zip [Variable 0..] (vars (term s))) }
+      context = Context (Map.fromList (zip [Variable 0..] (vars (term s)))) }
   where
     aux (Var _) = do { n <- get; put $! n+1; return (Var (Variable n)) }
     aux (Fun f xs) = fmap (Fun f) (mapM aux xs)
 
-con :: String -> Type -> TmOf v
-con c ty = Tm { term = Fun (Constant c) [], context = Map.empty, typ = ty }
+con :: String -> Value Identity -> TmOf v
+con c x =
+  Tm { term = Fun (Constant c x) [],
+       context = Context Map.empty,
+       typ = typeOfValue x }
 
-hole :: Type -> Schema
-hole ty = Tm { term = Var ty, context = Map.empty, typ = ty }
+hole :: Value Gen -> Schema
+hole x =
+  Tm { term = Var x,
+       context = Context Map.empty,
+       typ = typeOfValue x }
 
-var :: Type -> Int -> Tm
-var ty n = Tm { term = Var (Variable n), context = Map.fromList [(Variable n, ty)], typ = ty }
+var :: Value Gen -> Int -> Tm
+var x n =
+  Tm { term = Var (Variable n),
+       context = Context (Map.singleton (Variable n) x'),
+       typ = typeOfValue x }
+  where
+    x' = injectValue (variant n) x
