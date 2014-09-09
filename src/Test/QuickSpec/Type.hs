@@ -5,9 +5,9 @@
 module Test.QuickSpec.Type(
   -- Types.
   Typeable,
-  Type, TyCon(..), TyVar(..),
+  Type, TyCon(..), TyVar(..), arrowType,
   TyVars(..), Typed(..), typeSubst, freshTyVarFor, freshen,
-  UnifyM, equalise, freshTyVar,
+  UnifyM, runUnifyM, equalise, freshTyVar,
   tryApply, canApply, apply,
   A, B, C, D,
   typeOf,
@@ -56,6 +56,10 @@ data Succ a deriving Typeable
 
 typeOf :: Typeable a => a -> Type
 typeOf x = fromTypeRep (Ty.typeOf x)
+
+arrowType :: [Type] -> Type -> Type
+arrowType [] res = res
+arrowType (arg:args) res = Fun Arrow [arg, arrowType args res]
 
 fromTypeRep :: Ty.TypeRep -> Type
 fromTypeRep ty =
@@ -120,6 +124,12 @@ freshen (TyVar x) t = typeSubst (\(TyVar n) -> Var (TyVar (n+x))) t
 -- A monad for generating unification constraints.
 type UnifyM = StateT TyVar (WriterT (DList (Type, Type)) Maybe)
 
+runUnifyM :: UnifyM a -> TyVar -> Maybe (a, Subst TyCon TyVar)
+runUnifyM x tv = do
+  (x, cs) <- runWriterT (evalStateT x tv)
+  s <- unifyMany Arrow (DList.toList cs)
+  return (x, s)
+
 freshTyVar :: UnifyM TyVar
 freshTyVar = do
   tv <- get
@@ -135,9 +145,8 @@ tryApply f x = do
   let tv = freshTyVarFor f
       x' = freshen tv x
       tv' = freshTyVarFor x' `max` tv
-  cs <- execWriterT (evalStateT (adapt f x') tv')
-  s <- unifyMany Arrow (DList.toList cs)
-  let sub = typeSubst (subst s . Var)
+  ((), s) <- runUnifyM (adapt f x') tv'
+  let sub = typeSubst (evalSubst s)
   return (sub f `groundApply` sub x')
 
 infixl `apply`
@@ -163,12 +172,6 @@ data Value f =
   Value {
     valueType :: Type,
     value :: f Any }
-
--- XXX this is convenient for term generation, but is it too dangerous?
-instance Eq (Value f) where
-  x == y = x `compare` y == EQ
-instance Ord (Value f) where
-  compare = comparing valueType
 
 instance Show (Value f) where
   show x = "<<" ++ show (toTypeRep (valueType x)) ++ ">>"

@@ -5,7 +5,7 @@
 module Test.QuickSpec.Base(
   Tm,
   module Data.Rewriting.Term, foldTerm, mapTerm,
-  module Data.Rewriting.Substitution, subst, substA, unifyMany) where
+  module Data.Rewriting.Substitution, evalSubst, subst, substA, unifyMany) where
 
 #include "errors.h"
 
@@ -24,6 +24,9 @@ foldTerm = T.fold
 
 mapTerm :: (f -> f') -> (v -> v') -> Tm f v -> Tm f' v'
 mapTerm = T.map
+
+evalSubst :: Ord v => Subst f v -> v -> Tm f v
+evalSubst s = subst s . Var
 
 subst :: Ord v => Subst f v -> Tm f v -> Tm f v
 subst = T.apply

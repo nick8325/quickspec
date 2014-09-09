@@ -16,29 +16,32 @@ import qualified Data.Map as Map
 import Data.Functor.Identity
 import Control.Applicative
 import Data.Traversable(traverse)
+import Data.Maybe
+import Data.Tuple
 
 -- Typed terms, parametrised over the type of variables.
 type Term = TermOf Variable
 data TermOf v =
   Term {
     term    :: Tm Constant v,
-    context :: Map v VarType,
+    context :: Map v Type,
     typ     :: Type }
   deriving (Eq, Show)
-type VarType = Value Gen
 
 -- Constants and variables.
--- Constants have values, while variables do not have values (their
--- generators are stored in the context).
+-- Constants have values, while variables do not (as only monomorphic
+-- variables have generators, so we need a separate defaulting phase).
 data Constant =
   Constant {
     conName  :: String,
     conValue :: Value Identity }
-  deriving (Show, Eq, Ord)
+  deriving Show
+instance Eq Constant where
+  x == y = x `compare` y == EQ
+instance Ord Constant where
+  compare = comparing (\x -> (conName x, valueType (conValue x)))
 
 newtype Variable = Variable { varNumber :: Int } deriving (Show, Eq, Ord, Enum)
-instance TyVars Variable where typeSubstA _ = pure
-
 instance Ord v => Ord (TermOf v) where
   compare = comparing $ \t -> (measure (term t), term t, context t, typ t)
 
@@ -52,10 +55,10 @@ size Var{} = 0
 size (Fun _f xs) = 1+sum (map size xs)
 
 -- How to apply terms.
-instance TyVars v => TyVars (TermOf v) where
+instance TyVars (TermOf v) where
   typeSubstA f (Term t ctx ty) =
     Term t <$> typeSubstA f ctx <*> typeSubstA f ty
-instance (Ord v, TyVars v) => Typed (TermOf v) where
+instance Ord v => Typed (TermOf v) where
   adapt f x = do
     adapt (context f) (context x)
     adapt (typ f) (typ x)
@@ -68,11 +71,11 @@ instance (Ord v, TyVars v) => Typed (TermOf v) where
 
 instance TyVars v => TyVars (Map k v) where
   typeSubstA f = traverse (typeSubstA f)
-instance (Ord k, Eq v, Typed v) => Typed (Map k v) where
+instance (Ord k, Eq v, TyVars v) => Typed (Map k v) where
   adapt m1 m2 = equaliseContexts m1 m2
   groundApply m1 m2 = Map.union m1 m2
 
-equaliseContexts :: (Ord k, Eq v, Typed v) => Map k v -> Map k v -> UnifyM ()
+equaliseContexts :: (Ord k, Eq v, TyVars v) => Map k v -> Map k v -> UnifyM ()
 equaliseContexts m1 m2 = guard (Map.null conflicts)
   where
     conflicts = maybeIntersection check m1 m2
@@ -82,33 +85,47 @@ equaliseContexts m1 m2 = guard (Map.null conflicts)
       | otherwise = Just ()
 
 -- A schema is a term with holes where the variables should be.
-type Schema = TermOf VarType
+type Schema = TermOf ()
 
-schema :: Term -> Schema
-schema t =
-  Term { term = rename f (term t),
-         context = Map.empty,
-         typ = typ t }
-  where
-    f x = Map.findWithDefault __ x (context t)
+-- Instantiate a schema by making all the variables different.
+instantiate :: Schema -> Term
+instantiate = inferType . introduceVars
 
--- You can instantiate a schema either by making all the variables
--- the same or by making them all different.
-leastGeneral, mostGeneral :: Schema -> Term
-leastGeneral s =
-  s { term = rename f (term s),
-      context = Map.fromList (zip [Variable 0..] tys) }
+introduceVars :: Schema -> Term
+introduceVars s =
+  s { term = t,
+      context =
+        freshen (freshTyVarFor s)
+          (Map.fromList
+            [(Variable i, Var (TyVar i)) | Variable i <- vars t]) }
   where
-    tys = usort (vars (term s))
-    names = Map.fromList (zip tys [Variable 0..])
-    f x = Map.findWithDefault __ x names
-mostGeneral s =
-  s { term = evalState (aux (term s)) 0,
-      context = Map.fromList (zipWith f [0..] (vars (term s))) }
-  where
+    t = evalState (aux (term s)) 0
     aux (Var _) = do { n <- get; put $! n+1; return (Var (Variable n)) }
     aux (Fun f xs) = fmap (Fun f) (mapM aux xs)
-    f n x = (Variable n, mapValue (variant n) x)
+
+inferType :: Term -> Term
+inferType t = typeSubst (evalSubst s) t
+  where
+    (_, s) = fromMaybe __ (runUnifyM m (freshTyVarFor t))
+    m = do
+      ty <- aux (term t)
+      equalise ty (typ t)
+    aux (Var x) = return (Map.findWithDefault __ x (context t))
+    aux (Fun f xs) = do
+      tys <- mapM aux xs
+      ty <- fmap Var freshTyVar
+      equalise (valueType (conValue f)) (arrowType tys ty)
+      return ty
+
+-- Take a term and unify all variables of the same type.
+skeleton :: Term -> Term
+skeleton t =
+  t { term = rename f (term t),
+      context = Map.fromList (map swap (Map.toList names)) }
+  where
+    names = Map.fromList (map swap (Map.toList (context t)))
+    f x = Map.findWithDefault __
+            (Map.findWithDefault __ x (context t)) names
 
 con :: String -> Value Identity -> TermOf v
 con c x =
@@ -116,19 +133,8 @@ con c x =
          context = Map.empty,
          typ = valueType x }
 
-hole :: Value Gen -> Schema
-hole x =
-  Term { term = Var x,
-         context = Map.empty,
-         typ = valueType x }
-
-var :: Value Gen -> Int -> Term
-var x n =
-  Term { term = Var (Variable n),
-         context = Map.singleton (Variable n) x',
-         typ = valueType x }
-  where
-    x' = mapValue (variant n) x
+hole :: Schema
+hole = Term { term = Var (), context = Map.empty, typ = Var (TyVar 0) }
 
 evaluateTm :: Applicative f => (v -> Value f) -> Tm Constant v -> Value f
 evaluateTm env (Var v) = env v
@@ -137,17 +143,26 @@ evaluateTm env (Fun f xs) =
   where
     x = mapValue (pure . runIdentity) (conValue f)
 
-evaluateSchema :: Schema -> Value Gen
-evaluateSchema t = evaluateTm id (term t)
-
-evaluateTerm :: Term -> Value Gen
-evaluateTerm t =
+evaluateTerm :: (Type -> Value Gen) -> Term -> Value Gen
+evaluateTerm env t =
   -- The evaluation itself doesn't happen in the Gen monad but in the
   -- (StdGen, Int) reader monad. This is to avoid splitting the seed,
   -- which would cause different occurrences of the same variable
   -- to get different values!
   toGen (evaluateTm f (term t))
   where
-    f x = fromGen (Map.findWithDefault __ x (context t))
+    f x@(Variable n) =
+      fromGen
+        (mapValue (variant n)
+          (env (Map.findWithDefault __ x (context t))))
     toGen = mapValue (MkGen . curry)
     fromGen = mapValue (uncurry . unGen)
+
+-- Testing!
+app, rev :: Schema
+app = con "app" (toValue (Identity ((++) :: [A] -> [A] -> [A])))
+rev = con "rev" (toValue (Identity (reverse :: [A] -> [A])))
+env :: Type -> Value Gen
+env _ = toValue (arbitrary :: Gen [Int])
+t :: Schema
+t = rev `apply` (app `apply` hole `apply` hole)
