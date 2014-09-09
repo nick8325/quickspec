@@ -14,12 +14,11 @@ import Data.Maybe
 import qualified Data.Map as Map
 import Control.Monad
 
-data Eval a = Eval {
-  ordDict :: Dict (Ord a),
-  tree :: TestTree a
-  }
-
+data Eval a =
+    Testable (Dict (Ord a)) (TestTree a)
+  | Untestable [a]
 type Evals = Map Type (Value Eval)
+
 type Schemas = Map Int (Map Type [Schema])
 
 collect :: [Typed a] -> Map Type [a]
@@ -43,6 +42,7 @@ schemasOfSize n ss = do
   (xty, xs) <- Map.toList =<< maybeToList (Map.lookup j ss)
   guard (canApply fty xty)
   f <- fs
+  guard (canApply f (Var ()))
   x <- xs
   return (apply f x)
 

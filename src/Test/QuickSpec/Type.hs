@@ -5,7 +5,7 @@
 module Test.QuickSpec.Type(
   -- Types.
   Typeable,
-  Type, TyCon(..), TyVar(..), arrowType,
+  Type, TyCon(..), TyVar(..), arrowType, arity,
   TyVars(..), Apply(..), typeSubst, freshTyVarFor, freshen,
   UnifyM, runUnifyM, execUnifyM, equalise, freshTyVar, freshenM,
   tryApply, canApply, apply,
@@ -65,6 +65,10 @@ typeOf x = fromTypeRep (Ty.typeOf x)
 arrowType :: [Type] -> Type -> Type
 arrowType [] res = res
 arrowType (arg:args) res = Fun Arrow [arg, arrowType args res]
+
+arity :: Type -> Int
+arity (Fun Arrow [_, res]) = 1+arity res
+arity _ = 0
 
 fromTypeRep :: Ty.TypeRep -> Type
 fromTypeRep ty =
