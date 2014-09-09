@@ -41,3 +41,11 @@ arb _ = instance_ (Dict :: Dict (Arbitrary a))
 
 findInstance :: Typeable c => Signature -> Maybe (Dict c)
 findInstance sig = msum [ gcast d | Instance d <- instances sig ]
+
+-- Testing!
+sig :: Signature
+sig = mconcat [
+  constant "rev" (reverse :: [A] -> [A]),
+  constant "app" ((++) :: [A] -> [A] -> [A]),
+  ord (undefined :: [Int]),
+  arb (undefined :: [Int])]

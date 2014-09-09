@@ -90,6 +90,10 @@ equaliseContexts m1 m2 = guard (Map.null conflicts)
       | x == y = Nothing
       | otherwise = Just ()
 
+-- Turn a term into a schema by forgetting about its variables.
+schema :: Term -> Schema
+schema = rename (const ())
+
 -- Instantiate a schema by making all the variables different.
 instantiate :: Schema -> Typed Term
 instantiate = inferType . introduceVars
