@@ -64,6 +64,7 @@ library
     Test.QuickSpec.Signature
     Test.QuickSpec.TestTree
     Test.QuickSpec.Eval
+    Test.QuickSpec.Pruning
 
   Build-depends:
     base < 5, containers, transformers, QuickCheck >= 2.7, spoon >= 0.2, term-rewriting, constraints, dlist, ansi-wl-pprint
