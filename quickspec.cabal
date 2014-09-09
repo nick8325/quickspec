@@ -57,6 +57,7 @@ library
   hs-source-dirs: src
   include-dirs: src
   Exposed-modules:
+    Test.QuickSpec
     Test.QuickSpec.Utils
     Test.QuickSpec.Base
     Test.QuickSpec.Type
