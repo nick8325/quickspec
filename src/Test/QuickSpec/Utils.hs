@@ -68,3 +68,6 @@ instance Ord a => Monoid (Max a) where
   mempty = Max Nothing
   Max (Just x) `mappend` y = Max (Just (getMaxWith x y))
   Max Nothing  `mappend` y = y
+
+labelM :: Monad m => (a -> m b) -> [a] -> m [(a, b)]
+labelM f = mapM (\x -> do { y <- f x; return (x, y) })

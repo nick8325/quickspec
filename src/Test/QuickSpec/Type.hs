@@ -6,8 +6,8 @@ module Test.QuickSpec.Type(
   -- Types.
   Typeable,
   Type, TyCon(..), TyVar(..), arrowType,
-  TyVars(..), Typed(..), typeSubst, freshTyVarFor, freshen,
-  UnifyM, runUnifyM, equalise, freshTyVar,
+  TyVars(..), Apply(..), typeSubst, freshTyVarFor, freshen,
+  UnifyM, runUnifyM, execUnifyM, equalise, freshTyVar, freshenM,
   tryApply, canApply, apply,
   A, B, C, D,
   typeOf,
@@ -100,7 +100,7 @@ class TyVars a where
   typeSubstA :: Applicative f => (TyVar -> f Type) -> a -> f a
 
 -- Typed things that support function application.
-class TyVars a => Typed a where
+class TyVars a => Apply a where
   -- Generate the constraints needed to apply a function to its argument.
   adapt :: a -> a -> UnifyM ()
 
@@ -120,47 +120,59 @@ freshTyVarFor t =
 freshen :: TyVars a => TyVar -> a -> a
 freshen (TyVar x) t = typeSubst (\(TyVar n) -> Var (TyVar (n+x))) t
 
+freshenM :: TyVars a => a -> UnifyM a
+freshenM t = do
+  let TyVar n = freshTyVarFor t
+  tv <- freshTyVars n
+  return (freshen tv t)
+
 -- A monad for generating unification constraints.
 type UnifyM = StateT TyVar (WriterT (DList (Type, Type)) Maybe)
 
-runUnifyM :: UnifyM a -> TyVar -> Maybe (a, Subst TyCon TyVar)
-runUnifyM x tv = do
+runUnifyM :: TyVar -> UnifyM a -> Maybe (a, Subst TyCon TyVar)
+runUnifyM tv x = do
   (x, cs) <- runWriterT (evalStateT x tv)
   s <- unifyMany Arrow (DList.toList cs)
   return (x, s)
 
+execUnifyM :: TyVar -> UnifyM a -> Maybe (Subst TyCon TyVar)
+execUnifyM tv x = fmap snd (runUnifyM tv x)
+
 freshTyVar :: UnifyM TyVar
-freshTyVar = do
-  tv <- get
-  put $! succ tv
+freshTyVar = freshTyVars 1
+
+freshTyVars :: Int -> UnifyM TyVar
+freshTyVars n = do
+  tv@(TyVar m) <- get
+  put $! TyVar (m+n)
   return tv
 
 equalise :: Type -> Type -> UnifyM ()
 equalise t u = lift (tell (DList.singleton (t, u)))
 
 -- Application of typed terms.
-tryApply :: Typed a => a -> a -> Maybe a
+tryApply :: Apply a => a -> a -> Maybe a
 tryApply f x = do
   let tv = freshTyVarFor f
       x' = freshen tv x
       tv' = freshTyVarFor x' `max` tv
-  ((), s) <- runUnifyM (adapt f x') tv'
+  s <- execUnifyM tv' (adapt f x')
   let sub = typeSubst (evalSubst s)
   return (sub f `groundApply` sub x')
 
 infixl `apply`
-apply :: Typed a => a -> a -> a
+apply :: Apply a => a -> a -> a
 apply f x =
   case tryApply f x of
     Nothing -> ERROR "apply: ill-typed term"
     Just y -> y
 
-canApply :: Typed a => a -> a -> Bool
+canApply :: Apply a => a -> a -> Bool
 canApply f x = isJust (tryApply f x)
 
 instance TyVars Type where
   typeSubstA = substA
-instance Typed Type where
+instance Apply Type where
   adapt t u = do
     tv <- freshTyVar
     equalise t (Fun Arrow [u, Var tv])
@@ -186,7 +198,7 @@ toValue x = Value (typeOf (undefined :: a)) (toAny x)
 
 instance TyVars (Value f) where
   typeSubstA f (Value ty x) = Value <$> typeSubstA f ty <*> pure x
-instance Applicative f => Typed (Value f) where
+instance Applicative f => Apply (Value f) where
   adapt f x = adapt (valueType f) (valueType x)
   groundApply f x =
     -- Use $! to check that the types match before computing the value
