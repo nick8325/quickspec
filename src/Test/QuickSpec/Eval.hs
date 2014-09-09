@@ -45,3 +45,11 @@ schemasOfSize n ss = do
   f <- fs
   x <- xs
   return (apply f x)
+
+-- Testing!
+extend n ss = Map.insert n (typeSchemas (schemasOfSize n ss)) ss
+ss1 = initialSchemas sig
+ss2 = extend 2 ss1
+ss3 = extend 3 ss2
+ss4 = extend 4 ss3
+ss5 = extend 5 ss4
