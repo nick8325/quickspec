@@ -34,7 +34,6 @@ import Data.Maybe
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Writer.Strict
-import Data.Ord
 import qualified Data.DList as DList
 import Data.DList(DList)
 import Data.Functor.Identity
