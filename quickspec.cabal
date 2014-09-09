@@ -66,4 +66,4 @@ library
     Test.QuickSpec.Eval
 
   Build-depends:
-    base < 5, containers, transformers, QuickCheck >= 2.7, spoon >= 0.2, term-rewriting, constraints, dlist
+    base < 5, containers, transformers, QuickCheck >= 2.7, spoon >= 0.2, term-rewriting, constraints, dlist, ansi-wl-pprint

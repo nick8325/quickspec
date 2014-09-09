@@ -5,7 +5,8 @@
 module Test.QuickSpec.Base(
   Tm,
   module Data.Rewriting.Term, foldTerm, mapTerm,
-  module Data.Rewriting.Substitution, evalSubst, subst, substA, unifyMany) where
+  module Data.Rewriting.Substitution, evalSubst, subst, substA, unifyMany,
+  module Text.PrettyPrint.ANSI.Leijen, prettyPrint, prettyShow) where
 
 #include "errors.h"
 
@@ -15,6 +16,7 @@ import Data.Rewriting.Substitution hiding (apply, fromString, parse, parseIO)
 import qualified Data.Rewriting.Substitution as T
 import Control.Applicative
 import Data.Traversable(sequenceA)
+import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 
 -- Renamings of functionality from term-rewriting.
 type Tm = T.Term
@@ -40,3 +42,9 @@ substA s (Fun f xs) = Fun f <$> sequenceA (map (substA s) xs)
 -- (non-bottom) value.
 unifyMany :: (Eq f, Ord v) => f -> [(Tm f v, Tm f v)] -> Maybe (Subst f v)
 unifyMany f xs = unify (Fun f (map fst xs)) (Fun f (map snd xs))
+
+prettyPrint :: Pretty a => a -> IO ()
+prettyPrint x = putStrLn (prettyShow x)
+
+prettyShow :: Pretty a => a -> String
+prettyShow x = displayS (renderSmart 0.4 100 (pretty x)) ""

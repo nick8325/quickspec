@@ -44,6 +44,12 @@ type Type = Tm TyCon TyVar
 data TyCon = Arrow | TyCon Ty.TyCon deriving (Eq, Ord, Show)
 newtype TyVar = TyVar { tyVarNumber :: Int } deriving (Eq, Ord, Show, Enum)
 
+instance Pretty TyCon where
+  pretty Arrow = text "->"
+  pretty (TyCon x) = text (show x)
+instance Pretty TyVar where
+  pretty (TyVar n) = text ("a" ++ show n)
+
 -- Type variables.
 type A = TyVarNumber Zero
 type B = TyVarNumber (Succ Zero)
@@ -185,7 +191,7 @@ data Value f =
     value :: f Any }
 
 instance Show (Value f) where
-  show x = "<<" ++ show (toTypeRep (valueType x)) ++ ">>"
+  show x = "<<" ++ prettyShow (valueType x) ++ ">>"
 
 fromAny :: f Any -> f a
 fromAny = unsafeCoerce

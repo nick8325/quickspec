@@ -43,8 +43,12 @@ data Constant =
 instance Eq Constant where x == y = x `compare` y == EQ
 instance Ord Constant where
   compare = comparing (\x -> (conName x, valueType (conValue x)))
+instance Pretty Constant where
+  pretty x = text (conName x)
 
 newtype Variable = Variable { varNumber :: Int } deriving (Show, Eq, Ord, Enum)
+instance Pretty Variable where
+  pretty x = text ("v" ++ show (varNumber x))
 
 -- Applying terms.
 instance TyVars (TermOf v) where typeSubstA _ = pure
@@ -60,6 +64,15 @@ data Typed a =
     context :: Map Variable Type,
     typ     :: Type }
   deriving (Eq, Ord, Show)
+
+instance Pretty a => Pretty (Typed a) where
+  pretty t =
+    hang 2 $
+    sep (punctuate comma (map prettyBinding (Map.toList (context t)))) <$$>
+    text "|-" <+> pretty (untyped t) <$$>
+    text "::" <+> pretty (typ t)
+    where
+      prettyBinding (x, t) = pretty x <> text ":" <> pretty t
 
 -- How to apply typed things.
 instance TyVars a => TyVars (Typed a) where
