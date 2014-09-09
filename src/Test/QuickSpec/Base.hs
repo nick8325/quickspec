@@ -5,7 +5,7 @@
 module Test.QuickSpec.Base(
   Tm,
   module Data.Rewriting.Term, foldTerm, mapTerm,
-  module Data.Rewriting.Substitution, subst, subst', unifyMany) where
+  module Data.Rewriting.Substitution, subst, substA, unifyMany) where
 
 #include "errors.h"
 
@@ -13,6 +13,8 @@ import Data.Rewriting.Term hiding (Term, fold, map, fromString, parse, parseIO, 
 import qualified Data.Rewriting.Term as T
 import Data.Rewriting.Substitution hiding (apply, fromString, parse, parseIO)
 import qualified Data.Rewriting.Substitution as T
+import Control.Applicative
+import Data.Traversable(sequenceA)
 
 -- Renamings of functionality from term-rewriting.
 type Tm = T.Term
@@ -26,9 +28,9 @@ mapTerm = T.map
 subst :: Ord v => Subst f v -> Tm f v -> Tm f v
 subst = T.apply
 
-subst' :: (v -> Tm f v) -> Tm f v -> Tm f v
-subst' s (Var x) = s x
-subst' s (Fun f xs) = Fun f (map (subst' s) xs)
+substA :: Applicative f => (v -> f (Tm c v)) -> Tm c v -> f (Tm c v)
+substA s (Var x) = s x
+substA s (Fun f xs) = Fun f <$> sequenceA (map (substA s) xs)
 
 -- Unify several pairs of terms at once.
 -- The first argument is a dummy function symbol which can be any

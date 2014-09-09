@@ -8,6 +8,7 @@ import Data.Ord(comparing)
 import System.IO
 import Control.Exception
 import Control.Spoon
+import Data.Monoid
 
 repeatM :: Monad m => m a -> m [a]
 repeatM = sequence . repeat
@@ -56,3 +57,14 @@ unbuffered x = do
 
 spoony :: Eq a => a -> Maybe a
 spoony x = teaspoon ((x == x) `seq` x)
+
+newtype Max a = Max { getMax :: Maybe a }
+
+getMaxWith :: Ord a => a -> Max a -> a
+getMaxWith x (Max (Just y)) = x `max` y
+getMaxWith x (Max Nothing)  = x
+
+instance Ord a => Monoid (Max a) where
+  mempty = Max Nothing
+  Max (Just x) `mappend` y = Max (Just (getMaxWith x y))
+  Max Nothing  `mappend` y = y

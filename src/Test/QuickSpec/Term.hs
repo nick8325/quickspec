@@ -13,10 +13,9 @@ import Control.Monad.Trans.State.Strict
 import Data.Ord
 import Data.Map(Map)
 import qualified Data.Map as Map
-import Control.Monad.Trans.Class
-import Control.Monad.Trans.Writer.Strict
 import Data.Functor.Identity
 import Control.Applicative
+import Data.Traversable(traverse)
 
 -- Typed terms, parametrised over the type of variables.
 type Term = TermOf Variable
@@ -38,9 +37,7 @@ data Constant =
   deriving (Show, Eq, Ord)
 
 newtype Variable = Variable { varNumber :: Int } deriving (Show, Eq, Ord, Enum)
-instance TyVars Variable where
-  tyVars _ = []
-  tySubst _ x = x
+instance TyVars Variable where typeSubstA _ = pure
 
 instance Ord v => Ord (TermOf v) where
   compare = comparing $ \t -> (measure (term t), term t, context t, typ t)
@@ -56,31 +53,33 @@ size (Fun _f xs) = 1+sum (map size xs)
 
 -- How to apply terms.
 instance TyVars v => TyVars (TermOf v) where
-  tyVars t = tyVars (typ t) ++ tyVars (Map.elems (context t))
-  tySubst f t =
-    t { term = rename (tySubst f) (term t),
-        context = fmap (tySubst f) (context t),
-        typ = tySubst f (typ t) }
-
-instance (Ord v, TyVars v) => Apply (TermOf v) where
-  tyApply f x = do
-    (ctx, cs) <- lift (lift (equaliseContexts (context f) (context x)))
-    lift (tell cs)
-    (f', x') <- tyApply (typ f) (typ x)
-    return (f { context = ctx, typ = f' },
-            x { context = ctx, typ = x' })
-  tyGroundApply f x | context f == context x =
+  typeSubstA f (Term t ctx ty) =
+    Term t <$> typeSubstA f ctx <*> typeSubstA f ty
+instance (Ord v, TyVars v) => Typed (TermOf v) where
+  adapt f x = do
+    adapt (context f) (context x)
+    adapt (typ f) (typ x)
+  groundApply f x =
     Term { term = app (term f) (term x),
-           context = context f,
-           typ = tyGroundApply (typ f) (typ x) }
+           context = groundApply (context f) (context x),
+           typ = groundApply (typ f) (typ x) }
     where
       app (Fun f xs) t = Fun f (xs ++ [t])
 
-equaliseContexts :: Ord v => Map v VarType -> Map v VarType ->
-                    Maybe (Map v VarType, [(Type, Type)])
-equaliseContexts m1 m2 = do
-  guard (Map.null (Map.intersection m1 m2))
-  return (Map.union m1 m2, [])
+instance TyVars v => TyVars (Map k v) where
+  typeSubstA f = traverse (typeSubstA f)
+instance (Ord k, Eq v, Typed v) => Typed (Map k v) where
+  adapt m1 m2 = equaliseContexts m1 m2
+  groundApply m1 m2 = Map.union m1 m2
+
+equaliseContexts :: (Ord k, Eq v, Typed v) => Map k v -> Map k v -> UnifyM ()
+equaliseContexts m1 m2 = guard (Map.null conflicts)
+  where
+    conflicts = maybeIntersection check m1 m2
+    maybeIntersection f = Map.mergeWithKey (const f) (const Map.empty) (const Map.empty)
+    check x y
+      | x == y = Nothing
+      | otherwise = Just ()
 
 -- A schema is a term with holes where the variables should be.
 type Schema = TermOf VarType
@@ -109,34 +108,34 @@ mostGeneral s =
   where
     aux (Var _) = do { n <- get; put $! n+1; return (Var (Variable n)) }
     aux (Fun f xs) = fmap (Fun f) (mapM aux xs)
-    f n x = (Variable n, injectValue (variant n) x)
+    f n x = (Variable n, mapValue (variant n) x)
 
 con :: String -> Value Identity -> TermOf v
 con c x =
   Term { term = Fun (Constant c x) [],
          context = Map.empty,
-         typ = typeOfValue x }
+         typ = valueType x }
 
 hole :: Value Gen -> Schema
 hole x =
   Term { term = Var x,
          context = Map.empty,
-         typ = typeOfValue x }
+         typ = valueType x }
 
 var :: Value Gen -> Int -> Term
 var x n =
   Term { term = Var (Variable n),
          context = Map.singleton (Variable n) x',
-         typ = typeOfValue x }
+         typ = valueType x }
   where
-    x' = injectValue (variant n) x
+    x' = mapValue (variant n) x
 
 evaluateTm :: Applicative f => (v -> Value f) -> Tm Constant v -> Value f
 evaluateTm env (Var v) = env v
 evaluateTm env (Fun f xs) =
   foldl apply x (map (evaluateTm env) xs)
   where
-    x = injectValue (pure . runIdentity) (conValue f)
+    x = mapValue (pure . runIdentity) (conValue f)
 
 evaluateSchema :: Schema -> Value Gen
 evaluateSchema t = evaluateTm id (term t)
@@ -150,5 +149,5 @@ evaluateTerm t =
   toGen (evaluateTm f (term t))
   where
     f x = fromGen (Map.findWithDefault __ x (context t))
-    toGen = injectValue (MkGen . curry)
-    fromGen = injectValue (uncurry . unGen)
+    toGen = mapValue (MkGen . curry)
+    fromGen = mapValue (uncurry . unGen)
