@@ -17,6 +17,8 @@ import qualified Data.Rewriting.Substitution as T
 import Control.Applicative
 import Data.Traversable(sequenceA)
 import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
+import qualified Data.Map as Map
+import Data.Map(Map)
 
 -- Renamings of functionality from term-rewriting.
 type Tm = T.Term
@@ -48,3 +50,9 @@ prettyPrint x = putStrLn (prettyShow x)
 
 prettyShow :: Pretty a => a -> String
 prettyShow x = displayS (renderSmart 0.4 100 (pretty x)) ""
+
+instance (Pretty k, Pretty v) => Pretty (Map k v) where
+  pretty m =
+    braces (align (sep (punctuate comma (map binding (Map.toList m)))))
+    where
+      binding (x, v) = pretty x <> text ":" <> pretty v

@@ -68,11 +68,9 @@ data Typed a =
 instance Pretty a => Pretty (Typed a) where
   pretty t =
     hang 2 $
-    sep (punctuate comma (map prettyBinding (Map.toList (context t)))) <$$>
+    pretty (context t) <$$>
     text "|-" <+> pretty (untyped t) <$$>
     text "::" <+> pretty (typ t)
-    where
-      prettyBinding (x, t) = pretty x <> text ":" <> pretty t
 
 -- How to apply typed things.
 instance TyVars a => TyVars (Typed a) where
