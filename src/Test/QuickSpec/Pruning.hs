@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, TypeFamilies #-}
+{-# LANGUAGE CPP #-}
 module Test.QuickSpec.Pruning where
 
 #include "errors.h"
@@ -11,19 +11,16 @@ import qualified Data.Map as Map
 import Data.Maybe
 import Control.Monad.Trans.State.Strict
 
-type PruneM a = State (PrunerState a)
-
 class Pruner a where
-  data PrunerState a
-  initialState :: PrunerState a
-  unifyUntyped :: PruningTerm -> PruningTerm -> PruneM a Bool
-  repUntyped :: PruningTerm -> PruneM a PruningTerm
+  initialState :: a
+  unifyUntyped :: PruningTerm -> PruningTerm -> State a Bool
+  repUntyped :: PruningTerm -> State a (Maybe PruningTerm)
 
-unify :: Pruner a => Typed Equation -> PruneM a Bool
+unify :: Pruner a => Typed Equation -> State a Bool
 unify e = unifyUntyped (encodeTypes (lhs e)) (encodeTypes (rhs e))
 
-rep :: Pruner a => Typed Term -> PruneM a Term
-rep t = fmap decodeTypes (repUntyped (encodeTypes t))
+rep :: Pruner a => Typed Term -> State a (Maybe Term)
+rep t = fmap (fmap decodeTypes) (repUntyped (encodeTypes t))
 
 type PruningTerm = Tm PruningConstant PruningVariable
 

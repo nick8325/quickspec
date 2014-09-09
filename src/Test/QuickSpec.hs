@@ -9,3 +9,4 @@ import Test.QuickSpec.TestTree
 import Test.QuickSpec.Eval
 import Test.QuickSpec.Equation
 import Test.QuickSpec.Pruning
+import Test.QuickSpec.Pruning.Simple
