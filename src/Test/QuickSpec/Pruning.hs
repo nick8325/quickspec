@@ -1,13 +1,29 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, TypeFamilies #-}
 module Test.QuickSpec.Pruning where
 
 #include "errors.h"
 import Test.QuickSpec.Base
 import Test.QuickSpec.Type
 import Test.QuickSpec.Term
+import Test.QuickSpec.Equation
 import Data.Rewriting.Substitution.Type
 import qualified Data.Map as Map
 import Data.Maybe
+import Control.Monad.Trans.State.Strict
+
+type PruneM a = State (PrunerState a)
+
+class Pruner a where
+  data PrunerState a
+  initialState :: PrunerState a
+  unifyUntyped :: PruningTerm -> PruningTerm -> PruneM a Bool
+  repUntyped :: PruningTerm -> PruneM a PruningTerm
+
+unify :: Pruner a => Typed Equation -> PruneM a Bool
+unify e = unifyUntyped (encodeTypes (lhs e)) (encodeTypes (rhs e))
+
+rep :: Pruner a => Typed Term -> PruneM a Term
+rep t = fmap decodeTypes (repUntyped (encodeTypes t))
 
 type PruningTerm = Tm PruningConstant PruningVariable
 
@@ -53,3 +69,8 @@ encodeTypes t = subst s' u
       fty <- freshenM (valueType (conValue f))
       equalise fty (arrowType (map snd args) res)
       return (Fun (TermConstant f) (map tag args), res)
+
+decodeTypes :: PruningTerm -> Term
+decodeTypes (Fun HasType [_, Var (TermVariable x)]) = Var x
+decodeTypes (Fun HasType [_, Fun (TermConstant f) xs]) =
+  Fun f (map decodeTypes xs)

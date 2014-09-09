@@ -64,6 +64,7 @@ library
     Test.QuickSpec.Signature
     Test.QuickSpec.TestTree
     Test.QuickSpec.Eval
+    Test.QuickSpec.Equation
     Test.QuickSpec.Pruning
 
   Build-depends:
