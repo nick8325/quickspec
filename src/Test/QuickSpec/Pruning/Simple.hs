@@ -9,7 +9,7 @@ import Control.Monad.Trans.State.Strict
 newtype SimplePruner = S [(PruningTerm, PruningTerm)]
 
 instance Pruner SimplePruner where
-  initialState = S []
+  emptyPruner = S []
   unifyUntyped = simpleUnify
   repUntyped = simpleRep
 

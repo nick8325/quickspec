@@ -1,5 +1,5 @@
 -- Terms and evaluation.
-{-# LANGUAGE CPP, GeneralizedNewtypeDeriving, TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE CPP, GeneralizedNewtypeDeriving, TypeSynonymInstances, FlexibleInstances, DeriveFunctor #-}
 module Test.QuickSpec.Term where
 
 #include "errors.h"
@@ -17,6 +17,7 @@ import Data.Functor.Identity
 import Control.Applicative
 import Data.Traversable(traverse)
 import Data.Tuple
+import qualified Data.Rewriting.Substitution.Type as T
 
 -- Terms and schemas.
 -- A schema is like a term but has holes instead of variables.
@@ -30,7 +31,7 @@ measure :: Ord v => Tm f v -> Measure f v
 measure t = (size t, rename (const ()) t, length (usort (vars t)), t)
 
 size :: Tm f v -> Int
-size Var{} = 0
+size Var{} = 1
 size (Fun _f xs) = 1+sum (map size xs)
 
 -- Constants have values, while variables do not (as only monomorphic
@@ -63,7 +64,7 @@ data Typed a =
     untyped :: a,
     context :: Map Variable Type,
     typ     :: Type }
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Functor)
 
 instance Pretty a => Pretty (Typed a) where
   pretty t =
@@ -107,7 +108,7 @@ schema = rename (const ())
 
 -- Instantiate a schema by making all the variables different.
 instantiate :: Schema -> Typed Term
-instantiate = inferType . introduceVars
+instantiate = normaliseTypes . inferType . introduceVars
 
 introduceVars :: Schema -> Term
 introduceVars s = evalState (aux s) 0
@@ -133,6 +134,11 @@ inferType t = typeSubst (evalSubst s) u
       fty <- freshenM (valueType (conValue f))
       equalise fty (arrowType tys ty)
       return ty
+
+normaliseTypes :: TyVars a => a -> a
+normaliseTypes t = typeSubst (evalSubst s) t
+  where
+    s = T.fromMap (Map.fromList (zip (usort (tyVars t)) (map (Var . TyVar) [0..])))
 
 -- Take a term and unify all variables of the same type.
 skeleton :: Typed Term -> Typed Term
@@ -170,7 +176,7 @@ evaluateTerm env t =
 app, rev :: Schema
 app = Fun (Constant "app" (toValue (Identity ((++) :: [A] -> [A] -> [A])))) []
 rev = Fun (Constant "rev" (toValue (Identity (reverse :: [A] -> [A])))) []
-env :: Type -> Value Gen
-env _ = toValue (arbitrary :: Gen [Int])
+myEnv :: Type -> Value Gen
+myEnv _ = toValue (arbitrary :: Gen [Int])
 t :: Schema
 t = rev `apply` (app `apply` Var () `apply` Var ())

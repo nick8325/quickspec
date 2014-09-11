@@ -12,7 +12,7 @@ import Data.Maybe
 import Control.Monad.Trans.State.Strict
 
 class Pruner a where
-  initialState :: a
+  emptyPruner :: a
   unifyUntyped :: PruningTerm -> PruningTerm -> State a Bool
   repUntyped :: PruningTerm -> State a (Maybe PruningTerm)
 

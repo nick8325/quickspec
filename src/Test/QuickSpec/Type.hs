@@ -6,7 +6,7 @@ module Test.QuickSpec.Type(
   -- Types.
   Typeable,
   Type, TyCon(..), TyVar(..), arrowType, arity,
-  TyVars(..), Apply(..), typeSubst, freshTyVarFor, freshen,
+  TyVars(..), Apply(..), typeSubst, freshTyVarFor, freshen, tyVars,
   UnifyM, runUnifyM, execUnifyM, equalise, freshTyVar, freshenM,
   tryApply, canApply, apply,
   A, B, C, D,
@@ -17,7 +17,9 @@ module Test.QuickSpec.Type(
   Value,
   toValue,
   fromValue,
+  castValue,
   valueType,
+  ofValue,
   mapValue,
   pairValues) where
 
@@ -121,6 +123,13 @@ class TyVars a => Apply a where
 typeSubst :: TyVars a => (TyVar -> Type) -> a -> a
 typeSubst f t = runIdentity (typeSubstA (return . f) t)
 
+tyVars :: TyVars a => a -> [TyVar]
+tyVars t = DList.toList (execWriter (typeSubstA f t))
+  where
+    f x = do
+      tell (DList.singleton x)
+      return (Var x)
+
 freshTyVarFor :: TyVars a => a -> TyVar
 freshTyVarFor t =
   case execWriter (typeSubstA (\x -> do { tell (Max (Just x)); return (Var x) }) t) of
@@ -215,14 +224,21 @@ instance Applicative f => Apply (Value f) where
     (Value $! groundApply (valueType f) (valueType x))
     (fromAny (value f) <*> value x)
 
+castValue :: forall f. Type -> Value f -> Maybe (Value f)
+castValue ty x = do
+  s <- match (valueType x) ty
+  return x { valueType = typeSubst (evalSubst s) (valueType x) }
+
 fromValue :: forall f a. Typeable a => Value f -> Maybe (f a)
 fromValue x = do
-  let ty = typeOf (undefined :: a)
-  _ <- match (valueType x) ty
+  _ <- castValue (typeOf (undefined :: a)) x
   return (fromAny (value x))
 
 mapValue :: (forall a. f a -> g a) -> Value f -> Value g
 mapValue f (Value ty x) = Value ty (f x)
+
+ofValue :: (forall a. f a -> b) -> Value f -> b
+ofValue f (Value ty x) = f x
 
 pairValues :: (forall a. f a -> g a -> h a) -> Value f -> Value g -> Maybe (Value h)
 pairValues f x y = do

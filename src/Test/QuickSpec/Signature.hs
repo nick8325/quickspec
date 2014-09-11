@@ -5,42 +5,42 @@ module Test.QuickSpec.Signature where
 
 #include "errors.h"
 import Data.Constraint
+import Test.QuickSpec.Base
 import Test.QuickSpec.Term
 import Test.QuickSpec.Type
 import Data.Functor.Identity
 import Data.Monoid
 import Test.QuickCheck
-import Data.Typeable
 import Control.Monad
+import Data.Maybe
 
-data Instance = forall c. Typeable c => Instance (Dict c)
+data Instance c = forall a. Typeable a => Instance (Dict (c a))
 data Signature =
   Signature {
     constants :: [Constant],
-    instances :: [Instance] }
+    ords      :: [Instance Ord],
+    arbs      :: [Instance Arbitrary] }
 
 instance Monoid Signature where
-  mempty = Signature [] []
-  Signature cs is `mappend` Signature cs' is' = Signature (cs++cs') (is++is')
+  mempty = Signature [] [] []
+  Signature cs os as `mappend` Signature cs' os' as' = Signature (cs++cs') (os++os') (as++as')
 
 constant :: Typeable a => String -> a -> Signature
-constant name x = Signature [Constant name (toValue (Identity x))] []
-
-instance_ :: Typeable c => Dict c -> Signature
-instance_ d = Signature [] [Instance d]
+constant name x = Signature [Constant name (toValue (Identity x))] [] []
 
 -- :)
 deriving instance Typeable Ord
 deriving instance Typeable Arbitrary
 
 ord :: forall a. (Typeable a, Ord a) => a -> Signature
-ord _ = instance_ (Dict :: Dict (Ord a))
+ord _ = Signature [] [Instance (Dict :: Dict (Ord a))] []
 
 arb :: forall a. (Typeable a, Arbitrary a) => a -> Signature
-arb _ = instance_ (Dict :: Dict (Arbitrary a))
+arb _ = Signature [] [] [Instance (Dict :: Dict (Arbitrary a))]
 
-findInstance :: Typeable c => Signature -> Maybe (Dict c)
-findInstance sig = msum [ gcast d | Instance d <- instances sig ]
+findInstance :: forall c. Type -> [Instance c] -> Maybe (Instance c)
+findInstance ty is =
+  listToMaybe [ i | i@(Instance (_ :: Dict (c a))) <- is, typeOf (undefined :: a) == ty ]
 
 -- Testing!
 sig :: Signature
