@@ -18,9 +18,10 @@ simpleUnify t u
   | measure (decodeTypes t) < measure (decodeTypes u) = simpleUnify u t
 simpleUnify u t = do
   S eqs <- get
-  case simplifies eqs t of
+  case simplifies eqs u of
     Just v -> do
-      unless (decodeTypes v `alwaysSimplerThan` decodeTypes u)
+      unless (decodeTypes v `alwaysSimplerThan` decodeTypes t ||
+              decodeTypes v `alwaysSimplerThan` decodeTypes u)
         (put (S ((u,t):eqs)))
       return True
     Nothing -> do
