@@ -44,5 +44,5 @@ simplifies eqs t = msum [ simplifies1 (u, v) t `mplus` simplifies1 (v, u) t | (u
 simplifies1 (t, u) v = do
   s <- match t v
   let w = subst s u
-  guard (decodeTypes w < decodeTypes v)
+  guard (measure (decodeTypes w) < measure (decodeTypes v))
   return w

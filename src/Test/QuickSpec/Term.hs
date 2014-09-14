@@ -28,7 +28,7 @@ type Schema = TermOf ()
 -- Term ordering - size, skeleton, generality.
 type Measure f v = (Int, Tm f (), Int, Tm f v)
 measure :: Ord v => Tm f v -> Measure f v
-measure t = (size t, rename (const ()) t, length (usort (vars t)), t)
+measure t = (size t, rename (const ()) t, -length (usort (vars t)), t)
 
 size :: Tm f v -> Int
 size Var{} = 1
@@ -124,7 +124,9 @@ inferType t = typeSubst (evalSubst s) u
       context = ctx,
       typ     = ty }
     Just ((ctx, ty), s) = runUnifyM (freshTyVarFor t) $ do
-      ctx <- fmap Map.fromList (labelM (const (fmap Var freshTyVar)) (usort (vars t)))
+      -- FIXME fix this immediately!
+      let freshTyVar' = return (typeOf (undefined :: [Int]))
+      ctx <- fmap Map.fromList (labelM (const freshTyVar') (usort (vars t)))
       ty <- aux ctx t
       return (ctx, ty)
     aux ctx (Var x) = return (Map.findWithDefault __ x ctx)

@@ -45,7 +45,7 @@ findInstance ty is =
 -- Testing!
 sig :: Signature
 sig = mconcat [
-  constant "rev" (reverse :: [A] -> [A]),
-  constant "app" ((++) :: [A] -> [A] -> [A]),
+  constant "rev" (reverse :: [Int] -> [Int]),
+  constant "app" ((++) :: [Int] -> [Int] -> [Int]),
   ord (undefined :: [Int]),
   arb (undefined :: [Int])]
