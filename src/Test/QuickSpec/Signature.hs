@@ -8,6 +8,7 @@ import Data.Constraint
 import Test.QuickSpec.Base
 import Test.QuickSpec.Term
 import Test.QuickSpec.Type
+import Test.QuickSpec.Utils
 import Data.Functor.Identity
 import Data.Monoid
 import Test.QuickCheck
@@ -49,6 +50,7 @@ sig = mconcat [
   constant "rev" (reverse :: [Int] -> [Int]),
   constant "app" ((++) :: [Int] -> [Int] -> [Int]),
   constant "[]" ([] :: [Int]),
---  constant "sort" (sort :: [Int] -> [Int]),
+  constant "sort" (sort :: [Int] -> [Int]),
+  --constant "usort" (usort :: [Int] -> [Int]),
   ord (undefined :: [Int]),
   arb (undefined :: [Int])]

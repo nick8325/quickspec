@@ -173,11 +173,11 @@ quickSpec sig = do
   return ()
 
 go :: Int -> Signature -> [(QCGen, Int)] -> (Type -> Value Gen) -> M ()
--- go 6 _ _ _ = return ()
+go 12 _ _ _ = return ()
 go n sig seeds gen = do
   modify (\s -> s { schemas = Map.insert n Map.empty (schemas s) })
   ss <- fmap (sortBy (comparing measure)) (schemasOfSize n sig)
-  lift $ putStr ("\nSize " ++ show n ++ ", " ++ show (length ss) ++ " schemas to consider: ")
+  lift $ putStr ("\n\nSize " ++ show n ++ ", " ++ show (length ss) ++ " schemas to consider: ")
   mapM_ (consider seeds gen) ss
   go (n+1) sig seeds gen
 
