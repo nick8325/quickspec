@@ -13,6 +13,7 @@ import Data.Monoid
 import Test.QuickCheck
 import Control.Monad
 import Data.Maybe
+import Data.List
 
 data Instance c = forall a. Typeable a => Instance (Dict (c a))
 data Signature =
@@ -47,5 +48,7 @@ sig :: Signature
 sig = mconcat [
   constant "rev" (reverse :: [Int] -> [Int]),
   constant "app" ((++) :: [Int] -> [Int] -> [Int]),
+  constant "[]" ([] :: [Int]),
+--  constant "sort" (sort :: [Int] -> [Int]),
   ord (undefined :: [Int]),
   arb (undefined :: [Int])]

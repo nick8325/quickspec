@@ -29,6 +29,7 @@ import Test.QuickCheck.Random
 import qualified Data.Typeable.Internal as T
 import Data.Word
 import Debug.Trace
+import System.IO
 
 type TestSet = Map (Typed ()) (Value TestedTerms)
 
@@ -166,6 +167,7 @@ genSeeds maxSize = do
 
 quickSpec :: Signature -> IO ()
 quickSpec sig = do
+  hSetBuffering stdout NoBuffering
   seeds <- genSeeds 20
   _ <- execStateT (go 1 sig (take 100 seeds) (table (env sig))) initialState
   return ()
@@ -175,7 +177,7 @@ go :: Int -> Signature -> [(QCGen, Int)] -> (Type -> Value Gen) -> M ()
 go n sig seeds gen = do
   modify (\s -> s { schemas = Map.insert n Map.empty (schemas s) })
   ss <- fmap (sortBy (comparing measure)) (schemasOfSize n sig)
-  lift $ putStrLn ("Size " ++ show n ++ ", " ++ show (length ss) ++ " schemas to consider")
+  lift $ putStr ("\nSize " ++ show n ++ ", " ++ show (length ss) ++ " schemas to consider: ")
   mapM_ (consider seeds gen) ss
   go (n+1) sig seeds gen
 
@@ -203,6 +205,7 @@ consider gen env s = do
           accept s
         Old u -> do
           --lift (putStrLn ("Found schema equality! " ++ prettyShow (untyped skel :=: untyped u)))
+          lift $ putStr "!"
           let s = schema (untyped u)
               extras =
                 case Map.lookup s (termTestSet state) of
@@ -211,9 +214,11 @@ consider gen env s = do
           modify (\st -> st { termTestSet = Map.insertWith (\x y -> y) s Map.empty (termTestSet st) })
           mapM_ (considerTerm gen env s) (sortBy (comparing (fmap measure)) (extras ++ allUnifications t))
         New ts' -> do
+          lift $ putStr "O"
           modify (\st -> st { schemaTestSet = ts' })
           accept s
     Just u -> do
+      lift $ putStr "X"
       --lift $ putStrLn ("Throwing away redundant schema: " ++ prettyShow (untyped t) ++ " -> " ++ prettyShow (decodeTypes u))
       let pruner' = execState (unifyUntyped (encodeTypes t) u) (pruner state)
       put state { pruner = pruner' }
@@ -228,11 +233,13 @@ considerTerm gen env s t = do
         Untestable ->
           ERROR "testable term became untestable"
         Old u -> do
-          lift $ prettyPrint (untyped (equation t u))
+          lift $ putStrLn ("\n" ++ prettyShow (untyped t) ++ " = " ++ prettyShow (untyped u))
           modify (\st -> st { pruner = execState (Test.QuickSpec.Pruning.unify (equation t u)) (pruner st) })
-        New ts' ->
+        New ts' -> do
+          lift $ putStr "o"
           modify (\st -> st { termTestSet = Map.insert s ts' (termTestSet st) })
     Just u -> do
+      lift $ putStr "x"
       --lift $ putStrLn ("Throwing away redundant term: " ++ prettyShow (untyped t) ++ " -> " ++ prettyShow (decodeTypes u))
       let pruner' = execState (unifyUntyped (encodeTypes t) u) (pruner state)
       put state { pruner = pruner' }
