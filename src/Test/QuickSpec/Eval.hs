@@ -15,7 +15,11 @@ import Data.Maybe
 import qualified Data.Map as Map
 import Control.Monad
 import Test.QuickSpec.Pruning
+import qualified Test.QuickSpec.Pruning as Pruning
 import Test.QuickSpec.Pruning.Simple hiding (S)
+import Test.QuickSpec.Pruning.E hiding (S)
+import qualified Test.QuickSpec.Pruning.Simple as Simple
+import qualified Test.QuickSpec.Pruning.E as E
 import Data.List hiding (insert)
 import Data.Ord
 import Control.Monad.Trans.State.Strict
@@ -233,7 +237,7 @@ considerTerm sig gen env s t = do
         Untestable ->
           ERROR "testable term became untestable"
         Old u -> do
-          lift $ putStrLn ("\n" ++ prettyShow (untyped t) ++ " = " ++ prettyShow (untyped u))
+          found t u
           modify (\st -> st { pruner = execState (Test.QuickSpec.Pruning.unify (equation t u)) (pruner st) })
         New ts' -> do
           lift $ putStr "o"
@@ -243,6 +247,16 @@ considerTerm sig gen env s t = do
       --lift $ putStrLn ("Throwing away redundant term: " ++ prettyShow (untyped t) ++ " -> " ++ prettyShow (decodeTypes u))
       let pruner' = execState (unifyUntyped (encodeTypes t) u) (pruner state)
       put state { pruner = pruner' }
+
+found :: Typed Term -> Typed Term -> M ()
+found t u = do
+  Simple.S eqs <- gets pruner
+  case evalState (Pruning.unify (equation t u)) (E.S eqs) of
+    True -> do
+      lift $ putStrLn ("\nProved by E: " ++ prettyShow (untyped t) ++ " = " ++ prettyShow (untyped u))
+      return ()
+    False ->
+      lift $ putStrLn ("\n******** " ++ prettyShow (untyped t) ++ " = " ++ prettyShow (untyped u))
 
 accept :: Schema -> M ()
 accept s = do

@@ -127,6 +127,7 @@ inferType t = typeSubst (evalSubst s) u
     Just ((ctx, ty), s) = runUnifyM (freshTyVarFor t) $ do
       -- FIXME fix this immediately!
       let freshTyVar' = return (typeOf (undefined :: It))
+      -- let freshTyVar' = return (typeOf (undefined :: [Int]))
       ctx <- fmap Map.fromList (labelM (const freshTyVar') (usort (vars t)))
       ty <- aux ctx t
       return (ctx, ty)
