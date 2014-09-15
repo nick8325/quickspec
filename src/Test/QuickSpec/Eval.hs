@@ -178,7 +178,7 @@ go n sig seeds gen = do
   modify (\s -> s { schemas = Map.insert n Map.empty (schemas s) })
   ss <- fmap (sortBy (comparing measure)) (schemasOfSize n sig)
   lift $ putStr ("\n\nSize " ++ show n ++ ", " ++ show (length ss) ++ " schemas to consider: ")
-  mapM_ (consider seeds gen) ss
+  mapM_ (consider sig seeds gen) ss
   go (n+1) sig seeds gen
 
 allUnifications :: Typed Term -> [Typed Term]
@@ -192,8 +192,8 @@ allUnifications t = map f ss
       untyped = rename (go s) (untyped t),
       context = Map.mapKeys (go s) (context t) }
 
-consider :: [(QCGen, Int)] -> (Type -> Value Gen) -> Schema -> M ()
-consider gen env s = do
+consider :: Signature -> [(QCGen, Int)] -> (Type -> Value Gen) -> Schema -> M ()
+consider sig gen env s = do
   state <- get
   let t = instantiate s
   case evalState (repUntyped (encodeTypes t)) (pruner state) of
@@ -212,7 +212,7 @@ consider gen env s = do
                   Nothing -> allUnifications (instantiate (schema (untyped u)))
                   Just _ -> []
           modify (\st -> st { termTestSet = Map.insertWith (\x y -> y) s Map.empty (termTestSet st) })
-          mapM_ (considerTerm gen env s) (sortBy (comparing (fmap measure)) (extras ++ allUnifications t))
+          mapM_ (considerTerm sig gen env s) (sortBy (comparing (fmap measure)) (extras ++ allUnifications t))
         New ts' -> do
           lift $ putStr "O"
           modify (\st -> st { schemaTestSet = ts' })
@@ -223,8 +223,8 @@ consider gen env s = do
       let pruner' = execState (unifyUntyped (encodeTypes t) u) (pruner state)
       put state { pruner = pruner' }
 
-considerTerm :: [(QCGen, Int)] -> (Type -> Value Gen) -> Schema -> Typed Term -> M ()
-considerTerm gen env s t = do
+considerTerm :: Signature -> [(QCGen, Int)] -> (Type -> Value Gen) -> Schema -> Typed Term -> M ()
+considerTerm sig gen env s t = do
   state <- get
   case evalState (repUntyped (encodeTypes t)) (pruner state) of
     Nothing -> do

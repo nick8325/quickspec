@@ -18,6 +18,7 @@ import Control.Applicative
 import Data.Traversable(traverse)
 import Data.Tuple
 import qualified Data.Rewriting.Substitution.Type as T
+import Octonions hiding (Fun)
 
 -- Terms and schemas.
 -- A schema is like a term but has holes instead of variables.
@@ -125,7 +126,7 @@ inferType t = typeSubst (evalSubst s) u
       typ     = ty }
     Just ((ctx, ty), s) = runUnifyM (freshTyVarFor t) $ do
       -- FIXME fix this immediately!
-      let freshTyVar' = return (typeOf (undefined :: [Int]))
+      let freshTyVar' = return (typeOf (undefined :: It))
       ctx <- fmap Map.fromList (labelM (const freshTyVar') (usort (vars t)))
       ty <- aux ctx t
       return (ctx, ty)
