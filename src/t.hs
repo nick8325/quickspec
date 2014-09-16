@@ -30,7 +30,15 @@ sig = mconcat [
   ord (undefined :: It),
   arb (undefined :: It)]
 
-main = quickSpec sig
+sig2 = mconcat [
+  constant "0" (0 :: Int),
+  constant "1" (1 :: Int),
+  constant "+" ((+) :: Int -> Int -> Int),
+  constant "*" ((*) :: Int -> Int -> Int),
+  ord (undefined :: Int),
+  arb (undefined :: Int)]
+
+main = quickSpec sig2
 
 {-
 sig1 = [

@@ -220,12 +220,16 @@ consider sig gen env s = do
         New ts' -> do
           lift $ putStr "O"
           modify (\st -> st { schemaTestSet = ts' })
+          modify (\st -> st { termTestSet = Map.insertWith (\x y -> y) s Map.empty (termTestSet st) })
+          when (simple s) (mapM_ (considerTerm sig gen env s) (sortBy (comparing (fmap measure)) (allUnifications (instantiate s))))
           accept s
     Just u -> do
       lift $ putStr "X"
       --lift $ putStrLn ("Throwing away redundant schema: " ++ prettyShow (untyped t) ++ " -> " ++ prettyShow (decodeTypes u))
       let pruner' = execState (unifyUntyped (encodeTypes t) u) (pruner state)
       put state { pruner = pruner' }
+
+simple t = size t <= 3
 
 considerTerm :: Signature -> [(QCGen, Int)] -> (Type -> Value Gen) -> Schema -> Typed Term -> M ()
 considerTerm sig gen env s t = do
