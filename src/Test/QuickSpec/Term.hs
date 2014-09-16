@@ -115,7 +115,7 @@ skeleton = unifyTermVars . unifyTypeVars
 evaluateTm :: Applicative f => (v -> Value f) -> Tm Constant v -> Value f
 evaluateTm env (Var v) = env v
 evaluateTm env (Fun f xs) =
-  foldl apply x (map (evaluateTm env) xs)
+  foldl groundApply x (map (evaluateTm env) xs)
   where
     x = mapValue (pure . runIdentity) (conValue f)
 
