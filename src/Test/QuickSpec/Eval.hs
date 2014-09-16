@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, ConstraintKinds, TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables #-}
+{-# LANGUAGE CPP, ConstraintKinds, TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables, TupleSections #-}
 module Test.QuickSpec.Eval where
 
 #include "errors.h"
@@ -35,7 +35,7 @@ import Data.Word
 import Debug.Trace
 import System.IO
 
-type TestSet = Map (Typed ()) (Value TestedTerms)
+type TestSet = Map Type (Value TestedTerms)
 
 data TestedTerms a =
   TestedTerms {
@@ -44,7 +44,7 @@ data TestedTerms a =
 
 data TestedTerm a =
   TestedTerm {
-    term  :: Typed Term,
+    term  :: Term,
     tests :: [a] }
 
 type M = StateT S IO
@@ -63,28 +63,26 @@ initialTestedTerms sig ty = do
       dict = dict,
       testedTerms = [] }
 
-findTestSet :: Signature -> Typed a -> TestSet -> Maybe (Value TestedTerms)
+findTestSet :: Signature -> Type -> TestSet -> Maybe (Value TestedTerms)
 findTestSet sig ty m =
-  Map.lookup (fmap (const ()) ty) m `mplus`
-  initialTestedTerms sig (typ ty)
+  Map.lookup ty m `mplus`
+  initialTestedTerms sig ty
 
-data Result = New TestSet | Old (Typed Term) | Untestable
+data Result = New TestSet | Old Term | Untestable
 
 insert :: Signature -> Value TestedTerm -> TestSet -> Result
 insert sig x ts =
-  case findTestSet sig (ofValue term x) ts of
+  case findTestSet sig (typ x) ts of
     Nothing -> Untestable
     Just tts ->
       let r = fromMaybe __ (pairValues insert1 x tts) in
       case ofValue isNew1 r of
         True ->
-          New (Map.insert ty (mapValue (\(New1 tts) -> tts) r) ts)
+          New (Map.insert (typ x) (mapValue (\(New1 tts) -> tts) r) ts)
         False ->
           Old (ofValue (\(Old1 t) -> t) r)
-  where
-    ty = fmap (const ()) (ofValue term x)
 
-data Result1 a = New1 (TestedTerms a) | Old1 (Typed Term)
+data Result1 a = New1 (TestedTerms a) | Old1 Term
 isNew1 (New1 _) = True
 isNew1 _ = False
 
@@ -103,7 +101,7 @@ insert1 x ts =
     aux _ [] [t] = Old1 (term t)
     aux _ [] _ = ERROR "two equal terms in TestedTerm structure"
 
-makeTests :: (Type -> Value Gen) -> [(QCGen, Int)] -> Typed Term -> Value TestedTerm
+makeTests :: (Type -> Value Gen) -> [(QCGen, Int)] -> Term -> Value TestedTerm
 makeTests env tests t =
   mapValue (TestedTerm t . f) (evaluateTerm env t)
   where
@@ -141,13 +139,13 @@ initialState =
 typeSchemas :: [Schema] -> Map Type [Schema]
 typeSchemas = fmap (map schema) . collect . map instantiate
 
-collect :: [Typed a] -> Map Type [a]
+collect :: Typed a => [a] -> Map Type [a]
 collect xs =
-  Map.fromList [(typ y, map untyped ys) | ys@(y:_) <- partitionBy typ xs]
+  Map.fromList [(typ y, ys) | ys@(y:_) <- partitionBy typ xs]
 
 schemasOfSize :: Int -> Signature -> M [Schema]
 schemasOfSize 1 sig =
-  return (Var ():[Fun c [] | c <- constants sig])
+  return (Var (Var (TyVar 0)):[Fun c [] | c <- constants sig])
 schemasOfSize n _ = do
   ss <- gets schemas
   return $
@@ -156,11 +154,11 @@ schemasOfSize n _ = do
       let j = n-i,
       (fty, fs) <- Map.toList =<< maybeToList (Map.lookup i ss),
       canApply fty (Var (TyVar 0)),
-      or [ canApply f (Var ()) | f <- fs ],
+      or [ canApply f (Var (Var (TyVar 0))) | f <- fs ],
       (xty, xs) <- Map.toList =<< maybeToList (Map.lookup j ss),
       canApply fty xty,
       f <- fs,
-      canApply f (Var ()),
+      canApply f (Var (Var (TyVar 0))),
       x <- xs ]
 
 genSeeds :: Int -> IO [(QCGen, Int)]
@@ -185,16 +183,13 @@ go n sig seeds gen = do
   mapM_ (consider sig seeds gen) ss
   go (n+1) sig seeds gen
 
-allUnifications :: Typed Term -> [Typed Term]
+allUnifications :: Term -> [Term]
 allUnifications t = map f ss
   where
-    vs = Map.fromList [ (ty, map fst xs) | xs@((_, ty):_) <- partitionBy snd (Map.toList (context t))]
-    s  = [ (v, Map.findWithDefault __ ty vs)  | (v, ty) <- Map.toList (context t) ]
-    ss = map Map.fromList (sequence [ [(v, ty) | ty <- tys] | (v, tys) <- s ])
+    vs = [ map (x,) xs | xs <- partitionBy typ (usort (vars t)), x <- xs ]
+    ss = map Map.fromList (sequence vs)
     go s x = Map.findWithDefault __ x s
-    f s = t {
-      untyped = rename (go s) (untyped t),
-      context = Map.mapKeys (go s) (context t) }
+    f s = rename (go s) t
 
 consider :: Signature -> [(QCGen, Int)] -> (Type -> Value Gen) -> Schema -> M ()
 consider sig gen env s = do
@@ -210,18 +205,18 @@ consider sig gen env s = do
         Old u -> do
           --lift (putStrLn ("Found schema equality! " ++ prettyShow (untyped skel :=: untyped u)))
           lift $ putStr "!"
-          let s = schema (untyped u)
+          let s = schema u
               extras =
                 case Map.lookup s (termTestSet state) of
-                  Nothing -> allUnifications (instantiate (schema (untyped u)))
+                  Nothing -> allUnifications (instantiate (schema u))
                   Just _ -> []
           modify (\st -> st { termTestSet = Map.insertWith (\x y -> y) s Map.empty (termTestSet st) })
-          mapM_ (considerTerm sig gen env s) (sortBy (comparing (fmap measure)) (extras ++ allUnifications t))
+          mapM_ (considerTerm sig gen env s) (sortBy (comparing measure) (extras ++ allUnifications t))
         New ts' -> do
           lift $ putStr "O"
           modify (\st -> st { schemaTestSet = ts' })
           modify (\st -> st { termTestSet = Map.insertWith (\x y -> y) s Map.empty (termTestSet st) })
-          when (simple s) (mapM_ (considerTerm sig gen env s) (sortBy (comparing (fmap measure)) (allUnifications (instantiate s))))
+          when (simple s) (mapM_ (considerTerm sig gen env s) (sortBy (comparing measure) (allUnifications (instantiate s))))
           accept s
     Just u -> do
       lift $ putStr "X"
@@ -231,18 +226,18 @@ consider sig gen env s = do
 
 simple t = size t <= 3
 
-considerTerm :: Signature -> [(QCGen, Int)] -> (Type -> Value Gen) -> Schema -> Typed Term -> M ()
+considerTerm :: Signature -> [(QCGen, Int)] -> (Type -> Value Gen) -> Schema -> Term -> M ()
 considerTerm sig gen env s t = do
   state <- get
   case evalState (repUntyped (encodeTypes t)) (pruner state) of
     Nothing -> do
-      --lift $ putStrLn ("Couldn't simplify " ++ prettyShow (untyped t))
+      --lift $ putStrLn ("Couldn't simplify " ++ prettyShow (t))
       case insert sig (makeTests env gen t) (Map.findWithDefault __ s (termTestSet state)) of
         Untestable ->
           ERROR "testable term became untestable"
         Old u -> do
           found t u
-          modify (\st -> st { pruner = execState (Test.QuickSpec.Pruning.unify (equation t u)) (pruner st) })
+          modify (\st -> st { pruner = execState (Test.QuickSpec.Pruning.unify (t :=: u)) (pruner st) })
         New ts' -> do
           lift $ putStr "o"
           modify (\st -> st { termTestSet = Map.insert s ts' (termTestSet st) })
@@ -252,15 +247,15 @@ considerTerm sig gen env s t = do
       let pruner' = execState (unifyUntyped (encodeTypes t) u) (pruner state)
       put state { pruner = pruner' }
 
-found :: Typed Term -> Typed Term -> M ()
+found :: Term -> Term -> M ()
 found t u = do
   Simple.S eqs <- gets pruner
-  case evalState (Pruning.unify (equation t u)) (E.S eqs) of
+  case evalState (Pruning.unify (t :=: u)) (E.S eqs) of
     True -> do
-      lift $ putStrLn ("\nProved by E: " ++ prettyShow (untyped t) ++ " = " ++ prettyShow (untyped u))
+      lift $ putStrLn ("\nProved by E: " ++ prettyShow t ++ " = " ++ prettyShow u)
       return ()
     False ->
-      lift $ putStrLn ("\n******** " ++ prettyShow (untyped t) ++ " = " ++ prettyShow (untyped u))
+      lift $ putStrLn ("\n******** " ++ prettyShow t ++ " = " ++ prettyShow u)
 
 accept :: Schema -> M ()
 accept s = do

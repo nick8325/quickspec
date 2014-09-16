@@ -70,4 +70,4 @@ library
     Test.QuickSpec.Pruning.Simple
 
   Build-depends:
-    base < 5, containers, transformers, QuickCheck >= 2.7, spoon >= 0.2, term-rewriting, constraints, dlist, ansi-wl-pprint, data-memocombinators, random
+    base < 5, containers, transformers, QuickCheck >= 2.7, spoon >= 0.2, term-rewriting, constraints, dlist, ansi-wl-pprint, data-memocombinators, random, bytestring, jukebox

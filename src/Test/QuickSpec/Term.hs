@@ -24,7 +24,7 @@ import Octonions hiding (Fun)
 -- A schema is like a term but has holes instead of variables.
 type TermOf = Tm Constant
 type Term = TermOf Variable
-type Schema = TermOf ()
+type Schema = TermOf Type
 
 -- Term ordering - size, skeleton, generality.
 type Measure f v = (Int, Tm f (), Int, Tm f v)
@@ -43,117 +43,74 @@ data Constant =
     conValue :: Value Identity }
   deriving Show
 instance Eq Constant where x == y = x `compare` y == EQ
-instance Ord Constant where
-  compare = comparing (\x -> (conName x, valueType (conValue x)))
+instance Ord Constant where compare = comparing conName
 instance Pretty Constant where
   pretty x = text (conName x)
+instance Typed Constant where
+  typ = typ . conValue
+  typeSubstA s (Constant name value) =
+    Constant name <$> typeSubstA s value
 
-newtype Variable = Variable { varNumber :: Int } deriving (Show, Eq, Ord, Enum)
+-- We're not allowed to have two variables with the same number
+-- but different type.
+data Variable =
+  Variable {
+    varNumber :: Int,
+    varType   :: Type}
+  deriving Show
+instance Eq Variable where x == y = x `compare` y == EQ
+instance Ord Variable where compare = comparing varNumber
 instance Pretty Variable where
   pretty x = text ("v" ++ show (varNumber x))
+instance Typed Variable where
+  typ = varType
+  typeSubstA s (Variable n ty) =
+    Variable n <$> typeSubstA s ty
 
--- Applying terms.
-instance TyVars (TermOf v) where typeSubstA _ = pure
-instance Apply (TermOf v) where
+instance Typed v => Typed (TermOf v) where
+  typ (Var x) = typ x
+  typ (Fun f xs) = typeDrop (length xs) (typ f)
+    where
+      typeDrop 0 ty = ty
+      typeDrop n (Fun Arrow [_, ty]) = typeDrop (n-1) ty
+
+  typeSubstA s (Var x) = Var <$> typeSubstA s x
+  typeSubstA s (Fun f xs) =
+    Fun <$> typeSubstA s f <*> traverse (typeSubstA s) xs
+
+instance Typed v => Apply (TermOf v) where
   adapt Var{} _ = mzero
-  adapt Fun{} _ = return ()
-  groundApply (Fun f xs) t = Fun f (xs ++ [t])
+  adapt t@(Fun f xs) u = adapt (typ t) (typ u)
+  groundApply t@(Fun f xs) u =
+    case typ t of
+      Fun Arrow [arg, res] | arg == typ u -> Fun f (xs ++ [u])
 
--- Things which have a type in a certain context.
-data Typed a =
-  Typed {
-    untyped :: a,
-    context :: Map Variable Type,
-    typ     :: Type }
-  deriving (Eq, Ord, Show, Functor)
-
-instance Pretty a => Pretty (Typed a) where
-  pretty t =
-    hang 2 $
-    pretty (context t) <$$>
-    text "|-" <+> pretty (untyped t) <$$>
-    text "::" <+> pretty (typ t)
-
--- How to apply typed things.
-instance TyVars a => TyVars (Typed a) where
-  typeSubstA f (Typed x ctx ty) =
-    Typed <$> typeSubstA f x <*> typeSubstA f ctx <*> typeSubstA f ty
-instance Apply a => Apply (Typed a) where
-  adapt f x = do
-    adapt (untyped f) (untyped x)
-    adapt (context f) (context x)
-    adapt (typ f) (typ x)
-  groundApply f x =
-    Typed { untyped = groundApply (untyped f) (untyped x),
-            context = groundApply (context f) (context x),
-            typ = groundApply (typ f) (typ x) }
-
-instance TyVars v => TyVars (Map k v) where
-  typeSubstA f = traverse (typeSubstA f)
-instance (Ord k, Eq v, TyVars v) => Apply (Map k v) where
-  adapt m1 m2 = equaliseContexts m1 m2
-  groundApply m1 m2 = Map.union m1 m2
-
-equaliseContexts :: (Ord k, Eq v, TyVars v) => Map k v -> Map k v -> UnifyM ()
-equaliseContexts m1 m2 = guard (Map.null conflicts)
-  where
-    conflicts = maybeIntersection check m1 m2
-    maybeIntersection f = Map.mergeWithKey (const f) (const Map.empty) (const Map.empty)
-    check x y
-      | x == y = Nothing
-      | otherwise = Just ()
-
--- Turn a term into a schema by forgetting about its variables.
-schema :: Term -> Schema
-schema = rename (const ())
-
--- Instantiate a schema by making all the variables different.
-instantiate :: Schema -> Typed Term
-instantiate = normaliseTypes . inferType . introduceVars
-
-introduceVars :: Schema -> Term
-introduceVars s = evalState (aux s) 0
-  where
-    aux (Var ()) = do { n <- get; put $! n+1; return (Var (Variable n)) }
-    aux (Fun f xs) = fmap (Fun f) (mapM aux xs)
-
-inferType :: Term -> Typed Term
-inferType t = typeSubst (evalSubst s) u
-  where
-    u = Typed {
-      untyped = t,
-      context = ctx,
-      typ     = ty }
-    Just ((ctx, ty), s) = runUnifyM (freshTyVarFor t) $ do
-      -- FIXME fix this immediately!
-      -- let freshTyVar' = return (typeOf (undefined :: It))
-      let freshTyVar' = return (typeOf (undefined :: Int))
-      -- let freshTyVar' = return (typeOf (undefined :: [Int]))
-      ctx <- fmap Map.fromList (labelM (const freshTyVar') (usort (vars t)))
-      ty <- aux ctx t
-      return (ctx, ty)
-    aux ctx (Var x) = return (Map.findWithDefault __ x ctx)
-    aux ctx (Fun f xs) = do
-      tys <- mapM (aux ctx) xs
-      ty <- fmap Var freshTyVar
-      fty <- freshenM (valueType (conValue f))
-      equalise fty (arrowType tys ty)
-      return ty
-
-normaliseTypes :: TyVars a => a -> a
+-- Take a term and alpha-rename its type canonically.
+normaliseTypes :: Typed a => a -> a
 normaliseTypes t = typeSubst (evalSubst s) t
   where
     s = T.fromMap (Map.fromList (zip (usort (tyVars t)) (map (Var . TyVar) [0..])))
 
--- Take a term and unify all variables of the same type.
-skeleton :: Typed Term -> Typed Term
-skeleton t =
-  t { untyped = rename f (untyped t),
-      context = Map.fromList (map swap (Map.toList names)) }
+-- Turn a term into a schema by forgetting about its variables.
+schema :: Term -> Schema
+schema = rename typ
+
+-- Instantiate a schema by making all the variables different.
+instantiate :: Schema -> Term
+instantiate s = evalState (aux s) 0
   where
-    names = Map.fromList (map swap (Map.toList (context t)))
-    f x = Map.findWithDefault __
-            (Map.findWithDefault __ x (context t)) names
+    aux (Var ty) = do { n <- get; put $! n+1; return (Var (Variable n ty)) }
+    aux (Fun f xs) = fmap (Fun f) (mapM aux xs)
+
+-- Take a term and unify all type variables,
+-- and then all variables of the same type.
+skeleton :: Term -> Term
+skeleton = unifyTermVars . unifyTypeVars
+  where
+    unifyTypeVars = typeSubst (const (Var (TyVar 0)))
+    unifyTermVars t = subst (T.fromMap (Map.fromList (makeSubst (vars t)))) t
+    makeSubst xs =
+      [ (v, Var w) | vs@(w:_) <- partitionBy typ xs, v <- vs ]
 
 evaluateTm :: Applicative f => (v -> Value f) -> Tm Constant v -> Value f
 evaluateTm env (Var v) = env v
@@ -162,26 +119,14 @@ evaluateTm env (Fun f xs) =
   where
     x = mapValue (pure . runIdentity) (conValue f)
 
-evaluateTerm :: (Type -> Value Gen) -> Typed Term -> Value Gen
+evaluateTerm :: (Type -> Value Gen) -> Term -> Value Gen
 evaluateTerm env t =
   -- The evaluation itself doesn't happen in the Gen monad but in the
   -- (StdGen, Int) reader monad. This is to avoid splitting the seed,
   -- which would cause different occurrences of the same variable
   -- to get different values!
-  toGen (evaluateTm f (untyped t))
+  toGen (evaluateTm f t)
   where
-    f x@(Variable n) =
-      fromGen
-        (mapValue (variant n)
-          (env (Map.findWithDefault __ x (context t))))
+    f (Variable n ty) = fromGen (mapValue (variant n) (env ty))
     toGen = mapValue (MkGen . curry)
     fromGen = mapValue (uncurry . unGen)
-
--- Testing!
-app, rev :: Schema
-app = Fun (Constant "app" (toValue (Identity ((++) :: [A] -> [A] -> [A])))) []
-rev = Fun (Constant "rev" (toValue (Identity (reverse :: [A] -> [A])))) []
-myEnv :: Type -> Value Gen
-myEnv _ = toValue (arbitrary :: Gen [Int])
-t :: Schema
-t = rev `apply` (app `apply` Var () `apply` Var ())

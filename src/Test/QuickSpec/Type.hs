@@ -6,7 +6,7 @@ module Test.QuickSpec.Type(
   -- Types.
   Typeable,
   Type, TyCon(..), TyVar(..), arrowType, arity,
-  TyVars(..), Apply(..), typeSubst, freshTyVarFor, freshen, tyVars,
+  Typed(..), Apply(..), typeSubst, freshTyVarFor, freshen, tyVars,
   UnifyM, runUnifyM, execUnifyM, equalise, freshTyVar, freshenM,
   tryApply, canApply, apply,
   A, B, C, D,
@@ -18,7 +18,6 @@ module Test.QuickSpec.Type(
   toValue,
   fromValue,
   castValue,
-  valueType,
   ofValue,
   mapValue,
   pairValues) where
@@ -39,6 +38,7 @@ import Control.Monad.Trans.Writer.Strict
 import qualified Data.DList as DList
 import Data.DList(DList)
 import Data.Functor.Identity
+import Data.Traversable(traverse)
 
 -- A (possibly polymorphic) type.
 type Type = Tm TyCon TyVar
@@ -106,43 +106,46 @@ toTypeRep (Var (TyVar n)) = Ty.mkTyConApp varTyCon [toTyVar n]
     toTyVar 0 = Ty.mkTyConApp zeroTyCon []
     toTyVar n = Ty.mkTyConApp succTyCon [toTyVar (n-1)]
 
--- Things that contain types (e.g., contexts).
-class TyVars a where
+-- Things with types.
+class Typed a where
+  -- The type.
+  typ :: a -> Type
   -- Substitute for all type variables.
   typeSubstA :: Applicative f => (TyVar -> f Type) -> a -> f a
 
 -- Typed things that support function application.
-class TyVars a => Apply a where
+class Typed a => Apply a where
   -- Generate the constraints needed to apply a function to its argument.
   adapt :: a -> a -> UnifyM ()
+  adapt t u = adapt (typ t) (typ u)
 
   -- Apply a function to its argument, assuming that equalise has already
   -- been used to unify the relevant bits of the types.
   groundApply :: a -> a -> a
 
-typeSubst :: TyVars a => (TyVar -> Type) -> a -> a
+typeSubst :: Typed a => (TyVar -> Type) -> a -> a
 typeSubst f t = runIdentity (typeSubstA (return . f) t)
 
-tyVars :: TyVars a => a -> [TyVar]
+tyVars :: Typed a => a -> [TyVar]
 tyVars t = DList.toList (execWriter (typeSubstA f t))
   where
     f x = do
       tell (DList.singleton x)
       return (Var x)
 
-freshTyVarFor :: TyVars a => a -> TyVar
+freshTyVarFor :: Typed a => a -> TyVar
 freshTyVarFor t =
   case execWriter (typeSubstA (\x -> do { tell (Max (Just x)); return (Var x) }) t) of
     Max Nothing -> TyVar 0
     Max (Just (TyVar n)) -> TyVar (n+1)
 
-freshen :: TyVars a => TyVar -> a -> a
+freshen :: Typed a => TyVar -> a -> a
 freshen (TyVar x) t = typeSubst (\(TyVar n) -> Var (TyVar (n+x))) t
 
-freshenM :: TyVars a => a -> UnifyM a
+freshenM :: Typed a => a -> UnifyM a
 freshenM t = do
   let TyVar n = freshTyVarFor t
-  tv <- freshTyVars n
+  tv <- freshTyped n
   return (freshen tv t)
 
 -- A monad for generating unification constraints.
@@ -158,10 +161,10 @@ execUnifyM :: TyVar -> UnifyM a -> Maybe (Subst TyCon TyVar)
 execUnifyM tv x = fmap snd (runUnifyM tv x)
 
 freshTyVar :: UnifyM TyVar
-freshTyVar = freshTyVars 1
+freshTyVar = freshTyped 1
 
-freshTyVars :: Int -> UnifyM TyVar
-freshTyVars n = do
+freshTyped :: Int -> UnifyM TyVar
+freshTyped n = do
   tv@(TyVar m) <- get
   put $! TyVar (m+n)
   return tv
@@ -189,8 +192,12 @@ apply f x =
 canApply :: Apply a => a -> a -> Bool
 canApply f x = isJust (tryApply f x)
 
-instance TyVars Type where
-  typeSubstA = substA
+instance Typed Type where
+  typ = id
+  typeSubstA s (Var x) = s x
+  typeSubstA s (Fun f xs) =
+    Fun f <$> traverse (typeSubstA s) xs
+
 instance Apply Type where
   adapt t u = do
     tv <- freshTyVar
@@ -215,10 +222,10 @@ toAny = unsafeCoerce
 toValue :: forall f a. Typeable a => f a -> Value f
 toValue x = Value (typeOf (undefined :: a)) (toAny x)
 
-instance TyVars (Value f) where
+instance Typed (Value f) where
+  typ = valueType
   typeSubstA f (Value ty x) = Value <$> typeSubstA f ty <*> pure x
 instance Applicative f => Apply (Value f) where
-  adapt f x = adapt (valueType f) (valueType x)
   groundApply f x =
     -- Use $! to check that the types match before computing the value
     (Value $! groundApply (valueType f) (valueType x))
