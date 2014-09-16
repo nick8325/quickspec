@@ -86,8 +86,8 @@ instance Typed v => Apply (TermOf v) where
       Fun Arrow [arg, res] | arg == typ u -> Fun f (xs ++ [u])
 
 -- Take a term and alpha-rename its type canonically.
-normaliseTypes :: Typed a => a -> a
-normaliseTypes t = typeSubst (evalSubst s) t
+normaliseType :: Typed a => a -> a
+normaliseType t = typeSubst (evalSubst s) t
   where
     s = T.fromMap (Map.fromList (zip (usort (tyVars t)) (map (Var . TyVar) [0..])))
 

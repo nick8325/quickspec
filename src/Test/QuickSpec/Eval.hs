@@ -65,7 +65,7 @@ initialTestedTerms sig ty = do
 
 findTestSet :: Signature -> Type -> TestSet -> Maybe (Value TestedTerms)
 findTestSet sig ty m =
-  Map.lookup ty m `mplus`
+  Map.lookup (normaliseType ty) m `mplus`
   initialTestedTerms sig ty
 
 data Result = New TestSet | Old Term | Untestable
@@ -78,7 +78,7 @@ insert sig x ts =
       let r = fromMaybe __ (pairValues insert1 x tts) in
       case ofValue isNew1 r of
         True ->
-          New (Map.insert (typ x) (mapValue (\(New1 tts) -> tts) r) ts)
+          New (Map.insert (normaliseType (typ x)) (mapValue (\(New1 tts) -> tts) r) ts)
         False ->
           Old (ofValue (\(Old1 t) -> t) r)
 
@@ -207,16 +207,17 @@ consider sig gen env s = do
           lift $ putStr "!"
           let s = schema u
               extras =
-                case Map.lookup s (termTestSet state) of
+                case Map.lookup (normaliseType s) (termTestSet state) of
                   Nothing -> allUnifications (instantiate (schema u))
                   Just _ -> []
-          modify (\st -> st { termTestSet = Map.insertWith (\x y -> y) s Map.empty (termTestSet st) })
+          modify (\st -> st { termTestSet = Map.insertWith (\x y -> y) (normaliseType s) Map.empty (termTestSet st) })
           mapM_ (considerTerm sig gen env s) (sortBy (comparing measure) (extras ++ allUnifications t))
         New ts' -> do
           lift $ putStr "O"
           modify (\st -> st { schemaTestSet = ts' })
-          modify (\st -> st { termTestSet = Map.insertWith (\x y -> y) s Map.empty (termTestSet st) })
-          when (simple s) (mapM_ (considerTerm sig gen env s) (sortBy (comparing measure) (allUnifications (instantiate s))))
+          when (simple s) $ do
+            modify (\st -> st { termTestSet = Map.insertWith (\x y -> y) (normaliseType s) Map.empty (termTestSet st) })
+            mapM_ (considerTerm sig gen env s) (sortBy (comparing measure) (allUnifications (instantiate s)))
           accept s
     Just u -> do
       lift $ putStr "X"
@@ -232,7 +233,7 @@ considerTerm sig gen env s t = do
   case evalState (repUntyped (encodeTypes t)) (pruner state) of
     Nothing -> do
       --lift $ putStrLn ("Couldn't simplify " ++ prettyShow (t))
-      case insert sig (makeTests env gen t) (Map.findWithDefault __ s (termTestSet state)) of
+      case insert sig (makeTests env gen t) (Map.findWithDefault __ (normaliseType s) (termTestSet state)) of
         Untestable ->
           ERROR "testable term became untestable"
         Old u -> do
@@ -240,7 +241,7 @@ considerTerm sig gen env s t = do
           modify (\st -> st { pruner = execState (Test.QuickSpec.Pruning.unify (t :=: u)) (pruner st) })
         New ts' -> do
           lift $ putStr "o"
-          modify (\st -> st { termTestSet = Map.insert s ts' (termTestSet st) })
+          modify (\st -> st { termTestSet = Map.insert (normaliseType s) ts' (termTestSet st) })
     Just u -> do
       lift $ putStr "x"
       --lift $ putStrLn ("Throwing away redundant term: " ++ prettyShow (untyped t) ++ " -> " ++ prettyShow (decodeTypes u))
@@ -263,7 +264,7 @@ accept s = do
   modify (\st -> st { schemas = Map.adjust f (size s) (schemas st) })
   where
     t = instantiate s
-    f m = Map.insertWith (++) (typ t) [s] m
+    f m = Map.insertWith (++) (normaliseType (typ t)) [s] m
 
 instance MemoTable Type where
   table = wrap f g table
