@@ -28,7 +28,7 @@ instance Pruner EPruner where
   unifyUntyped = eUnify
   repUntyped _ = return Nothing
 
-liftIO x = return $! unsafePerformIO x
+liftIO x = unsafePerformIO (fmap return x)
 
 eUnify :: PruningTerm -> PruningTerm -> State EPruner Bool
 eUnify t u = do
