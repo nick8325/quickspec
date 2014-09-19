@@ -203,6 +203,7 @@ instance Apply Type where
     tv <- freshTyVar
     equalise t (Fun Arrow [u, Var tv])
   groundApply (Fun Arrow [arg, res]) t | t == arg = res
+  groundApply t u = ERROR ("Incompatible function types " ++ prettyShow t ++ " and " ++ prettyShow u)
 
 -- Dynamic values inside an applicative functor.
 data Value f =

@@ -50,7 +50,7 @@ sig = mconcat [
   constant "rev" (reverse :: [Int] -> [Int]),
   constant "app" ((++) :: [Int] -> [Int] -> [Int]),
   constant "[]" ([] :: [Int]),
-  constant "sort" (sort :: [Int] -> [Int]),
+  --constant "sort" (sort :: [Int] -> [Int]),
   --constant "usort" (usort :: [Int] -> [Int]),
   ord (undefined :: [Int]),
   arb (undefined :: [Int])]

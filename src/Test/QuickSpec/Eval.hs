@@ -40,7 +40,9 @@ type TestSet = Map Type (Value TestedTerms)
 data TestedTerms a =
   TestedTerms {
     dict :: Dict (Ord a),
-    testedTerms :: [TestedTerm a] }
+    testResults :: TestResults a }
+
+data TestResults a = TestCase (Map a (TestResults a)) | Singleton (TestedTerm a)
 
 data TestedTerm a =
   TestedTerm {
@@ -61,7 +63,7 @@ initialTestedTerms sig ty = do
   return . toValue $
     TestedTerms {
       dict = dict,
-      testedTerms = [] }
+      testResults = TestCase Map.empty }
 
 findTestSet :: Signature -> Type -> TestSet -> Maybe (Value TestedTerms)
 findTestSet sig ty m =
@@ -89,17 +91,19 @@ isNew1 _ = False
 insert1 :: TestedTerm a -> TestedTerms a -> Result1 a
 insert1 x ts =
   case dict ts of
-    Dict -> aux ts' (tests x) (testedTerms ts)
+    Dict -> aux k (term x) (tests x) (testResults ts)
   where
-    ts' = ts { testedTerms = x:testedTerms ts }
-    aux :: Ord a => TestedTerms a -> [a] -> [TestedTerm a] -> Result1 a
-    aux x _ [] = New1 x
-    aux y (x:xs) ts =
-      aux y xs [ t { tests = tail (tests t) }
-               | t <- ts,
-                 head (tests t) == x ]
-    aux _ [] [t] = Old1 (term t)
-    aux _ [] _ = ERROR "two equal terms in TestedTerm structure"
+    k res = ts { testResults = res }
+    aux :: Ord a => (TestResults a -> TestedTerms a) -> Term -> [a] -> TestResults a -> Result1 a
+    aux k x [] (Singleton (TestedTerm y [])) = Old1 y
+    aux k x ts (Singleton (TestedTerm y (t':ts'))) =
+      aux k x ts (TestCase (Map.singleton t' (Singleton (TestedTerm y ts'))))
+    aux k x (t:ts) (TestCase res) =
+      case Map.lookup t res of
+        Nothing -> New1 (k (TestCase (Map.insert t (Singleton (TestedTerm x ts)) res)))
+        Just res' ->
+          let k' r = k (TestCase (Map.insert t r res)) in
+          aux k' x ts res'
 
 makeTests :: (Type -> Value Gen) -> [(QCGen, Int)] -> Term -> Value TestedTerm
 makeTests env tests t =
@@ -112,7 +116,7 @@ env :: Signature -> Type -> Value Gen
 env sig ty =
   case findInstance ty (arbs sig) of
     Nothing ->
-      toValue (ERROR $ "missing arbitrary instance for " ++ prettyShow ty :: Gen A)
+      fromMaybe __ (castValue ty (toValue (ERROR $ "missing arbitrary instance for " ++ prettyShow ty :: Gen A)))
     Just (Instance (Dict :: Dict (Arbitrary a))) ->
       toValue (arbitrary :: Gen a)
 
@@ -251,7 +255,7 @@ considerTerm sig gen env s t = do
 found :: Term -> Term -> M ()
 found t u = do
   Simple.S eqs <- gets pruner
-  case evalState (Pruning.unify (t :=: u)) (E.S eqs) of
+  case False of --evalState (Pruning.unify (t :=: u)) (E.S eqs) of
     True -> do
       lift $ putStrLn ("\nProved by E: " ++ prettyShow t ++ " = " ++ prettyShow u)
       return ()

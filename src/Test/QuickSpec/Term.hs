@@ -19,6 +19,9 @@ import Data.Traversable(traverse)
 import Data.Tuple
 import qualified Data.Rewriting.Substitution.Type as T
 import Octonions hiding (Fun)
+import Data.List
+import Data.Maybe
+import Debug.Trace
 
 -- Terms and schemas.
 -- A schema is like a term but has holes instead of variables.
@@ -56,7 +59,7 @@ instance Typed Constant where
 data Variable =
   Variable {
     varNumber :: Int,
-    varType   :: Type}
+    varType   :: Type }
   deriving Show
 instance Eq Variable where x == y = x `compare` y == EQ
 instance Ord Variable where compare = comparing varNumber
@@ -66,6 +69,8 @@ instance Typed Variable where
   typ = varType
   typeSubstA s (Variable n ty) =
     Variable n <$> typeSubstA s ty
+instance CoArbitrary Variable where
+  coarbitrary x = coarbitrary (varNumber x)
 
 instance Typed v => Typed (TermOf v) where
   typ (Var x) = typ x
@@ -89,7 +94,9 @@ instance Typed v => Apply (TermOf v) where
 normaliseType :: Typed a => a -> a
 normaliseType t = typeSubst (evalSubst s) t
   where
-    s = T.fromMap (Map.fromList (zip (usort (tyVars t)) (map (Var . TyVar) [0..])))
+    s = T.fromMap (Map.fromList (zip tvs (map (Var . TyVar) [0..])))
+    tvs = tvs' ++ (usort (tyVars t) \\ tvs')
+    tvs' = usort (tyVars (typ t))
 
 -- Turn a term into a schema by forgetting about its variables.
 schema :: Term -> Schema
@@ -104,22 +111,22 @@ instantiate s = evalState (aux s) 0
 
 -- Take a term and unify all type variables,
 -- and then all variables of the same type.
-skeleton :: Term -> Term
-skeleton = unifyTermVars . unifyTypeVars
+skeleton :: (Ord v, Typed v) => TermOf v -> TermOf v
+skeleton = normaliseType . unifyTermVars . unifyTypeVars
   where
     unifyTypeVars = typeSubst (const (Var (TyVar 0)))
     unifyTermVars t = subst (T.fromMap (Map.fromList (makeSubst (vars t)))) t
     makeSubst xs =
       [ (v, Var w) | vs@(w:_) <- partitionBy typ xs, v <- vs ]
 
-evaluateTm :: Applicative f => (v -> Value f) -> Tm Constant v -> Value f
+evaluateTm :: (Typed v, Applicative f, Show v) => (v -> Value f) -> Tm Constant v -> Value f
 evaluateTm env (Var v) = env v
 evaluateTm env (Fun f xs) =
   foldl groundApply x (map (evaluateTm env) xs)
   where
     x = mapValue (pure . runIdentity) (conValue f)
 
-evaluateTerm :: (Type -> Value Gen) -> Term -> Value Gen
+evaluateTerm :: (CoArbitrary v, Ord v, Typed v, Show v) => (Type -> Value Gen) -> TermOf v -> Value Gen
 evaluateTerm env t =
   -- The evaluation itself doesn't happen in the Gen monad but in the
   -- (StdGen, Int) reader monad. This is to avoid splitting the seed,
@@ -127,6 +134,6 @@ evaluateTerm env t =
   -- to get different values!
   toGen (evaluateTm f t)
   where
-    f (Variable n ty) = fromGen (mapValue (variant n) (env ty))
+    f x = fromGen (mapValue (coarbitrary x) (env (typ x)))
     toGen = mapValue (MkGen . curry)
     fromGen = mapValue (uncurry . unGen)

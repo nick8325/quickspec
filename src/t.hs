@@ -38,7 +38,7 @@ sig2 = mconcat [
   ord (undefined :: Int),
   arb (undefined :: Int)]
 
-main = quickSpec sig2
+main = quickSpec S.sig
 
 {-
 sig1 = [
