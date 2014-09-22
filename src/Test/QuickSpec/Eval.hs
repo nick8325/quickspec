@@ -33,6 +33,7 @@ import qualified Data.Typeable.Internal as T
 import Data.Word
 import Debug.Trace
 import System.IO
+import PrettyPrinting
 
 type TestSet = Map Type (Value TestedTerms)
 
@@ -148,7 +149,14 @@ collect xs =
 
 schemasOfSize :: Int -> Signature -> M [Schema]
 schemasOfSize 1 sig =
-  return (Var (Var (TyVar 0)):[Fun c [] | c <- constants sig])
+  return $
+    [Var ty | ty <- tys] ++
+    [Fun c [] | c <- constants sig]
+  where
+    tys = [typeOf (undefined :: [Int])]
+    {-tys = [typeOf (undefined :: Int),
+           typeOf (undefined :: [Bool]),
+           typeOf (undefined :: Layout Bool)]-}
 schemasOfSize n _ = do
   ss <- gets schemas
   return $
@@ -178,7 +186,7 @@ quickSpec sig = do
   return ()
 
 go :: Int -> Signature -> [(QCGen, Int)] -> (Type -> Value Gen) -> M ()
-go 12 _ _ _ = return ()
+go 10 _ _ _ = return ()
 go n sig seeds gen = do
   modify (\s -> s { schemas = Map.insert n Map.empty (schemas s) })
   ss <- fmap (sortBy (comparing measure)) (schemasOfSize n sig)
@@ -222,13 +230,15 @@ consider sig gen env s = do
             modify (\st -> st { termTestSet = Map.insertWith (\x y -> y) (normaliseType s) Map.empty (termTestSet st) })
             mapM_ (considerTerm sig gen env s) (sortBy (comparing measure) (allUnifications (instantiate s)))
           accept s
-    Just u -> do
+    Just u | measure (schema (decodeTypes u)) < measure s -> do
       lift $ putStr "X"
-      --lift $ putStrLn ("Throwing away redundant schema: " ++ prettyShow (untyped t) ++ " -> " ++ prettyShow (decodeTypes u))
+      -- lift $ putStrLn ("Throwing away redundant schema: " ++ prettyShow t ++ " -> " ++ prettyShow (decodeTypes u))
       let pruner' = execState (unifyUntyped (encodeTypes t) u) (pruner state)
       put state { pruner = pruner' }
 
-simple t = size t <= 3
+-- simple t = size t <= 5
+-- simple t = True
+simple t = False
 
 considerTerm :: Signature -> [(QCGen, Int)] -> (Type -> Value Gen) -> Schema -> Term -> M ()
 considerTerm sig gen env s t = do
@@ -254,7 +264,7 @@ considerTerm sig gen env s t = do
 found :: Term -> Term -> M ()
 found t u = do
   Simple.S eqs <- gets pruner
-  case False of --evalState (Pruning.unify (t :=: u)) (E.S eqs) of
+  case False of -- evalState (Pruning.unify (t :=: u)) (E.S eqs) of
     True -> do
       lift $ putStrLn ("\nProved by E: " ++ prettyShow t ++ " = " ++ prettyShow u)
       return ()

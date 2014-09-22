@@ -10,7 +10,8 @@ import Octonions
 import Test.QuickSpec.Eval
 import Test.QuickSpec.Signature hiding (sig)
 import qualified Test.QuickSpec.Signature as S
-import Data.Monoid
+import Data.Monoid hiding ((<>))
+import PrettyPrinting
 
 (\\), (/) :: It -> It -> It
 a / b = a * recip b
@@ -36,6 +37,23 @@ sig2 = mconcat [
   constant "+" ((+) :: Int -> Int -> Int),
   constant "*" ((*) :: Int -> Int -> Int),
   ord (undefined :: Int),
+  arb (undefined :: Int)]
+
+sig3 = mconcat [
+  constant "text" (text :: [Bool] -> Layout Bool),
+  constant "nest" (nest :: Int -> Layout Bool -> Layout Bool),
+  constant "$$" (($$) :: Layout Bool -> Layout Bool -> Layout Bool),
+  constant "<>" ((<>) :: Layout Bool -> Layout Bool -> Layout Bool),
+  constant "[]" ([] :: [Bool]),
+  constant "++" ((++) :: [Bool] -> [Bool] -> [Bool]),
+  constant "0" (0 :: Int),
+  constant "+" ((+) :: Int -> Int -> Int),
+  constant "length" (length :: [Bool] -> Int),
+  ord (undefined :: Layout Bool),
+  ord (undefined :: [Bool]),
+  ord (undefined :: Int),
+  arb (undefined :: Layout Bool),
+  arb (undefined :: [Bool]),
   arb (undefined :: Int)]
 
 main = quickSpec S.sig
