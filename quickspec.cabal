@@ -63,7 +63,6 @@ library
     Test.QuickSpec.Type
     Test.QuickSpec.Term
     Test.QuickSpec.Signature
-    Test.QuickSpec.TestTree
     Test.QuickSpec.Eval
     Test.QuickSpec.Equation
     Test.QuickSpec.Pruning

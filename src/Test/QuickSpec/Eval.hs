@@ -6,7 +6,6 @@ import Test.QuickSpec.Base
 import Test.QuickSpec.Utils
 import Test.QuickSpec.Type
 import Test.QuickSpec.Term
-import Test.QuickSpec.TestTree
 import Test.QuickSpec.Signature
 import Test.QuickSpec.Equation
 import Data.Constraint
