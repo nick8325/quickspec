@@ -30,9 +30,9 @@ type Term = TermOf Variable
 type Schema = TermOf Type
 
 -- Term ordering - size, skeleton, generality.
-type Measure f v = (Int, Tm f (), Int, Tm f v)
+type Measure f v = (Int, Int, Tm f (), Int, Tm f v)
 measure :: Ord v => Tm f v -> Measure f v
-measure t = (size t, rename (const ()) t, -length (usort (vars t)), t)
+measure t = (size t, -length (vars t), rename (const ()) t, -length (usort (vars t)), t)
 
 size :: Tm f v -> Int
 size Var{} = 1
