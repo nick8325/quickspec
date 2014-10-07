@@ -5,25 +5,16 @@
 module Test.QuickSpec.Type(
   -- Types.
   Typeable,
-  Type, TyCon(..), TyVar(..), arrowType, arity,
-  Typed(..), Apply(..), typeSubst, freshTyVarFor, freshen, tyVars,
-  UnifyM, runUnifyM, execUnifyM, equalise, freshTyVar, freshenM,
-  tryApply, canApply, apply,
-  A, B, C, D,
-  typeOf,
-  fromTypeRep,
-  toTypeRep,
-  -- Dynamic values.
-  Value,
-  toValue,
-  fromValue,
-  castValue,
-  ofValue,
-  mapValue,
-  forValue,
-  pairValues,
+  Type, TyCon(..), TyVar(..), A, B, C, D, typeOf, arrowType, arity,
+  -- Things that have types.
+  Typed(..), typeSubst, tyVars,
+  Apply(..), apply, canApply,
+  -- Polymorphic types.
   Poly, poly, unPoly,
-  Unwrapped(..), unwrap) where
+  -- Dynamic values.
+  Value, toValue, fromValue,
+  Unwrapped(..), unwrap,
+  pairValues, mapValue, forValue, ofValue) where
 
 #include "errors.h"
 
@@ -45,6 +36,7 @@ import Data.Traversable(traverse)
 import qualified Data.Map as Map
 import qualified Data.Rewriting.Substitution.Type as T
 import Data.List
+import Control.Monad
 
 -- A (possibly polymorphic) type.
 type Type = Tm TyCon TyVar
@@ -92,8 +84,9 @@ fromTypeRep ty =
         (tyCon, [ty']) | tyCon == succTyCon -> succ (fromTyVar ty')
         (tyCon, []) | tyCon == zeroTyCon -> 0
 
-arrowTyCon, varTyCon, succTyCon, zeroTyCon :: Ty.TyCon
+arrowTyCon, commaTyCon, varTyCon, succTyCon, zeroTyCon :: Ty.TyCon
 arrowTyCon = con (undefined :: () -> ())
+commaTyCon = con (undefined :: ((),()))
 varTyCon   = con (undefined :: TyVarNumber ())
 succTyCon  = con (undefined :: Succ ())
 zeroTyCon  = con (undefined :: Zero)
@@ -101,7 +94,7 @@ zeroTyCon  = con (undefined :: Zero)
 con :: Typeable a => a -> Ty.TyCon
 con = fst . Ty.splitTyConApp . Ty.typeOf
 
--- Mostly for showing types.
+-- For showing types.
 toTypeRep :: Type -> Ty.TypeRep
 toTypeRep (Fun tyCon tys) = Ty.mkTyConApp (toTyCon tyCon) (map toTypeRep tys)
   where
@@ -119,16 +112,6 @@ class Typed a where
   -- Substitute for all type variables.
   typeSubstA :: Applicative f => (TyVar -> f Type) -> a -> f a
 
--- Typed things that support function application.
-class Typed a => Apply a where
-  -- Generate the constraints needed to apply a function to its argument.
-  adapt :: a -> a -> UnifyM ()
-  adapt t u = adapt (typ t) (typ u)
-
-  -- Apply a function to its argument, assuming that equalise has already
-  -- been used to unify the relevant bits of the types.
-  groundApply :: a -> a -> a
-
 typeSubst :: Typed a => (TyVar -> Type) -> a -> a
 typeSubst f t = runIdentity (typeSubstA (return . f) t)
 
@@ -139,54 +122,10 @@ tyVars t = DList.toList (execWriter (typeSubstA f t))
       tell (DList.singleton x)
       return (Var x)
 
-freshTyVarFor :: Typed a => a -> TyVar
-freshTyVarFor t =
-  case execWriter (typeSubstA (\x -> do { tell (Max (Just x)); return (Var x) }) t) of
-    Max Nothing -> TyVar 0
-    Max (Just (TyVar n)) -> TyVar (n+1)
-
-freshen :: Typed a => TyVar -> a -> a
-freshen (TyVar x) t = typeSubst (\(TyVar n) -> Var (TyVar (n+x))) t
-
-freshenM :: Typed a => a -> UnifyM a
-freshenM t = do
-  let TyVar n = freshTyVarFor t
-  tv <- freshTyped n
-  return (freshen tv t)
-
--- A monad for generating unification constraints.
-type UnifyM = StateT TyVar (WriterT (DList (Type, Type)) Maybe)
-
-runUnifyM :: TyVar -> UnifyM a -> Maybe (a, Subst TyCon TyVar)
-runUnifyM tv x = do
-  (x, cs) <- runWriterT (evalStateT x tv)
-  s <- unifyMany Arrow (DList.toList cs)
-  return (x, s)
-
-execUnifyM :: TyVar -> UnifyM a -> Maybe (Subst TyCon TyVar)
-execUnifyM tv x = fmap snd (runUnifyM tv x)
-
-freshTyVar :: UnifyM TyVar
-freshTyVar = freshTyped 1
-
-freshTyped :: Int -> UnifyM TyVar
-freshTyped n = do
-  tv@(TyVar m) <- get
-  put $! TyVar (m+n)
-  return tv
-
-equalise :: Type -> Type -> UnifyM ()
-equalise t u = lift (tell (DList.singleton (t, u)))
-
--- Application of typed terms.
-tryApply :: Apply a => a -> a -> Maybe a
-tryApply f x = do
-  let tv = freshTyVarFor f
-      x' = freshen tv x
-      tv' = freshTyVarFor x' `max` tv
-  s <- execUnifyM tv' (adapt f x')
-  let sub = typeSubst (evalSubst s)
-  return (sub f `groundApply` sub x')
+-- Typed things that support function application.
+class Typed a => Apply a where
+  -- Apply a function to its argument.
+  tryApply :: a -> a -> Maybe a
 
 infixl `apply`
 apply :: Apply a => a -> a -> a
@@ -198,6 +137,7 @@ apply f x =
 canApply :: Apply a => a -> a -> Bool
 canApply f x = isJust (tryApply f x)
 
+-- Instances.
 instance Typed Type where
   typ = id
   typeSubstA s (Var x) = s x
@@ -205,11 +145,41 @@ instance Typed Type where
     Fun f <$> traverse (typeSubstA s) xs
 
 instance Apply Type where
-  adapt t u = do
-    tv <- freshTyVar
-    equalise t (Fun Arrow [u, Var tv])
-  groundApply (Fun Arrow [arg, res]) t | t == arg = res
-  groundApply t u = ERROR ("Incompatible function types " ++ prettyShow t ++ " and " ++ prettyShow u)
+  tryApply (Fun Arrow [arg, res]) t | t == arg = Just res
+  tryApply t u = Nothing
+
+instance (Typed a, Typed b) => Typed (a, b) where
+  typ (x, y) = Fun (TyCon commaTyCon) [typ x, typ y]
+  typeSubstA f (x, y) = liftA2 (,) (typeSubstA f x) (typeSubstA f y)
+
+-- Represents a forall-quantifier over all the type variables in a type.
+-- Wrapping a term in Poly normalises the type by alpha-renaming
+-- type variables canonically.
+newtype Poly a = Poly { unPoly :: a }
+  deriving (Eq, Ord, Show, Pretty, Typeable)
+
+poly :: Typed a => a -> Poly a
+poly x = Poly (normaliseType x)
+
+normaliseType :: Typed a => a -> a
+normaliseType t = typeSubst (evalSubst s) t
+  where
+    s = T.fromMap (Map.fromList (zip tvs (map (Var . TyVar) [0..])))
+    tvs = tvs' ++ (usort (tyVars t) \\ tvs')
+    tvs' = usort (tyVars (typ t))
+
+instance Typed a => Typed (Poly a) where
+  typ = typ . unPoly
+  typeSubstA f (Poly x) = fmap poly (typeSubstA f x)
+
+instance Apply a => Apply (Poly a) where
+  tryApply (Poly f) (Poly x) = do
+    -- Rename x's type variables to not clash with f's.
+    let x' = typeSubst (\(TyVar n) -> Var (TyVar (-n-1))) x
+        resType = Var (TyVar 0)
+    s <- unify (typ f) (arrowType [typ x] resType)
+    let (f', x'') = typeSubst (evalSubst s) (f, x')
+    fmap poly (tryApply f' x'')
 
 -- Dynamic values inside an applicative functor.
 data Value f =
@@ -218,7 +188,7 @@ data Value f =
     value :: f Any }
 
 instance Show (Value f) where
-  show x = "<<" ++ prettyShow (valueType x) ++ ">>"
+  show x = "<<" ++ prettyShow (typ x) ++ ">>"
 
 fromAny :: f Any -> f a
 fromAny = unsafeCoerce
@@ -229,24 +199,32 @@ toAny = unsafeCoerce
 toValue :: forall f a. Typeable a => f a -> Value f
 toValue x = Value (typeOf (undefined :: a)) (toAny x)
 
+fromValue :: forall f a. Typeable a => Value f -> Maybe (f a)
+fromValue x = do
+  guard (typ x == typeOf (undefined :: a))
+  return (fromAny (value x))
+
+pairValues :: (forall a. f a -> g a -> h a) -> Value f -> Value g -> Value h
+pairValues f x y
+  | typ x == typ y =
+      Value (typ x) (f (value x) (value y))
+  | otherwise =
+      ERROR "non-matching types"
+
 instance Typed (Value f) where
   typ = valueType
   typeSubstA f (Value ty x) = Value <$> typeSubstA f ty <*> pure x
 instance Applicative f => Apply (Value f) where
-  groundApply f x =
-    -- Use $! to check that the types match before computing the value
-    (Value $! groundApply (valueType f) (valueType x))
-    (fromAny (value f) <*> value x)
+  tryApply f x = do
+    ty <- tryApply (typ f) (typ x)
+    return (Value ty (fromAny (value f) <*> value x))
 
-castValue :: forall f. Type -> Value f -> Maybe (Value f)
-castValue ty x = do
-  s <- match (valueType x) ty
-  return x { valueType = typeSubst (evalSubst s) (valueType x) }
+-- Unwrap a value to get at the thing inside, while still being able
+-- to wrap it up again.
+data Unwrapped f = forall a. U (f a) (forall g. g a -> Value g)
 
-fromValue :: forall f a. Typeable a => Value f -> Maybe (f a)
-fromValue x = do
-  _ <- castValue (typeOf (undefined :: a)) x
-  return (fromAny (value x))
+unwrap :: Value f -> Unwrapped f
+unwrap x = U (value x) (\y -> Value (typ x) y)
 
 mapValue :: (forall a. f a -> g a) -> Value f -> Value g
 mapValue f v =
@@ -260,31 +238,3 @@ ofValue :: (forall a. f a -> b) -> Value f -> b
 ofValue f v =
   case unwrap v of
     U x _ -> f x
-
-pairValues :: (forall a. f a -> g a -> h a) -> Value f -> Value g -> Maybe (Value h)
-pairValues f x y = do
-  let y' = freshen (freshTyVarFor x) y
-  s <- unify (valueType x) (valueType y')
-  let z = subst s (valueType x)
-  return (Value z (f (value x) (value y)))
-
--- Represents a forall-quantifier over all the type variables in a type.
--- Wrapping a term in Poly normalises the type by alpha-renaming
--- type variables canonically.
-newtype Poly a = Poly { unPoly :: a }
-  deriving (Eq, Ord, Show, Pretty, Typeable)
-
-poly :: Typed a => a -> Poly a
-poly = Poly . normaliseType
-
-normaliseType :: Typed a => a -> a
-normaliseType t = typeSubst (evalSubst s) t
-  where
-    s = T.fromMap (Map.fromList (zip tvs (map (Var . TyVar) [0..])))
-    tvs = tvs' ++ (usort (tyVars t) \\ tvs')
-    tvs' = usort (tyVars (typ t))
-
-data Unwrapped f = forall a. U (f a) (forall g. g a -> Value g)
-
-unwrap :: Value f -> Unwrapped f
-unwrap x = U (value x) (\y -> Value (typ x) y)

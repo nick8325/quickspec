@@ -84,11 +84,11 @@ instance Typed v => Typed (TermOf v) where
     Fun <$> typeSubstA s f <*> traverse (typeSubstA s) xs
 
 instance Typed v => Apply (TermOf v) where
-  adapt Var{} _ = mzero
-  adapt t@(Fun f xs) u = adapt (typ t) (typ u)
-  groundApply t@(Fun f xs) u =
+  tryApply t@(Fun f xs) u =
     case typ t of
-      Fun Arrow [arg, res] | arg == typ u -> Fun f (xs ++ [u])
+      Fun Arrow [arg, res] | arg == typ u -> Just (Fun f (xs ++ [u]))
+      _ -> Nothing
+  tryApply Var{} _ = Nothing
 
 -- Turn a term into a schema by forgetting about its variables.
 schema :: Term -> Schema
@@ -114,7 +114,7 @@ skeleton = unifyTermVars . unifyTypeVars
 evaluateTm :: (Typed v, Applicative f, Show v) => (v -> Value f) -> Tm Constant v -> Value f
 evaluateTm env (Var v) = env v
 evaluateTm env (Fun f xs) =
-  foldl groundApply x (map (evaluateTm env) xs)
+  foldl apply x (map (evaluateTm env) xs)
   where
     x = mapValue (pure . runIdentity) (conValue f)
 

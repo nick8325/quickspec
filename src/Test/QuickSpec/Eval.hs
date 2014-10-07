@@ -77,7 +77,7 @@ insert sig x ts =
   case findTestSet sig (typ x) ts of
     Nothing -> Untestable
     Just tts ->
-      case unwrap (fromMaybe __ (pairValues insert1 x tts)) of
+      case unwrap (pairValues insert1 x tts) of
         U (New1 tts) wrap ->
           New (Map.insert (poly (typ x)) (wrap tts) ts)
         U (Old1 t) _ ->
@@ -113,7 +113,7 @@ env :: Signature -> Type -> Value Gen
 env sig ty =
   case [ i | i <- arbs sig, typ i == ty ] of
     [] ->
-      fromMaybe __ (castValue ty (toValue (ERROR $ "missing arbitrary instance for " ++ prettyShow ty :: Gen A)))
+      toValue (ERROR $ "missing arbitrary instance for " ++ prettyShow ty :: Gen A)
     (i:_) ->
       forValue i $ \(Instance Dict) -> arbitrary
 
