@@ -59,8 +59,8 @@ data S = S {
 
 initialTestedTerms :: Signature -> Type -> Maybe (Value TestedTerms)
 initialTestedTerms sig ty = do
-  Instance dict <- findInstance ty (ords sig)
-  return . toValue $
+  inst <- listToMaybe [ i | i <- ords sig, typ i == ty ]
+  return $ forValue inst $ \(Instance dict) ->
     TestedTerms {
       dict = dict,
       testResults = TestCase Map.empty }
@@ -114,11 +114,11 @@ makeTests env tests t =
 
 env :: Signature -> Type -> Value Gen
 env sig ty =
-  case findInstance ty (arbs sig) of
-    Nothing ->
+  case [ i | i <- arbs sig, typ i == ty ] of
+    [] ->
       fromMaybe __ (castValue ty (toValue (ERROR $ "missing arbitrary instance for " ++ prettyShow ty :: Gen A)))
-    Just (Instance (Dict :: Dict (Arbitrary a))) ->
-      toValue (arbitrary :: Gen a)
+    (i:_) ->
+      forValue i $ \(Instance Dict) -> arbitrary
 
 type Schemas = Map Int (Map Type [Schema])
 

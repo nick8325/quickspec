@@ -20,6 +20,7 @@ module Test.QuickSpec.Type(
   castValue,
   ofValue,
   mapValue,
+  forValue,
   pairValues) where
 
 #include "errors.h"
@@ -244,6 +245,9 @@ fromValue x = do
 
 mapValue :: (forall a. f a -> g a) -> Value f -> Value g
 mapValue f (Value ty x) = Value ty (f x)
+
+forValue :: Value f -> (forall a. f a -> g a) -> Value g
+forValue x f = mapValue f x
 
 ofValue :: (forall a. f a -> b) -> Value f -> b
 ofValue f (Value ty x) = f x

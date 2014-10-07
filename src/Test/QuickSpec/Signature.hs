@@ -16,12 +16,12 @@ import Control.Monad
 import Data.Maybe
 import Data.List
 
-data Instance c = forall a. Typeable a => Instance (Dict (c a))
+newtype Instance c a = Instance (Dict (c a))
 data Signature =
   Signature {
     constants :: [Constant],
-    ords      :: [Instance Ord],
-    arbs      :: [Instance Arbitrary] }
+    ords      :: [Value (Instance Ord)],
+    arbs      :: [Value (Instance Arbitrary)] }
 
 instance Monoid Signature where
   mempty = Signature [] [] []
@@ -35,14 +35,10 @@ deriving instance Typeable Ord
 deriving instance Typeable Arbitrary
 
 ord :: forall a. (Typeable a, Ord a) => a -> Signature
-ord _ = Signature [] [Instance (Dict :: Dict (Ord a))] []
+ord _ = Signature [] [toValue (Instance Dict :: Instance Ord a)] []
 
 arb :: forall a. (Typeable a, Arbitrary a) => a -> Signature
-arb _ = Signature [] [] [Instance (Dict :: Dict (Arbitrary a))]
-
-findInstance :: forall c. Type -> [Instance c] -> Maybe (Instance c)
-findInstance ty is =
-  listToMaybe [ i | i@(Instance (_ :: Dict (c a))) <- is, typeOf (undefined :: a) == ty ]
+arb _ = Signature [] [] [toValue (Instance Dict :: Instance Arbitrary a)]
 
 -- Testing!
 sig :: Signature
