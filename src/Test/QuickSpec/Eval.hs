@@ -117,7 +117,7 @@ env sig ty =
     (i:_) ->
       forValue i $ \(Instance Dict) -> arbitrary
 
-type Schemas = Map Int (Map (Poly Type) [Schema])
+type Schemas = Map Int (Map (Poly Type) [Poly Schema])
 
 instance Pruner S where
   emptyPruner      = initialState
@@ -162,12 +162,12 @@ schemasOfSize n _ = do
       let j = n-i,
       (fty, fs) <- Map.toList =<< maybeToList (Map.lookup i ss),
       canApply fty (poly (Var (TyVar 0))),
-      or [ canApply (poly f) (poly (Var (Var (TyVar 0)))) | f <- fs ],
+      or [ canApply f (poly (Var (Var (TyVar 0)))) | f <- fs ],
       (xty, xs) <- Map.toList =<< maybeToList (Map.lookup j ss),
       canApply fty xty,
-      f <- fmap poly fs,
+      f <- fs,
       canApply f (poly (Var (Var (TyVar 0)))),
-      x <- fmap poly xs ]
+      x <- xs ]
 
 genSeeds :: Int -> IO [(QCGen, Int)]
 genSeeds maxSize = do
@@ -274,7 +274,7 @@ accept s = do
   modify (\st -> st { schemas = Map.adjust f (size s) (schemas st) })
   where
     t = instantiate s
-    f m = Map.insertWith (++) (poly (typ t)) [s] m
+    f m = Map.insertWith (++) (poly (typ t)) [poly s] m
 
 instance MemoTable Type where
   table = wrap f g table
