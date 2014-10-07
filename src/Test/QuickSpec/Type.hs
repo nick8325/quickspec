@@ -5,7 +5,8 @@
 module Test.QuickSpec.Type(
   -- Types.
   Typeable,
-  Type, TyCon(..), TyVar(..), A, B, C, D, typeOf, arrowType, arity,
+  Type, TyCon(..), TyVar(..), A, B, C, D,
+  typeOf, arrowType, arity, toTypeRep, fromTypeRep,
   -- Things that have types.
   Typed(..), typeSubst, tyVars,
   Apply(..), apply, canApply,
