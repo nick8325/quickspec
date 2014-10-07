@@ -1,5 +1,5 @@
 -- Polymorphic types and dynamic values.
-{-# LANGUAGE DeriveDataTypeable, CPP, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances, GeneralizedNewtypeDeriving, Rank2Types #-}
+{-# LANGUAGE DeriveDataTypeable, CPP, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances, GeneralizedNewtypeDeriving, Rank2Types, ExistentialQuantification #-}
 -- To avoid a warning about TyVarNumber's constructor being unused:
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
 module Test.QuickSpec.Type(
@@ -22,7 +22,8 @@ module Test.QuickSpec.Type(
   mapValue,
   forValue,
   pairValues,
-  Poly, poly, unPoly) where
+  Poly, poly, unPoly,
+  Unwrapped(..), unwrap) where
 
 #include "errors.h"
 
@@ -248,13 +249,17 @@ fromValue x = do
   return (fromAny (value x))
 
 mapValue :: (forall a. f a -> g a) -> Value f -> Value g
-mapValue f (Value ty x) = Value ty (f x)
+mapValue f v =
+  case unwrap v of
+    U x wrap -> wrap (f x)
 
 forValue :: Value f -> (forall a. f a -> g a) -> Value g
 forValue x f = mapValue f x
 
 ofValue :: (forall a. f a -> b) -> Value f -> b
-ofValue f (Value ty x) = f x
+ofValue f v =
+  case unwrap v of
+    U x _ -> f x
 
 pairValues :: (forall a. f a -> g a -> h a) -> Value f -> Value g -> Maybe (Value h)
 pairValues f x y = do
@@ -278,3 +283,8 @@ normaliseType t = typeSubst (evalSubst s) t
     s = T.fromMap (Map.fromList (zip tvs (map (Var . TyVar) [0..])))
     tvs = tvs' ++ (usort (tyVars t) \\ tvs')
     tvs' = usort (tyVars (typ t))
+
+data Unwrapped f = forall a. U (f a) (forall g. g a -> Value g)
+
+unwrap :: Value f -> Unwrapped f
+unwrap x = U (value x) (\y -> Value (typ x) y)
