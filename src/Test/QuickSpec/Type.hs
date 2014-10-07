@@ -222,15 +222,15 @@ instance Applicative f => Apply (Value f) where
 
 -- Unwrap a value to get at the thing inside, while still being able
 -- to wrap it up again.
-data Unwrapped f = forall a. U (f a) (forall g. g a -> Value g)
+data Unwrapped f = forall a. f a `In` (forall g. g a -> Value g)
 
 unwrap :: Value f -> Unwrapped f
-unwrap x = U (value x) (\y -> Value (typ x) y)
+unwrap x = value x `In` \y -> Value (typ x) y
 
 mapValue :: (forall a. f a -> g a) -> Value f -> Value g
 mapValue f v =
   case unwrap v of
-    U x wrap -> wrap (f x)
+    x `In` wrap -> wrap (f x)
 
 forValue :: Value f -> (forall a. f a -> g a) -> Value g
 forValue x f = mapValue f x
@@ -238,4 +238,4 @@ forValue x f = mapValue f x
 ofValue :: (forall a. f a -> b) -> Value f -> b
 ofValue f v =
   case unwrap v of
-    U x _ -> f x
+    x `In` _ -> f x

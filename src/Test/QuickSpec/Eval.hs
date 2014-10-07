@@ -78,9 +78,9 @@ insert sig x ts =
     Nothing -> Untestable
     Just tts ->
       case unwrap (pairValues insert1 x tts) of
-        U (New1 tts) wrap ->
+        New1 tts `In` wrap ->
           New (Map.insert (poly (typ x)) (wrap tts) ts)
-        U (Old1 t) _ ->
+        Old1 t `In` _ ->
           Old t
 
 data Result1 a = New1 (TestedTerms a) | Old1 Term
