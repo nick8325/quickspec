@@ -21,7 +21,8 @@ module Test.QuickSpec.Type(
   ofValue,
   mapValue,
   forValue,
-  pairValues) where
+  pairValues,
+  Poly, poly, unPoly) where
 
 #include "errors.h"
 
@@ -40,6 +41,9 @@ import qualified Data.DList as DList
 import Data.DList(DList)
 import Data.Functor.Identity
 import Data.Traversable(traverse)
+import qualified Data.Map as Map
+import qualified Data.Rewriting.Substitution.Type as T
+import Data.List
 
 -- A (possibly polymorphic) type.
 type Type = Tm TyCon TyVar
@@ -258,3 +262,19 @@ pairValues f x y = do
   s <- unify (valueType x) (valueType y')
   let z = subst s (valueType x)
   return (Value z (f (value x) (value y)))
+
+-- Represents a forall-quantifier over all the type variables in a type.
+-- Wrapping a term in Poly normalises the type by alpha-renaming
+-- type variables canonically.
+newtype Poly a = Poly { unPoly :: a }
+  deriving (Eq, Ord, Show, Pretty, Typeable)
+
+poly :: Typed a => a -> Poly a
+poly = Poly . normaliseType
+
+normaliseType :: Typed a => a -> a
+normaliseType t = typeSubst (evalSubst s) t
+  where
+    s = T.fromMap (Map.fromList (zip tvs (map (Var . TyVar) [0..])))
+    tvs = tvs' ++ (usort (tyVars t) \\ tvs')
+    tvs' = usort (tyVars (typ t))

@@ -35,7 +35,7 @@ import Debug.Trace
 import System.IO
 import PrettyPrinting
 
-type TestSet = Map Type (Value TestedTerms)
+type TestSet = Map (Poly Type) (Value TestedTerms)
 
 data TestedTerms a =
   TestedTerms {
@@ -54,7 +54,7 @@ type M = StateT S IO
 data S = S {
   schemas       :: Schemas,
   schemaTestSet :: TestSet,
-  termTestSet   :: Map Schema TestSet,
+  termTestSet   :: Map (Poly Schema) TestSet,
   pruner        :: SimplePruner }
 
 initialTestedTerms :: Signature -> Type -> Maybe (Value TestedTerms)
@@ -67,7 +67,7 @@ initialTestedTerms sig ty = do
 
 findTestSet :: Signature -> Type -> TestSet -> Maybe (Value TestedTerms)
 findTestSet sig ty m =
-  Map.lookup (normaliseType ty) m `mplus`
+  Map.lookup (poly ty) m `mplus`
   initialTestedTerms sig ty
 
 data Result = New TestSet | Old Term | Untestable
@@ -80,7 +80,7 @@ insert sig x ts =
       let r = fromMaybe __ (pairValues insert1 x tts) in
       case ofValue isNew1 r of
         True ->
-          New (Map.insert (normaliseType (typ x)) (mapValue (\(New1 tts) -> tts) r) ts)
+          New (Map.insert (poly (typ x)) (mapValue (\(New1 tts) -> tts) r) ts)
         False ->
           Old (ofValue (\(Old1 t) -> t) r)
 
@@ -120,7 +120,7 @@ env sig ty =
     (i:_) ->
       forValue i $ \(Instance Dict) -> arbitrary
 
-type Schemas = Map Int (Map Type [Schema])
+type Schemas = Map Int (Map (Poly Type) [Schema])
 
 instance Pruner S where
   emptyPruner      = initialState
@@ -164,10 +164,10 @@ schemasOfSize n _ = do
     | i <- [1..n-1],
       let j = n-i,
       (fty, fs) <- Map.toList =<< maybeToList (Map.lookup i ss),
-      canApply fty (Var (TyVar 0)),
+      canApply (unPoly fty) (Var (TyVar 0)),
       or [ canApply f (Var (Var (TyVar 0))) | f <- fs ],
       (xty, xs) <- Map.toList =<< maybeToList (Map.lookup j ss),
-      canApply fty xty,
+      canApply (unPoly fty) (unPoly xty),
       f <- fs,
       canApply f (Var (Var (TyVar 0))),
       x <- xs ]
@@ -218,16 +218,16 @@ consider sig gen env s = do
           lift $ putStr "!"
           let s = schema u
               extras =
-                case Map.lookup (normaliseType s) (termTestSet state) of
+                case Map.lookup (poly s) (termTestSet state) of
                   Nothing -> allUnifications (instantiate (schema u))
                   Just _ -> []
-          modify (\st -> st { termTestSet = Map.insertWith (\x y -> y) (normaliseType s) Map.empty (termTestSet st) })
+          modify (\st -> st { termTestSet = Map.insertWith (\x y -> y) (poly s) Map.empty (termTestSet st) })
           mapM_ (considerTerm sig gen env s) (sortBy (comparing measure) (extras ++ allUnifications t))
         New ts' -> do
           lift $ putStr "O"
           modify (\st -> st { schemaTestSet = ts' })
           when (simple s) $ do
-            modify (\st -> st { termTestSet = Map.insertWith (\x y -> y) (normaliseType s) Map.empty (termTestSet st) })
+            modify (\st -> st { termTestSet = Map.insertWith (\x y -> y) (poly s) Map.empty (termTestSet st) })
             mapM_ (considerTerm sig gen env s) (sortBy (comparing measure) (allUnifications (instantiate s)))
           accept s
     Just u | measure (schema (decodeTypes u)) < measure s -> do
@@ -246,7 +246,7 @@ considerTerm sig gen env s t = do
   case evalState (repUntyped (encodeTypes t)) (pruner state) of
     Nothing -> do
       --lift $ putStrLn ("Couldn't simplify " ++ prettyShow (t))
-      case insert sig (makeTests env gen t) (Map.findWithDefault __ (normaliseType s) (termTestSet state)) of
+      case insert sig (makeTests env gen t) (Map.findWithDefault __ (poly s) (termTestSet state)) of
         Untestable ->
           ERROR "testable term became untestable"
         Old u -> do
@@ -254,7 +254,7 @@ considerTerm sig gen env s t = do
           modify (\st -> st { pruner = execState (Test.QuickSpec.Pruning.unify (t :=: u)) (pruner st) })
         New ts' -> do
           lift $ putStr "o"
-          modify (\st -> st { termTestSet = Map.insert (normaliseType s) ts' (termTestSet st) })
+          modify (\st -> st { termTestSet = Map.insert (poly s) ts' (termTestSet st) })
     Just u -> do
       lift $ putStr "x"
       --lift $ putStrLn ("Throwing away redundant term: " ++ prettyShow (untyped t) ++ " -> " ++ prettyShow (decodeTypes u))
@@ -277,7 +277,7 @@ accept s = do
   modify (\st -> st { schemas = Map.adjust f (size s) (schemas st) })
   where
     t = instantiate s
-    f m = Map.insertWith (++) (normaliseType (typ t)) [s] m
+    f m = Map.insertWith (++) (poly (typ t)) [s] m
 
 instance MemoTable Type where
   table = wrap f g table

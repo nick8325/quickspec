@@ -90,14 +90,6 @@ instance Typed v => Apply (TermOf v) where
     case typ t of
       Fun Arrow [arg, res] | arg == typ u -> Fun f (xs ++ [u])
 
--- Take a term and alpha-rename its type canonically.
-normaliseType :: Typed a => a -> a
-normaliseType t = typeSubst (evalSubst s) t
-  where
-    s = T.fromMap (Map.fromList (zip tvs (map (Var . TyVar) [0..])))
-    tvs = tvs' ++ (usort (tyVars t) \\ tvs')
-    tvs' = usort (tyVars (typ t))
-
 -- Turn a term into a schema by forgetting about its variables.
 schema :: Term -> Schema
 schema = rename typ
@@ -112,7 +104,7 @@ instantiate s = evalState (aux s) 0
 -- Take a term and unify all type variables,
 -- and then all variables of the same type.
 skeleton :: (Ord v, Typed v) => TermOf v -> TermOf v
-skeleton = normaliseType . unifyTermVars . unifyTypeVars
+skeleton = unifyTermVars . unifyTypeVars
   where
     unifyTypeVars = typeSubst (const (Var (TyVar 0)))
     unifyTermVars t = subst (T.fromMap (Map.fromList (makeSubst (vars t)))) t
