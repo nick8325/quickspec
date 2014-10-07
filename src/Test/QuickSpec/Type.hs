@@ -177,7 +177,7 @@ instance Apply a => Apply (Poly a) where
     -- Rename x's type variables to not clash with f's.
     let x' = typeSubst (\(TyVar n) -> Var (TyVar (-n-1))) x
         resType = Var (TyVar 0)
-    s <- unify (typ f) (arrowType [typ x] resType)
+    s <- unify (typ f) (arrowType [typ x'] resType)
     let (f', x'') = typeSubst (evalSubst s) (f, x')
     fmap poly (tryApply f' x'')
 

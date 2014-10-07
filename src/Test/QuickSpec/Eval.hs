@@ -157,17 +157,17 @@ schemasOfSize 1 sig =
 schemasOfSize n _ = do
   ss <- gets schemas
   return $
-    [ apply f x
+    [ unPoly (apply f x)
     | i <- [1..n-1],
       let j = n-i,
       (fty, fs) <- Map.toList =<< maybeToList (Map.lookup i ss),
-      canApply (unPoly fty) (Var (TyVar 0)),
-      or [ canApply f (Var (Var (TyVar 0))) | f <- fs ],
+      canApply fty (poly (Var (TyVar 0))),
+      or [ canApply (poly f) (poly (Var (Var (TyVar 0)))) | f <- fs ],
       (xty, xs) <- Map.toList =<< maybeToList (Map.lookup j ss),
-      canApply (unPoly fty) (unPoly xty),
-      f <- fs,
-      canApply f (Var (Var (TyVar 0))),
-      x <- xs ]
+      canApply fty xty,
+      f <- fmap poly fs,
+      canApply f (poly (Var (Var (TyVar 0)))),
+      x <- fmap poly xs ]
 
 genSeeds :: Int -> IO [(QCGen, Int)]
 genSeeds maxSize = do
