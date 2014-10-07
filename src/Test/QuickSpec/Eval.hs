@@ -77,16 +77,13 @@ insert sig x ts =
   case findTestSet sig (typ x) ts of
     Nothing -> Untestable
     Just tts ->
-      let r = fromMaybe __ (pairValues insert1 x tts) in
-      case ofValue isNew1 r of
-        True ->
-          New (Map.insert (poly (typ x)) (mapValue (\(New1 tts) -> tts) r) ts)
-        False ->
-          Old (ofValue (\(Old1 t) -> t) r)
+      case unwrap (fromMaybe __ (pairValues insert1 x tts)) of
+        U (New1 tts) wrap ->
+          New (Map.insert (poly (typ x)) (wrap tts) ts)
+        U (Old1 t) _ ->
+          Old t
 
 data Result1 a = New1 (TestedTerms a) | Old1 Term
-isNew1 (New1 _) = True
-isNew1 _ = False
 
 insert1 :: TestedTerm a -> TestedTerms a -> Result1 a
 insert1 x ts =
