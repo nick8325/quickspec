@@ -2,7 +2,7 @@
 -- and provides a few things on top.
 
 {-# LANGUAGE CPP #-}
-module Test.QuickSpec.Base(
+module QuickSpec.Base(
   Tm,
   module Data.Rewriting.Term, foldTerm, mapTerm,
   module Data.Rewriting.Substitution, evalSubst, subst, substA, unifyMany,

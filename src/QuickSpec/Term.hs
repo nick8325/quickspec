@@ -1,11 +1,11 @@
 -- Terms and evaluation.
 {-# LANGUAGE CPP, GeneralizedNewtypeDeriving, TypeSynonymInstances, FlexibleInstances, DeriveFunctor #-}
-module Test.QuickSpec.Term where
+module QuickSpec.Term where
 
 #include "errors.h"
-import Test.QuickSpec.Utils
-import Test.QuickSpec.Base
-import Test.QuickSpec.Type
+import QuickSpec.Utils
+import QuickSpec.Base
+import QuickSpec.Type
 import Test.QuickCheck
 import Test.QuickCheck.Gen
 import Control.Monad.Trans.State.Strict

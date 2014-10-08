@@ -1,6 +1,6 @@
-module Test.QuickSpec.TestSet where
+module QuickSpec.TestSet where
 
-import Test.QuickSpec.Type
+import QuickSpec.Type
 import qualified Data.Map as Map
 import Data.Map(Map)
 import Data.Constraint

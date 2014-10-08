@@ -1,5 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module Test.QuickSpec.Rules(
+module QuickSpec.Rules(
   RulesT, runRulesT,
   on, onMatch, signal, getEvents, numHooks) where
 

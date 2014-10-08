@@ -2,7 +2,7 @@
 {-# LANGUAGE DeriveDataTypeable, CPP, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances, GeneralizedNewtypeDeriving, Rank2Types, ExistentialQuantification #-}
 -- To avoid a warning about TyVarNumber's constructor being unused:
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
-module Test.QuickSpec.Type(
+module QuickSpec.Type(
   -- Types.
   Typeable,
   Type, TyCon(..), TyVar(..), A, B, C, D,
@@ -19,8 +19,8 @@ module Test.QuickSpec.Type(
 
 #include "errors.h"
 
-import Test.QuickSpec.Base
-import Test.QuickSpec.Utils
+import QuickSpec.Base
+import QuickSpec.Utils
 import Data.Typeable(Typeable)
 import qualified Data.Typeable as Ty
 import GHC.Exts(Any)

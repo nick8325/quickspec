@@ -1,12 +1,12 @@
 -- Signatures, collecting and finding witnesses, etc.
 {-# LANGUAGE CPP, ConstraintKinds, ExistentialQuantification, ScopedTypeVariables, DeriveDataTypeable #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-module Test.QuickSpec.Signature where
+module QuickSpec.Signature where
 
 #include "errors.h"
 import Data.Constraint
-import Test.QuickSpec.Term
-import Test.QuickSpec.Type
+import QuickSpec.Term
+import QuickSpec.Type
 import Data.Functor.Identity
 import Data.Monoid
 import Test.QuickCheck

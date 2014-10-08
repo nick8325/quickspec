@@ -1,33 +1,33 @@
 {-# LANGUAGE CPP, TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables, TupleSections #-}
-module Test.QuickSpec.Eval where
+module QuickSpec.Eval where
 
 #include "errors.h"
-import Test.QuickSpec.Base hiding (unify)
-import qualified Test.QuickSpec.Base as Base
-import Test.QuickSpec.Utils
-import Test.QuickSpec.Type
-import Test.QuickSpec.Term
-import Test.QuickSpec.Signature
-import Test.QuickSpec.Equation
+import QuickSpec.Base hiding (unify)
+import qualified QuickSpec.Base as Base
+import QuickSpec.Utils
+import QuickSpec.Type
+import QuickSpec.Term
+import QuickSpec.Signature
+import QuickSpec.Equation
 import Data.Map(Map)
 import Data.Maybe
 import qualified Data.Map as Map
 import Control.Monad
-import Test.QuickSpec.Pruning
-import Test.QuickSpec.Pruning.Simple hiding (S)
-import qualified Test.QuickSpec.Pruning.Simple as Simple
-import qualified Test.QuickSpec.Pruning.E as E
+import QuickSpec.Pruning
+import QuickSpec.Pruning.Simple hiding (S)
+import qualified QuickSpec.Pruning.Simple as Simple
+import qualified QuickSpec.Pruning.E as E
 import Data.List hiding (insert)
 import Data.Ord
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Class
 import Data.MemoCombinators.Class
-import Test.QuickSpec.TestSet
-import Test.QuickSpec.Rules
+import QuickSpec.TestSet
+import QuickSpec.Rules
 import Control.Monad.IO.Class
-import Test.QuickSpec.Memo()
+import QuickSpec.Memo()
 import Control.Applicative
-import Test.QuickSpec.Test
+import QuickSpec.Test
 
 type M = RulesT Event (StateT S IO)
 

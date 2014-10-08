@@ -1,6 +1,6 @@
 -- | Miscellaneous utility functions.
 
-module Test.QuickSpec.Utils where
+module QuickSpec.Utils where
 
 import Control.Arrow((&&&))
 import Data.List(groupBy, sortBy)

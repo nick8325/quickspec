@@ -1,14 +1,14 @@
 {-# LANGUAGE TypeOperators, Rank2Types, FlexibleContexts, TypeSynonymInstances, StandaloneDeriving, DeriveGeneric, CPP #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-module Test.QuickSpec.Memo where
+module QuickSpec.Memo where
 
 #include "errors.h"
 import GHC.Generics
 import Data.MemoCombinators
 import Data.MemoCombinators.Class
 import Prelude hiding (either)
-import Test.QuickSpec.Base
-import Test.QuickSpec.Type(TyCon(..), TyVar(..))
+import QuickSpec.Base
+import QuickSpec.Type(TyCon(..), TyVar(..))
 import qualified Data.Typeable as T
 import qualified Data.Typeable.Internal as T
 import Data.Word

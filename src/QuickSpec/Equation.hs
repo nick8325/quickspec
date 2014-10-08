@@ -1,7 +1,7 @@
-module Test.QuickSpec.Equation where
+module QuickSpec.Equation where
 
-import Test.QuickSpec.Base
-import Test.QuickSpec.Term
+import QuickSpec.Base
+import QuickSpec.Term
 
 data Equation = (:=:) { lhs, rhs :: Term }
 

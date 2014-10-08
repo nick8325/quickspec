@@ -1,12 +1,12 @@
 {-# LANGUAGE CPP #-}
-module Test.QuickSpec.Test where
+module QuickSpec.Test where
 
 #include "errors.h"
-import Test.QuickSpec.Base
-import Test.QuickSpec.Term
-import Test.QuickSpec.Type
-import Test.QuickSpec.Signature
-import Test.QuickSpec.TestSet
+import QuickSpec.Base
+import QuickSpec.Term
+import QuickSpec.Type
+import QuickSpec.Signature
+import QuickSpec.TestSet
 import Test.QuickCheck
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Random

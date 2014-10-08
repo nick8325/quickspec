@@ -1,11 +1,11 @@
 {-# LANGUAGE CPP #-}
-module Test.QuickSpec.Pruning where
+module QuickSpec.Pruning where
 
 #include "errors.h"
-import Test.QuickSpec.Base
-import Test.QuickSpec.Type
-import Test.QuickSpec.Term
-import Test.QuickSpec.Equation
+import QuickSpec.Base
+import QuickSpec.Type
+import QuickSpec.Term
+import QuickSpec.Equation
 import Control.Monad.Trans.State.Strict
 
 class Pruner a where

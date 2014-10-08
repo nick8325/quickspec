@@ -1,8 +1,8 @@
-module Test.QuickSpec.Pruning.Simple where
+module QuickSpec.Pruning.Simple where
 
-import Test.QuickSpec.Base
-import Test.QuickSpec.Term
-import Test.QuickSpec.Pruning
+import QuickSpec.Base
+import QuickSpec.Term
+import QuickSpec.Pruning
 import Control.Monad
 import Control.Monad.Trans.State.Strict
 

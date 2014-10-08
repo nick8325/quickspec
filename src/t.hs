@@ -1,16 +1,16 @@
 {-# LANGUAGE FlexibleInstances, GeneralizedNewtypeDeriving, DeriveDataTypeable, ScopedTypeVariables #-}
 import Data.Ratio
-import Test.QuickSpec
+import QuickSpec
 import Test.QuickCheck
 import Control.Monad
 import Prelude hiding ((/), (\\))
 import qualified Prelude
 import Data.Typeable
 import Octonions
-import Test.QuickSpec.Type
-import Test.QuickSpec.Eval
-import Test.QuickSpec.Signature hiding (sig)
-import qualified Test.QuickSpec.Signature as S
+import QuickSpec.Type
+import QuickSpec.Eval
+import QuickSpec.Signature hiding (sig)
+import qualified QuickSpec.Signature as S
 import Data.Monoid hiding ((<>))
 import PrettyPrinting
 

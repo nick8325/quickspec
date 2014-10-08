@@ -1,11 +1,11 @@
 {-# LANGUAGE GADTs #-}
-module Test.QuickSpec.Pruning.E where
+module QuickSpec.Pruning.E where
 
-import Test.QuickSpec.Base
-import Test.QuickSpec.Term
-import Test.QuickSpec.Type
-import Test.QuickSpec.Utils
-import Test.QuickSpec.Pruning
+import QuickSpec.Base
+import QuickSpec.Term
+import QuickSpec.Type
+import QuickSpec.Utils
+import QuickSpec.Pruning
 import System.IO
 import System.IO.Unsafe
 import Control.Monad.Trans.State.Strict
