@@ -14,12 +14,17 @@ import System.Random
 import Data.Constraint
 import Data.Maybe
 
+defaultType :: Typed a => a -> a
+defaultType = typeSubst (const intType)
+  where
+    intType = typeOf (undefined :: Int)
+
 makeTester :: (a -> Term) -> (Type -> Value Gen) -> [(QCGen, Int)] -> Signature -> Type -> Maybe (Value (TypedTestSet a))
 makeTester toTerm env tests sig ty = do
   Instance Dict `In` w <-
-    fmap unwrap (listToMaybe [ i | i <- ords sig, typ i == ty ])
+    fmap unwrap (listToMaybe [ i | i <- ords sig, typ i == defaultType ty ])
   return . wrap w $
-    emptyTypedTestSet (Just . reunwrap w . makeTests env tests . toTerm)
+    emptyTypedTestSet (Just . reunwrap w . makeTests env tests . defaultType . toTerm)
 
 makeTests :: (Type -> Value Gen) -> [(QCGen, Int)] -> Term -> Value []
 makeTests env tests t =
@@ -32,10 +37,11 @@ env :: Signature -> Type -> Value Gen
 env sig ty =
   case [ i | i <- arbs sig, typ i == ty ] of
     [] ->
+      fromMaybe __ $
+      cast ty $
       toValue (ERROR $ "missing arbitrary instance for " ++ prettyShow ty :: Gen A)
     (i:_) ->
       forValue i $ \(Instance Dict) -> arbitrary
-
 
 genSeeds :: Int -> IO [(QCGen, Int)]
 genSeeds maxSize = do

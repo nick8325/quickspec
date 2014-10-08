@@ -30,24 +30,22 @@ sig = mconcat [
   constant "[]" ([] :: [Int]),
   --constant "sort" (sort :: [Int] -> [Int]),
   --constant "usort" (usort :: [Int] -> [Int]),
-  ord (undefined :: [Int]),
-  arb (undefined :: [Int])]
+  inst (undefined :: Int),
+  inst (undefined :: [Int])]
 
 sig2 = mconcat [
   constant "1" (1 :: It),
   constant "*" ((*) :: It -> It -> It),
   constant "/" ((/) :: It -> It -> It),
   constant "\\" ((\\) :: It -> It -> It),
-  ord (undefined :: It),
-  arb (undefined :: It)]
+  inst (undefined :: It)]
 
 sig3 = mconcat [
   constant "0" (0 :: Int),
   constant "1" (1 :: Int),
   constant "+" ((+) :: Int -> Int -> Int),
   constant "*" ((*) :: Int -> Int -> Int),
-  ord (undefined :: Int),
-  arb (undefined :: Int)]
+  inst (undefined :: Int)]
 
 sig4 = mconcat [
   constant "text" (text :: [Bool] -> Layout Bool),
@@ -59,12 +57,9 @@ sig4 = mconcat [
   constant "0" (0 :: Int),
   constant "+" ((+) :: Int -> Int -> Int),
   constant "length" (length :: [Bool] -> Int),
-  ord (undefined :: Layout Bool),
-  ord (undefined :: [Bool]),
-  ord (undefined :: Int),
-  arb (undefined :: Layout Bool),
-  arb (undefined :: [Bool]),
-  arb (undefined :: Int)]
+  inst (undefined :: Layout Bool),
+  inst (undefined :: [Bool]),
+  inst (undefined :: Int)]
 
 main = quickSpec sig
 

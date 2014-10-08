@@ -1,7 +1,8 @@
-{-# LANGUAGE TypeOperators, Rank2Types, FlexibleContexts, TypeSynonymInstances, StandaloneDeriving, DeriveGeneric #-}
+{-# LANGUAGE TypeOperators, Rank2Types, FlexibleContexts, TypeSynonymInstances, StandaloneDeriving, DeriveGeneric, CPP #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Test.QuickSpec.Memo where
 
+#include "errors.h"
 import GHC.Generics
 import Data.MemoCombinators
 import Data.MemoCombinators.Class
@@ -51,7 +52,7 @@ instance MemoTable TyVar where table = genericTable
 instance MemoTable T.TyCon where
   table = wrap f g table
     where
-      f :: (Word64, Word64) -> T.TyCon
-      f (x, y) = T.TyCon (T.Fingerprint x y) undefined undefined undefined
-      g :: T.TyCon -> (Word64, Word64)
-      g (T.TyCon (T.Fingerprint x y) _ _ _) = (x, y)
+      f :: (Word64, Word64, String) -> T.TyCon
+      f (x, y, xs) = T.TyCon (T.Fingerprint x y) __ __ xs
+      g :: T.TyCon -> (Word64, Word64, String)
+      g (T.TyCon (T.Fingerprint x y) _ _ xs) = (x, y, xs)

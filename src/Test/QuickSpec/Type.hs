@@ -8,10 +8,10 @@ module Test.QuickSpec.Type(
   Type, TyCon(..), TyVar(..), A, B, C, D,
   typeOf, arrowType, arity, toTypeRep, fromTypeRep,
   -- Things that have types.
-  Typed(..), typeSubst, tyVars,
+  Typed(..), typeSubst, tyVars, cast,
   Apply(..), apply, canApply,
   -- Polymorphic types.
-  Poly, poly, unPoly, polyTyp,
+  Poly, poly, unPoly, polyTyp, polyPair,
   -- Dynamic values.
   Value, toValue, fromValue,
   Unwrapped(..), unwrap, Wrapper(..),
@@ -120,6 +120,11 @@ tyVars t = DList.toList (execWriter (typeSubstA f t))
       tell (DList.singleton x)
       return (Var x)
 
+cast :: Typed a => Type -> a -> Maybe a
+cast ty x = do
+  s <- match (typ x) ty
+  return (typeSubst (evalSubst s) x)
+
 -- Typed things that support function application.
 class Typed a => Apply a where
   -- Apply a function to its argument.
@@ -169,18 +174,21 @@ normaliseType t = typeSubst (evalSubst s) t
 polyTyp :: Typed a => Poly a -> Poly Type
 polyTyp (Poly x) = Poly (typ x)
 
+polyPair :: (Typed a, Typed b) => Poly a -> Poly b -> Poly (a, b)
+polyPair (Poly x) (Poly y) = poly (x, y')
+  where
+    y' = typeSubst (\(TyVar n) -> Var (TyVar (-n-1))) y
+
 instance Typed a => Typed (Poly a) where
   typ = typ . unPoly
   typeSubstA f (Poly x) = fmap poly (typeSubstA f x)
 
 instance Apply a => Apply (Poly a) where
-  tryApply (Poly f) (Poly x) = do
-    -- Rename x's type variables to not clash with f's.
-    let x' = typeSubst (\(TyVar n) -> Var (TyVar (-n-1))) x
-        resType = Var (TyVar 0)
-    s <- unify (typ f) (arrowType [typ x'] resType)
-    let (f', x'') = typeSubst (evalSubst s) (f, x')
-    fmap poly (tryApply f' x'')
+  tryApply f x = do
+    let (f', (x', resType)) = unPoly (polyPair f (polyPair x (poly (Var (TyVar 0)))))
+    s <- unify (typ f') (arrowType [typ x'] resType)
+    let (f'', x'') = typeSubst (evalSubst s) (f', x')
+    fmap poly (tryApply f'' x'')
 
 -- Dynamic values inside an applicative functor.
 data Value f =

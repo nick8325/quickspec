@@ -30,3 +30,6 @@ ord _ = Signature [] [toValue (Instance Dict :: Instance Ord a)] []
 
 arb :: forall a. (Typeable a, Arbitrary a) => a -> Signature
 arb _ = Signature [] [] [toValue (Instance Dict :: Instance Arbitrary a)]
+
+inst :: forall a. (Typeable a, Ord a, Arbitrary a) => a -> Signature
+inst x = ord x `mappend` arb x

@@ -3,6 +3,7 @@ module Test.QuickSpec.Eval where
 
 #include "errors.h"
 import Test.QuickSpec.Base hiding (unify)
+import qualified Test.QuickSpec.Base as Base
 import Test.QuickSpec.Utils
 import Test.QuickSpec.Type
 import Test.QuickSpec.Term
@@ -42,6 +43,7 @@ data Event =
   | Term   TermFrom (KindOf TermFrom)
   | ConsiderSchema Schema
   | ConsiderTerm   TermFrom
+  | UntestableGroundType Type
   deriving (Eq, Ord, Show)
 
 data KindOf a = Untestable | Representative | EqualTo a
@@ -60,13 +62,8 @@ initialState ts ts' =
 schemasOfSize :: Int -> Signature -> M [Schema]
 schemasOfSize 1 sig =
   return $
-    [Var ty | ty <- tys] ++
+    [Var (Var (TyVar 0))] ++
     [Fun c [] | c <- constants sig]
-  where
-    tys = [typeOf (undefined :: [Int])]
-    {-tys = [typeOf (undefined :: Int),
-           typeOf (undefined :: [Bool]),
-           typeOf (undefined :: Layout Bool)]-}
 schemasOfSize n _ = do
   ss <- lift $ gets schemas
   return $
@@ -110,10 +107,12 @@ allUnifications t = map f ss
     f s = rename (go s) t
 
 createRules :: M ()
-createRules =
+createRules = do
   onMatch $ \e -> do
     case e of
-      Schema s Untestable -> accept s
+      Schema s Untestable -> do
+        when (arity (typ s) == 0) (signal (UntestableGroundType (typ (defaultType s))))
+        accept s
       Schema s (EqualTo t) -> do
         considerRenamings t t
         considerRenamings t s
@@ -126,6 +125,23 @@ createRules =
       Term _ Representative -> return ()
       ConsiderSchema s -> consider s
       ConsiderTerm   t -> consider t
+      UntestableGroundType ty ->
+        liftIO $ putStrLn ("Warning: generated term of untestable type " ++ prettyShow ty)
+  onMatch $ \e ->
+    case e of
+      Schema s Representative ->
+        onMatch $ \e ->
+          case e of
+            Schema t Representative | t < s -> do
+              let pair = polyPair (poly s) (poly t)
+                  (s', t') = unPoly pair
+              case Base.unify (typ s') (typ t') of
+                Just sub -> do
+                  signal (ConsiderSchema (typeSubst (evalSubst sub) s'))
+                  signal (ConsiderSchema (typeSubst (evalSubst sub) t'))
+                Nothing -> return ()
+            _ -> return ()
+      _ -> return ()
 
 considerRenamings :: Schema -> Schema -> M ()
 considerRenamings s s' =
