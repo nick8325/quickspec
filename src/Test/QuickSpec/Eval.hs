@@ -211,7 +211,7 @@ found :: Term -> Term -> M ()
 found t u = do
   Simple.S eqs <- lift $ gets pruner
   lift $ modify (\s -> s { pruner = execState (unify (t :=: u)) (pruner s) })
-  case False && evalState (unify (t :=: u)) (E.S eqs) of
+  case True && evalState (unify (t :=: u)) (E.S eqs) of
     True ->
       return ()
     False ->

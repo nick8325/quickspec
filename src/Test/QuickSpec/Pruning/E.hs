@@ -32,12 +32,12 @@ eliftIO x = unsafePerformIO (fmap return x)
 eUnify :: PruningTerm -> PruningTerm -> State EPruner Bool
 eUnify t u = do
   S eqs <- get
-  eliftIO (putStr ("\nSending to E: " ++ prettyShow (decodeTypes t) ++ " = " ++ prettyShow (decodeTypes u) ++ ": ") >> hFlush stdout)
-  let opts = Jukebox.EFlags "eprover" (Just 5) Nothing
+  -- eliftIO (putStr ("\nSending to E: " ++ prettyShow (decodeTypes t) ++ " = " ++ prettyShow (decodeTypes u) ++ ": ") >> hFlush stdout)
+  let opts = Jukebox.EFlags "eprover" (Just 0) Nothing
       prob = translate eqs t u
   prob' <- eliftIO (Jukebox.toFofIO (Jukebox.clausifyIO (Jukebox.ClausifyFlags False)) (Jukebox.tags False) prob)
   res <- eliftIO (Jukebox.runE opts prob')
-  eliftIO (print res)
+  --eliftIO (print res)
   case res of
     Left Jukebox.Unsatisfiable ->
       -- Pruned
