@@ -1,6 +1,5 @@
 module Test.QuickSpec.TestSet where
 
-import Test.QuickSpec.Term
 import Test.QuickSpec.Type
 import qualified Data.Map as Map
 import Data.Map(Map)

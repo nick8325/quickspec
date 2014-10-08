@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, ConstraintKinds, TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables, TupleSections #-}
+{-# LANGUAGE CPP, TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables, TupleSections #-}
 module Test.QuickSpec.Eval where
 
 #include "errors.h"
@@ -8,7 +8,6 @@ import Test.QuickSpec.Type
 import Test.QuickSpec.Term
 import Test.QuickSpec.Signature
 import Test.QuickSpec.Equation
-import Data.Constraint
 import Data.Map(Map)
 import Data.Maybe
 import qualified Data.Map as Map
@@ -22,16 +21,12 @@ import Data.Ord
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Class
 import Data.MemoCombinators.Class
-import Test.QuickCheck hiding (collect, Result)
-import System.Random
-import Test.QuickCheck.Gen
-import Test.QuickCheck.Random
-import System.IO
 import Test.QuickSpec.TestSet
 import Test.QuickSpec.Rules
 import Control.Monad.IO.Class
 import Test.QuickSpec.Memo()
 import Control.Applicative
+import Test.QuickSpec.Test
 
 type M = RulesT Event (StateT S IO)
 
@@ -53,28 +48,6 @@ data EventFor a =
   | Equal a a
   | Representative a
   deriving (Eq, Ord, Show)
-
-makeTester :: (a -> Term) -> (Type -> Value Gen) -> [(QCGen, Int)] -> Signature -> Type -> Maybe (Value (TypedTestSet a))
-makeTester toTerm env tests sig ty = do
-  Instance Dict `In` w <-
-    fmap unwrap (listToMaybe [ i | i <- ords sig, typ i == ty ])
-  return . wrap w $
-    emptyTypedTestSet (Just . reunwrap w . makeTests env tests . toTerm)
-
-makeTests :: (Type -> Value Gen) -> [(QCGen, Int)] -> Term -> Value []
-makeTests env tests t =
-  mapValue f (evaluateTerm env t)
-  where
-    f :: Gen a -> [a]
-    f x = map (uncurry (unGen x)) tests
-
-env :: Signature -> Type -> Value Gen
-env sig ty =
-  case [ i | i <- arbs sig, typ i == ty ] of
-    [] ->
-      toValue (ERROR $ "missing arbitrary instance for " ++ prettyShow ty :: Gen A)
-    (i:_) ->
-      forValue i $ \(Instance Dict) -> arbitrary
 
 type Schemas = Map Int (Map (Poly Type) [Poly Schema])
 
@@ -111,15 +84,8 @@ schemasOfSize n _ = do
       canApply f (poly (Var (Var (TyVar 0)))),
       x <- xs ]
 
-genSeeds :: Int -> IO [(QCGen, Int)]
-genSeeds maxSize = do
-  rnd <- newQCGen
-  let rnds rnd = rnd1 : rnds rnd2 where (rnd1, rnd2) = split rnd
-  return (zip (rnds rnd) (concat (repeat [0,2..maxSize])))
-
 quickSpec :: Signature -> IO ()
-quickSpec sig = do
-  hSetBuffering stdout NoBuffering
+quickSpec sig = unbuffered $ do
   seeds <- fmap (take 100) (genSeeds 20)
   let e = table (env sig)
       ts = emptyTestSet (makeTester (skeleton . instantiate) e seeds sig)
