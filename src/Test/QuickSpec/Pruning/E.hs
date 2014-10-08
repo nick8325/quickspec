@@ -28,17 +28,17 @@ instance Pruner EPruner where
   unifyUntyped = eUnify
   repUntyped _ = return Nothing
 
-liftIO x = unsafePerformIO (fmap return x)
+eliftIO x = unsafePerformIO (fmap return x)
 
 eUnify :: PruningTerm -> PruningTerm -> State EPruner Bool
 eUnify t u = do
   S eqs <- get
-  liftIO (putStr ("\nSending to E: " ++ prettyShow (decodeTypes t) ++ " = " ++ prettyShow (decodeTypes u) ++ ": ") >> hFlush stdout)
+  eliftIO (putStr ("\nSending to E: " ++ prettyShow (decodeTypes t) ++ " = " ++ prettyShow (decodeTypes u) ++ ": ") >> hFlush stdout)
   let opts = Jukebox.EFlags "eprover" (Just 5) Nothing
       prob = translate eqs t u
-  prob' <- liftIO (Jukebox.toFofIO (Jukebox.clausifyIO (Jukebox.ClausifyFlags False)) (Jukebox.tags False) prob)
-  res <- liftIO (Jukebox.runE opts prob')
-  liftIO (print res)
+  prob' <- eliftIO (Jukebox.toFofIO (Jukebox.clausifyIO (Jukebox.ClausifyFlags False)) (Jukebox.tags False) prob)
+  res <- eliftIO (Jukebox.runE opts prob')
+  eliftIO (print res)
   case res of
     Left Jukebox.Unsatisfiable ->
       -- Pruned

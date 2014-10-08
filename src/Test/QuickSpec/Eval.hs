@@ -2,7 +2,7 @@
 module Test.QuickSpec.Eval where
 
 #include "errors.h"
-import Test.QuickSpec.Base
+import Test.QuickSpec.Base hiding (unify)
 import Test.QuickSpec.Utils
 import Test.QuickSpec.Type
 import Test.QuickSpec.Term
@@ -37,14 +37,29 @@ import Debug.Trace
 import System.IO
 import PrettyPrinting
 import Test.QuickSpec.TestSet
+import Test.QuickSpec.Rules
+import Control.Monad.IO.Class
 
-type M = StateT S IO
+type M = RulesT Event (StateT S IO)
 
 data S = S {
   schemas       :: Schemas,
   schemaTestSet :: TestSet,
   termTestSet   :: Map (Poly Schema) TestSet,
-  pruner        :: SimplePruner }
+  pruner        :: SimplePruner,
+  freshTestSet  :: TestSet }
+
+data Event =
+    Schema (EventFor Schema)
+  | Term (Poly Schema) (EventFor Term)
+  deriving (Eq, Ord, Show)
+
+data EventFor a =
+    Exists a
+  | Untestable a
+  | Equal a a
+  | Representative a
+  deriving (Eq, Ord, Show)
 
 makeTester :: (Type -> Value Gen) -> [(QCGen, Int)] -> Signature -> Type -> Maybe (Value TestedTerms)
 makeTester env tests sig ty = do
@@ -86,7 +101,8 @@ initialState ts =
   S { schemas       = Map.empty,
       schemaTestSet = ts,
       termTestSet   = Map.empty,
-      pruner        = emptyPruner }
+      pruner        = emptyPruner,
+      freshTestSet  = ts }
 
 typeSchemas :: [Schema] -> Map Type [Schema]
 typeSchemas = fmap (map schema) . collect . map instantiate
@@ -106,7 +122,7 @@ schemasOfSize 1 sig =
            typeOf (undefined :: [Bool]),
            typeOf (undefined :: Layout Bool)]-}
 schemasOfSize n _ = do
-  ss <- gets schemas
+  ss <- lift $ gets schemas
   return $
     [ unPoly (apply f x)
     | i <- [1..n-1],
@@ -131,16 +147,17 @@ quickSpec sig = do
   hSetBuffering stdout NoBuffering
   seeds <- genSeeds 20
   let ts = emptyTestSet (makeTester (table (env sig)) (take 100 seeds) sig)
-  _ <- execStateT (go 1 sig ts) (initialState ts)
+  _ <- execStateT (runRulesT (createRules sig ts >> go 1 sig ts)) (initialState ts)
   return ()
 
 go :: Int -> Signature -> TestSet -> M ()
 go 10 _ _ = return ()
 go n sig emptyTs = do
-  modify (\s -> s { schemas = Map.insert n Map.empty (schemas s) })
+  lift $ modify (\s -> s { schemas = Map.insert n Map.empty (schemas s) })
   ss <- fmap (sortBy (comparing measure)) (schemasOfSize n sig)
-  lift $ putStr ("\n\nSize " ++ show n ++ ", " ++ show (length ss) ++ " schemas to consider: ")
-  mapM_ (consider sig emptyTs) ss
+  liftIO $ putStrLn ("Size " ++ show n ++ ", " ++ show (length ss) ++ " schemas to consider:")
+  sequence_ [ signal (Schema (Exists s)) | s <- ss ]
+  liftIO $ putStrLn ""
   go (n+1) sig emptyTs
 
 allUnifications :: Term -> [Term]
@@ -151,79 +168,98 @@ allUnifications t = map f ss
     go s x = Map.findWithDefault __ x s
     f s = rename (go s) t
 
-consider :: Signature -> TestSet -> Schema -> M ()
-consider sig emptyTs s = do
-  state <- get
-  let t = instantiate s
-  case evalState (repUntyped (encodeTypes t)) (pruner state) of
-    Nothing -> do
-      -- Need to test this term
-      let skel = skeleton t
-      case insert (poly skel) (schemaTestSet state) of
-        Nothing ->
-          accept s
-        Just (Old u) -> do
-          --lift (putStrLn ("Found schema equality! " ++ prettyShow (untyped skel :=: untyped u)))
-          lift $ putStr "!"
-          let s = schema u
-              extras =
-                case Map.lookup (poly s) (termTestSet state) of
-                  Nothing -> allUnifications (instantiate (schema u))
-                  Just _ -> []
-          modify (\st -> st { termTestSet = Map.insertWith (\x y -> y) (poly s) emptyTs (termTestSet st) })
-          mapM_ (considerTerm sig s) (sortBy (comparing measure) (extras ++ allUnifications t))
-        Just (New ts') -> do
-          lift $ putStr "O"
-          modify (\st -> st { schemaTestSet = ts' })
-          when (simple s) $ do
-            modify (\st -> st { termTestSet = Map.insertWith (\x y -> y) (poly s) emptyTs (termTestSet st) })
-            mapM_ (considerTerm sig s) (sortBy (comparing measure) (allUnifications (instantiate s)))
-          accept s
-    Just u | measure (schema (decodeTypes u)) < measure s -> do
-      lift $ putStr "X"
-      -- lift $ putStrLn ("Throwing away redundant schema: " ++ prettyShow t ++ " -> " ++ prettyShow (decodeTypes u))
-      let pruner' = execState (unifyUntyped (encodeTypes t) u) (pruner state)
-      put state { pruner = pruner' }
+createRules :: Signature -> TestSet -> M ()
+createRules sig ts =
+  onMatch $ \e -> do
+    case e of
+      Schema (Exists s) -> considerSchema s
+      Schema (Untestable s) -> accept s
+      Schema (Equal s t) -> do
+        considerRenamings t t
+        considerRenamings t s
+      Schema (Representative s) -> do
+        accept s
+        when (size s <= 5) $ considerRenamings s s
+      Term s (Exists t) -> considerTerm s t
+      Term s (Untestable t) ->
+        ERROR ("Untestable instance " ++ prettyShow t ++ " of testable schema " ++ prettyShow s)
+      Term _ (Equal t u) -> found t u
+      Term _ (Representative _) -> return ()
 
--- simple t = size t <= 5
--- simple t = True
-simple t = False
+considerRenamings s s' =
+  sequence_ [ signal (Term (poly s) (Exists t)) | t <- ts ]
+  where
+    ts = sortBy (comparing measure) (allUnifications (instantiate s'))
 
-considerTerm :: Signature -> Schema -> Term -> M ()
-considerTerm sig s t = do
-  state <- get
-  case evalState (repUntyped (encodeTypes t)) (pruner state) of
+data Consideration a b =
+  Consideration {
+    pruningTerm :: a -> Term,
+    pruningMeasure :: Term -> b,
+    testingTerm :: a -> Term,
+    testingUnTerm :: Term -> a,
+    getTestSet :: M TestSet,
+    putTestSet :: TestSet -> M (),
+    event :: EventFor a -> Event }
+
+consider :: Ord b => Consideration a b -> a -> M ()
+consider con x = do
+  pruner <- lift $ gets pruner
+  let t = pruningTerm con x
+  case evalState (repUntyped (encodeTypes t)) pruner of
+    Just u | pruningMeasure con (decodeTypes u) < pruningMeasure con t ->
+      let mod = execState (unifyUntyped (encodeTypes t) u)
+      in lift $ modify (\s -> s { pruner = mod pruner })
     Nothing -> do
-      --lift $ putStrLn ("Couldn't simplify " ++ prettyShow (t))
-      case insert (poly t) (Map.findWithDefault __ (poly s) (termTestSet state)) of
+      ts <- getTestSet con
+      let t = testingTerm con x
+      case insert (poly t) ts of
         Nothing ->
-          ERROR "testable term became untestable"
-        Just (Old u) -> do
-          found t u
-          modify (\st -> st { pruner = execState (Test.QuickSpec.Pruning.unify (t :=: u)) (pruner st) })
-        Just (New ts') -> do
-          lift $ putStr "o"
-          modify (\st -> st { termTestSet = Map.insert (poly s) ts' (termTestSet st) })
-    Just u -> do
-      lift $ putStr "x"
-      --lift $ putStrLn ("Throwing away redundant term: " ++ prettyShow (untyped t) ++ " -> " ++ prettyShow (decodeTypes u))
-      let pruner' = execState (unifyUntyped (encodeTypes t) u) (pruner state)
-      put state { pruner = pruner' }
+          signal (event con (Untestable x))
+        Just (Old u) ->
+          signal (event con (Equal x (testingUnTerm con u)))
+        Just (New ts) -> do
+          putTestSet con ts
+          signal (event con (Representative x))
+
+considerSchema s = consider con s
+  where
+    con =
+      Consideration {
+        pruningTerm = instantiate,
+        pruningMeasure = measure . schema,
+        testingTerm = skeleton . instantiate,
+        testingUnTerm = schema,
+        getTestSet = lift $ gets schemaTestSet,
+        putTestSet = \ts -> lift $ modify (\s -> s { schemaTestSet = ts }),
+        event = Schema }
+
+considerTerm s t = consider con t
+  where
+    con =
+      Consideration {
+        pruningTerm = id,
+        pruningMeasure = measure,
+        testingTerm = id,
+        testingUnTerm = id,
+        getTestSet = getTestSet,
+        putTestSet = \ts -> lift $ modify (\st -> st { termTestSet = Map.insert s ts (termTestSet st) }),
+        event = Term s }
+    getTestSet = lift $ do
+      ts <- gets freshTestSet
+      gets (Map.findWithDefault ts s . termTestSet)
 
 found :: Term -> Term -> M ()
 found t u = do
-  Simple.S eqs <- gets pruner
+  Simple.S eqs <- lift $ gets pruner
+  lift $ modify (\s -> s { pruner = execState (unify (t :=: u)) (pruner s) })
   case False of -- evalState (Pruning.unify (t :=: u)) (E.S eqs) of
-    True -> do
-      lift $ putStrLn ("\nProved by E: " ++ prettyShow t ++ " = " ++ prettyShow u)
+    True ->
       return ()
     False ->
-      lift $ putStrLn ("\n******** " ++ prettyShow t ++ " = " ++ prettyShow u)
+      liftIO $ putStrLn (prettyShow t ++ " = " ++ prettyShow u)
 
 accept :: Schema -> M ()
 accept s = do
-  --lift (putStrLn ("Accepting schema " ++ prettyShow s))
-  modify (\st -> st { schemas = Map.adjust f (size s) (schemas st) })
+  lift $ modify (\st -> st { schemas = Map.adjust f (size s) (schemas st) })
   where
-    t = instantiate s
-    f m = Map.insertWith (++) (poly (typ t)) [poly s] m
+    f m = Map.insertWith (++) (polyTyp (poly s)) [poly s] m
