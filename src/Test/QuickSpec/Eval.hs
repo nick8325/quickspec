@@ -43,7 +43,9 @@ data Event =
   | Term   TermFrom (KindOf TermFrom)
   | ConsiderSchema Schema
   | ConsiderTerm   TermFrom
-  | UntestableGroundType Type
+  | UntestableGroundType (Poly Type)
+  | SchemaType           (Poly Type)
+  | UnifiableTypes       (Poly Type) (Poly Type) (Poly Type)
   deriving (Eq, Ord, Show)
 
 data KindOf a = Untestable | Representative | EqualTo a
@@ -89,7 +91,11 @@ quickSpec sig = unbuffered $ do
   return ()
 
 go :: Int -> Signature -> M ()
-go 10 _ = return ()
+go 10 _ = do
+  n <- numEvents
+  h <- numHooks
+  liftIO $ putStrLn (show n ++ " events happened in total.")
+  liftIO $ putStrLn (show h ++ " hooks installed.")
 go n sig = do
   lift $ modify (\s -> s { schemas = Map.insert n Map.empty (schemas s) })
   ss <- fmap (sortBy (comparing measure)) (schemasOfSize n sig)
@@ -111,7 +117,7 @@ createRules = do
   onMatch $ \e -> do
     case e of
       Schema s Untestable -> do
-        when (arity (typ s) == 0) (signal (UntestableGroundType (typ (defaultType s))))
+        when (arity (typ s) == 0) (signal (UntestableGroundType (poly (typ (defaultType s)))))
         accept s
       Schema s (EqualTo t) -> do
         considerRenamings t t
@@ -127,18 +133,24 @@ createRules = do
       ConsiderTerm   t -> consider t
       UntestableGroundType ty ->
         liftIO $ putStrLn ("Warning: generated term of untestable type " ++ prettyShow ty)
+      SchemaType ty -> return ()
+      UnifiableTypes _ _ _ -> return ()
   onMatch $ \e ->
     case e of
-      Schema s Representative ->
+      SchemaType ty1 ->
         onMatch $ \e ->
           case e of
-            Schema t Representative | t < s -> do
-              let pair = polyPair (poly s) (poly t)
-                  (s', t') = unPoly pair
-              case Base.unify (typ s') (typ t') of
+            SchemaType ty2 | unPoly ty1 < unPoly ty2 -> do
+              let (ty1', ty2') = unPoly (polyPair ty1 ty2)
+              case Base.unify ty1' ty2' of
                 Just sub -> do
-                  signal (ConsiderSchema (typeSubst (evalSubst sub) s'))
-                  signal (ConsiderSchema (typeSubst (evalSubst sub) t'))
+                  let mgu = poly (typeSubst (evalSubst sub) ty1')
+                      tys = [ty1, ty2] \\ [mgu]
+                  onMatch $ \e ->
+                    case e of
+                      Schema s Representative | poly (typ s) `elem` tys ->
+                        signal (ConsiderSchema (fromMaybe __ (cast (unPoly mgu) s)))
+                      _ -> return ()
                 Nothing -> return ()
             _ -> return ()
       _ -> return ()
@@ -207,6 +219,7 @@ found t u = do
 
 accept :: Schema -> M ()
 accept s = do
+  signal (SchemaType (poly (typ s)))
   lift $ modify (\st -> st { schemas = Map.adjust f (size s) (schemas st) })
   where
     f m = Map.insertWith (++) (polyTyp (poly s)) [poly s] m
