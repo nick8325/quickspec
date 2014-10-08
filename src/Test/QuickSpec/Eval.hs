@@ -92,9 +92,25 @@ quickSpec sig = unbuffered $ do
 
 go :: Int -> Signature -> M ()
 go 10 _ = do
-  n <- numEvents
+  es <- getEvents
+  let isSchema (Schema _ _) = True
+      isSchema _ = False
+      isTerm (Term _ _) = True
+      isTerm _ = False
+      isCreation (ConsiderSchema _) = True
+      isCreation (ConsiderTerm _) = True
+      isCreation _ = False
+      numEvents = length es
+      numSchemas = length (filter isSchema es)
+      numTerms = length (filter isTerm es)
+      numCreation = length (filter isCreation es)
+      numMisc = numEvents - numSchemas - numTerms - numCreation
   h <- numHooks
-  liftIO $ putStrLn (show n ++ " events happened in total.")
+  liftIO $ putStrLn (show numEvents ++ " events created in total (" ++
+                     show numSchemas ++ " schemas, " ++
+                     show numTerms ++ " terms, " ++
+                     show numCreation ++ " creation, " ++
+                     show numMisc ++ " miscellaneous).")
   liftIO $ putStrLn (show h ++ " hooks installed.")
 go n sig = do
   lift $ modify (\s -> s { schemas = Map.insert n Map.empty (schemas s) })

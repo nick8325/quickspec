@@ -1,7 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Test.QuickSpec.Rules(
   RulesT, runRulesT,
-  on, onMatch, signal, numEvents, numHooks) where
+  on, onMatch, signal, getEvents, numHooks) where
 
 import Control.Monad.Trans.State
 import Control.Monad.Trans.Class
@@ -30,11 +30,11 @@ data Event e m =
 runRulesT :: Monad m => RulesT e m a -> m a
 runRulesT m = evalStateT (unRulesT m) (S Map.empty [])
 
-numEvents :: Monad m => RulesT e m Int
-numEvents =
+getEvents :: Monad m => RulesT e m [e]
+getEvents =
   RulesT $ do
     es <- gets events
-    return (length [ () | Fired <- Map.elems es ])
+    return [ e | (e, Fired) <- Map.toList es ]
 
 numHooks :: Monad m => RulesT e m Int
 numHooks = RulesT (gets (length . hooks))
