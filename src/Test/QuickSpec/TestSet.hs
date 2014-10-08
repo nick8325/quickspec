@@ -1,9 +1,7 @@
 module Test.QuickSpec.TestSet where
 
-import Test.QuickSpec.Base
 import Test.QuickSpec.Term
 import Test.QuickSpec.Type
-import Test.QuickSpec.Signature
 import qualified Data.Map as Map
 import Data.Map(Map)
 import Data.Constraint
@@ -61,7 +59,7 @@ insert1 x ts =
   where
     k res = ts { testResults = res }
     aux :: Ord a => (TestResults a -> TestedTerms a) -> Term -> [a] -> TestResults a -> Result1 a
-    aux k x [] (Singleton (TestedTerm y [])) = Old1 y
+    aux _ _ [] (Singleton (TestedTerm y [])) = Old1 y
     aux k x ts (Singleton (TestedTerm y (t':ts'))) =
       aux k x ts (TestCase (Map.singleton t' (Singleton (TestedTerm y ts'))))
     aux k x (t:ts) (TestCase res) =

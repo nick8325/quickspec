@@ -5,16 +5,11 @@ module Test.QuickSpec.Signature where
 
 #include "errors.h"
 import Data.Constraint
-import Test.QuickSpec.Base
 import Test.QuickSpec.Term
 import Test.QuickSpec.Type
-import Test.QuickSpec.Utils
 import Data.Functor.Identity
 import Data.Monoid
 import Test.QuickCheck
-import Control.Monad
-import Data.Maybe
-import Data.List
 
 newtype Instance c a = Instance (Dict (c a))
 data Signature =

@@ -8,20 +8,13 @@ import Test.QuickSpec.Base
 import Test.QuickSpec.Type
 import Test.QuickCheck
 import Test.QuickCheck.Gen
-import Control.Monad
 import Control.Monad.Trans.State.Strict
 import Data.Ord
-import Data.Map(Map)
 import qualified Data.Map as Map
 import Data.Functor.Identity
 import Control.Applicative
 import Data.Traversable(traverse)
-import Data.Tuple
 import qualified Data.Rewriting.Substitution.Type as T
-import Octonions hiding (Fun)
-import Data.List
-import Data.Maybe
-import Debug.Trace
 
 -- Terms and schemas.
 -- A schema is like a term but has holes instead of variables.
@@ -86,7 +79,7 @@ instance Typed v => Typed (TermOf v) where
 instance Typed v => Apply (TermOf v) where
   tryApply t@(Fun f xs) u =
     case typ t of
-      Fun Arrow [arg, res] | arg == typ u -> Just (Fun f (xs ++ [u]))
+      Fun Arrow [arg, _] | arg == typ u -> Just (Fun f (xs ++ [u]))
       _ -> Nothing
   tryApply Var{} _ = Nothing
 

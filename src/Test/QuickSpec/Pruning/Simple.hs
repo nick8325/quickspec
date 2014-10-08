@@ -41,7 +41,10 @@ simpleRep t = do
   S eqs <- get
   return (simplifies eqs t)
 
+simplifies :: [(PruningTerm, PruningTerm)] -> PruningTerm -> Maybe PruningTerm
 simplifies eqs t = msum [ simplifies1 (u, v) t `mplus` simplifies1 (v, u) t | (u, v) <- eqs ]
+
+simplifies1 :: (PruningTerm, PruningTerm) -> PruningTerm -> Maybe PruningTerm
 simplifies1 (t, u) v = do
   s <- match t v
   let w = subst s u

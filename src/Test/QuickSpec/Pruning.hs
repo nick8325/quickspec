@@ -6,9 +6,6 @@ import Test.QuickSpec.Base
 import Test.QuickSpec.Type
 import Test.QuickSpec.Term
 import Test.QuickSpec.Equation
-import Data.Rewriting.Substitution.Type
-import qualified Data.Map as Map
-import Data.Maybe
 import Control.Monad.Trans.State.Strict
 
 class Pruner a where

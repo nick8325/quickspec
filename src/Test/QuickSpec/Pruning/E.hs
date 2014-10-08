@@ -8,15 +8,13 @@ import Test.QuickSpec.Utils
 import Test.QuickSpec.Pruning
 import System.IO
 import System.IO.Unsafe
-import Data.List hiding (find)
-import qualified Data.Map as Map
-import Data.Map(Map)
 import Control.Monad.Trans.State.Strict
+import Data.Map(Map)
+import qualified Data.Map as Map
 import qualified Data.ByteString.Char8 as BS
 import qualified Jukebox.Form as Jukebox
 import qualified Jukebox.Name as Jukebox
 import qualified Jukebox.Provers.E as Jukebox
-import qualified Jukebox.TPTP.Print as Jukebox
 import qualified Jukebox.Toolbox as Jukebox
 import qualified Jukebox.Monotonox.ToFOF as Jukebox
 import qualified Jukebox.Clausify as Jukebox
@@ -28,6 +26,7 @@ instance Pruner EPruner where
   unifyUntyped = eUnify
   repUntyped _ = return Nothing
 
+eliftIO :: IO a -> State EPruner a
 eliftIO x = unsafePerformIO (fmap return x)
 
 eUnify :: PruningTerm -> PruningTerm -> State EPruner Bool
@@ -48,6 +47,8 @@ eUnify t u = do
       modify (\(S eqs) -> S ((t,u):eqs))
       return False
 
+translate :: [(PruningTerm, PruningTerm)] -> PruningTerm -> PruningTerm ->
+             Jukebox.Closed [Jukebox.Input Jukebox.Form]
 translate eqs t u = Jukebox.close_ Jukebox.stdNames $ do
   ty <- Jukebox.newType "i"
   let terms = [t, u] ++ concat [ [l, r] | (l, r) <- eqs ]
@@ -61,8 +62,11 @@ translate eqs t u = Jukebox.close_ Jukebox.stdNames $ do
   return (input Jukebox.Conjecture (conjecturise (translateEq var fun (t, u))):
           map (input Jukebox.Axiom . translateEq var fun) eqs)
 
+makeVarName :: PruningVariable -> String
 makeVarName (TermVariable x) = 'X':show (varNumber x)
 makeVarName (TypeVariable x) = 'A':show (tyVarNumber x)
+
+makeFunName :: PruningConstant -> String
 makeFunName (TermConstant x) = 'f':conName x
 makeFunName (TypeConstant x) = 't':show x
 makeFunName HasType          = "as"
@@ -76,11 +80,18 @@ conjecturise t =
     term (Jukebox.Var (x Jukebox.::: t)) = (x Jukebox.::: Jukebox.FunType [] t) Jukebox.:@: []
     term t = Jukebox.recursively conjecturise t
 
+find :: Ord k => Map k v -> k -> v
 find m x = Map.findWithDefault (error "E: not found") x m
 
+translateEq :: (PruningVariable -> Jukebox.Variable) ->
+               (PruningConstant -> Jukebox.Function) ->
+               (PruningTerm, PruningTerm) -> Jukebox.Form
 translateEq var fun (t, u) =
   Jukebox.Literal (Jukebox.Pos (translateTerm var fun t Jukebox.:=: translateTerm var fun u))
 
-translateTerm var fun (Var x) = Jukebox.Var (var x)
-translateTerm var fun (Fun f ts) = fun f Jukebox.:@: map (translateTerm var fun) ts
+translateTerm :: (PruningVariable -> Jukebox.Variable) ->
+                 (PruningConstant -> Jukebox.Function) ->
+                 PruningTerm -> Jukebox.Term
+translateTerm var _fun (Var x) = Jukebox.Var (var x)
+translateTerm var  fun (Fun f ts) = fun f Jukebox.:@: map (translateTerm var fun) ts
 

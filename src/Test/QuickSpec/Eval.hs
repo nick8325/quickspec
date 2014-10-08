@@ -8,37 +8,29 @@ import Test.QuickSpec.Type
 import Test.QuickSpec.Term
 import Test.QuickSpec.Signature
 import Test.QuickSpec.Equation
-import Test.QuickSpec.Memo
 import Data.Constraint
 import Data.Map(Map)
 import Data.Maybe
 import qualified Data.Map as Map
 import Control.Monad
 import Test.QuickSpec.Pruning
-import qualified Test.QuickSpec.Pruning as Pruning
 import Test.QuickSpec.Pruning.Simple hiding (S)
-import Test.QuickSpec.Pruning.E hiding (S)
 import qualified Test.QuickSpec.Pruning.Simple as Simple
 import qualified Test.QuickSpec.Pruning.E as E
 import Data.List hiding (insert)
 import Data.Ord
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Class
-import Data.MemoCombinators hiding (wrap)
-import qualified Data.MemoCombinators as Memo
 import Data.MemoCombinators.Class
 import Test.QuickCheck hiding (collect, Result)
 import System.Random
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Random
-import qualified Data.Typeable.Internal as T
-import Data.Word
-import Debug.Trace
 import System.IO
-import PrettyPrinting
 import Test.QuickSpec.TestSet
 import Test.QuickSpec.Rules
 import Control.Monad.IO.Class
+import Test.QuickSpec.Memo()
 
 type M = RulesT Event (StateT S IO)
 
@@ -84,17 +76,6 @@ env sig ty =
       forValue i $ \(Instance Dict) -> arbitrary
 
 type Schemas = Map Int (Map (Poly Type) [Poly Schema])
-
-instance Pruner S where
-  emptyPruner      = __
-  unifyUntyped t u = inPruner (unifyUntyped t u)
-  repUntyped t     = inPruner (repUntyped t)
-
-inPruner x = do
-  s <- get
-  let (y, s') = runState x (pruner s)
-  put s { pruner = s' }
-  return y
 
 initialState :: TestSet -> S
 initialState ts =
@@ -147,7 +128,7 @@ quickSpec sig = do
   hSetBuffering stdout NoBuffering
   seeds <- genSeeds 20
   let ts = emptyTestSet (makeTester (table (env sig)) (take 100 seeds) sig)
-  _ <- execStateT (runRulesT (createRules sig ts >> go 1 sig ts)) (initialState ts)
+  _ <- execStateT (runRulesT (createRules >> go 1 sig ts)) (initialState ts)
   return ()
 
 go :: Int -> Signature -> TestSet -> M ()
@@ -168,8 +149,8 @@ allUnifications t = map f ss
     go s x = Map.findWithDefault __ x s
     f s = rename (go s) t
 
-createRules :: Signature -> TestSet -> M ()
-createRules sig ts =
+createRules :: M ()
+createRules =
   onMatch $ \e -> do
     case e of
       Schema (Exists s) -> considerSchema s
@@ -186,6 +167,7 @@ createRules sig ts =
       Term _ (Equal t u) -> found t u
       Term _ (Representative _) -> return ()
 
+considerRenamings :: Schema -> Schema -> M ()
 considerRenamings s s' =
   sequence_ [ signal (Term (poly s) (Exists t)) | t <- ts ]
   where
@@ -221,6 +203,7 @@ consider con x = do
           putTestSet con ts
           signal (event con (Representative x))
 
+considerSchema :: Schema -> M ()
 considerSchema s = consider con s
   where
     con =
@@ -233,6 +216,7 @@ considerSchema s = consider con s
         putTestSet = \ts -> lift $ modify (\s -> s { schemaTestSet = ts }),
         event = Schema }
 
+considerTerm :: Poly Schema -> Term -> M ()
 considerTerm s t = consider con t
   where
     con =
@@ -252,7 +236,7 @@ found :: Term -> Term -> M ()
 found t u = do
   Simple.S eqs <- lift $ gets pruner
   lift $ modify (\s -> s { pruner = execState (unify (t :=: u)) (pruner s) })
-  case False of -- evalState (Pruning.unify (t :=: u)) (E.S eqs) of
+  case False && evalState (unify (t :=: u)) (E.S eqs) of
     True ->
       return ()
     False ->

@@ -27,17 +27,14 @@ import GHC.Exts(Any)
 import Unsafe.Coerce
 import Control.Applicative
 import Data.Maybe
-import Control.Monad.Trans.Class
-import Control.Monad.Trans.State.Strict
-import Control.Monad.Trans.Writer.Strict
 import qualified Data.DList as DList
-import Data.DList(DList)
 import Data.Functor.Identity
 import Data.Traversable(traverse)
 import qualified Data.Map as Map
 import qualified Data.Rewriting.Substitution.Type as T
 import Data.List
 import Control.Monad
+import Control.Monad.Trans.Writer
 
 -- A (possibly polymorphic) type.
 type Type = Tm TyCon TyVar
@@ -147,7 +144,7 @@ instance Typed Type where
 
 instance Apply Type where
   tryApply (Fun Arrow [arg, res]) t | t == arg = Just res
-  tryApply t u = Nothing
+  tryApply _ _ = Nothing
 
 instance (Typed a, Typed b) => Typed (a, b) where
   typ (x, y) = Fun (TyCon commaTyCon) [typ x, typ y]

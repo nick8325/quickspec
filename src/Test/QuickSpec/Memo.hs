@@ -1,4 +1,5 @@
 {-# LANGUAGE TypeOperators, Rank2Types, FlexibleContexts, TypeSynonymInstances, StandaloneDeriving, DeriveGeneric #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Test.QuickSpec.Memo where
 
 import GHC.Generics
