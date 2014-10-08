@@ -23,7 +23,17 @@ r x = Fun (\y -> y * x)
 l1 x = Fun (\y -> x \\ y)
 r1 x = Fun (\y -> y / x)
 
+
 sig = mconcat [
+  constant "rev" (reverse :: [Int] -> [Int]),
+  constant "app" ((++) :: [Int] -> [Int] -> [Int]),
+  constant "[]" ([] :: [Int]),
+  --constant "sort" (sort :: [Int] -> [Int]),
+  --constant "usort" (usort :: [Int] -> [Int]),
+  ord (undefined :: [Int]),
+  arb (undefined :: [Int])]
+
+sig2 = mconcat [
   constant "1" (1 :: It),
   constant "*" ((*) :: It -> It -> It),
   constant "/" ((/) :: It -> It -> It),
@@ -31,7 +41,7 @@ sig = mconcat [
   ord (undefined :: It),
   arb (undefined :: It)]
 
-sig2 = mconcat [
+sig3 = mconcat [
   constant "0" (0 :: Int),
   constant "1" (1 :: Int),
   constant "+" ((+) :: Int -> Int -> Int),
@@ -39,7 +49,7 @@ sig2 = mconcat [
   ord (undefined :: Int),
   arb (undefined :: Int)]
 
-sig3 = mconcat [
+sig4 = mconcat [
   constant "text" (text :: [Bool] -> Layout Bool),
   constant "nest" (nest :: Int -> Layout Bool -> Layout Bool),
   constant "$$" (($$) :: Layout Bool -> Layout Bool -> Layout Bool),
@@ -56,7 +66,7 @@ sig3 = mconcat [
   arb (undefined :: [Bool]),
   arb (undefined :: Int)]
 
-main = quickSpec S.sig
+main = quickSpec sig
 
 {-
 sig1 = [
