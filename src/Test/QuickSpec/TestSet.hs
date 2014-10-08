@@ -7,42 +7,42 @@ import Data.Map(Map)
 import Data.Constraint
 import Control.Monad
 
-data TestSet =
+data TestSet t =
   TestSet {
-    makeType :: Type -> Maybe (Value TestedTerms),
-    testSet :: Map (Poly Type) (Value TestedTerms)
+    makeType :: Type -> Maybe (Value (TypedTestSet t)),
+    testSet :: Map (Poly Type) (Value (TypedTestSet t))
     }
 
-data TestedTerms a =
-  TestedTerms {
-    makeTerm :: Term -> Maybe [a],
+data TypedTestSet t a =
+  TypedTestSet {
+    makeTerm :: t -> Maybe [a],
     dict :: Dict (Ord a),
-    testResults :: TestResults a }
+    testResults :: TestResults t a }
 
-data TestResults a = TestCase (Map a (TestResults a)) | Singleton (TestedTerm a)
+data TestResults t a = TestCase (Map a (TestResults t a)) | Singleton (Tested t a)
 
-data TestedTerm a =
-  TestedTerm {
-    term  :: Term,
+data Tested t a =
+  Tested {
+    term  :: t,
     tests :: [a] }
 
-emptyTestSet :: (Type -> Maybe (Value TestedTerms)) -> TestSet
+emptyTestSet :: (Type -> Maybe (Value (TypedTestSet t))) -> TestSet t
 emptyTestSet makeType = TestSet makeType Map.empty
 
-emptyTestedTerms :: Ord a => (Term -> Maybe [a]) -> TestedTerms a
-emptyTestedTerms makeTerm = TestedTerms makeTerm Dict (TestCase Map.empty)
+emptyTypedTestSet :: Ord a => (t -> Maybe [a]) -> TypedTestSet t a
+emptyTypedTestSet makeTerm = TypedTestSet makeTerm Dict (TestCase Map.empty)
 
-data Result = New TestSet | Old Term
+data Result t = New (TestSet t) | Old t
 
-findTestSet :: Poly Term -> TestSet -> Maybe (Value TestedTerms)
+findTestSet :: Typed t => Poly t -> TestSet t -> Maybe (Value (TypedTestSet t))
 findTestSet x ts =
   Map.lookup (polyTyp x) (testSet ts) `mplus`
   makeType ts (typ x)
 
-insert :: Poly Term -> TestSet -> Maybe Result
+insert :: Typed t => Poly t -> TestSet t -> Maybe (Result t)
 insert x ts = do
   tts `In` w <- fmap unwrap (findTestSet x ts)
-  tt <- fmap (TestedTerm (unPoly x)) (makeTerm tts (unPoly x))
+  tt <- fmap (Tested (unPoly x)) (makeTerm tts (unPoly x))
   return $
     case insert1 tt tts of
       New1 tts ->
@@ -50,21 +50,20 @@ insert x ts = do
       Old1 t ->
         Old t
 
-data Result1 a = New1 (TestedTerms a) | Old1 Term
+data Result1 t a = New1 (TypedTestSet t a) | Old1 t
 
-insert1 :: TestedTerm a -> TestedTerms a -> Result1 a
+insert1 :: Typed t => Tested t a -> TypedTestSet t a -> Result1 t a
 insert1 x ts =
   case dict ts of
     Dict -> aux k (term x) (tests x) (testResults ts)
   where
     k res = ts { testResults = res }
-    aux :: Ord a => (TestResults a -> TestedTerms a) -> Term -> [a] -> TestResults a -> Result1 a
-    aux _ _ [] (Singleton (TestedTerm y [])) = Old1 y
-    aux k x ts (Singleton (TestedTerm y (t':ts'))) =
-      aux k x ts (TestCase (Map.singleton t' (Singleton (TestedTerm y ts'))))
+    aux _ _ [] (Singleton (Tested y [])) = Old1 y
+    aux k x ts (Singleton (Tested y (t':ts'))) =
+      aux k x ts (TestCase (Map.singleton t' (Singleton (Tested y ts'))))
     aux k x (t:ts) (TestCase res) =
       case Map.lookup t res of
-        Nothing -> New1 (k (TestCase (Map.insert t (Singleton (TestedTerm x ts)) res)))
+        Nothing -> New1 (k (TestCase (Map.insert t (Singleton (Tested x ts)) res)))
         Just res' ->
           let k' r = k (TestCase (Map.insert t r res)) in
           aux k' x ts res'

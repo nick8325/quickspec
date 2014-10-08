@@ -31,19 +31,20 @@ import Test.QuickSpec.TestSet
 import Test.QuickSpec.Rules
 import Control.Monad.IO.Class
 import Test.QuickSpec.Memo()
+import Control.Applicative
 
 type M = RulesT Event (StateT S IO)
 
 data S = S {
   schemas       :: Schemas,
-  schemaTestSet :: TestSet,
-  termTestSet   :: Map (Poly Schema) TestSet,
+  schemaTestSet :: TestSet Schema,
+  termTestSet   :: Map (Poly Schema) (TestSet TermFrom),
   pruner        :: SimplePruner,
-  freshTestSet  :: TestSet }
+  freshTestSet  :: TestSet TermFrom }
 
 data Event =
     Schema (EventFor Schema)
-  | Term (Poly Schema) (EventFor Term)
+  | Term   (EventFor TermFrom)
   deriving (Eq, Ord, Show)
 
 data EventFor a =
@@ -53,12 +54,12 @@ data EventFor a =
   | Representative a
   deriving (Eq, Ord, Show)
 
-makeTester :: (Type -> Value Gen) -> [(QCGen, Int)] -> Signature -> Type -> Maybe (Value TestedTerms)
-makeTester env tests sig ty = do
+makeTester :: (a -> Term) -> (Type -> Value Gen) -> [(QCGen, Int)] -> Signature -> Type -> Maybe (Value (TypedTestSet a))
+makeTester toTerm env tests sig ty = do
   Instance Dict `In` w <-
     fmap unwrap (listToMaybe [ i | i <- ords sig, typ i == ty ])
   return . wrap w $
-    emptyTestedTerms (Just . reunwrap w . makeTests env tests)
+    emptyTypedTestSet (Just . reunwrap w . makeTests env tests . toTerm)
 
 makeTests :: (Type -> Value Gen) -> [(QCGen, Int)] -> Term -> Value []
 makeTests env tests t =
@@ -77,13 +78,13 @@ env sig ty =
 
 type Schemas = Map Int (Map (Poly Type) [Poly Schema])
 
-initialState :: TestSet -> S
-initialState ts =
+initialState :: TestSet Schema -> TestSet TermFrom -> S
+initialState ts ts' =
   S { schemas       = Map.empty,
       schemaTestSet = ts,
       termTestSet   = Map.empty,
       pruner        = emptyPruner,
-      freshTestSet  = ts }
+      freshTestSet  = ts' }
 
 typeSchemas :: [Schema] -> Map Type [Schema]
 typeSchemas = fmap (map schema) . collect . map instantiate
@@ -126,20 +127,22 @@ genSeeds maxSize = do
 quickSpec :: Signature -> IO ()
 quickSpec sig = do
   hSetBuffering stdout NoBuffering
-  seeds <- genSeeds 20
-  let ts = emptyTestSet (makeTester (table (env sig)) (take 100 seeds) sig)
-  _ <- execStateT (runRulesT (createRules >> go 1 sig ts)) (initialState ts)
+  seeds <- fmap (take 100) (genSeeds 20)
+  let e = table (env sig)
+      ts = emptyTestSet (makeTester (skeleton . instantiate) e seeds sig)
+      ts' = emptyTestSet (makeTester (\(From _ t) -> t) e seeds sig)
+  _ <- execStateT (runRulesT (createRules >> go 1 sig)) (initialState ts ts')
   return ()
 
-go :: Int -> Signature -> TestSet -> M ()
-go 10 _ _ = return ()
-go n sig emptyTs = do
+go :: Int -> Signature -> M ()
+go 10 _ = return ()
+go n sig = do
   lift $ modify (\s -> s { schemas = Map.insert n Map.empty (schemas s) })
   ss <- fmap (sortBy (comparing measure)) (schemasOfSize n sig)
   liftIO $ putStrLn ("Size " ++ show n ++ ", " ++ show (length ss) ++ " schemas to consider:")
   sequence_ [ signal (Schema (Exists s)) | s <- ss ]
   liftIO $ putStrLn ""
-  go (n+1) sig emptyTs
+  go (n+1) sig
 
 allUnifications :: Term -> [Term]
 allUnifications t = map f ss
@@ -153,7 +156,7 @@ createRules :: M ()
 createRules =
   onMatch $ \e -> do
     case e of
-      Schema (Exists s) -> considerSchema s
+      Schema (Exists s) -> consider s
       Schema (Untestable s) -> accept s
       Schema (Equal s t) -> do
         considerRenamings t t
@@ -161,76 +164,63 @@ createRules =
       Schema (Representative s) -> do
         accept s
         when (size s <= 5) $ considerRenamings s s
-      Term s (Exists t) -> considerTerm s t
-      Term s (Untestable t) ->
-        ERROR ("Untestable instance " ++ prettyShow t ++ " of testable schema " ++ prettyShow s)
-      Term _ (Equal t u) -> found t u
-      Term _ (Representative _) -> return ()
+      Term (Exists t) -> consider t
+      Term (Untestable (From s t)) ->
+        ERROR ("Untestable instance " ++ prettyShow t ++ " of testable schema " ++ prettyShow (unPoly s))
+      Term (Equal (From _ t) (From _ u)) -> found t u
+      Term (Representative _) -> return ()
 
 considerRenamings :: Schema -> Schema -> M ()
 considerRenamings s s' =
-  sequence_ [ signal (Term (poly s) (Exists t)) | t <- ts ]
+  sequence_ [ signal (Term (Exists (From (poly s) t))) | t <- ts ]
   where
     ts = sortBy (comparing measure) (allUnifications (instantiate s'))
 
-data Consideration a b =
-  Consideration {
-    pruningTerm :: a -> Term,
-    pruningMeasure :: Term -> b,
-    testingTerm :: a -> Term,
-    testingUnTerm :: Term -> a,
-    getTestSet :: M TestSet,
-    putTestSet :: TestSet -> M (),
-    event :: EventFor a -> Event }
+class (Eq a, Typed a) => Considerable a where
+  toTerm     :: a -> Term
+  getTestSet :: a -> M (TestSet a)
+  putTestSet :: a -> TestSet a -> M ()
+  event      :: EventFor a -> Event
 
-consider :: Ord b => Consideration a b -> a -> M ()
-consider con x = do
+consider :: Considerable a => a -> M ()
+consider x = do
   pruner <- lift $ gets pruner
-  let t = pruningTerm con x
+  let t = toTerm x
   case evalState (repUntyped (encodeTypes t)) pruner of
-    Just u | pruningMeasure con (decodeTypes u) < pruningMeasure con t ->
+    Just u | measure (decodeTypes u) < measure t ->
       let mod = execState (unifyUntyped (encodeTypes t) u)
       in lift $ modify (\s -> s { pruner = mod pruner })
     Nothing -> do
-      ts <- getTestSet con
-      let t = testingTerm con x
-      case insert (poly t) ts of
+      ts <- getTestSet x
+      case insert (poly x) ts of
         Nothing ->
-          signal (event con (Untestable x))
-        Just (Old u) ->
-          signal (event con (Equal x (testingUnTerm con u)))
+          signal (event (Untestable x))
+        Just (Old y) ->
+          signal (event (Equal x y))
         Just (New ts) -> do
-          putTestSet con ts
-          signal (event con (Representative x))
+          putTestSet x ts
+          signal (event (Representative x))
 
-considerSchema :: Schema -> M ()
-considerSchema s = consider con s
-  where
-    con =
-      Consideration {
-        pruningTerm = instantiate,
-        pruningMeasure = measure . schema,
-        testingTerm = skeleton . instantiate,
-        testingUnTerm = schema,
-        getTestSet = lift $ gets schemaTestSet,
-        putTestSet = \ts -> lift $ modify (\s -> s { schemaTestSet = ts }),
-        event = Schema }
+instance Considerable Schema where
+  toTerm = instantiate
+  getTestSet _ = lift $ gets schemaTestSet
+  putTestSet _ ts = lift $ modify (\s -> s { schemaTestSet = ts })
+  event = Schema
 
-considerTerm :: Poly Schema -> Term -> M ()
-considerTerm s t = consider con t
-  where
-    con =
-      Consideration {
-        pruningTerm = id,
-        pruningMeasure = measure,
-        testingTerm = id,
-        testingUnTerm = id,
-        getTestSet = getTestSet,
-        putTestSet = \ts -> lift $ modify (\st -> st { termTestSet = Map.insert s ts (termTestSet st) }),
-        event = Term s }
-    getTestSet = lift $ do
-      ts <- gets freshTestSet
-      gets (Map.findWithDefault ts s . termTestSet)
+data TermFrom = From (Poly Schema) Term deriving (Eq, Ord, Show)
+
+instance Typed TermFrom where
+  typ (From _ t) = typ t
+  typeSubstA f (From s t) = From s <$> typeSubstA f t
+
+instance Considerable TermFrom where
+  toTerm (From _ t) = t
+  getTestSet (From s _) = lift $ do
+    ts <- gets freshTestSet
+    gets (Map.findWithDefault ts s . termTestSet)
+  putTestSet (From s _) ts =
+    lift $ modify (\st -> st { termTestSet = Map.insert s ts (termTestSet st) })
+  event = Term
 
 found :: Term -> Term -> M ()
 found t u = do
