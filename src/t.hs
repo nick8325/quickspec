@@ -7,6 +7,7 @@ import Prelude hiding ((/), (\\))
 import qualified Prelude
 import Data.Typeable
 import Octonions
+import Test.QuickSpec.Type
 import Test.QuickSpec.Eval
 import Test.QuickSpec.Signature hiding (sig)
 import qualified Test.QuickSpec.Signature as S
@@ -25,9 +26,9 @@ r1 x = Fun (\y -> y / x)
 
 
 sig = mconcat [
-  constant "rev" (reverse :: [Int] -> [Int]),
-  constant "app" ((++) :: [Int] -> [Int] -> [Int]),
-  constant "[]" ([] :: [Int]),
+  constant "rev" (reverse :: [A] -> [A]),
+  constant "app" ((++) :: [A] -> [A] -> [A]),
+  constant "[]" ([] :: [A]),
   --constant "sort" (sort :: [Int] -> [Int]),
   --constant "usort" (usort :: [Int] -> [Int]),
   inst (undefined :: Int),
