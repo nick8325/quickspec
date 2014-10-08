@@ -83,7 +83,7 @@ schemasOfSize n _ = do
 
 quickSpec :: Signature -> IO ()
 quickSpec sig = unbuffered $ do
-  seeds <- fmap (take 100) (genSeeds 20)
+  seeds <- fmap (take 2) (genSeeds 20)
   let e = table (env sig)
       ts = emptyTestSet (makeTester (skeleton . instantiate) e seeds sig)
       ts' = emptyTestSet (makeTester (\(From _ t) -> t) e seeds sig)

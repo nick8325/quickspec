@@ -18,17 +18,22 @@ import PrettyPrinting
 a / b = a * recip b
 b \\ a = recip b * a
 
-l, r, l1, r1 :: It -> Fun
+l, r, l1, r1, t :: It -> Fun
 l x = Fun (\y -> x * y)
 r x = Fun (\y -> y * x)
 l1 x = Fun (\y -> x \\ y)
 r1 x = Fun (\y -> y / x)
+t x = r x `compose` l1 x
 
+compose :: Fun -> Fun -> Fun
+compose (Fun f) (Fun g) = Fun (f . g)
 
 sig = mconcat [
   constant "rev" (reverse :: [A] -> [A]),
   constant "app" ((++) :: [A] -> [A] -> [A]),
   constant "[]" ([] :: [A]),
+  arb (undefined :: Int -> Int),
+  constant "map" (map :: (Int -> Int) -> [Int] -> [Int]),
   --constant "sort" (sort :: [Int] -> [Int]),
   --constant "usort" (usort :: [Int] -> [Int]),
   inst (undefined :: Int),
@@ -37,8 +42,17 @@ sig = mconcat [
 sig2 = mconcat [
   constant "1" (1 :: It),
   constant "*" ((*) :: It -> It -> It),
-  constant "/" ((/) :: It -> It -> It),
-  constant "\\" ((\\) :: It -> It -> It),
+--  constant "/" ((/) :: It -> It -> It),
+--  constant "\\" ((\\) :: It -> It -> It),
+  constant "id" (Fun id),
+  constant "l" l,
+  constant "r" r,
+  constant "l1" l1,
+  constant "r1" r1,
+  constant "t" t,
+  constant "." compose,
+  inst (undefined :: Int),
+  inst (undefined :: Fun),
   inst (undefined :: It)]
 
 sig3 = mconcat [
@@ -62,7 +76,7 @@ sig4 = mconcat [
   inst (undefined :: [Bool]),
   inst (undefined :: Int)]
 
-main = quickSpec sig
+main = quickSpec sig2
 
 {-
 sig1 = [

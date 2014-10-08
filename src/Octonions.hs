@@ -5,6 +5,9 @@ import Data.Ratio
 import Data.Typeable
 import Control.Monad
 import Test.QuickCheck
+import Test.QuickCheck.Gen
+import Test.QuickCheck.Random
+import Data.Ord
 
 class Fractional a => Conj a where
   conj :: a -> a
@@ -36,6 +39,14 @@ newtype Quaternion = Quaternion (Complex, Complex) deriving (Eq, Ord, Num, Typea
 newtype Octonion = Octonion (Quaternion, Quaternion) deriving (Eq, Ord, Num, Typeable, Fractional, Conj, Arbitrary, CoArbitrary)
 newtype It = It Octonion deriving (Eq, Ord, Num, Typeable, Fractional)
 newtype Fun = Fun (It -> It) deriving (Arbitrary, CoArbitrary, Typeable)
+
+instance Eq Fun where
+  f == g = compare f g == EQ
+instance Ord Fun where
+  compare = comparing (\(Fun f) -> map f vals)
+
+vals :: [It]
+vals = unGen (vector 5) (mkQCGen 12345) 10
 
 instance Arbitrary It where arbitrary = fmap It it
 instance CoArbitrary It where coarbitrary (It x) = coarbitrary x
