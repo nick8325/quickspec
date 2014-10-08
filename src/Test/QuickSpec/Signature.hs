@@ -1,5 +1,5 @@
 -- Signatures, collecting and finding witnesses, etc.
-{-# LANGUAGE CPP, ConstraintKinds, ExistentialQuantification, ScopedTypeVariables, DeriveDataTypeable, StandaloneDeriving #-}
+{-# LANGUAGE CPP, ConstraintKinds, ExistentialQuantification, ScopedTypeVariables, DeriveDataTypeable #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Test.QuickSpec.Signature where
 
@@ -29,10 +29,6 @@ instance Monoid Signature where
 
 constant :: Typeable a => String -> a -> Signature
 constant name x = Signature [Constant name (toValue (Identity x))] [] []
-
--- :)
-deriving instance Typeable Ord
-deriving instance Typeable Arbitrary
 
 ord :: forall a. (Typeable a, Ord a) => a -> Signature
 ord _ = Signature [] [toValue (Instance Dict :: Instance Ord a)] []
