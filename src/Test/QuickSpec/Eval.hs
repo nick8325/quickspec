@@ -86,13 +86,6 @@ initialState ts ts' =
       pruner        = emptyPruner,
       freshTestSet  = ts' }
 
-typeSchemas :: [Schema] -> Map Type [Schema]
-typeSchemas = fmap (map schema) . collect . map instantiate
-
-collect :: Typed a => [a] -> Map Type [a]
-collect xs =
-  Map.fromList [(typ y, ys) | ys@(y:_) <- partitionBy typ xs]
-
 schemasOfSize :: Int -> Signature -> M [Schema]
 schemasOfSize 1 sig =
   return $
