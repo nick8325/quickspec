@@ -38,15 +38,13 @@ data S = S {
   freshTestSet  :: TestSet TermFrom }
 
 data Event =
-    Schema (EventFor Schema)
-  | Term   (EventFor TermFrom)
+    Schema Schema   (KindOf Schema)
+  | Term   TermFrom (KindOf TermFrom)
+  | ConsiderSchema Schema
+  | ConsiderTerm   TermFrom
   deriving (Eq, Ord, Show)
 
-data EventFor a =
-    Exists a
-  | Untestable a
-  | Equal a a
-  | Representative a
+data KindOf a = Untestable | Representative | EqualTo a
   deriving (Eq, Ord, Show)
 
 type Schemas = Map Int (Map (Poly Type) [Poly Schema])
@@ -99,7 +97,7 @@ go n sig = do
   lift $ modify (\s -> s { schemas = Map.insert n Map.empty (schemas s) })
   ss <- fmap (sortBy (comparing measure)) (schemasOfSize n sig)
   liftIO $ putStrLn ("Size " ++ show n ++ ", " ++ show (length ss) ++ " schemas to consider:")
-  sequence_ [ signal (Schema (Exists s)) | s <- ss ]
+  mapM_ (signal . ConsiderSchema) ss
   liftIO $ putStrLn ""
   go (n+1) sig
 
@@ -115,23 +113,23 @@ createRules :: M ()
 createRules =
   onMatch $ \e -> do
     case e of
-      Schema (Exists s) -> consider s
-      Schema (Untestable s) -> accept s
-      Schema (Equal s t) -> do
+      Schema s Untestable -> accept s
+      Schema s (EqualTo t) -> do
         considerRenamings t t
         considerRenamings t s
-      Schema (Representative s) -> do
+      Schema s Representative -> do
         accept s
         when (size s <= 5) $ considerRenamings s s
-      Term (Exists t) -> consider t
-      Term (Untestable (From s t)) ->
+      Term (From s t) Untestable ->
         ERROR ("Untestable instance " ++ prettyShow t ++ " of testable schema " ++ prettyShow (unPoly s))
-      Term (Equal (From _ t) (From _ u)) -> found t u
-      Term (Representative _) -> return ()
+      Term (From _ t) (EqualTo (From _ u)) -> found t u
+      Term _ Representative -> return ()
+      ConsiderSchema s -> consider s
+      ConsiderTerm   t -> consider t
 
 considerRenamings :: Schema -> Schema -> M ()
 considerRenamings s s' =
-  sequence_ [ signal (Term (Exists (From (poly s) t))) | t <- ts ]
+  sequence_ [ signal (ConsiderTerm (From (poly s) t)) | t <- ts ]
   where
     ts = sortBy (comparing measure) (allUnifications (instantiate s'))
 
@@ -139,7 +137,7 @@ class (Eq a, Typed a) => Considerable a where
   toTerm     :: a -> Term
   getTestSet :: a -> M (TestSet a)
   putTestSet :: a -> TestSet a -> M ()
-  event      :: EventFor a -> Event
+  event      :: a -> KindOf a -> Event
 
 consider :: Considerable a => a -> M ()
 consider x = do
@@ -153,12 +151,12 @@ consider x = do
       ts <- getTestSet x
       case insert (poly x) ts of
         Nothing ->
-          signal (event (Untestable x))
+          signal (event x Untestable)
         Just (Old y) ->
-          signal (event (Equal x y))
+          signal (event x (EqualTo y))
         Just (New ts) -> do
           putTestSet x ts
-          signal (event (Representative x))
+          signal (event x Representative)
 
 instance Considerable Schema where
   toTerm = instantiate
