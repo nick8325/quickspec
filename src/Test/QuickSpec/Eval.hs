@@ -8,6 +8,7 @@ import Test.QuickSpec.Type
 import Test.QuickSpec.Term
 import Test.QuickSpec.Signature
 import Test.QuickSpec.Equation
+import Test.QuickSpec.Memo
 import Data.Constraint
 import Data.Map(Map)
 import Data.Maybe
@@ -226,31 +227,3 @@ accept s = do
   where
     t = instantiate s
     f m = Map.insertWith (++) (poly (typ t)) [poly s] m
-
-instance MemoTable Type where
-  table = Memo.wrap f g table
-    where
-      f :: Either Int (TyCon, [Type]) -> Type
-      f (Left x) = Var (TyVar x)
-      f (Right (x, xs)) = Fun x xs
-      g :: Type -> Either Int (TyCon, [Type])
-      g (Var (TyVar x)) = Left x
-      g (Fun x xs) = Right (x, xs)
-
-instance MemoTable TyCon where
-  table = Memo.wrap f g table
-    where
-      f :: Maybe T.TyCon -> TyCon
-      f (Just x) = TyCon x
-      f Nothing = Arrow
-      g :: TyCon -> Maybe T.TyCon
-      g (TyCon x) = Just x
-      g Arrow = Nothing
-
-instance MemoTable T.TyCon where
-  table = Memo.wrap f g table
-    where
-      f :: (Word64, Word64) -> T.TyCon
-      f (x, y) = T.TyCon (T.Fingerprint x y) undefined undefined undefined
-      g :: T.TyCon -> (Word64, Word64)
-      g (T.TyCon (T.Fingerprint x y) _ _ _) = (x, y)
