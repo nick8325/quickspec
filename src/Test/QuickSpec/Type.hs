@@ -11,11 +11,11 @@ module Test.QuickSpec.Type(
   Typed(..), typeSubst, tyVars,
   Apply(..), apply, canApply,
   -- Polymorphic types.
-  Poly, poly, unPoly,
+  Poly, poly, unPoly, polyTyp,
   -- Dynamic values.
   Value, toValue, fromValue,
-  Unwrapped(..), unwrap,
-  pairValues, mapValue, forValue, ofValue) where
+  Unwrapped(..), unwrap, Wrapper(..),
+  mapValue, forValue, ofValue, pairValues) where
 
 #include "errors.h"
 
@@ -169,6 +169,9 @@ normaliseType t = typeSubst (evalSubst s) t
     tvs = tvs' ++ (usort (tyVars t) \\ tvs')
     tvs' = usort (tyVars (typ t))
 
+polyTyp :: Typed a => Poly a -> Poly Type
+polyTyp (Poly x) = Poly (typ x)
+
 instance Typed a => Typed (Poly a) where
   typ = typ . unPoly
   typeSubstA f (Poly x) = fmap poly (typeSubstA f x)
@@ -205,13 +208,6 @@ fromValue x = do
   guard (typ x == typeOf (undefined :: a))
   return (fromAny (value x))
 
-pairValues :: (forall a. f a -> g a -> h a) -> Value f -> Value g -> Value h
-pairValues f x y
-  | typ x == typ y =
-      Value (typ x) (f (value x) (value y))
-  | otherwise =
-      ERROR "non-matching types"
-
 instance Typed (Value f) where
   typ = valueType
   typeSubstA f (Value ty x) = Value <$> typeSubstA f ty <*> pure x
@@ -222,15 +218,26 @@ instance Applicative f => Apply (Value f) where
 
 -- Unwrap a value to get at the thing inside, while still being able
 -- to wrap it up again.
-data Unwrapped f = forall a. f a `In` (forall g. g a -> Value g)
+data Unwrapped f = forall a. f a `In` Wrapper a
+data Wrapper a =
+  Wrapper {
+    wrap :: forall g. g a -> Value g,
+    reunwrap :: forall g. Value g -> g a }
 
 unwrap :: Value f -> Unwrapped f
-unwrap x = value x `In` \y -> Value (typ x) y
+unwrap x =
+  value x `In`
+    Wrapper
+      (\y -> Value (typ x) y)
+      (\y ->
+        if typ x == typ y
+        then fromAny (value y)
+        else ERROR "non-matching types")
 
 mapValue :: (forall a. f a -> g a) -> Value f -> Value g
 mapValue f v =
   case unwrap v of
-    x `In` wrap -> wrap (f x)
+    x `In` w -> wrap w (f x)
 
 forValue :: Value f -> (forall a. f a -> g a) -> Value g
 forValue x f = mapValue f x
@@ -239,3 +246,9 @@ ofValue :: (forall a. f a -> b) -> Value f -> b
 ofValue f v =
   case unwrap v of
     x `In` _ -> f x
+
+pairValues :: (forall a. f a -> g a -> h a) -> Value f -> Value g -> Value h
+pairValues f x y =
+  case unwrap x of
+    x `In` w ->
+      wrap w (f x (reunwrap w y))

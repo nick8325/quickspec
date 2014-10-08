@@ -23,7 +23,8 @@ import Data.List hiding (insert)
 import Data.Ord
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Class
-import Data.MemoCombinators
+import Data.MemoCombinators hiding (wrap)
+import qualified Data.MemoCombinators as Memo
 import Data.MemoCombinators.Class
 import Test.QuickCheck hiding (collect, Result)
 import System.Random
@@ -34,20 +35,7 @@ import Data.Word
 import Debug.Trace
 import System.IO
 import PrettyPrinting
-
-type TestSet = Map (Poly Type) (Value TestedTerms)
-
-data TestedTerms a =
-  TestedTerms {
-    dict :: Dict (Ord a),
-    testResults :: TestResults a }
-
-data TestResults a = TestCase (Map a (TestResults a)) | Singleton (TestedTerm a)
-
-data TestedTerm a =
-  TestedTerm {
-    term  :: Term,
-    tests :: [a] }
+import Test.QuickSpec.TestSet
 
 type M = StateT S IO
 
@@ -57,54 +45,16 @@ data S = S {
   termTestSet   :: Map (Poly Schema) TestSet,
   pruner        :: SimplePruner }
 
-initialTestedTerms :: Signature -> Type -> Maybe (Value TestedTerms)
-initialTestedTerms sig ty = do
-  inst <- listToMaybe [ i | i <- ords sig, typ i == ty ]
-  return $ forValue inst $ \(Instance dict) ->
-    TestedTerms {
-      dict = dict,
-      testResults = TestCase Map.empty }
+makeTester :: (Type -> Value Gen) -> [(QCGen, Int)] -> Signature -> Type -> Maybe (Value TestedTerms)
+makeTester env tests sig ty = do
+  Instance Dict `In` w <-
+    fmap unwrap (listToMaybe [ i | i <- ords sig, typ i == ty ])
+  return . wrap w $
+    emptyTestedTerms (Just . reunwrap w . makeTests env tests)
 
-findTestSet :: Signature -> Type -> TestSet -> Maybe (Value TestedTerms)
-findTestSet sig ty m =
-  Map.lookup (poly ty) m `mplus`
-  initialTestedTerms sig ty
-
-data Result = New TestSet | Old Term | Untestable
-
-insert :: Signature -> Value TestedTerm -> TestSet -> Result
-insert sig x ts =
-  case findTestSet sig (typ x) ts of
-    Nothing -> Untestable
-    Just tts ->
-      case unwrap (pairValues insert1 x tts) of
-        New1 tts `In` wrap ->
-          New (Map.insert (poly (typ x)) (wrap tts) ts)
-        Old1 t `In` _ ->
-          Old t
-
-data Result1 a = New1 (TestedTerms a) | Old1 Term
-
-insert1 :: TestedTerm a -> TestedTerms a -> Result1 a
-insert1 x ts =
-  case dict ts of
-    Dict -> aux k (term x) (tests x) (testResults ts)
-  where
-    k res = ts { testResults = res }
-    aux :: Ord a => (TestResults a -> TestedTerms a) -> Term -> [a] -> TestResults a -> Result1 a
-    aux k x [] (Singleton (TestedTerm y [])) = Old1 y
-    aux k x ts (Singleton (TestedTerm y (t':ts'))) =
-      aux k x ts (TestCase (Map.singleton t' (Singleton (TestedTerm y ts'))))
-    aux k x (t:ts) (TestCase res) =
-      case Map.lookup t res of
-        Nothing -> New1 (k (TestCase (Map.insert t (Singleton (TestedTerm x ts)) res)))
-        Just res' ->
-          let k' r = k (TestCase (Map.insert t r res)) in
-          aux k' x ts res'
-
-makeTests :: (Type -> Value Gen) -> [(QCGen, Int)] -> Term -> Value TestedTerm
+makeTests :: (Type -> Value Gen) -> [(QCGen, Int)] -> Term -> Value []
 makeTests env tests t =
-  mapValue (TestedTerm t . f) (evaluateTerm env t)
+  mapValue f (evaluateTerm env t)
   where
     f :: Gen a -> [a]
     f x = map (uncurry (unGen x)) tests
@@ -120,7 +70,7 @@ env sig ty =
 type Schemas = Map Int (Map (Poly Type) [Poly Schema])
 
 instance Pruner S where
-  emptyPruner      = initialState
+  emptyPruner      = __
   unifyUntyped t u = inPruner (unifyUntyped t u)
   repUntyped t     = inPruner (repUntyped t)
 
@@ -130,10 +80,10 @@ inPruner x = do
   put s { pruner = s' }
   return y
 
-initialState :: S
-initialState =
+initialState :: TestSet -> S
+initialState ts =
   S { schemas       = Map.empty,
-      schemaTestSet = Map.empty,
+      schemaTestSet = ts,
       termTestSet   = Map.empty,
       pruner        = emptyPruner }
 
@@ -179,17 +129,18 @@ quickSpec :: Signature -> IO ()
 quickSpec sig = do
   hSetBuffering stdout NoBuffering
   seeds <- genSeeds 20
-  _ <- execStateT (go 1 sig (take 100 seeds) (table (env sig))) initialState
+  let ts = emptyTestSet (makeTester (table (env sig)) (take 100 seeds) sig)
+  _ <- execStateT (go 1 sig ts) (initialState ts)
   return ()
 
-go :: Int -> Signature -> [(QCGen, Int)] -> (Type -> Value Gen) -> M ()
-go 10 _ _ _ = return ()
-go n sig seeds gen = do
+go :: Int -> Signature -> TestSet -> M ()
+go 10 _ _ = return ()
+go n sig emptyTs = do
   modify (\s -> s { schemas = Map.insert n Map.empty (schemas s) })
   ss <- fmap (sortBy (comparing measure)) (schemasOfSize n sig)
   lift $ putStr ("\n\nSize " ++ show n ++ ", " ++ show (length ss) ++ " schemas to consider: ")
-  mapM_ (consider sig seeds gen) ss
-  go (n+1) sig seeds gen
+  mapM_ (consider sig emptyTs) ss
+  go (n+1) sig emptyTs
 
 allUnifications :: Term -> [Term]
 allUnifications t = map f ss
@@ -199,18 +150,18 @@ allUnifications t = map f ss
     go s x = Map.findWithDefault __ x s
     f s = rename (go s) t
 
-consider :: Signature -> [(QCGen, Int)] -> (Type -> Value Gen) -> Schema -> M ()
-consider sig gen env s = do
+consider :: Signature -> TestSet -> Schema -> M ()
+consider sig emptyTs s = do
   state <- get
   let t = instantiate s
   case evalState (repUntyped (encodeTypes t)) (pruner state) of
     Nothing -> do
       -- Need to test this term
       let skel = skeleton t
-      case insert sig (makeTests env gen skel) (schemaTestSet state) of
-        Untestable ->
+      case insert (poly skel) (schemaTestSet state) of
+        Nothing ->
           accept s
-        Old u -> do
+        Just (Old u) -> do
           --lift (putStrLn ("Found schema equality! " ++ prettyShow (untyped skel :=: untyped u)))
           lift $ putStr "!"
           let s = schema u
@@ -218,14 +169,14 @@ consider sig gen env s = do
                 case Map.lookup (poly s) (termTestSet state) of
                   Nothing -> allUnifications (instantiate (schema u))
                   Just _ -> []
-          modify (\st -> st { termTestSet = Map.insertWith (\x y -> y) (poly s) Map.empty (termTestSet st) })
-          mapM_ (considerTerm sig gen env s) (sortBy (comparing measure) (extras ++ allUnifications t))
-        New ts' -> do
+          modify (\st -> st { termTestSet = Map.insertWith (\x y -> y) (poly s) emptyTs (termTestSet st) })
+          mapM_ (considerTerm sig s) (sortBy (comparing measure) (extras ++ allUnifications t))
+        Just (New ts') -> do
           lift $ putStr "O"
           modify (\st -> st { schemaTestSet = ts' })
           when (simple s) $ do
-            modify (\st -> st { termTestSet = Map.insertWith (\x y -> y) (poly s) Map.empty (termTestSet st) })
-            mapM_ (considerTerm sig gen env s) (sortBy (comparing measure) (allUnifications (instantiate s)))
+            modify (\st -> st { termTestSet = Map.insertWith (\x y -> y) (poly s) emptyTs (termTestSet st) })
+            mapM_ (considerTerm sig s) (sortBy (comparing measure) (allUnifications (instantiate s)))
           accept s
     Just u | measure (schema (decodeTypes u)) < measure s -> do
       lift $ putStr "X"
@@ -237,19 +188,19 @@ consider sig gen env s = do
 -- simple t = True
 simple t = False
 
-considerTerm :: Signature -> [(QCGen, Int)] -> (Type -> Value Gen) -> Schema -> Term -> M ()
-considerTerm sig gen env s t = do
+considerTerm :: Signature -> Schema -> Term -> M ()
+considerTerm sig s t = do
   state <- get
   case evalState (repUntyped (encodeTypes t)) (pruner state) of
     Nothing -> do
       --lift $ putStrLn ("Couldn't simplify " ++ prettyShow (t))
-      case insert sig (makeTests env gen t) (Map.findWithDefault __ (poly s) (termTestSet state)) of
-        Untestable ->
+      case insert (poly t) (Map.findWithDefault __ (poly s) (termTestSet state)) of
+        Nothing ->
           ERROR "testable term became untestable"
-        Old u -> do
+        Just (Old u) -> do
           found t u
           modify (\st -> st { pruner = execState (Test.QuickSpec.Pruning.unify (t :=: u)) (pruner st) })
-        New ts' -> do
+        Just (New ts') -> do
           lift $ putStr "o"
           modify (\st -> st { termTestSet = Map.insert (poly s) ts' (termTestSet st) })
     Just u -> do
@@ -277,7 +228,7 @@ accept s = do
     f m = Map.insertWith (++) (poly (typ t)) [poly s] m
 
 instance MemoTable Type where
-  table = wrap f g table
+  table = Memo.wrap f g table
     where
       f :: Either Int (TyCon, [Type]) -> Type
       f (Left x) = Var (TyVar x)
@@ -287,7 +238,7 @@ instance MemoTable Type where
       g (Fun x xs) = Right (x, xs)
 
 instance MemoTable TyCon where
-  table = wrap f g table
+  table = Memo.wrap f g table
     where
       f :: Maybe T.TyCon -> TyCon
       f (Just x) = TyCon x
@@ -297,7 +248,7 @@ instance MemoTable TyCon where
       g Arrow = Nothing
 
 instance MemoTable T.TyCon where
-  table = wrap f g table
+  table = Memo.wrap f g table
     where
       f :: (Word64, Word64) -> T.TyCon
       f (x, y) = T.TyCon (T.Fingerprint x y) undefined undefined undefined
