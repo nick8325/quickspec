@@ -83,7 +83,7 @@ schemasOfSize n _ = do
 
 quickSpec :: Signature -> IO ()
 quickSpec sig = unbuffered $ do
-  seeds <- fmap (take 2) (genSeeds 20)
+  seeds <- fmap (take 100) (genSeeds 20)
   let e = table (env sig)
       ts = emptyTestSet (makeTester (skeleton . instantiate) e seeds sig)
       ts' = emptyTestSet (makeTester (\(From _ t) -> t) e seeds sig)
@@ -227,7 +227,7 @@ found :: Term -> Term -> M ()
 found t u = do
   Simple.S eqs <- lift $ gets pruner
   lift $ modify (\s -> s { pruner = execState (unify (t :=: u)) (pruner s) })
-  case True && evalState (unify (t :=: u)) (E.S eqs) of
+  case False && evalState (unify (t :=: u)) (E.S eqs) of
     True ->
       return ()
     False ->

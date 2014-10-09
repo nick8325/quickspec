@@ -32,8 +32,8 @@ sig = mconcat [
   constant "rev" (reverse :: [A] -> [A]),
   constant "app" ((++) :: [A] -> [A] -> [A]),
   constant "[]" ([] :: [A]),
-  arb (undefined :: Int -> Int),
-  constant "map" (map :: (Int -> Int) -> [Int] -> [Int]),
+  --arb (undefined :: Int -> Int),
+  --constant "map" (map :: (Int -> Int) -> [Int] -> [Int]),
   --constant "sort" (sort :: [Int] -> [Int]),
   --constant "usort" (usort :: [Int] -> [Int]),
   inst (undefined :: Int),
@@ -76,7 +76,7 @@ sig4 = mconcat [
   inst (undefined :: [Bool]),
   inst (undefined :: Int)]
 
-main = quickSpec sig2
+main = quickSpec sig
 
 {-
 sig1 = [
