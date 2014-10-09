@@ -41,7 +41,7 @@ findTestSet x ts =
 insert :: Typed t => Poly t -> TestSet t -> Maybe (Result t)
 insert x ts = do
   tts `In` w <- fmap unwrap (findTestSet x ts)
-  tt <- fmap (Tested (unPoly x)) (makeTerm tts (unPoly x))
+  tt <- fmap (Tested (mono x)) (makeTerm tts (mono x))
   return $
     case insert1 tt tts of
       New1 tts ->

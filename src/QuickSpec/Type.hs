@@ -12,7 +12,7 @@ module QuickSpec.Type(
   Typed(..), typeSubst, tyVars, cast,
   Apply(..), apply, canApply,
   -- Polymorphic types.
-  Poly, poly, unPoly, polyTyp, polyPair,
+  Poly, poly, mono, polyTyp, polyPair,
   -- Dynamic values.
   Value, toValue, fromValue,
   Unwrapped(..), unwrap, Wrapper(..),
@@ -166,7 +166,7 @@ instance (Typed a, Typed b) => Typed (a, b) where
 -- Represents a forall-quantifier over all the type variables in a type.
 -- Wrapping a term in Poly normalises the type by alpha-renaming
 -- type variables canonically.
-newtype Poly a = Poly { unPoly :: a }
+newtype Poly a = Poly { mono :: a }
   deriving (Eq, Ord, Show, Pretty, Typeable)
 
 poly :: Typed a => a -> Poly a
@@ -188,12 +188,12 @@ polyPair (Poly x) (Poly y) = poly (x, y')
     y' = typeSubst (\(TyVar n) -> Var (TyVar (-n-1))) y
 
 instance Typed a => Typed (Poly a) where
-  typ = typ . unPoly
+  typ = typ . mono
   typeSubstA f (Poly x) = fmap poly (typeSubstA f x)
 
 instance Apply a => Apply (Poly a) where
   tryApply f x = do
-    let (f', (x', resType)) = unPoly (polyPair f (polyPair x (poly (Var (TyVar 0)))))
+    let (f', (x', resType)) = mono (polyPair f (polyPair x (poly (Var (TyVar 0)))))
     s <- unify (typ f') (arrowType [typ x'] resType)
     let (f'', x'') = typeSubst (evalSubst s) (f', x')
     fmap poly (tryApply f'' x'')

@@ -69,7 +69,7 @@ schemasOfSize 1 sig =
 schemasOfSize n _ = do
   ss <- lift $ gets schemas
   return $
-    [ unPoly (apply f x)
+    [ mono (apply f x)
     | i <- [1..n-1],
       let j = n-i,
       (fty, fs) <- Map.toList =<< maybeToList (Map.lookup i ss),
@@ -85,7 +85,7 @@ quickSpec :: Signature -> IO ()
 quickSpec sig = unbuffered $ do
   seeds <- fmap (take 100) (genSeeds 20)
   let e = table (env sig)
-      ts = emptyTestSet (makeTester (skeleton . instantiate . unPoly) e seeds sig)
+      ts = emptyTestSet (makeTester (skeleton . instantiate . mono) e seeds sig)
       ts' = emptyTestSet (makeTester (\(From _ t) -> t) e seeds sig)
   _ <- execStateT (runRulesT (createRules sig >> go 1 sig)) (initialState ts ts')
   return ()
@@ -141,7 +141,7 @@ createRules sig = do
           considerRenamings t s
         Representative -> do
           accept s
-          when (size (unPoly s) <= 5) $
+          when (size (mono s) <= 5) $
             considerRenamings s s
 
   rule $ do
@@ -149,7 +149,7 @@ createRules sig = do
     execute $
       case k of
         Untestable ->
-          ERROR ("Untestable instance " ++ prettyShow t ++ " of testable schema " ++ prettyShow (unPoly s))
+          ERROR ("Untestable instance " ++ prettyShow t ++ " of testable schema " ++ prettyShow (mono s))
         EqualTo (From _ u) -> found t u
         Representative -> return ()
 
@@ -157,7 +157,7 @@ createRules sig = do
         Set.fromList (Var (TyVar 0):map (typeSubst (const (Var (TyVar 0))) . typeRes . typ) (constants sig))
   rule $ do
     ConsiderSchema s <- event
-    require (typeRes (typ (skeleton (instantiate (unPoly s)))) `Set.member` allowedTypes)
+    require (typeRes (typ (skeleton (instantiate (mono s)))) `Set.member` allowedTypes)
     execute (consider s)
 
   rule $ do
@@ -172,8 +172,8 @@ createRules sig = do
   rule $ do
     Type ty1 <- event
     Type ty2 <- event
-    require (unPoly ty1 < unPoly ty2)
-    let (ty1', ty2') = unPoly (polyPair ty1 ty2)
+    require (mono ty1 < mono ty2)
+    let (ty1', ty2') = mono (polyPair ty1 ty2)
     Just sub <- return (Base.unify ty1' ty2')
     let mgu = poly (typeSubst (evalSubst sub) ty1')
         tys = [ty1, ty2] \\ [mgu]
@@ -182,7 +182,7 @@ createRules sig = do
     require (polyTyp s `elem` tys)
 
     execute $
-      generate (ConsiderSchema (fromMaybe __ (cast (unPoly mgu) s)))
+      generate (ConsiderSchema (fromMaybe __ (cast (mono mgu) s)))
 
   rule $ do
     Schema s Untestable <- event
@@ -202,7 +202,7 @@ considerRenamings :: Poly Schema -> Poly Schema -> M ()
 considerRenamings s s' = do
   sequence_ [ generate (ConsiderTerm (From s t)) | t <- ts ]
   where
-    ts = sortBy (comparing measure) (allUnifications (instantiate (unPoly s')))
+    ts = sortBy (comparing measure) (allUnifications (instantiate (mono s')))
 
 class (Eq a, Typed a) => Considerable a where
   toTerm     :: a -> Term
@@ -230,7 +230,7 @@ consider x = do
           generate (makeEvent x Representative)
 
 instance Considerable (Poly Schema) where
-  toTerm = instantiate . unPoly
+  toTerm = instantiate . mono
   getTestSet _ = lift $ gets schemaTestSet
   putTestSet _ ts = lift $ modify (\s -> s { schemaTestSet = ts })
   makeEvent = Schema
@@ -262,6 +262,6 @@ found t u = do
 
 accept :: Poly Schema -> M ()
 accept s = do
-  lift $ modify (\st -> st { schemas = Map.adjust f (size (unPoly s)) (schemas st) })
+  lift $ modify (\st -> st { schemas = Map.adjust f (size (mono s)) (schemas st) })
   where
     f m = Map.insertWith (++) (polyTyp s) [s] m
