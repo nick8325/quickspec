@@ -33,15 +33,15 @@ type M = RulesT Event (StateT S IO)
 
 data S = S {
   schemas       :: Schemas,
-  schemaTestSet :: TestSet Schema,
+  schemaTestSet :: TestSet (Poly Schema),
   termTestSet   :: Map (Poly Schema) (TestSet TermFrom),
   pruner        :: SimplePruner,
   freshTestSet  :: TestSet TermFrom }
 
 data Event =
-    Schema Schema   (KindOf Schema)
-  | Term   TermFrom (KindOf TermFrom)
-  | ConsiderSchema Schema
+    Schema (Poly Schema)   (KindOf (Poly Schema))
+  | Term   TermFrom        (KindOf TermFrom)
+  | ConsiderSchema (Poly Schema)
   | ConsiderTerm   TermFrom
   | Type           (Poly Type)
   | UntestableType (Poly Type)
@@ -52,7 +52,7 @@ data KindOf a = Untestable | Representative | EqualTo a
 
 type Schemas = Map Int (Map (Poly Type) [Poly Schema])
 
-initialState :: TestSet Schema -> TestSet TermFrom -> S
+initialState :: TestSet (Poly Schema) -> TestSet TermFrom -> S
 initialState ts ts' =
   S { schemas       = Map.empty,
       schemaTestSet = ts,
@@ -84,7 +84,7 @@ quickSpec :: Signature -> IO ()
 quickSpec sig = unbuffered $ do
   seeds <- fmap (take 100) (genSeeds 20)
   let e = table (env sig)
-      ts = emptyTestSet (makeTester (skeleton . instantiate) e seeds sig)
+      ts = emptyTestSet (makeTester (skeleton . instantiate . unPoly) e seeds sig)
       ts' = emptyTestSet (makeTester (\(From _ t) -> t) e seeds sig)
   _ <- execStateT (runRulesT (createRules >> go 1 sig)) (initialState ts ts')
   return ()
@@ -115,7 +115,7 @@ go n sig = do
   lift $ modify (\s -> s { schemas = Map.insert n Map.empty (schemas s) })
   ss <- fmap (sortBy (comparing measure)) (schemasOfSize n sig)
   liftIO $ putStrLn ("Size " ++ show n ++ ", " ++ show (length ss) ++ " schemas to consider:")
-  mapM_ (generate . ConsiderSchema) ss
+  mapM_ (generate . ConsiderSchema . poly) ss
   liftIO $ putStrLn ""
   go (n+1) sig
 
@@ -130,11 +130,6 @@ allUnifications t = map f ss
 createRules :: M ()
 createRules = do
   rule $ do
-    Schema s _ <- event
-    execute $
-      generate (Type (poly (typ s)))
-
-  rule $ do
     Schema s k <- event
     execute $
       case k of
@@ -144,7 +139,7 @@ createRules = do
           considerRenamings t s
         Representative -> do
           accept s
-          when (size s <= 5) $
+          when (size (unPoly s) <= 5) $
             considerRenamings s s
 
   rule $ do
@@ -165,6 +160,11 @@ createRules = do
     execute (consider s)
 
   rule $ do
+    Schema s _ <- event
+    execute $
+      generate (Type (polyTyp s))
+
+  rule $ do
     Type ty1 <- event
     Type ty2 <- event
     require (unPoly ty1 < unPoly ty2)
@@ -174,7 +174,7 @@ createRules = do
         tys = [ty1, ty2] \\ [mgu]
 
     Schema s Representative <- event
-    require (poly (typ s) `elem` tys)
+    require (polyTyp s `elem` tys)
 
     execute $
       generate (ConsiderSchema (fromMaybe __ (cast (unPoly mgu) s)))
@@ -183,7 +183,7 @@ createRules = do
     Schema s Untestable <- event
     require (arity (typ s) == 0)
     execute $
-      generate (UntestableType (poly (typ (defaultType s))))
+      generate (UntestableType (polyTyp (defaultType s)))
 
   rule $ do
     UntestableType ty <- event
@@ -191,11 +191,13 @@ createRules = do
       liftIO $ putStrLn $
         "Warning: generated term of untestable type " ++ prettyShow ty
 
-considerRenamings :: Schema -> Schema -> M ()
+  -- rule $ event >>= execute . liftIO . print
+
+considerRenamings :: Poly Schema -> Poly Schema -> M ()
 considerRenamings s s' =
-  sequence_ [ generate (ConsiderTerm (From (poly s) t)) | t <- ts ]
+  sequence_ [ generate (ConsiderTerm (From s t)) | t <- ts ]
   where
-    ts = sortBy (comparing measure) (allUnifications (instantiate s'))
+    ts = sortBy (comparing measure) (allUnifications (instantiate (unPoly s')))
 
 class (Eq a, Typed a) => Considerable a where
   toTerm     :: a -> Term
@@ -222,8 +224,8 @@ consider x = do
           putTestSet x ts
           generate (makeEvent x Representative)
 
-instance Considerable Schema where
-  toTerm = instantiate
+instance Considerable (Poly Schema) where
+  toTerm = instantiate . unPoly
   getTestSet _ = lift $ gets schemaTestSet
   putTestSet _ ts = lift $ modify (\s -> s { schemaTestSet = ts })
   makeEvent = Schema
@@ -253,8 +255,8 @@ found t u = do
     False ->
       liftIO $ putStrLn (prettyShow t ++ " = " ++ prettyShow u)
 
-accept :: Schema -> M ()
+accept :: Poly Schema -> M ()
 accept s = do
-  lift $ modify (\st -> st { schemas = Map.adjust f (size s) (schemas st) })
+  lift $ modify (\st -> st { schemas = Map.adjust f (size (unPoly s)) (schemas st) })
   where
-    f m = Map.insertWith (++) (polyTyp (poly s)) [poly s] m
+    f m = Map.insertWith (++) (polyTyp s) [s] m
