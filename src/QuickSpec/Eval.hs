@@ -43,9 +43,8 @@ data Event =
   | Term   TermFrom (KindOf TermFrom)
   | ConsiderSchema Schema
   | ConsiderTerm   TermFrom
-  | UntestableGroundType (Poly Type)
-  | SchemaType           (Poly Type)
-  | UnifiableTypes       (Poly Type) (Poly Type) (Poly Type)
+  | Type           (Poly Type)
+  | UntestableType (Poly Type)
   deriving (Eq, Ord, Show)
 
 data KindOf a = Untestable | Representative | EqualTo a
@@ -131,8 +130,13 @@ allUnifications t = map f ss
 createRules :: M ()
 createRules = do
   rule $ do
+    Schema s _ <- event
+    execute $
+      generate (Type (poly (typ s)))
+
+  rule $ do
     Schema s k <- event
-    execute $ do
+    execute $
       case k of
         Untestable -> accept s
         EqualTo t -> do
@@ -161,8 +165,8 @@ createRules = do
     execute (consider s)
 
   rule $ do
-    SchemaType ty1 <- event
-    SchemaType ty2 <- event
+    Type ty1 <- event
+    Type ty2 <- event
     require (unPoly ty1 < unPoly ty2)
     let (ty1', ty2') = unPoly (polyPair ty1 ty2)
     Just sub <- return (Base.unify ty1' ty2')
@@ -179,10 +183,10 @@ createRules = do
     Schema s Untestable <- event
     require (arity (typ s) == 0)
     execute $
-      generate (UntestableGroundType (poly (typ (defaultType s))))
+      generate (UntestableType (poly (typ (defaultType s))))
 
   rule $ do
-    UntestableGroundType ty <- event
+    UntestableType ty <- event
     execute $
       liftIO $ putStrLn $
         "Warning: generated term of untestable type " ++ prettyShow ty
@@ -251,7 +255,6 @@ found t u = do
 
 accept :: Schema -> M ()
 accept s = do
-  generate (SchemaType (poly (typ s)))
   lift $ modify (\st -> st { schemas = Map.adjust f (size s) (schemas st) })
   where
     f m = Map.insertWith (++) (polyTyp (poly s)) [poly s] m
