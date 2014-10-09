@@ -116,7 +116,7 @@ go n sig = do
   lift $ modify (\s -> s { schemas = Map.insert n Map.empty (schemas s) })
   ss <- fmap (sortBy (comparing measure)) (schemasOfSize n sig)
   liftIO $ putStrLn ("Size " ++ show n ++ ", " ++ show (length ss) ++ " schemas to consider:")
-  mapM_ (signal . ConsiderSchema) ss
+  mapM_ (generate . ConsiderSchema) ss
   liftIO $ putStrLn ""
   go (n+1) sig
 
@@ -130,50 +130,66 @@ allUnifications t = map f ss
 
 createRules :: M ()
 createRules = do
-  onMatch $ \e -> do
-    case e of
-      Schema s Untestable -> do
-        when (arity (typ s) == 0) (signal (UntestableGroundType (poly (typ (defaultType s)))))
-        accept s
-      Schema s (EqualTo t) -> do
-        considerRenamings t t
-        considerRenamings t s
-      Schema s Representative -> do
-        accept s
-        when (size s <= 5) $ considerRenamings s s
-      Term (From s t) Untestable ->
-        ERROR ("Untestable instance " ++ prettyShow t ++ " of testable schema " ++ prettyShow (unPoly s))
-      Term (From _ t) (EqualTo (From _ u)) -> found t u
-      Term _ Representative -> return ()
-      ConsiderSchema s -> consider s
-      ConsiderTerm   t -> consider t
-      UntestableGroundType ty ->
-        liftIO $ putStrLn ("Warning: generated term of untestable type " ++ prettyShow ty)
-      SchemaType ty -> return ()
-      UnifiableTypes _ _ _ -> return ()
-  onMatch $ \e ->
-    case e of
-      SchemaType ty1 ->
-        onMatch $ \e ->
-          case e of
-            SchemaType ty2 | unPoly ty1 < unPoly ty2 -> do
-              let (ty1', ty2') = unPoly (polyPair ty1 ty2)
-              case Base.unify ty1' ty2' of
-                Just sub -> do
-                  let mgu = poly (typeSubst (evalSubst sub) ty1')
-                      tys = [ty1, ty2] \\ [mgu]
-                  onMatch $ \e ->
-                    case e of
-                      Schema s Representative | poly (typ s) `elem` tys ->
-                        signal (ConsiderSchema (fromMaybe __ (cast (unPoly mgu) s)))
-                      _ -> return ()
-                Nothing -> return ()
-            _ -> return ()
-      _ -> return ()
+  rule $ do
+    Schema s k <- event
+    execute $ do
+      case k of
+        Untestable -> accept s
+        EqualTo t -> do
+          considerRenamings t t
+          considerRenamings t s
+        Representative -> do
+          accept s
+          when (size s <= 5) $
+            considerRenamings s s
+
+  rule $ do
+    Term (From s t) k <- event
+    execute $
+      case k of
+        Untestable ->
+          ERROR ("Untestable instance " ++ prettyShow t ++ " of testable schema " ++ prettyShow (unPoly s))
+        EqualTo (From _ u) -> found t u
+        Representative -> return ()
+
+  rule $ do
+    ConsiderSchema s <- event
+    execute (consider s)
+
+  rule $ do
+    ConsiderTerm s <- event
+    execute (consider s)
+
+  rule $ do
+    SchemaType ty1 <- event
+    SchemaType ty2 <- event
+    require (unPoly ty1 < unPoly ty2)
+    let (ty1', ty2') = unPoly (polyPair ty1 ty2)
+    Just sub <- return (Base.unify ty1' ty2')
+    let mgu = poly (typeSubst (evalSubst sub) ty1')
+        tys = [ty1, ty2] \\ [mgu]
+
+    Schema s Representative <- event
+    require (poly (typ s) `elem` tys)
+
+    execute $
+      generate (ConsiderSchema (fromMaybe __ (cast (unPoly mgu) s)))
+
+  rule $ do
+    Schema s Untestable <- event
+    require (arity (typ s) == 0)
+    execute $
+      generate (UntestableGroundType (poly (typ (defaultType s))))
+
+  rule $ do
+    UntestableGroundType ty <- event
+    execute $
+      liftIO $ putStrLn $
+        "Warning: generated term of untestable type " ++ prettyShow ty
 
 considerRenamings :: Schema -> Schema -> M ()
 considerRenamings s s' =
-  sequence_ [ signal (ConsiderTerm (From (poly s) t)) | t <- ts ]
+  sequence_ [ generate (ConsiderTerm (From (poly s) t)) | t <- ts ]
   where
     ts = sortBy (comparing measure) (allUnifications (instantiate s'))
 
@@ -181,7 +197,7 @@ class (Eq a, Typed a) => Considerable a where
   toTerm     :: a -> Term
   getTestSet :: a -> M (TestSet a)
   putTestSet :: a -> TestSet a -> M ()
-  event      :: a -> KindOf a -> Event
+  makeEvent  :: a -> KindOf a -> Event
 
 consider :: Considerable a => a -> M ()
 consider x = do
@@ -195,18 +211,18 @@ consider x = do
       ts <- getTestSet x
       case insert (poly x) ts of
         Nothing ->
-          signal (event x Untestable)
+          generate (makeEvent x Untestable)
         Just (Old y) ->
-          signal (event x (EqualTo y))
+          generate (makeEvent x (EqualTo y))
         Just (New ts) -> do
           putTestSet x ts
-          signal (event x Representative)
+          generate (makeEvent x Representative)
 
 instance Considerable Schema where
   toTerm = instantiate
   getTestSet _ = lift $ gets schemaTestSet
   putTestSet _ ts = lift $ modify (\s -> s { schemaTestSet = ts })
-  event = Schema
+  makeEvent = Schema
 
 data TermFrom = From (Poly Schema) Term deriving (Eq, Ord, Show)
 
@@ -221,7 +237,7 @@ instance Considerable TermFrom where
     gets (Map.findWithDefault ts s . termTestSet)
   putTestSet (From s _) ts =
     lift $ modify (\st -> st { termTestSet = Map.insert s ts (termTestSet st) })
-  event = Term
+  makeEvent = Term
 
 found :: Term -> Term -> M ()
 found t u = do
@@ -235,7 +251,7 @@ found t u = do
 
 accept :: Schema -> M ()
 accept s = do
-  signal (SchemaType (poly (typ s)))
+  generate (SchemaType (poly (typ s)))
   lift $ modify (\st -> st { schemas = Map.adjust f (size s) (schemas st) })
   where
     f m = Map.insertWith (++) (polyTyp (poly s)) [poly s] m
