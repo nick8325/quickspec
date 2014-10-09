@@ -6,7 +6,8 @@ module QuickSpec.Type(
   -- Types.
   Typeable,
   Type, TyCon(..), TyVar(..), A, B, C, D,
-  typeOf, arrowType, arity, toTypeRep, fromTypeRep,
+  typeOf, toTypeRep, fromTypeRep,
+  arrowType, typeArgs, typeRes, arity,
   -- Things that have types.
   Typed(..), typeSubst, tyVars, cast,
   Apply(..), apply, canApply,
@@ -64,9 +65,16 @@ arrowType :: [Type] -> Type -> Type
 arrowType [] res = res
 arrowType (arg:args) res = Fun Arrow [arg, arrowType args res]
 
+typeArgs :: Type -> [Type]
+typeArgs (Fun Arrow [arg, res]) = arg:typeArgs res
+typeArgs _ = []
+
+typeRes :: Type -> Type
+typeRes (Fun Arrow [_, res]) = typeRes res
+typeRes ty = ty
+
 arity :: Type -> Int
-arity (Fun Arrow [_, res]) = 1+arity res
-arity _ = 0
+arity = length . typeArgs
 
 fromTypeRep :: Ty.TypeRep -> Type
 fromTypeRep ty =

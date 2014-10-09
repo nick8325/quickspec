@@ -12,6 +12,7 @@ import QuickSpec.Equation
 import Data.Map(Map)
 import Data.Maybe
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import Control.Monad
 import QuickSpec.Pruning
 import QuickSpec.Pruning.Simple hiding (S)
@@ -86,7 +87,7 @@ quickSpec sig = unbuffered $ do
   let e = table (env sig)
       ts = emptyTestSet (makeTester (skeleton . instantiate . unPoly) e seeds sig)
       ts' = emptyTestSet (makeTester (\(From _ t) -> t) e seeds sig)
-  _ <- execStateT (runRulesT (createRules >> go 1 sig)) (initialState ts ts')
+  _ <- execStateT (runRulesT (createRules sig >> go 1 sig)) (initialState ts ts')
   return ()
 
 go :: Int -> Signature -> M ()
@@ -122,13 +123,14 @@ go n sig = do
 allUnifications :: Term -> [Term]
 allUnifications t = map f ss
   where
-    vs = [ map (x,) xs | xs <- partitionBy typ (usort (vars t)), x <- xs ]
+    vs = [ map (x,) xs | xs <- partitionBy (unifyTypeVars . typ) (usort (vars t)), x <- xs ]
     ss = map Map.fromList (sequence vs)
     go s x = Map.findWithDefault __ x s
     f s = rename (go s) t
+    unifyTypeVars = typeSubst (const (Var (TyVar 0)))
 
-createRules :: M ()
-createRules = do
+createRules :: Signature -> M ()
+createRules sig = do
   rule $ do
     Schema s k <- event
     execute $
@@ -151,8 +153,11 @@ createRules = do
         EqualTo (From _ u) -> found t u
         Representative -> return ()
 
+  let allowedTypes =
+        Set.fromList (Var (TyVar 0):map (typeSubst (const (Var (TyVar 0))) . typeRes . typ) (constants sig))
   rule $ do
     ConsiderSchema s <- event
+    require (typeRes (typ (skeleton (instantiate (unPoly s)))) `Set.member` allowedTypes)
     execute (consider s)
 
   rule $ do
@@ -194,7 +199,7 @@ createRules = do
   -- rule $ event >>= execute . liftIO . print
 
 considerRenamings :: Poly Schema -> Poly Schema -> M ()
-considerRenamings s s' =
+considerRenamings s s' = do
   sequence_ [ generate (ConsiderTerm (From s t)) | t <- ts ]
   where
     ts = sortBy (comparing measure) (allUnifications (instantiate (unPoly s')))
