@@ -214,9 +214,9 @@ consider :: Considerable a => a -> M ()
 consider x = do
   pruner <- lift $ gets pruner
   let t = toTerm x
-  case evalState (repUntyped (encodeTypes t)) pruner of
-    Just u | measure (decodeTypes u) < measure t ->
-      let mod = execState (unifyUntyped (encodeTypes t) u)
+  case evalState (rep t) pruner of
+    Just u | measure u < measure t ->
+      let mod = execState (unify (t :=: u))
       in lift $ modify (\s -> s { pruner = mod pruner })
     Nothing -> do
       ts <- getTestSet x
