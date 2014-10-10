@@ -48,7 +48,9 @@ boolSig = mconcat [
   constant "False" False,
   constant "||" (||),
   constant "&&" (&&),
-  constant "not" not]
+  constant "not" not,
+  inst (undefined :: Int),
+  inst (undefined :: Bool)]
 
 octSig = mconcat [
   constant "1" (1 :: It),
