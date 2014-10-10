@@ -28,18 +28,29 @@ t x = r x `compose` l1 x
 compose :: Fun -> Fun -> Fun
 compose (Fun f) (Fun g) = Fun (f . g)
 
-sig = mconcat [
+listsSig = mconcat [
   constant "rev" (reverse :: [A] -> [A]),
   constant "app" ((++) :: [A] -> [A] -> [A]),
   constant "[]" ([] :: [A]),
-  --arb (undefined :: Int -> Int),
-  --constant "map" (map :: (Int -> Int) -> [Int] -> [Int]),
-  --constant "sort" (sort :: [Int] -> [Int]),
-  --constant "usort" (usort :: [Int] -> [Int]),
+  arb (undefined :: Int -> Int),
+  constant "map" (map :: (Int -> Int) -> [Int] -> [Int]),
   inst (undefined :: Int),
   inst (undefined :: [Int])]
 
-sig2 = mconcat [
+constSig = mconcat [
+  constant "const" ((\x y -> [const x y]) :: A -> B -> [A]),
+  constant "asTypeOf" ((\x y -> [asTypeOf x y]) :: A -> A -> [A]),
+  inst (undefined :: [Int]),
+  inst (undefined :: Int)]
+
+boolSig = mconcat [
+  constant "True" True,
+  constant "False" False,
+  constant "||" (||),
+  constant "&&" (&&),
+  constant "not" not]
+
+octSig = mconcat [
   constant "1" (1 :: It),
   constant "*" ((*) :: It -> It -> It),
 --  constant "/" ((/) :: It -> It -> It),
@@ -55,14 +66,14 @@ sig2 = mconcat [
   inst (undefined :: Fun),
   inst (undefined :: It)]
 
-sig3 = mconcat [
+arithSig = mconcat [
   constant "0" (0 :: Int),
   constant "1" (1 :: Int),
   constant "+" ((+) :: Int -> Int -> Int),
   constant "*" ((*) :: Int -> Int -> Int),
   inst (undefined :: Int)]
 
-sig4 = mconcat [
+prettySig = mconcat [
   constant "text" (text :: [Bool] -> Layout Bool),
   constant "nest" (nest :: Int -> Layout Bool -> Layout Bool),
   constant "$$" (($$) :: Layout Bool -> Layout Bool -> Layout Bool),
@@ -76,7 +87,7 @@ sig4 = mconcat [
   inst (undefined :: [Bool]),
   inst (undefined :: Int)]
 
-main = quickSpec sig
+main = quickSpec listsSig
 
 {-
 sig1 = [

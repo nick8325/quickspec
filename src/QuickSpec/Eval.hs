@@ -286,7 +286,7 @@ consider x = do
     Just u | measure u < measure t ->
       let mod = execState (unify (t :=: u))
       in lift $ modify (\s -> s { pruner = mod pruner })
-    Nothing -> do
+    _ -> do
       ts <- getTestSet x
       case insert (poly x) ts of
         Nothing ->
