@@ -120,6 +120,28 @@ go n sig = do
   liftIO $ putStrLn ""
   go (n+1) sig
 
+instantiateFor :: Term -> Schema -> Term
+instantiateFor s t = evalState (aux t) (maxVar, Map.fromList varList)
+  where
+    aux (Var ty) = do
+      (n, m) <- get
+      index <-
+        case Map.lookup (monoTyp ty) m of
+          Just ((Variable n' _):ys) -> do
+            put (n, Map.insert (monoTyp ty) ys m)
+            return n'
+          _ -> do
+            put (n+1, m)
+            return n
+      return (Var (Variable index ty))
+    aux (Fun f xs) = fmap (Fun f) (mapM aux xs)
+    maxVar = 1+maximum (0:map varNumber (vars s))
+    monoTyp :: Typed a => a -> Type
+    monoTyp = unifyTypeVars . typ
+    unifyTypeVars = typeSubst (const (Var (TyVar 0)))
+    varList =
+      [ (monoTyp x, xs) | xs@(x:_) <- partitionBy monoTyp (usort (vars s)) ]
+
 allUnifications :: Term -> [Term]
 allUnifications t = map f ss
   where
@@ -202,7 +224,7 @@ considerRenamings :: Poly Schema -> Poly Schema -> M ()
 considerRenamings s s' = do
   sequence_ [ generate (ConsiderTerm (From s t)) | t <- ts ]
   where
-    ts = sortBy (comparing measure) (allUnifications (instantiate (mono s')))
+    ts = sortBy (comparing measure) (allUnifications (instantiateFor (instantiate (mono s)) (mono s')))
 
 class (Eq a, Typed a) => Considerable a where
   toTerm     :: a -> Term
