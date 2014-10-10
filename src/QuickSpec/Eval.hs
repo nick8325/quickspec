@@ -120,6 +120,52 @@ go n sig = do
   liftIO $ putStrLn ""
   go (n+1) sig
 
+-- NOTE:
+-- consider the law map f (xs++ys) = map f xs++map f ys.
+-- The schemas are:
+--   1) map f (_++_)
+--   2) map _ _++map _ _
+-- At one point we used the following buggy algorithm to instantiate
+-- the schemas:
+--   1) replace each hole with a fresh variable
+--   2) unify/permute various combinations of variables
+-- But this gives us the two schemas:
+--   1) map v0 (v1++v2)
+--   2) map v0 v1++map v2 v3
+-- By unifying v0 and v2 in the second law we get
+--      map v0 v1++map v0 v3
+-- but this does not compare equal to the first time, because we would
+-- need the variable to be called v2 instead!
+--
+-- The solution is, when we create fresh variables for a schema, take
+-- the variable names from the representative's schema if at all possible.
+-- So in the example above, in the representative v2 has type list so
+-- we would instantiate the non-reprentative to
+--      map v0 v1++map v3 v2
+-- and now unifying v3 and v0 gives us what we want.
+--
+-- So the idea is, when you have a whole of a certain type, check if the
+-- instantiated schema had a variable of that type and use that variable
+-- first.
+--
+-- However, there is a complication: unifying two variables will unify
+-- their types, so the types may change during instantiation and it's not
+-- clear how to find variables of the right type in the representative.
+-- But there is a solution. When instantiating a schema we only unify
+-- two variables if their types are both type variables, not if one of
+-- the variables has a concrete type (we do this to make sure that each
+-- schema has a unique most specific instance). This helps us here:
+-- during the entire instantiation algorithm, we compare types "up to"
+-- type variables i.e. two types that are the same except for having
+-- different type variables compare equal. Thus instantiation never changes
+-- the types (as far as this comparison is concerned) and this extra
+-- complication with type unification goes away.
+--
+-- This approach is justified because we instantiate all type variables
+-- to the same type during testing anyway.
+--
+-- FIXME this process will currently produce ill-typed terms because
+-- when we unify two terms we don't unify their types. Fix this!
 instantiateFor :: Term -> Schema -> Term
 instantiateFor s t = evalState (aux t) (maxVar, Map.fromList varList)
   where
