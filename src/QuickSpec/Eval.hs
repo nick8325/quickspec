@@ -282,7 +282,7 @@ consider :: Considerable a => a -> M ()
 consider x = do
   pruner <- lift $ gets pruner
   let t = toTerm x
-  case evalState (rep t) pruner of
+  case evalState (rep (etaExpand t)) pruner of
     Just u | measure u < measure t ->
       let mod = execState (unify (t :=: u))
       in lift $ modify (\s -> s { pruner = mod pruner })
@@ -296,6 +296,16 @@ consider x = do
         Just (New ts) -> do
           putTestSet x ts
           generate (makeEvent x Representative)
+
+etaExpand :: Term -> Term
+etaExpand t = aux (1+maximum (0:map varNumber (vars t))) t
+  where
+    aux n t =
+      let f = poly t
+          x = poly (Var (Variable n (Var (TyVar 0))))
+      in case tryApply f x of
+        Nothing -> t
+        Just u -> aux (n+1) (mono u)
 
 instance Considerable (Poly Schema) where
   toTerm = instantiate . mono

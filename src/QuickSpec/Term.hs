@@ -36,7 +36,8 @@ size (Fun _f xs) = 1+sum (map size xs)
 data Constant =
   Constant {
     conName  :: String,
-    conValue :: Value Identity }
+    conValue :: Value Identity,
+    conArity :: Int }
   deriving Show
 instance Eq Constant where x == y = x `compare` y == EQ
 instance Ord Constant where compare = comparing conName
@@ -44,8 +45,8 @@ instance Pretty Constant where
   pretty x = text (conName x)
 instance Typed Constant where
   typ = typ . conValue
-  typeSubstA s (Constant name value) =
-    Constant name <$> typeSubstA s value
+  typeSubstA s (Constant name value arity) =
+    Constant name <$> typeSubstA s value <*> pure arity
 
 -- We're not allowed to have two variables with the same number
 -- but different type.
@@ -77,11 +78,11 @@ instance Typed v => Typed (TermOf v) where
     Fun <$> typeSubstA s f <*> traverse (typeSubstA s) xs
 
 instance Typed v => Apply (TermOf v) where
-  tryApply t@(Fun f xs) u =
+  tryApply t@(Fun f xs) u | conArity f > length xs =
     case typ t of
       Fun Arrow [arg, _] | arg == typ u -> Just (Fun f (xs ++ [u]))
       _ -> Nothing
-  tryApply Var{} _ = Nothing
+  tryApply _ _ = Nothing
 
 -- Turn a term into a schema by forgetting about its variables.
 schema :: Term -> Schema

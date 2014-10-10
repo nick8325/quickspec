@@ -23,7 +23,7 @@ instance Monoid Signature where
   Signature cs os as `mappend` Signature cs' os' as' = Signature (cs++cs') (os++os') (as++as')
 
 constant :: Typeable a => String -> a -> Signature
-constant name x = Signature [Constant name (toValue (Identity x))] [] []
+constant name x = Signature [Constant name (toValue (Identity x)) (arity (typeOf x))] [] []
 
 ord :: forall a. (Typeable a, Ord a) => a -> Signature
 ord _ = Signature [] [toValue (Instance Dict :: Instance Ord a)] []
