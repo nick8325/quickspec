@@ -201,14 +201,14 @@ createRules :: Signature -> M ()
 createRules sig = do
   rule $ do
     Schema s k <- event
-    execute $
+    execute $ do
+      accept s
       case k of
-        Untestable -> accept s
+        Untestable -> return ()
         EqualTo t -> do
           considerRenamings t t
           considerRenamings t s
         Representative -> do
-          accept s
           when (size (mono s) <= 5) $
             considerRenamings s s
 
