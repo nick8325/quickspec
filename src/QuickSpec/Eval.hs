@@ -297,6 +297,9 @@ consider x = do
           putTestSet x ts
           generate (makeEvent x Representative)
 
+-- NOTE: this is not quite correct because we might get
+-- t x --> u x x
+-- so we need to check the "all instances are reduced" thing instead.
 etaExpand :: Term -> Term
 etaExpand t = aux (1+maximum (0:map varNumber (vars t))) t
   where
