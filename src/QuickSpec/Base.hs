@@ -5,12 +5,14 @@
 module QuickSpec.Base(
   Tm,
   module Data.Rewriting.Term, foldTerm, mapTerm,
+  module Data.Rewriting.Term.Ops,
   module Data.Rewriting.Substitution, evalSubst, subst, substA, unifyMany,
   module Text.PrettyPrint.ANSI.Leijen, prettyPrint, prettyShow) where
 
 #include "errors.h"
 
 import Data.Rewriting.Term hiding (Term, fold, map, fromString, parse, parseIO, parseFun, parseVar, parseWST)
+import Data.Rewriting.Term.Ops(subterms)
 import qualified Data.Rewriting.Term as T
 import Data.Rewriting.Substitution hiding (apply, fromString, parse, parseIO)
 import qualified Data.Rewriting.Substitution as T

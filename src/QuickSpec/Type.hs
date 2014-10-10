@@ -7,12 +7,12 @@ module QuickSpec.Type(
   Typeable,
   Type, TyCon(..), TyVar(..), A, B, C, D,
   typeOf, toTypeRep, fromTypeRep,
-  arrowType, typeArgs, typeRes, arity,
+  arrowType, typeArgs, typeRes, arity, monoTyp,
   -- Things that have types.
   Typed(..), typeSubst, tyVars, cast,
   Apply(..), apply, canApply,
   -- Polymorphic types.
-  Poly, poly, mono, polyTyp, polyPair,
+  Poly, poly, mono, polyTyp, polyPair, polyMgu,
   -- Dynamic values.
   Value, toValue, fromValue,
   Unwrapped(..), unwrap, Wrapper(..),
@@ -75,6 +75,9 @@ typeRes ty = ty
 
 arity :: Type -> Int
 arity = length . typeArgs
+
+monoTyp :: Typed a => a -> Type
+monoTyp = typeSubst (const (Var (TyVar 0))) . typ
 
 fromTypeRep :: Ty.TypeRep -> Type
 fromTypeRep ty =
@@ -186,6 +189,12 @@ polyPair :: (Typed a, Typed b) => Poly a -> Poly b -> Poly (a, b)
 polyPair (Poly x) (Poly y) = poly (x, y')
   where
     y' = typeSubst (\(TyVar n) -> Var (TyVar (-n-1))) y
+
+polyMgu :: Poly Type -> Poly Type -> Maybe (Poly Type)
+polyMgu ty1 ty2 = do
+  let (ty1', ty2') = mono (polyPair ty1 ty2)
+  sub <- unify ty1' ty2'
+  return (poly (typeSubst (evalSubst sub) ty1'))
 
 instance Typed a => Typed (Poly a) where
   typ = typ . mono

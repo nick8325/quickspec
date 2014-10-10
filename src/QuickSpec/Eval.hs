@@ -13,6 +13,7 @@ import Data.Map(Map)
 import Data.Maybe
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import Data.Set(Set)
 import Control.Monad
 import QuickSpec.Pruning
 import QuickSpec.Pruning.Simple hiding (S)
@@ -37,7 +38,8 @@ data S = S {
   schemaTestSet :: TestSet (Poly Schema),
   termTestSet   :: Map (Poly Schema) (TestSet TermFrom),
   pruner        :: SimplePruner,
-  freshTestSet  :: TestSet TermFrom }
+  freshTestSet  :: TestSet TermFrom,
+  types         :: Set Type }
 
 data Event =
     Schema (Poly Schema)   (KindOf (Poly Schema))
@@ -53,13 +55,14 @@ data KindOf a = Untestable | Representative | EqualTo a
 
 type Schemas = Map Int (Map (Poly Type) [Poly Schema])
 
-initialState :: TestSet (Poly Schema) -> TestSet TermFrom -> S
-initialState ts ts' =
+initialState :: Signature -> TestSet (Poly Schema) -> TestSet TermFrom -> Set Type -> S
+initialState sig ts ts' types =
   S { schemas       = Map.empty,
       schemaTestSet = ts,
       termTestSet   = Map.empty,
-      pruner        = emptyPruner,
-      freshTestSet  = ts' }
+      pruner        = emptyPruner types sig,
+      freshTestSet  = ts',
+      types         = types }
 
 schemasOfSize :: Int -> Signature -> M [Schema]
 schemasOfSize 1 sig =
@@ -87,8 +90,15 @@ quickSpec sig = unbuffered $ do
   let e = table (env sig)
       ts = emptyTestSet (makeTester (skeleton . instantiate . mono) e seeds sig)
       ts' = emptyTestSet (makeTester (\(From _ t) -> t) e seeds sig)
-  _ <- execStateT (runRulesT (createRules sig >> go 1 sig)) (initialState ts ts')
+      types = typeUniverse sig
+  _ <- execStateT (runRulesT (createRules sig >> go 1 sig)) (initialState sig ts ts' types)
   return ()
+
+typeUniverse :: Signature -> Set Type
+typeUniverse sig =
+  Set.fromList $
+    Var (TyVar 0):
+    [ monoTyp t | c <- constants sig, t <- subterms (typ c) ]
 
 go :: Int -> Signature -> M ()
 go 10 _ = do
@@ -182,20 +192,16 @@ instantiateFor s t = evalState (aux t) (maxVar, Map.fromList varList)
       return (Var (Variable index ty))
     aux (Fun f xs) = fmap (Fun f) (mapM aux xs)
     maxVar = 1+maximum (0:map varNumber (vars s))
-    monoTyp :: Typed a => a -> Type
-    monoTyp = unifyTypeVars . typ
-    unifyTypeVars = typeSubst (const (Var (TyVar 0)))
     varList =
       [ (monoTyp x, xs) | xs@(x:_) <- partitionBy monoTyp (usort (vars s)) ]
 
 allUnifications :: Term -> [Term]
 allUnifications t = map f ss
   where
-    vs = [ map (x,) xs | xs <- partitionBy (unifyTypeVars . typ) (usort (vars t)), x <- xs ]
+    vs = [ map (x,) xs | xs <- partitionBy monoTyp (usort (vars t)), x <- xs ]
     ss = map Map.fromList (sequence vs)
     go s x = Map.findWithDefault __ x s
     f s = rename (go s) t
-    unifyTypeVars = typeSubst (const (Var (TyVar 0)))
 
 createRules :: Signature -> M ()
 createRules sig = do
@@ -221,11 +227,10 @@ createRules sig = do
         EqualTo (From _ u) -> found t u
         Representative -> return ()
 
-  let allowedTypes =
-        Set.fromList (Var (TyVar 0):map (typeSubst (const (Var (TyVar 0))) . typeRes . typ) (constants sig))
   rule $ do
     ConsiderSchema s <- event
-    require (typeRes (typ (skeleton (instantiate (mono s)))) `Set.member` allowedTypes)
+    types <- execute $ lift $ gets types
+    require (and [ monoTyp t `Set.member` types | t <- subterms (mono s) ])
     execute (consider s)
 
   rule $ do
@@ -241,10 +246,8 @@ createRules sig = do
     Type ty1 <- event
     Type ty2 <- event
     require (mono ty1 < mono ty2)
-    let (ty1', ty2') = mono (polyPair ty1 ty2)
-    Just sub <- return (Base.unify ty1' ty2')
-    let mgu = poly (typeSubst (evalSubst sub) ty1')
-        tys = [ty1, ty2] \\ [mgu]
+    Just mgu <- return (polyMgu ty1 ty2)
+    let tys = [ty1, ty2] \\ [mgu]
 
     Schema s Representative <- event
     require (polyTyp s `elem` tys)
@@ -281,11 +284,13 @@ class (Eq a, Typed a) => Considerable a where
 consider :: Considerable a => a -> M ()
 consider x = do
   pruner <- lift $ gets pruner
+  types  <- lift $ gets types
   let t = toTerm x
   case evalState (rep (etaExpand t)) pruner of
     Just u | measure u < measure t ->
-      let mod = execState (unify (t :=: u))
-      in lift $ modify (\s -> s { pruner = mod pruner })
+{-      let mod = execState (unify types (t :=: u))
+      in lift $ modify (\s -> s { pruner = mod pruner })-}
+      return ()
     _ -> do
       ts <- getTestSet x
       case insert (poly x) ts of
@@ -334,11 +339,13 @@ instance Considerable TermFrom where
 found :: Term -> Term -> M ()
 found t u = do
   Simple.S eqs <- lift $ gets pruner
-  lift $ modify (\s -> s { pruner = execState (unify (t :=: u)) (pruner s) })
-  case False && evalState (unify (t :=: u)) (E.S eqs) of
+  types <- lift $ gets types
+  res <- liftIO $ uncurry (E.eUnify eqs) (toPruningEquation (t :=: u))
+  case res of
     True ->
       return ()
-    False ->
+    False -> do
+      lift $ modify (\s -> s { pruner = execState (unify types (t :=: u)) (pruner s) })
       liftIO $ putStrLn (prettyShow t ++ " = " ++ prettyShow u)
 
 accept :: Poly Schema -> M ()

@@ -18,33 +18,23 @@ import qualified Jukebox.Provers.E as Jukebox
 import qualified Jukebox.Toolbox as Jukebox
 import qualified Jukebox.Monotonox.ToFOF as Jukebox
 import qualified Jukebox.Clausify as Jukebox
+import qualified Jukebox.TPTP.Print as Jukebox
+import qualified Text.PrettyPrint.HughesPJ as Jukebox
+import Data.Char
 
-newtype EPruner = S [(PruningTerm, PruningTerm)]
-
-instance Pruner EPruner where
-  emptyPruner = S []
-  unifyUntyped = eUnify
-  repUntyped _ = return Nothing
-
-eliftIO :: IO a -> State EPruner a
-eliftIO x = unsafePerformIO (fmap return x)
-
-eUnify :: PruningTerm -> PruningTerm -> State EPruner Bool
-eUnify t u = do
-  S eqs <- get
-  -- eliftIO (putStr ("\nSending to E: " ++ prettyShow (decodeTypes t) ++ " = " ++ prettyShow (decodeTypes u) ++ ": ") >> hFlush stdout)
-  let opts = Jukebox.EFlags "eprover" (Just 30) Nothing
+eUnify :: [(PruningTerm, PruningTerm)] -> PruningTerm -> PruningTerm -> IO Bool
+eUnify eqs t u = do
+  --eliftIO (putStr ("\nSending to E: " ++ prettyShow (fromPruningTerm t) ++ " = " ++ prettyShow (fromPruningTerm u) ++ ": ") >> hFlush stdout)
+  let opts = Jukebox.EFlags "eprover" (Just 1) Nothing
       prob = translate eqs t u
-  prob' <- eliftIO (Jukebox.toFofIO (Jukebox.clausifyIO (Jukebox.ClausifyFlags False)) (Jukebox.tags False) prob)
-  res <- eliftIO (Jukebox.runE opts prob')
+  putStrLn (Jukebox.render (Jukebox.prettyProblem "fof" Jukebox.Normal prob))
+  res <- Jukebox.runE opts prob
   --eliftIO (print res)
   case res of
     Left Jukebox.Unsatisfiable ->
       -- Pruned
       return True
     _ -> do
-      -- Not pruned
-      modify (\(S eqs) -> S ((t,u):eqs))
       return False
 
 translate :: [(PruningTerm, PruningTerm)] -> PruningTerm -> PruningTerm ->
@@ -59,17 +49,17 @@ translate eqs t u = Jukebox.close_ Jukebox.stdNames $ do
   let var = find (Map.fromList (zip vs varSyms))
       fun = find (Map.fromList (zip fs funSyms))
       input kind form = Jukebox.Input (BS.pack "clause") kind form
-  return (input Jukebox.Conjecture (conjecturise (translateEq var fun (t, u))):
+  return (input Jukebox.Conjecture (conjecturise (translateEq var fun (skolemise t, skolemise u))):
           map (input Jukebox.Axiom . translateEq var fun) eqs)
 
 makeVarName :: PruningVariable -> String
-makeVarName (TermVariable x) = 'X':show (varNumber x)
-makeVarName (TypeVariable x) = 'A':show (tyVarNumber x)
+makeVarName (TermVariable x ty) = 'X':show (varNumber x)
 
 makeFunName :: PruningConstant -> String
-makeFunName (TermConstant x) = 'f':conName x
-makeFunName (TypeConstant x) = 't':show x
-makeFunName HasType          = "as"
+makeFunName (TermConstant x n ty) = 'f':conName x ++ "/" ++ show n ++ "@" ++ strip (prettyShow ty)
+makeFunName (HasType ty)        = "@" ++ strip (prettyShow ty)
+
+strip = filter (not . isSpace)
 
 conjecturise :: Jukebox.Symbolic a => a -> a
 conjecturise t =
@@ -79,6 +69,10 @@ conjecturise t =
   where
     term (Jukebox.Var (x Jukebox.::: t)) = (x Jukebox.::: Jukebox.FunType [] t) Jukebox.:@: []
     term t = Jukebox.recursively conjecturise t
+
+skolemise :: PruningTerm -> PruningTerm
+skolemise (Fun f xs) = Fun f (map skolemise xs)
+skolemise x@(Var (TermVariable _ ty)) = Fun (HasType ty) [x]
 
 find :: Ord k => Map k v -> k -> v
 find m x = Map.findWithDefault (error "E: not found") x m
