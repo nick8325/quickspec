@@ -7,12 +7,12 @@ module QuickSpec.Type(
   Typeable,
   Type, TyCon(..), TyVar(..), A, B, C, D,
   typeOf, toTypeRep, fromTypeRep,
-  arrowType, typeArgs, typeRes, arity, monoTyp,
+  arrowType, typeArgs, typeRes, arity, oneTypeVar,
   -- Things that have types.
   Typed(..), typeSubst, tyVars, cast,
   Apply(..), apply, canApply,
   -- Polymorphic types.
-  Poly, poly, mono, polyTyp, polyPair, polyMgu,
+  Poly, poly, unPoly, polyTyp, polyPair, polyMgu,
   -- Dynamic values.
   Value, toValue, fromValue,
   Unwrapped(..), unwrap, Wrapper(..),
@@ -78,8 +78,8 @@ typeRes ty = ty
 arity :: Type -> Int
 arity = length . typeArgs
 
-monoTyp :: Typed a => a -> Type
-monoTyp = typeSubst (const (Var (TyVar 0))) . typ
+oneTypeVar :: Typed a => a -> a
+oneTypeVar = typeSubst (const (Var (TyVar 0)))
 
 fromTypeRep :: Ty.TypeRep -> Type
 fromTypeRep ty =
@@ -179,7 +179,7 @@ instance (Typed a, Typed b) => Typed (a, b) where
 -- Represents a forall-quantifier over all the type variables in a type.
 -- Wrapping a term in Poly normalises the type by alpha-renaming
 -- type variables canonically.
-newtype Poly a = Poly { mono :: a }
+newtype Poly a = Poly { unPoly :: a }
   deriving (Eq, Ord, Show, Pretty, Typeable)
 
 poly :: Typed a => a -> Poly a
@@ -202,17 +202,17 @@ polyPair (Poly x) (Poly y) = poly (x, y')
 
 polyMgu :: Poly Type -> Poly Type -> Maybe (Poly Type)
 polyMgu ty1 ty2 = do
-  let (ty1', ty2') = mono (polyPair ty1 ty2)
+  let (ty1', ty2') = unPoly (polyPair ty1 ty2)
   sub <- unify ty1' ty2'
   return (poly (typeSubst (evalSubst sub) ty1'))
 
 instance Typed a => Typed (Poly a) where
-  typ = typ . mono
+  typ = typ . unPoly
   typeSubstA f (Poly x) = fmap poly (typeSubstA f x)
 
 instance Apply a => Apply (Poly a) where
   tryApply f x = do
-    let (f', (x', resType)) = mono (polyPair f (polyPair x (poly (Var (TyVar 0)))))
+    let (f', (x', resType)) = unPoly (polyPair f (polyPair x (poly (Var (TyVar 0)))))
     s <- unify (typ f') (arrowType [typ x'] resType)
     let (f'', x'') = typeSubst (evalSubst s) (f', x')
     fmap poly (tryApply f'' x'')

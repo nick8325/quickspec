@@ -25,8 +25,8 @@ class Pruner a where
 emptyPruner :: Pruner a => Set Type -> Signature -> a
 emptyPruner univ sig = execState go untypedEmptyPruner
   where
-    go = mapM_ axiom (constants sig >>= partiallyApply >>= instances >>= return . defaulted . poly)
-    axiom (Defaulted t) = unifyUntyped (Fun (HasType (typ t)) [toPruningTerm t]) (toPruningTerm t)
+    go = mapM_ axiom (constants sig >>= partiallyApply >>= instances >>= return . oneTypeVar)
+    axiom t = unifyUntyped (Fun (HasType (typ t)) [toPruningTerm t]) (toPruningTerm t)
     instances t@(Fun _ ts) =
       [ typeSubst (evalSubst (fromMap sub)) t
       | sub <- foldr intersection [Map.empty] (map (constrain (Set.toList univ)) (t:ts)) ]
@@ -35,7 +35,7 @@ emptyPruner univ sig = execState go untypedEmptyPruner
       | i <- [0..conArity x],
         let ts = [ Var (Variable j (Var (TyVar 0))) | j <- [0..i-1] ] ]
     fun x [] = x
-    fun x (t:ts) = fun (mono (poly x `apply` poly t)) ts
+    fun x (t:ts) = fun (unPoly (poly x `apply` poly t)) ts
 
 unify :: Pruner a => Set Type -> Equation -> State a Bool
 unify univ e = do
@@ -57,8 +57,8 @@ unifyEquation :: Equation -> Equation
 unifyEquation (lhs :=: rhs) = lhs' :=: rhs'
   where
     Just ty = polyMgu (poly (typ lhs)) (poly (typ rhs))
-    Just lhs' = cast (mono ty) lhs
-    Just rhs' = cast (mono ty) rhs
+    Just lhs' = cast (unPoly ty) lhs
+    Just rhs' = cast (unPoly ty) rhs
 
 eqnInstances :: [Type] -> Term -> Term -> [(Term, Term)]
 eqnInstances univ lhs rhs =
@@ -110,8 +110,8 @@ instance Pretty PruningVariable where
 toPruningTerm :: Term -> PruningTerm
 toPruningTerm = guardNakedVariables . go
   where
-    go (Fun f xs) = Fun (TermConstant f (length xs) (monoTyp f)) (map go xs)
-    go (Var x) = Var (TermVariable x (monoTyp x))
+    go (Fun f xs) = Fun (TermConstant f (length xs) (typ (oneTypeVar f))) (map go xs)
+    go (Var x) = Var (TermVariable x (typ (oneTypeVar x)))
     guardNakedVariables x@(Var (TermVariable _ ty)) = Fun (HasType ty) [x]
     guardNakedVariables x = x
 

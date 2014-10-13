@@ -89,9 +89,13 @@ schema = rename typ
 
 -- Instantiate a schema by making all the variables different.
 instantiate :: Schema -> Term
-instantiate s = evalState (aux s) 0
+instantiate s = evalState (aux s) Map.empty
   where
-    aux (Var ty) = do { n <- get; put $! n+1; return (Var (Variable n ty)) }
+    aux (Var ty) = do
+      m <- get
+      let n = Map.findWithDefault 0 ty m
+      put $! Map.insert ty (n+1) m
+      return (Var (Variable n ty))
     aux (Fun f xs) = fmap (Fun f) (mapM aux xs)
 
 -- Take a term and unify all type variables,

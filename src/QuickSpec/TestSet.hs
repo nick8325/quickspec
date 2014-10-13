@@ -9,7 +9,7 @@ import Control.Monad
 data TestSet t =
   TestSet {
     makeType :: Type -> Maybe (Value (TypedTestSet t)),
-    testSet :: Map (Poly Type) (Value (TypedTestSet t))
+    testSet :: Map Type (Value (TypedTestSet t))
     }
 
 data TypedTestSet t a =
@@ -33,19 +33,19 @@ emptyTypedTestSet makeTerm = TypedTestSet makeTerm Dict (TestCase Map.empty)
 
 data Result t = New (TestSet t) | Old t
 
-findTestSet :: Typed t => Poly t -> TestSet t -> Maybe (Value (TypedTestSet t))
+findTestSet :: Typed t => t -> TestSet t -> Maybe (Value (TypedTestSet t))
 findTestSet x ts =
-  Map.lookup (polyTyp x) (testSet ts) `mplus`
+  Map.lookup (typ x) (testSet ts) `mplus`
   makeType ts (typ x)
 
-insert :: Typed t => Poly t -> TestSet t -> Maybe (Result t)
+insert :: Typed t => t -> TestSet t -> Maybe (Result t)
 insert x ts = do
   tts `In` w <- fmap unwrap (findTestSet x ts)
-  tt <- fmap (Tested (mono x)) (makeTerm tts (mono x))
+  tt <- fmap (Tested x) (makeTerm tts x)
   return $
     case insert1 tt tts of
       New1 tts ->
-        New ts { testSet = Map.insert (polyTyp x) (wrap w tts) (testSet ts) }
+        New ts { testSet = Map.insert (typ x) (wrap w tts) (testSet ts) }
       Old1 t ->
         Old t
 
