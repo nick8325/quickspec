@@ -24,10 +24,10 @@ import Data.Char
 
 eUnify :: [(PruningTerm, PruningTerm)] -> PruningTerm -> PruningTerm -> IO Bool
 eUnify eqs t u = do
-  --eliftIO (putStr ("\nSending to E: " ++ prettyShow (fromPruningTerm t) ++ " = " ++ prettyShow (fromPruningTerm u) ++ ": ") >> hFlush stdout)
+  -- putStrLn ("\nSending to E: " ++ prettyShow (fromPruningTerm t) ++ " = " ++ prettyShow (fromPruningTerm u))
   let opts = Jukebox.EFlags "eprover" (Just 1) Nothing
       prob = translate eqs t u
-  --putStrLn (Jukebox.render (Jukebox.prettyProblem "fof" Jukebox.Normal prob))
+  -- putStrLn (Jukebox.render (Jukebox.prettyProblem "fof" Jukebox.Normal prob))
   res <- Jukebox.runE opts prob
   --eliftIO (print res)
   case res of
@@ -41,35 +41,23 @@ translate :: [(PruningTerm, PruningTerm)] -> PruningTerm -> PruningTerm ->
              Jukebox.Closed [Jukebox.Input Jukebox.Form]
 translate eqs t u = Jukebox.close_ Jukebox.stdNames $ do
   ty <- Jukebox.newType "i"
-  let terms = [skolemise t, skolemise u] ++ concat [ [l, r] | (l, r) <- eqs ]
+  let terms = [t, u] ++ concat [ [l, r] | (l, r) <- eqs ]
       vs = usort (concatMap vars terms)
       fs = usort (concatMap funs terms)
   varSyms <- sequence [ Jukebox.newSymbol "X" ty | x <- vs ]
   funSyms <- sequence [ Jukebox.newFunction (makeFunName x) [] ty | x <- fs]
   let var = find (Map.fromList (zip vs varSyms))
       fun = find (Map.fromList (zip fs funSyms))
-      input kind form = Jukebox.Input (BS.pack "clause") kind form
-  return (input Jukebox.Conjecture (conjecturise (translateEq var fun (skolemise t, skolemise u))):
-          map (input Jukebox.Axiom . translateEq var fun) eqs)
+      input form = Jukebox.Input (BS.pack "clause") Jukebox.Axiom form
+  return (input (Jukebox.nt (translateEq var fun (t, u))):
+          map (input . translateEq var fun) eqs)
 
 makeFunName :: PruningConstant -> String
 makeFunName (TermConstant x n ty) = conName x
+makeFunName (SkolemVariable _)    = "x"
 makeFunName (HasType ty)          = "@"
 
 strip = filter (not . isSpace)
-
-conjecturise :: Jukebox.Symbolic a => a -> a
-conjecturise t =
-  case Jukebox.typeOf t of
-    Jukebox.Term -> term t
-    _ -> Jukebox.recursively conjecturise t
-  where
-    term (Jukebox.Var (x Jukebox.::: t)) = (x Jukebox.::: Jukebox.FunType [] t) Jukebox.:@: []
-    term t = Jukebox.recursively conjecturise t
-
-skolemise :: PruningTerm -> PruningTerm
-skolemise (Fun f xs) = Fun f (map skolemise xs)
-skolemise x@(Var (TermVariable _ ty)) = Fun (HasType ty) [x]
 
 find :: (Pretty k, Show v, Ord k) => Map k v -> k -> v
 find m x = Map.findWithDefault (error $ "E: couldn't find " ++ prettyShow x ++ " in:\n" ++ showList (Map.toList m)) x m
@@ -79,13 +67,13 @@ find m x = Map.findWithDefault (error $ "E: couldn't find " ++ prettyShow x ++ "
         "  " ++ prettyShow k ++ " -> " ++ show v
       | (k, v) <- xs ]
 
-translateEq :: (PruningVariable -> Jukebox.Variable) ->
+translateEq :: (Int -> Jukebox.Variable) ->
                (PruningConstant -> Jukebox.Function) ->
                (PruningTerm, PruningTerm) -> Jukebox.Form
 translateEq var fun (t, u) =
   Jukebox.Literal (Jukebox.Pos (translateTerm var fun t Jukebox.:=: translateTerm var fun u))
 
-translateTerm :: (PruningVariable -> Jukebox.Variable) ->
+translateTerm :: (Int -> Jukebox.Variable) ->
                  (PruningConstant -> Jukebox.Function) ->
                  PruningTerm -> Jukebox.Term
 translateTerm var _fun (Var x) = Jukebox.Var (var x)

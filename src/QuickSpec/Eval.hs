@@ -36,6 +36,7 @@ type M = RulesT Event (StateT S IO)
 
 data S = S {
   schemas       :: Schemas,
+  terms         :: Set (TermOf Int),
   schemaTestSet :: TestSet Schema,
   termTestSet   :: Map Schema (TestSet TermFrom),
   pruner        :: SimplePruner,
@@ -72,6 +73,7 @@ type Schemas = Map Int (Map (Poly Type) [Poly Schema])
 initialState :: Signature -> [(QCGen, Int)] -> S
 initialState sig seeds =
   S { schemas       = Map.empty,
+      terms         = Set.empty,
       schemaTestSet = emptyTestSet (makeTester specialise e seeds sig),
       termTestSet   = Map.empty,
       pruner        = emptyPruner types sig,
@@ -146,7 +148,7 @@ go n sig = do
 allUnifications :: Term -> [Term]
 allUnifications t = map f ss
   where
-    vs = [ map (x,) xs | xs <- partitionBy (typ . oneTypeVar) (usort (vars t)), x <- xs ]
+    vs = [ map (x,) xs | xs <- partitionBy typ (usort (vars t)), x <- xs ]
     ss = map Map.fromList (sequence vs)
     go s x = Map.findWithDefault __ x s
     f s = rename (go s) t
@@ -157,7 +159,7 @@ createRules sig = do
     Schema s k <- event
     execute $ do
       accept s
-      let ms = defaultTypes (unPoly s)
+      let ms = oneTypeVar (unPoly s)
       case k of
         Untestable -> return ()
         EqualTo t -> do
@@ -174,16 +176,18 @@ createRules sig = do
         Untestable ->
           ERROR ("Untestable instance " ++ prettyShow t ++ " of testable schema " ++ prettyShow s)
         EqualTo (From _ u) -> found t u
-        Representative -> return ()
+        Representative -> acceptTerm t
 
   rule $ do
     ConsiderSchema s <- event
     types <- execute $ lift $ gets types
     require (and [ oneTypeVar (typ t) `Set.member` types | t <- subterms (unPoly s) ])
-    execute (consider (Schema s) (unPoly (defaultTypes s)))
+    execute (consider (Schema s) (unPoly (oneTypeVar s)))
 
   rule $ do
-    ConsiderTerm t <- event
+    ConsiderTerm t@(From _ t') <- event
+    terms <- execute $ lift $ gets terms
+    require (and [ normaliseVars u `Set.member` terms | u <- properSubterms t' ])
     execute (consider (Term t) t)
 
   rule $ do
@@ -291,7 +295,7 @@ found :: Term -> Term -> M ()
 found t u = do
   Simple.S eqs <- lift $ gets pruner
   types <- lift $ gets types
-  res <- liftIO $ uncurry (E.eUnify eqs) (toPruningEquation (t :=: u))
+  res <- liftIO $ uncurry (E.eUnify eqs) (let e' = unifyEquation (t :=: u) in (toPruningTermSkolem (lhs e'), toPruningTermSkolem (rhs e')))
   case res of
     True ->
       return ()
@@ -304,3 +308,7 @@ accept s = do
   lift $ modify (\st -> st { schemas = Map.adjust f (size (unPoly s)) (schemas st) })
   where
     f m = Map.insertWith (++) (polyTyp s) [s] m
+
+acceptTerm :: Term -> M ()
+acceptTerm t = do
+  lift $ modify (\st -> st { terms = Set.insert (normaliseVars t) (terms st) })

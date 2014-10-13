@@ -5,28 +5,35 @@ import QuickSpec.Term
 import QuickSpec.Pruning
 import Control.Monad
 import Control.Monad.Trans.State.Strict
+import Data.Maybe
 
 newtype SimplePruner = S [(PruningTerm, PruningTerm)]
 
 instance Pruner SimplePruner where
   untypedEmptyPruner = S []
+  areEqualUntyped = simpleAreEqual
   unifyUntyped = simpleUnify
   repUntyped = simpleRep
 
-simpleUnify :: PruningTerm -> PruningTerm -> State SimplePruner Bool
+simpleAreEqual :: PruningTerm -> PruningTerm -> State SimplePruner Bool
+simpleAreEqual t u
+  | measure (fromPruningTerm t) < measure (fromPruningTerm u) = simpleAreEqual u t
+simpleAreEqual u t = do
+  S eqs <- get
+  return (isJust (simplifies eqs u))
+
+simpleUnify :: PruningTerm -> PruningTerm -> State SimplePruner ()
 simpleUnify t u
   | measure (fromPruningTerm t) < measure (fromPruningTerm u) = simpleUnify u t
 simpleUnify u t = do
   S eqs <- get
   case simplifies eqs u of
-    Just v -> do
-      unless (fromPruningTerm v `alwaysSimplerThan` fromPruningTerm t ||
-              fromPruningTerm v `alwaysSimplerThan` fromPruningTerm u)
-        (put (S ((u,t):eqs)))
-      return True
-    Nothing -> do
+    Just v |
+      fromPruningTerm v `alwaysSimplerThan` fromPruningTerm t ||
+      fromPruningTerm v `alwaysSimplerThan` fromPruningTerm u ->
+        return ()
+    _ ->
       put (S ((u,t):eqs))
-      return False
 
 alwaysSimplerThan :: Term -> Term -> Bool
 t `alwaysSimplerThan` u =

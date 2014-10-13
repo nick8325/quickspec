@@ -19,14 +19,22 @@ import Data.Maybe
 
 class Pruner a where
   untypedEmptyPruner :: a
-  unifyUntyped :: PruningTerm -> PruningTerm -> State a Bool
-  repUntyped :: PruningTerm -> State a (Maybe PruningTerm)
+  repUntyped         :: PruningTerm -> State a (Maybe PruningTerm)
+  areEqualUntyped    :: PruningTerm -> PruningTerm -> State a Bool
+  unifyUntyped       :: PruningTerm -> PruningTerm -> State a ()
 
 emptyPruner :: Pruner a => Set Type -> Signature -> a
 emptyPruner univ sig = execState go untypedEmptyPruner
   where
-    go = mapM_ axiom (constants sig >>= partiallyApply >>= instances >>= return . oneTypeVar)
-    axiom t = unifyUntyped (Fun (HasType (typ t)) [toPruningTerm t]) (toPruningTerm t)
+    go = do
+      mapM_ axiom (constants sig >>= partiallyApply >>= instances >>= return . oneTypeVar)
+      mapM_ typeAxiom (Set.toList univ)
+    axiom t = unifyUntyped (Fun (HasType (typ t)) [normaliseVars (toPruningTerm t)]) (normaliseVars (toPruningTerm t))
+    -- Since we don't add any type axioms for skolem variables,
+    -- we might need type axioms for HasType, I'm not sure.
+    typeAxiom ty = unifyUntyped (hasTy (hasTy (Var 0))) (hasTy (Var 0))
+      where
+        hasTy t = Fun (HasType ty) [t]
     instances t@(Fun _ ts) =
       [ typeSubst (evalSubst (fromMap sub)) t
       | sub <- foldr intersection [Map.empty] (map (constrain (Set.toList univ)) (t:ts)) ]
@@ -37,19 +45,14 @@ emptyPruner univ sig = execState go untypedEmptyPruner
     fun x [] = x
     fun x (t:ts) = fun (unPoly (poly x `apply` poly t)) ts
 
-unify :: Pruner a => Set Type -> Equation -> State a Bool
-unify univ e = do
-  let e' = unifyEquation e
-  res <- unifyOne (lhs e', rhs e')
-  case res of
-    True ->
-      return True
-    False -> do
-      mapM_ unifyOne (eqnInstances (Set.toList univ) (lhs e') (rhs e'))
-      return False
-
-toPruningEquation :: Equation -> (PruningTerm, PruningTerm)
-toPruningEquation e = (toPruningTerm (lhs e'), toPruningTerm (rhs e'))
+unify :: Pruner a => Set Type -> Equation -> State a ()
+unify univ e =
+  sequence_
+    [ unifyUntyped t' u'
+    | (lhs, rhs) <- eqnInstances (Set.toList univ) (lhs e') (rhs e'),
+      let t = toPruningTerm lhs,
+      let u = toPruningTerm rhs,
+      let (t', u') = normaliseEquation (t, u) ]
   where
     e' = unifyEquation e
 
@@ -77,46 +80,69 @@ ms1 `intersection` ms2 = usort [ Map.union m1 m2 | m1 <- ms1, m2 <- ms2, ok m1 m
   where
     ok m1 m2 = and [ Map.lookup x m1 == Map.lookup x m2 | x <- Map.keys (Map.intersection m1 m2) ]
 
-constrain :: Typed a => [Type] -> a -> [Map TyVar Type]
+constrain :: [Type] -> Term -> [Map TyVar Type]
 constrain univ t =
   usort [ toMap sub | u <- univ, Just sub <- [match (typ t) u] ]
 
-unifyOne :: Pruner a => (Term, Term) -> State a Bool
-unifyOne (lhs, rhs) = unifyUntyped (toPruningTerm lhs) (toPruningTerm rhs)
-
 rep :: Pruner a => Term -> State a (Maybe Term)
-rep t = fmap (fmap fromPruningTerm) (repUntyped (toPruningTerm t))
+rep t = fmap (fmap fromPruningTerm) (repUntyped (normaliseVars (toPruningTerm t)))
 
-type PruningTerm = Tm PruningConstant PruningVariable
+type PruningTerm = Tm PruningConstant Int
 
 data PruningConstant
-  -- Invariant: type is constant's monotype
-  = TermConstant Constant Int Type
+  = TermConstant Constant Type Int
+    -- The type is always the same as the constant's type,
+    -- it's only included here so that it's counted in the Ord instance
+  | SkolemVariable Variable
   | HasType Type
   deriving (Eq, Ord, Show)
 
 instance Pretty PruningConstant where
-  pretty (TermConstant x _ ty) = pretty x
+  pretty (TermConstant x _ _) = pretty x
   pretty (HasType ty) = text "@" <> pretty ty
 
-data PruningVariable
-  -- Invariant: type is variable's monotype
-  = TermVariable Variable Type
-  deriving (Eq, Ord, Show)
-
-instance Pretty PruningVariable where
-  pretty (TermVariable x ty) = pretty x
-
-toPruningTerm :: Term -> PruningTerm
-toPruningTerm = guardNakedVariables . go
+toPruningTerm :: Term -> Tm PruningConstant Variable
+toPruningTerm = toPruningTerm2 . toPruningTerm1
+toPruningTermSkolem :: Term -> PruningTerm
+toPruningTermSkolem = normaliseVars . toPruningTerm2 . skolemise . toPruningTerm1
   where
-    go (Fun f xs) = Fun (TermConstant f (length xs) (typ (oneTypeVar f))) (map go xs)
-    go (Var x) = Var (TermVariable x (typ (oneTypeVar x)))
-    guardNakedVariables x@(Var (TermVariable _ ty)) = Fun (HasType ty) [x]
+    skolemise (Fun f xs) = Fun f (map skolemise xs)
+    skolemise (Var x) = Fun (HasType (typ x)) [Fun (SkolemVariable x) []]
+
+toPruningTerm1 :: Term -> Tm PruningConstant Variable
+toPruningTerm1 = mapTerm f id . withArity
+  where
+    f (fun, n) = TermConstant fun (typ fun) n
+
+toPruningTerm2 :: Tm PruningConstant Variable -> Tm PruningConstant Variable
+toPruningTerm2 = guardNakedVariables
+  where
+    guardNakedVariables (Var x) = Fun (HasType (typ x)) [Var x]
     guardNakedVariables x = x
 
--- FIXME not sure this is right!
 fromPruningTerm :: PruningTerm -> Term
-fromPruningTerm (Var (TermVariable x _)) = Var x
-fromPruningTerm (Fun (TermConstant f _ _) xs) = Fun f (map fromPruningTerm xs)
-fromPruningTerm (Fun (HasType _) [x]) = fromPruningTerm x
+fromPruningTerm t =
+  fromPruningTermWith n t
+  where
+    n = maximum (0:[1+n | SkolemVariable (Variable n _) <- funs t])
+
+fromPruningTermWith :: Int -> PruningTerm -> Term
+fromPruningTermWith n (Fun (TermConstant fun _ _) xs) =
+  Fun fun (zipWith (fromPruningTermWithType n) (typeArgs (typ fun)) xs)
+fromPruningTermWith n (Fun (HasType ty) [t]) = fromPruningTermWithType n ty t
+fromPruningTermWith _ _ = ERROR "ill-typed term?"
+
+fromPruningTermWithType :: Int -> Type -> PruningTerm -> Term
+fromPruningTermWithType m ty (Var n) = Var (Variable (m+n) ty)
+fromPruningTermWithType n ty (Fun (SkolemVariable x) []) = Var x
+fromPruningTermWithType n _  t = fromPruningTermWith n t
+
+normaliseVars t = rename (\x -> fromMaybe __ (Map.lookup x m)) t
+  where
+    m = Map.fromList (zip (usort (vars t)) [0..])
+
+normaliseEquation (t, u) =
+  (rename (\x -> fromMaybe __ (Map.lookup x m)) t,
+   rename (\x -> fromMaybe __ (Map.lookup x m)) u)
+  where
+    m = Map.fromList (zip (usort (vars t ++ vars u)) [0..])
