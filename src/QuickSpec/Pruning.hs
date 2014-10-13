@@ -5,6 +5,7 @@ module QuickSpec.Pruning where
 import QuickSpec.Base
 import QuickSpec.Type
 import QuickSpec.Term
+import QuickSpec.Test
 import QuickSpec.Utils
 import QuickSpec.Signature
 import QuickSpec.Equation
@@ -24,7 +25,7 @@ class Pruner a where
 emptyPruner :: Pruner a => Set Type -> Signature -> a
 emptyPruner univ sig = execState go untypedEmptyPruner
   where
-    go = mapM_ axiom (constants sig >>= partiallyApply >>= instances)
+    go = mapM_ axiom (constants sig >>= partiallyApply >>= instances >>= return . defaultType)
     axiom t = unifyUntyped (Fun (HasType (typ t)) [toPruningTerm t]) (toPruningTerm t)
     instances t@(Fun _ ts) =
       [ typeSubst (evalSubst (fromMap sub)) t

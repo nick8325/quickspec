@@ -24,6 +24,7 @@ import QuickSpec.Base
 import QuickSpec.Utils
 import Data.Typeable(Typeable)
 import qualified Data.Typeable as Ty
+import qualified Data.Typeable.Internal as Ty
 import GHC.Exts(Any)
 import Unsafe.Coerce
 import Control.Applicative
@@ -36,6 +37,7 @@ import qualified Data.Rewriting.Substitution.Type as T
 import Data.List
 import Control.Monad
 import Control.Monad.Trans.Writer
+import Test.QuickCheck
 
 -- A (possibly polymorphic) type.
 type Type = Tm TyCon TyVar
@@ -113,6 +115,14 @@ toTypeRep (Var (TyVar n)) = Ty.mkTyConApp varTyCon [toTyVar n]
   where
     toTyVar 0 = Ty.mkTyConApp zeroTyCon []
     toTyVar n = Ty.mkTyConApp succTyCon [toTyVar (n-1)]
+
+-- CoArbitrary instances.
+instance CoArbitrary Ty.TypeRep where
+  coarbitrary (Ty.TypeRep (Ty.Fingerprint x y) _ _) =
+    coarbitrary x . coarbitrary y
+
+instance CoArbitrary Type where
+  coarbitrary = coarbitrary . toTypeRep
 
 -- Things with types.
 class Typed a where

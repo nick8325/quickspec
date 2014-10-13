@@ -35,9 +35,10 @@ size (Fun _f xs) = 1+sum (map size xs)
 -- variables have generators, so we need a separate defaulting phase).
 data Constant =
   Constant {
-    conName  :: String,
-    conValue :: Value Identity,
-    conArity :: Int }
+    conName         :: String,
+    conValue        :: Value Identity,
+    conGeneralValue :: Poly (Value Identity),
+    conArity        :: Int }
   deriving Show
 instance Eq Constant where x == y = x `compare` y == EQ
 instance Ord Constant where compare = comparing conName
@@ -45,26 +46,24 @@ instance Pretty Constant where
   pretty x = text (conName x)
 instance Typed Constant where
   typ = typ . conValue
-  typeSubstA s (Constant name value arity) =
-    Constant name <$> typeSubstA s value <*> pure arity
+  typeSubstA s (Constant name value generalValue arity) =
+    Constant name <$> typeSubstA s value <*> pure generalValue <*> pure arity
 
 -- We're not allowed to have two variables with the same number
--- but different type.
+-- but unifiable types.
 data Variable =
   Variable {
     varNumber :: Int,
     varType   :: Type }
-  deriving Show
-instance Eq Variable where x == y = x `compare` y == EQ
-instance Ord Variable where compare = comparing varNumber
+  deriving (Show, Eq, Ord)
 instance Pretty Variable where
-  pretty x = text ("v" ++ show (varNumber x))
+  pretty x = text ("v" ++ show (varNumber x)) <> text ":" <> pretty (varType x)
 instance Typed Variable where
   typ = varType
   typeSubstA s (Variable n ty) =
     Variable n <$> typeSubstA s ty
 instance CoArbitrary Variable where
-  coarbitrary x = coarbitrary (varNumber x)
+  coarbitrary x = coarbitrary (varNumber x) . coarbitrary (varType x)
 
 instance Typed v => Typed (TermOf v) where
   typ (Var x) = typ x

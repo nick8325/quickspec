@@ -35,27 +35,40 @@ type M = RulesT Event (StateT S IO)
 
 data S = S {
   schemas       :: Schemas,
-  schemaTestSet :: TestSet (Poly Schema),
-  termTestSet   :: Map (Poly Schema) (TestSet TermFrom),
+  schemaTestSet :: TestSet Schema,
+  termTestSet   :: Map Schema (TestSet TermFrom),
   pruner        :: SimplePruner,
   freshTestSet  :: TestSet TermFrom,
   types         :: Set Type }
 
 data Event =
-    Schema (Poly Schema)   (KindOf (Poly Schema))
-  | Term   TermFrom        (KindOf TermFrom)
+    Schema (Poly Schema) (KindOf Schema)
+  | Term   TermFrom      (KindOf TermFrom)
   | ConsiderSchema (Poly Schema)
   | ConsiderTerm   TermFrom
   | Type           (Poly Type)
   | UntestableType (Poly Type)
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord)
+
+instance Pretty Event where
+  pretty (Schema s k) = text "schema" <+> pretty s <> text ":" <+> pretty k
+  pretty (Term t k) = text "term" <+> pretty t <> text ":" <+> pretty k
+  pretty (ConsiderSchema s) = text "consider schema" <+> pretty s
+  pretty (ConsiderTerm t) = text "consider term" <+> pretty t
+  pretty (Type ty) = text "type" <+> pretty ty
+  pretty (UntestableType ty) = text "untestable type" <+> pretty ty
 
 data KindOf a = Untestable | Representative | EqualTo a
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord)
+
+instance Pretty a => Pretty (KindOf a) where
+  pretty Untestable = text "untestable"
+  pretty Representative = text "representative"
+  pretty (EqualTo x) = text "equal to" <+> pretty x
 
 type Schemas = Map Int (Map (Poly Type) [Poly Schema])
 
-initialState :: Signature -> TestSet (Poly Schema) -> TestSet TermFrom -> Set Type -> S
+initialState :: Signature -> TestSet Schema -> TestSet TermFrom -> Set Type -> S
 initialState sig ts ts' types =
   S { schemas       = Map.empty,
       schemaTestSet = ts,
@@ -88,7 +101,7 @@ quickSpec :: Signature -> IO ()
 quickSpec sig = unbuffered $ do
   seeds <- fmap (take 100) (genSeeds 20)
   let e = table (env sig)
-      ts = emptyTestSet (makeTester (skeleton . instantiate . mono) e seeds sig)
+      ts = emptyTestSet (makeTester (skeleton . instantiate) e seeds sig)
       ts' = emptyTestSet (makeTester (\(From _ t) -> t) e seeds sig)
       types = typeUniverse sig
   _ <- execStateT (runRulesT (createRules sig >> go 1 sig)) (initialState sig ts ts' types)
@@ -130,52 +143,6 @@ go n sig = do
   liftIO $ putStrLn ""
   go (n+1) sig
 
--- NOTE:
--- consider the law map f (xs++ys) = map f xs++map f ys.
--- The schemas are:
---   1) map f (_++_)
---   2) map _ _++map _ _
--- At one point we used the following buggy algorithm to instantiate
--- the schemas:
---   1) replace each hole with a fresh variable
---   2) unify/permute various combinations of variables
--- But this gives us the two schemas:
---   1) map v0 (v1++v2)
---   2) map v0 v1++map v2 v3
--- By unifying v0 and v2 in the second law we get
---      map v0 v1++map v0 v3
--- but this does not compare equal to the first time, because we would
--- need the variable to be called v2 instead!
---
--- The solution is, when we create fresh variables for a schema, take
--- the variable names from the representative's schema if at all possible.
--- So in the example above, in the representative v2 has type list so
--- we would instantiate the non-reprentative to
---      map v0 v1++map v3 v2
--- and now unifying v3 and v0 gives us what we want.
---
--- So the idea is, when you have a whole of a certain type, check if the
--- instantiated schema had a variable of that type and use that variable
--- first.
---
--- However, there is a complication: unifying two variables will unify
--- their types, so the types may change during instantiation and it's not
--- clear how to find variables of the right type in the representative.
--- But there is a solution. When instantiating a schema we only unify
--- two variables if their types are both type variables, not if one of
--- the variables has a concrete type (we do this to make sure that each
--- schema has a unique most specific instance). This helps us here:
--- during the entire instantiation algorithm, we compare types "up to"
--- type variables i.e. two types that are the same except for having
--- different type variables compare equal. Thus instantiation never changes
--- the types (as far as this comparison is concerned) and this extra
--- complication with type unification goes away.
---
--- This approach is justified because we instantiate all type variables
--- to the same type during testing anyway.
---
--- FIXME this process will currently produce ill-typed terms because
--- when we unify two terms we don't unify their types. Fix this!
 instantiateFor :: Term -> Schema -> Term
 instantiateFor s t = evalState (aux t) (maxVar, Map.fromList varList)
   where
@@ -209,21 +176,22 @@ createRules sig = do
     Schema s k <- event
     execute $ do
       accept s
+      let ms = defaultType (mono s)
       case k of
         Untestable -> return ()
         EqualTo t -> do
           considerRenamings t t
-          considerRenamings t s
+          considerRenamings t ms
         Representative -> do
-          when (size (mono s) <= 5) $
-            considerRenamings s s
+          when (size ms <= 5) $
+            considerRenamings ms ms
 
   rule $ do
     Term (From s t) k <- event
     execute $
       case k of
         Untestable ->
-          ERROR ("Untestable instance " ++ prettyShow t ++ " of testable schema " ++ prettyShow (mono s))
+          ERROR ("Untestable instance " ++ prettyShow t ++ " of testable schema " ++ prettyShow s)
         EqualTo (From _ u) -> found t u
         Representative -> return ()
 
@@ -231,11 +199,11 @@ createRules sig = do
     ConsiderSchema s <- event
     types <- execute $ lift $ gets types
     require (and [ monoTyp t `Set.member` types | t <- subterms (mono s) ])
-    execute (consider s)
+    execute (consider (Schema s) (mono s))
 
   rule $ do
-    ConsiderTerm s <- event
-    execute (consider s)
+    ConsiderTerm t <- event
+    execute (consider (Term t) t)
 
   rule $ do
     Schema s _ <- event
@@ -267,40 +235,38 @@ createRules sig = do
       liftIO $ putStrLn $
         "Warning: generated term of untestable type " ++ prettyShow ty
 
-  -- rule $ event >>= execute . liftIO . print
+  rule $ event >>= execute . liftIO . prettyPrint
 
-considerRenamings :: Poly Schema -> Poly Schema -> M ()
+considerRenamings :: Schema -> Schema -> M ()
 considerRenamings s s' = do
   sequence_ [ generate (ConsiderTerm (From s t)) | t <- ts ]
   where
-    ts = sortBy (comparing measure) (allUnifications (instantiateFor (instantiate (mono s)) (mono s')))
+    ts = sortBy (comparing measure) (allUnifications (instantiate s'))
 
 class (Eq a, Typed a) => Considerable a where
   toTerm     :: a -> Term
   getTestSet :: a -> M (TestSet a)
   putTestSet :: a -> TestSet a -> M ()
-  makeEvent  :: a -> KindOf a -> Event
 
-consider :: Considerable a => a -> M ()
-consider x = do
+consider :: Considerable a => (KindOf a -> Event) -> a -> M ()
+consider makeEvent x = do
   pruner <- lift $ gets pruner
   types  <- lift $ gets types
   let t = toTerm x
   case evalState (rep (etaExpand t)) pruner of
     Just u | measure u < measure t ->
-{-      let mod = execState (unify types (t :=: u))
-      in lift $ modify (\s -> s { pruner = mod pruner })-}
-      return ()
+      let mod = execState (unify types (t :=: u))
+      in lift $ modify (\s -> s { pruner = mod pruner })
     _ -> do
       ts <- getTestSet x
       case insert (poly x) ts of
         Nothing ->
-          generate (makeEvent x Untestable)
+          generate (makeEvent Untestable)
         Just (Old y) ->
-          generate (makeEvent x (EqualTo y))
+          generate (makeEvent (EqualTo y))
         Just (New ts) -> do
           putTestSet x ts
-          generate (makeEvent x Representative)
+          generate (makeEvent Representative)
 
 -- NOTE: this is not quite correct because we might get
 -- t x --> u x x
@@ -315,13 +281,15 @@ etaExpand t = aux (1+maximum (0:map varNumber (vars t))) t
         Nothing -> t
         Just u -> aux (n+1) (mono u)
 
-instance Considerable (Poly Schema) where
-  toTerm = instantiate . mono
+instance Considerable Schema where
+  toTerm = instantiate
   getTestSet _ = lift $ gets schemaTestSet
   putTestSet _ ts = lift $ modify (\s -> s { schemaTestSet = ts })
-  makeEvent = Schema
 
-data TermFrom = From (Poly Schema) Term deriving (Eq, Ord, Show)
+data TermFrom = From Schema Term deriving (Eq, Ord, Show)
+
+instance Pretty TermFrom where
+  pretty (From s t) = pretty t <+> text "from" <+> pretty s
 
 instance Typed TermFrom where
   typ (From _ t) = typ t
@@ -334,7 +302,6 @@ instance Considerable TermFrom where
     gets (Map.findWithDefault ts s . termTestSet)
   putTestSet (From s _) ts =
     lift $ modify (\st -> st { termTestSet = Map.insert s ts (termTestSet st) })
-  makeEvent = Term
 
 found :: Term -> Term -> M ()
 found t u = do

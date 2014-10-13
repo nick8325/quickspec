@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, GeneralizedNewtypeDeriving, DeriveDataTypeable #-}
 module QuickSpec.Test where
 
 #include "errors.h"
@@ -13,11 +13,15 @@ import Test.QuickCheck.Random
 import System.Random
 import Data.Constraint
 import Data.Maybe
+import Data.Ord
+import Control.Applicative
+
+newtype Default = Default Int deriving (Eq, Ord, Arbitrary, CoArbitrary, Typeable)
 
 defaultType :: Typed a => a -> a
-defaultType = typeSubst (const intType)
+defaultType = typeSubst (const ty)
   where
-    intType = typeOf (undefined :: Int)
+    ty = typeOf (undefined :: Default)
 
 makeTester :: (a -> Term) -> (Type -> Value Gen) -> [(QCGen, Int)] -> Signature -> Type -> Maybe (Value (TypedTestSet a))
 makeTester toTerm env tests sig ty = do

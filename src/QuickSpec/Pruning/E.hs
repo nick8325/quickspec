@@ -41,10 +41,10 @@ translate :: [(PruningTerm, PruningTerm)] -> PruningTerm -> PruningTerm ->
              Jukebox.Closed [Jukebox.Input Jukebox.Form]
 translate eqs t u = Jukebox.close_ Jukebox.stdNames $ do
   ty <- Jukebox.newType "i"
-  let terms = [t, u] ++ concat [ [l, r] | (l, r) <- eqs ]
+  let terms = [skolemise t, skolemise u] ++ concat [ [l, r] | (l, r) <- eqs ]
       vs = usort (concatMap vars terms)
       fs = usort (concatMap funs terms)
-  varSyms <- sequence [ Jukebox.newSymbol (makeVarName x) ty | x <- vs ]
+  varSyms <- sequence [ Jukebox.newSymbol "X" ty | x <- vs ]
   funSyms <- sequence [ Jukebox.newFunction (makeFunName x) [] ty | x <- fs]
   let var = find (Map.fromList (zip vs varSyms))
       fun = find (Map.fromList (zip fs funSyms))
@@ -52,12 +52,9 @@ translate eqs t u = Jukebox.close_ Jukebox.stdNames $ do
   return (input Jukebox.Conjecture (conjecturise (translateEq var fun (skolemise t, skolemise u))):
           map (input Jukebox.Axiom . translateEq var fun) eqs)
 
-makeVarName :: PruningVariable -> String
-makeVarName (TermVariable x ty) = 'X':show (varNumber x)
-
 makeFunName :: PruningConstant -> String
-makeFunName (TermConstant x n ty) = 'f':conName x ++ "/" ++ show n ++ "@" ++ strip (prettyShow ty)
-makeFunName (HasType ty)        = "@" ++ strip (prettyShow ty)
+makeFunName (TermConstant x n ty) = conName x
+makeFunName (HasType ty)          = "@"
 
 strip = filter (not . isSpace)
 
@@ -74,8 +71,13 @@ skolemise :: PruningTerm -> PruningTerm
 skolemise (Fun f xs) = Fun f (map skolemise xs)
 skolemise x@(Var (TermVariable _ ty)) = Fun (HasType ty) [x]
 
-find :: Ord k => Map k v -> k -> v
-find m x = Map.findWithDefault (error "E: not found") x m
+find :: (Pretty k, Show v, Ord k) => Map k v -> k -> v
+find m x = Map.findWithDefault (error $ "E: couldn't find " ++ prettyShow x ++ " in:\n" ++ showList (Map.toList m)) x m
+  where
+    showList xs =
+      unlines [
+        "  " ++ prettyShow k ++ " -> " ++ show v
+      | (k, v) <- xs ]
 
 translateEq :: (PruningVariable -> Jukebox.Variable) ->
                (PruningConstant -> Jukebox.Function) ->

@@ -9,6 +9,7 @@ import Data.Typeable
 import Octonions
 import QuickSpec.Type
 import QuickSpec.Eval
+import QuickSpec.Test
 import QuickSpec.Signature hiding (sig)
 import qualified QuickSpec.Signature as S
 import Data.Monoid hiding ((<>))
