@@ -27,7 +27,7 @@ eUnify eqs t u = do
   --eliftIO (putStr ("\nSending to E: " ++ prettyShow (fromPruningTerm t) ++ " = " ++ prettyShow (fromPruningTerm u) ++ ": ") >> hFlush stdout)
   let opts = Jukebox.EFlags "eprover" (Just 1) Nothing
       prob = translate eqs t u
-  putStrLn (Jukebox.render (Jukebox.prettyProblem "fof" Jukebox.Normal prob))
+  --putStrLn (Jukebox.render (Jukebox.prettyProblem "fof" Jukebox.Normal prob))
   res <- Jukebox.runE opts prob
   --eliftIO (print res)
   case res of

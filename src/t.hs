@@ -33,10 +33,10 @@ listsSig = mconcat [
   constant "rev" (reverse :: [A] -> [A]),
   constant "app" ((++) :: [A] -> [A] -> [A]),
   constant "[]" ([] :: [A]),
-  arb (undefined :: Int -> Int),
-  constant "map" (map :: (Int -> Int) -> [Int] -> [Int]),
-  inst (undefined :: Int),
-  inst (undefined :: [Int])]
+  arb (undefined :: Default -> Default),
+  constant "map" (map :: (A -> B) -> [A] -> [B]),
+  inst (undefined :: Default),
+  inst (undefined :: [Default])]
 
 constSig = mconcat [
   constant "const" ((\x y -> [const x y]) :: A -> B -> [A]),
