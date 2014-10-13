@@ -51,7 +51,8 @@ boolSig = mconcat [
   constant "&&" (&&),
   constant "not" not,
   inst (undefined :: Int),
-  inst (undefined :: Bool)]
+  inst (undefined :: Bool),
+  inst (undefined :: Default)]
 
 octSig = mconcat [
   constant "1" (1 :: It),
@@ -74,7 +75,8 @@ arithSig = mconcat [
   constant "1" (1 :: Int),
   constant "+" ((+) :: Int -> Int -> Int),
   constant "*" ((*) :: Int -> Int -> Int),
-  inst (undefined :: Int)]
+  inst (undefined :: Int),
+  inst (undefined :: Default)]
 
 prettySig = mconcat [
   constant "text" (text :: [Bool] -> Layout Bool),
@@ -88,7 +90,8 @@ prettySig = mconcat [
   constant "length" (length :: [Bool] -> Int),
   inst (undefined :: Layout Bool),
   inst (undefined :: [Bool]),
-  inst (undefined :: Int)]
+  inst (undefined :: Int),
+  inst (undefined :: Default)]
 
 main = quickSpec listsSig
 
