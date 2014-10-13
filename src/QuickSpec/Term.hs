@@ -57,7 +57,7 @@ data Variable =
     varType   :: Type }
   deriving (Show, Eq, Ord)
 instance Pretty Variable where
-  pretty x = text ("v" ++ show (varNumber x)) <> text ":" <> pretty (varType x)
+  pretty x = text ("v" ++ show (varNumber x))
 instance Typed Variable where
   typ = varType
   typeSubstA s (Variable n ty) =

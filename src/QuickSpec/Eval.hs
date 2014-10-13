@@ -35,14 +35,14 @@ type M = RulesT Event (StateT S IO)
 
 data S = S {
   schemas       :: Schemas,
-  schemaTestSet :: TestSet Schema,
-  termTestSet   :: Map Schema (TestSet TermFrom),
+  schemaTestSet :: TestSet (Defaulted Schema),
+  termTestSet   :: Map (Defaulted Schema) (TestSet TermFrom),
   pruner        :: SimplePruner,
   freshTestSet  :: TestSet TermFrom,
   types         :: Set Type }
 
 data Event =
-    Schema (Poly Schema) (KindOf Schema)
+    Schema (Poly Schema) (KindOf (Defaulted Schema))
   | Term   TermFrom      (KindOf TermFrom)
   | ConsiderSchema (Poly Schema)
   | ConsiderTerm   TermFrom
@@ -68,7 +68,7 @@ instance Pretty a => Pretty (KindOf a) where
 
 type Schemas = Map Int (Map (Poly Type) [Poly Schema])
 
-initialState :: Signature -> TestSet Schema -> TestSet TermFrom -> Set Type -> S
+initialState :: Signature -> TestSet (Defaulted Schema) -> TestSet TermFrom -> Set Type -> S
 initialState sig ts ts' types =
   S { schemas       = Map.empty,
       schemaTestSet = ts,
@@ -101,7 +101,7 @@ quickSpec :: Signature -> IO ()
 quickSpec sig = unbuffered $ do
   seeds <- fmap (take 100) (genSeeds 20)
   let e = table (env sig)
-      ts = emptyTestSet (makeTester (skeleton . instantiate) e seeds sig)
+      ts = emptyTestSet (makeTester (skeleton . instantiate . unDefaulted) e seeds sig)
       ts' = emptyTestSet (makeTester (\(From _ t) -> t) e seeds sig)
       types = typeUniverse sig
   _ <- execStateT (runRulesT (createRules sig >> go 1 sig)) (initialState sig ts ts' types)
@@ -176,14 +176,14 @@ createRules sig = do
     Schema s k <- event
     execute $ do
       accept s
-      let ms = defaultType (mono s)
+      let ms = defaulted s
       case k of
         Untestable -> return ()
         EqualTo t -> do
           considerRenamings t t
           considerRenamings t ms
         Representative -> do
-          when (size ms <= 5) $
+          when (size (unDefaulted ms) <= 5) $
             considerRenamings ms ms
 
   rule $ do
@@ -199,7 +199,7 @@ createRules sig = do
     ConsiderSchema s <- event
     types <- execute $ lift $ gets types
     require (and [ monoTyp t `Set.member` types | t <- subterms (mono s) ])
-    execute (consider (Schema s) (mono s))
+    execute (consider (Schema s) (defaulted s))
 
   rule $ do
     ConsiderTerm t <- event
@@ -227,7 +227,7 @@ createRules sig = do
     Schema s Untestable <- event
     require (arity (typ s) == 0)
     execute $
-      generate (UntestableType (polyTyp (defaultType s)))
+      generate (UntestableType (polyTyp s))
 
   rule $ do
     UntestableType ty <- event
@@ -235,10 +235,10 @@ createRules sig = do
       liftIO $ putStrLn $
         "Warning: generated term of untestable type " ++ prettyShow ty
 
-  rule $ event >>= execute . liftIO . prettyPrint
+  -- rule $ event >>= execute . liftIO . prettyPrint
 
-considerRenamings :: Schema -> Schema -> M ()
-considerRenamings s s' = do
+considerRenamings :: Defaulted Schema -> Defaulted Schema -> M ()
+considerRenamings s (Defaulted s') = do
   sequence_ [ generate (ConsiderTerm (From s t)) | t <- ts ]
   where
     ts = sortBy (comparing measure) (allUnifications (instantiate s'))
@@ -281,12 +281,12 @@ etaExpand t = aux (1+maximum (0:map varNumber (vars t))) t
         Nothing -> t
         Just u -> aux (n+1) (mono u)
 
-instance Considerable Schema where
-  toTerm = instantiate
+instance Considerable (Defaulted Schema) where
+  toTerm = instantiate . unDefaulted
   getTestSet _ = lift $ gets schemaTestSet
   putTestSet _ ts = lift $ modify (\s -> s { schemaTestSet = ts })
 
-data TermFrom = From Schema Term deriving (Eq, Ord, Show)
+data TermFrom = From (Defaulted Schema) Term deriving (Eq, Ord, Show)
 
 instance Pretty TermFrom where
   pretty (From s t) = pretty t <+> text "from" <+> pretty s

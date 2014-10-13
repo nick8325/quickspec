@@ -25,8 +25,8 @@ class Pruner a where
 emptyPruner :: Pruner a => Set Type -> Signature -> a
 emptyPruner univ sig = execState go untypedEmptyPruner
   where
-    go = mapM_ axiom (constants sig >>= partiallyApply >>= instances >>= return . defaultType)
-    axiom t = unifyUntyped (Fun (HasType (typ t)) [toPruningTerm t]) (toPruningTerm t)
+    go = mapM_ axiom (constants sig >>= partiallyApply >>= instances >>= return . defaulted . poly)
+    axiom (Defaulted t) = unifyUntyped (Fun (HasType (typ t)) [toPruningTerm t]) (toPruningTerm t)
     instances t@(Fun _ ts) =
       [ typeSubst (evalSubst (fromMap sub)) t
       | sub <- foldr intersection [Map.empty] (map (constrain (Set.toList univ)) (t:ts)) ]
