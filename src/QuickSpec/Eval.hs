@@ -31,6 +31,7 @@ import QuickSpec.Memo()
 import Control.Applicative
 import QuickSpec.Test
 import Test.QuickCheck.Random
+import Data.Monoid hiding ((<>))
 
 type M = RulesT Event (StateT S (PrunerT SimplePruner IO))
 
@@ -97,6 +98,12 @@ schemasOfSize n _ = do
       f <- fs,
       canApply f (poly (Var (Var (TyVar 0)))),
       x <- xs ]
+
+quickSpecWithBackground :: Signature -> Signature -> IO [Prop]
+quickSpecWithBackground sig1 sig2 = do
+  eqs <- quickSpec sig1
+  let sig = sig1 `mappend` sig2
+  quickSpec sig { background = eqs ++ background sig }
 
 quickSpec :: Signature -> IO [Prop]
 quickSpec sig = unbuffered $ do

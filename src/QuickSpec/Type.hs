@@ -1,12 +1,12 @@
 -- Polymorphic types and dynamic values.
-{-# LANGUAGE DeriveDataTypeable, CPP, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances, GeneralizedNewtypeDeriving, Rank2Types, ExistentialQuantification #-}
+{-# LANGUAGE DeriveDataTypeable, CPP, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances, GeneralizedNewtypeDeriving, Rank2Types, ExistentialQuantification, PolyKinds #-}
 -- To avoid a warning about TyVarNumber's constructor being unused:
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
 module QuickSpec.Type(
   -- Types.
   Typeable,
-  Type, TyCon(..), TyVar(..), A, B, C, D,
-  typeOf, toTypeRep, fromTypeRep,
+  Type, TyCon(..), tyCon, TyVar(..), A, B, C, D,
+  typeOf, typeRep, applyType, toTypeRep, fromTypeRep,
   arrowType, typeArgs, typeRes, arity, oneTypeVar,
   -- Things that have types.
   Typed(..), typeSubst, tyVars, cast,
@@ -16,7 +16,7 @@ module QuickSpec.Type(
   -- Dynamic values.
   Value, toValue, fromValue,
   Unwrapped(..), unwrap, Wrapper(..),
-  mapValue, forValue, ofValue, pairValues) where
+  mapValue, forValue, ofValue, pairValues, unwrapFunctor) where
 
 #include "errors.h"
 
@@ -69,6 +69,13 @@ data Succ a deriving Typeable
 typeOf :: Typeable a => a -> Type
 typeOf x = fromTypeRep (Ty.typeOf x)
 
+typeRep :: Typeable (a :: k) => proxy a -> Type
+typeRep x = fromTypeRep (Ty.typeRep x)
+
+applyType :: Type -> Type -> Type
+applyType (Fun f tys) ty = Fun f (tys ++ [ty])
+applyType _ _ = ERROR "tried to apply type variable"
+
 arrowType :: [Type] -> Type -> Type
 arrowType [] res = res
 arrowType (arg:args) res = Fun Arrow [arg, arrowType args res]
@@ -93,13 +100,15 @@ fromTypeRep ty =
     (tyVar, [ty]) | tyVar == varTyCon -> Var (TyVar (fromTyVar ty))
     (tyCon, tys) -> Fun (fromTyCon tyCon) (map fromTypeRep tys)
   where
-    fromTyCon tyCon
-      | tyCon == arrowTyCon = Arrow
-      | otherwise = TyCon tyCon
     fromTyVar ty =
       case Ty.splitTyConApp ty of
         (tyCon, [ty']) | tyCon == succTyCon -> succ (fromTyVar ty')
         (tyCon, []) | tyCon == zeroTyCon -> 0
+
+fromTyCon :: Ty.TyCon -> TyCon
+fromTyCon tyCon
+  | tyCon == arrowTyCon = Arrow
+  | otherwise = TyCon tyCon
 
 arrowTyCon, commaTyCon, listTyCon, varTyCon, succTyCon, zeroTyCon :: Ty.TyCon
 arrowTyCon = con (undefined :: () -> ())
@@ -111,6 +120,9 @@ zeroTyCon  = con (undefined :: Zero)
 
 con :: Typeable a => a -> Ty.TyCon
 con = fst . Ty.splitTyConApp . Ty.typeOf
+
+tyCon :: Typeable a => a -> TyCon
+tyCon = fromTyCon . con
 
 -- For showing types.
 toTypeRep :: Type -> Ty.TypeRep
@@ -239,10 +251,10 @@ fromAny = unsafeCoerce
 toAny :: f a -> f Any
 toAny = unsafeCoerce
 
-toValue :: forall f a. Typeable a => f a -> Value f
+toValue :: forall f (a :: *). Typeable a => f a -> Value f
 toValue x = Value (typeOf (undefined :: a)) (toAny x)
 
-fromValue :: forall f a. Typeable a => Value f -> Maybe (f a)
+fromValue :: forall f (a :: *). Typeable a => Value f -> Maybe (f a)
 fromValue x = do
   guard (typ x == typeOf (undefined :: a))
   return (fromAny (value x))
@@ -286,8 +298,25 @@ ofValue f v =
   case unwrap v of
     x `In` _ -> f x
 
-pairValues :: (forall a. f a -> g a -> h a) -> Value f -> Value g -> Value h
+pairValues :: forall f g. Typeable g => (forall a b. f a -> f b -> f (g a b)) -> Value f -> Value f -> Value f
 pairValues f x y =
-  case unwrap x of
-    x `In` w ->
-      wrap w (f x (reunwrap w y))
+  ty `seq`
+  Value {
+    valueType = ty,
+    value = toAny (f (value x) (value y)) }
+  where
+    ty = typeRep (undefined :: proxy g) `applyType` typ x `applyType` typ y
+
+unwrapFunctor :: forall f g h. Typeable g => (forall a. f (g a) -> h a) -> Value f -> Value h
+unwrapFunctor f x =
+  case typ x of
+    Fun _ tys@(_:_) ->
+      case ty `applyType` last tys == typ x of
+        True ->
+          Value {
+            valueType = last tys,
+            value = f (fromAny (value x)) }
+        False ->
+          ERROR "non-matching types"
+  where
+    ty = typeRep (undefined :: proxy g)

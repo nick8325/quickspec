@@ -1,5 +1,5 @@
 -- Signatures, collecting and finding witnesses, etc.
-{-# LANGUAGE CPP, ConstraintKinds, ExistentialQuantification, ScopedTypeVariables, DeriveDataTypeable #-}
+{-# LANGUAGE CPP, ConstraintKinds, ExistentialQuantification, ScopedTypeVariables, DeriveDataTypeable, Rank2Types, StandaloneDeriving, TypeOperators, FlexibleContexts, KindSignatures, GeneralizedNewtypeDeriving, GADTs #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module QuickSpec.Signature where
 
@@ -15,18 +15,61 @@ import Test.QuickCheck hiding (subterms)
 import qualified Data.Set as Set
 import Data.Set(Set)
 import Data.Char hiding (ord)
+import Data.Maybe
+import Control.Applicative
 
-newtype Instance c a = Instance (Dict (c a))
+newtype Instance = Instance { unInstance :: [Value Instance1] } deriving (Monoid, Show)
+newtype Instance1 a = Instance1 (Value (Instance2 a))
+data Instance2 a b = Instance2 (b -> a)
+
+makeInstance :: (Typeable a, Typeable b) => (b -> a) -> Instance
+makeInstance f = Instance [toValue (Instance1 (toValue (Instance2 f)))]
+
+deriving instance Typeable Ord
+deriving instance Typeable Arbitrary
+deriving instance Typeable CoArbitrary
+deriving instance Typeable (() :: Constraint)
+
 data Signature =
   Signature {
     constants  :: [Constant],
-    ords       :: [Value (Instance Ord)],
-    arbs       :: [Value (Instance Arbitrary)],
-    background :: [Prop] }
+    instances  :: [Instance],
+    background :: [Prop],
+    defaultTo  :: [Type] }
+  deriving Show
+
+defaultTo_ :: Signature -> Type
+defaultTo_ sig =
+  case defaultTo sig of
+    [] -> typeOf (undefined :: Int)
+    [ty]
+      | null (vars ty) -> ty
+      | otherwise ->
+        error $ "Default type is not ground: " ++ prettyShow ty
+    tys -> error $ "Several default types specified: " ++ prettyShow tys
+
+instances_ :: Signature -> [Value Instance1]
+instances_ sig = concatMap unInstance (instances sig ++ defaultInstances)
+
+defaultInstances :: [Instance]
+defaultInstances = [
+  inst (Sub Dict :: Arbitrary A :- Arbitrary [A]),
+  inst (Sub Dict :: Ord A :- Ord [A]),
+  inst (Sub Dict :: CoArbitrary A :- CoArbitrary [A]),
+  baseType (undefined :: Int),
+  baseType (undefined :: Bool),
+  inst (Sub Dict :: () :- CoArbitrary Int),
+  inst (Sub Dict :: () :- CoArbitrary Bool),
+  inst2 (Sub Dict :: (CoArbitrary A, Arbitrary B) :- Arbitrary (A -> B)),
+  makeInstance (\() -> Dict :: Dict ()),
+  makeInstance (\(dict :: Dict (Ord A)) -> DictOf dict),
+  makeInstance (\(dict :: Dict (Arbitrary A)) -> DictOf dict)]
+
+newtype DictOf c a = DictOf { unDictOf :: Dict (c a) } deriving Typeable
 
 instance Monoid Signature where
   mempty = Signature [] [] [] []
-  Signature cs os as b `mappend` Signature cs' os' as' b' = Signature (cs++cs') (os++os') (as++as') (b++b')
+  Signature cs is b d `mappend` Signature cs' is' b' d' = Signature (cs++cs') (is++is') (b++b') (d `mappend` d')
 
 signature :: Signature
 signature = mempty
@@ -46,17 +89,53 @@ isOp xs = not (all isIdent xs)
   where
     isIdent x = isAlphaNum x || x == '\'' || x == '_'
 
-ord :: forall a. (Typeable a, Ord a) => a -> Value (Instance Ord)
-ord _ = toValue (Instance Dict :: Instance Ord a)
+baseType :: forall a. (Ord a, Arbitrary a, Typeable a) => a -> Instance
+baseType _ =
+  mconcat [
+    inst (Sub Dict :: () :- Ord a),
+    inst (Sub Dict :: () :- Arbitrary a)]
 
-arb :: forall a. (Typeable a, Arbitrary a) => a -> Value (Instance Arbitrary)
-arb _ = toValue (Instance Dict :: Instance Arbitrary a)
+inst :: forall c1 c2. (Typeable c1, Typeable c2) => c1 :- c2 -> Instance
+inst ins = makeInstance f
+  where
+    f :: Dict c1 -> Dict c2
+    f Dict = case ins of Sub dict -> dict
 
-inst :: forall a. (Typeable a, Ord a, Arbitrary a) => a -> Signature
-inst x = signature { ords = [ord x], arbs = [arb x] }
+inst2 :: forall c1 c2 c3. (Typeable c1, Typeable c2, Typeable c3) => (c1, c2) :- c3 -> Instance
+inst2 ins = makeInstance f
+  where
+    f :: (Dict c1, Dict c2) -> Dict c3
+    f (Dict, Dict) = case ins of Sub dict -> dict
 
 typeUniverse :: Signature -> Set Type
 typeUniverse sig =
   Set.fromList $
     Var (TyVar 0):
     [ oneTypeVar (typ t) | c <- constants sig, t <- subterms (typ c) ]
+
+findInstanceOf :: forall f. Typeable f => Signature -> Type -> [Value f]
+findInstanceOf sig ty =
+  map (unwrapFunctor runIdentity) (findInstance sig ty')
+  where
+    ty' = typeRep (undefined :: proxy f) `applyType` ty
+
+findInstance :: Signature -> Type -> [Value Identity]
+findInstance sig (Fun unit [])
+  | unit == tyCon () =
+    return (toValue (Identity ()))
+findInstance sig (Fun pair [ty1, ty2])
+  | pair == tyCon ((),()) = do
+    x <- findInstance sig ty1
+    y <- findInstance sig ty2
+    return (pairValues (liftA2 (,)) x y)
+findInstance sig ty = do
+  i <- instances_ sig
+  sub <- maybeToList (match (typ i) ty)
+  let i' = typeSubst (evalSubst sub) i
+  case unwrap i' of
+    Instance1 i1 `In` w1 -> do
+      let i1' = typeSubst (evalSubst sub) i1
+      case unwrap i1' of
+        Instance2 f `In` w2 -> do
+          x <- fmap (reunwrap w2) (findInstance sig (typ i1'))
+          return (wrap w1 (fmap f x))

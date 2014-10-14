@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances, GeneralizedNewtypeDeriving, DeriveDataTypeable, ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleInstances, GeneralizedNewtypeDeriving, DeriveDataTypeable, ScopedTypeVariables, TypeOperators #-}
 import Data.Ratio
 import QuickSpec
 import Test.QuickCheck
@@ -17,6 +17,7 @@ import QuickSpec.Signature hiding (sig)
 import qualified QuickSpec.Signature as S
 import Data.Monoid hiding ((<>))
 import PrettyPrinting
+import Data.Constraint hiding ((\\))
 
 (\\), (/) :: It -> It -> It
 a / b = a * recip b
@@ -35,24 +36,17 @@ compose (ItFun f) (ItFun g) = ItFun (f . g)
 listsSig =
   signature {
     constants = [
-       constant "rev" (reverse :: [A] -> [A]),
-       constant "app" ((++) :: [A] -> [A] -> [A]),
-       constant "[]" ([] :: [A]),
-       constant "map" (map :: (A -> B) -> [A] -> [B]) ],
-    arbs = [arb (undefined :: Default -> Default),
-            arb (undefined :: Default),
-            arb (undefined :: [Default])],
-    ords = [ord (undefined :: Default),
-            ord (undefined :: [Default])]}
+      constant "rev" (reverse :: [A] -> [A]),
+      constant "app" ((++) :: [A] -> [A] -> [A]),
+      constant "[]" ([] :: [A]),
+      constant "map" (map :: (A -> B) -> [A] -> [B]) ]}
 
 constSig =
   mconcat [
     signature {
        constants = [
           constant "const" ((\x y -> [const x y]) :: A -> B -> [A]),
-          constant "asTypeOf" ((\x y -> [asTypeOf x y]) :: A -> A -> [A]) ] },
-    inst (undefined :: [Int]),
-    inst (undefined :: Int)]
+          constant "asTypeOf" ((\x y -> [asTypeOf x y]) :: A -> A -> [A]) ] }]
 
 boolSig =
   mconcat [
@@ -62,31 +56,26 @@ boolSig =
            constant "False" False,
            constant "||" (||),
            constant "&&" (&&),
-           constant "not" not ]},
-     inst (undefined :: Int),
-     inst (undefined :: Bool),
-     inst (undefined :: Default) ]
+           constant "not" not ]}]
 
 octSig =
-  mconcat [
-    signature {
-       constants = [
-          constant "1" (1 :: It),
-          constant "*" ((*) :: It -> It -> It),
-          --  constant "/" ((/) :: It -> It -> It),
-          --  constant "\\" ((\\) :: It -> It -> It),
-          constant "id" (ItFun id),
-          (constant "l" l)   { conStyle = Uncurried },
-          (constant "r" r)   { conStyle = Uncurried },
-          (constant "l1" l1) { conStyle = Uncurried },
-          (constant "r1" r1) { conStyle = Uncurried },
-          (constant "t" t)   { conStyle = Uncurried },
-          constant "." compose ],
-       background = octBackground },
-    inst (undefined :: Int),
-    inst (undefined :: ItFun),
-    inst (undefined :: It),
-    inst (undefined :: Default) ]
+  signature {
+    constants = [
+       constant "1" (1 :: It),
+       constant "*" ((*) :: It -> It -> It),
+       --  constant "/" ((/) :: It -> It -> It),
+       --  constant "\\" ((\\) :: It -> It -> It),
+       constant "id" (ItFun id),
+       (constant "l" l)   { conStyle = Uncurried },
+       (constant "r" r)   { conStyle = Uncurried },
+       (constant "l1" l1) { conStyle = Uncurried },
+       (constant "r1" r1) { conStyle = Uncurried },
+       (constant "t" t)   { conStyle = Uncurried },
+       constant "." compose ],
+    background = octBackground,
+    instances = [
+      baseType (undefined :: ItFun),
+      baseType (undefined :: It)]}
   where
     star = constant "*" ((*) :: It -> It -> It)
     lc = constant "l" l
@@ -140,81 +129,46 @@ times D C = B
 times D D = B
 
 table9point1 =
-  mconcat [
-    signature {
-       constants = [
-          constant "times" times,
-          constant "i" I,
-          constant "a" A,
-          constant "b" B,
-          constant "c" C,
-          constant "d" D ]},
-    inst (undefined :: Default),
-    inst (undefined :: Table9Point1) ]
+  signature {
+      constants = [
+        constant "times" times,
+        constant "i" I,
+        constant "a" A,
+        constant "b" B,
+        constant "c" C,
+        constant "d" D ],
+      instances = [
+        baseType (undefined :: Table9Point1)]}
 
 arithSig =
-  mconcat [
-    signature {
-       constants = [
-          constant "0" (0 :: Int),
-          constant "1" (1 :: Int),
-          constant "+" ((+) :: Int -> Int -> Int),
-          constant "*" ((*) :: Int -> Int -> Int) ]},
-    inst (undefined :: Int),
-    inst (undefined :: Default) ]
+  signature {
+    constants = [
+       constant "0" (0 :: Int),
+       constant "1" (1 :: Int),
+       constant "+" ((+) :: Int -> Int -> Int),
+       constant "*" ((*) :: Int -> Int -> Int) ]}
 
 prettyBackgroundSig =
-  mconcat [
-    signature {
-       constants = [
-          constant "[]" ([] :: [Bool]),
-          constant "++" ((++) :: [Bool] -> [Bool] -> [Bool]),
-          constant "0" (0 :: Int),
-          constant "+" ((+) :: Int -> Int -> Int),
-          constant "length" (length :: [Bool] -> Int) ]},
-    inst (undefined :: [Bool]),
-    inst (undefined :: Int),
-    inst (undefined :: Default) ]
+  signature {
+    constants = [
+       constant "[]" ([] :: [A]),
+       constant "++" ((++) :: [A] -> [A] -> [A]),
+       constant "0" (0 :: Int),
+       constant "+" ((+) :: Int -> Int -> Int),
+       constant "length" (length :: [A] -> Int) ]}
 
 prettySig =
-  prettyBackgroundSig `mappend`
-  mconcat [
-    signature {
-       constants = [
-          constant "text" (text :: [Bool] -> Layout Bool),
-          constant "nest" (nest :: Int -> Layout Bool -> Layout Bool),
-          constant "$$" (($$) :: Layout Bool -> Layout Bool -> Layout Bool),
-          constant "<>" ((<>) :: Layout Bool -> Layout Bool -> Layout Bool) ]},
-    inst (undefined :: Layout Bool) ]
-{-
-main = do
-  eqs <- quickSpec prettyBackgroundSig
-  quickSpec prettySig { background = eqs }-}
-main = quickSpec octSig
+  signature {
+    constants = [
+       constant "text" (text :: [A] -> Layout A),
+       constant "nest" (nest :: Int -> Layout A -> Layout A),
+       constant "$$" (($$) :: Layout A -> Layout A -> Layout A),
+       constant "<>" ((<>) :: Layout A -> Layout A -> Layout A) ],
+    instances = [
+      inst (Sub Dict :: Ord A :- Ord (Layout A)),
+      inst (Sub Dict :: Arbitrary A :- Arbitrary (Layout A)) ],
+    defaultTo = [typeOf (undefined :: Bool)] }
 
-{-
-sig1 = [
-  withDepth 4,
-  withTests 10,
-  ["a", "b", "c"] `vars` (undefined :: It),
-  "1" `fun0` (1 :: It),
-  "*" `fun2` ((*) :: It -> It -> It),
-  "/" `fun2` ((/) :: It -> It -> It),
-  "\\" `fun2` ((\\) :: It -> It -> It)]
-
-sig2 = [
-  withSize 3,
-  withDepth 4,
-  withTests 10,
-  ["f", "g", "h"] `vars` (undefined :: Fun),
-  ["a", "b", "c"] `vars` (undefined :: It),
-  observer2 (\x (Fun f :: Fun) -> f x),
-  "*" `fun2` ((*) :: It -> It -> It),
-  "1" `fun0` (1 :: It),
-  "1" `blind0` (Fun (\x -> x)),
-  "." `blind2` (\(Fun f) (Fun g) -> Fun (\x -> f (g x))),
-  "l" `blind1` l,
-  "r" `blind1` r,
-  "l1" `blind1` l1,
-  "r1" `blind1` r1]
--}
+main = quickSpec listsSig
+--main = quickSpecWithBackground prettyBackgroundSig prettySig
+--main = quickSpec octSig

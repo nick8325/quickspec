@@ -7,7 +7,7 @@ import QuickSpec.Type
 import QuickSpec.Term
 import QuickSpec.Test
 import QuickSpec.Utils
-import QuickSpec.Signature
+import QuickSpec.Signature hiding (instances)
 import QuickSpec.Prop
 import QuickSpec.Rules
 import Control.Monad.Trans.State.Strict

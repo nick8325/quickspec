@@ -16,19 +16,16 @@ import Data.Maybe
 import Data.Ord
 import Control.Applicative
 
-newtype Default = Default Int deriving (Eq, Ord, Arbitrary, CoArbitrary, Typeable)
-
-defaultTypes :: Typed a => a -> a
-defaultTypes = typeSubst (const ty)
-  where
-    ty = typeOf (undefined :: Default)
+defaultTypes :: Typed a => Type -> a -> a
+defaultTypes ty = typeSubst (const ty)
 
 makeTester :: (a -> Term) -> (Type -> Value Gen) -> [(QCGen, Int)] -> Signature -> Type -> Maybe (Value (TypedTestSet a))
 makeTester toTerm env tests sig ty = do
-  Instance Dict `In` w <-
-    fmap unwrap (listToMaybe [ i | i <- ords sig, typ i == defaultTypes ty ])
-  return . wrap w $
-    emptyTypedTestSet (Just . reunwrap w . makeTests (env . defaultTypes) tests . defaultTypes . toTerm)
+  i <- listToMaybe (findInstanceOf sig (defaultTypes (defaultTo_ sig) ty))
+  case unwrap (i :: Value (DictOf Ord)) of
+    DictOf Dict `In` w ->
+      return . wrap w $
+        emptyTypedTestSet (Just . reunwrap w . makeTests (env . defaultTypes (defaultTo_ sig)) tests . defaultTypes (defaultTo_ sig) . toTerm)
 
 makeTests :: (Type -> Value Gen) -> [(QCGen, Int)] -> Term -> Value []
 makeTests env tests t =
@@ -39,13 +36,13 @@ makeTests env tests t =
 
 env :: Signature -> Type -> Value Gen
 env sig ty =
-  case [ i | i <- arbs sig, typ i == ty ] of
+  case findInstanceOf sig ty of
     [] ->
       fromMaybe __ $
       cast ty $
       toValue (ERROR $ "missing arbitrary instance for " ++ prettyShow ty :: Gen A)
     (i:_) ->
-      forValue i $ \(Instance Dict) -> arbitrary
+      forValue (i :: Value (DictOf Arbitrary)) $ \(DictOf Dict) -> arbitrary
 
 genSeeds :: Int -> IO [(QCGen, Int)]
 genSeeds maxSize = do
