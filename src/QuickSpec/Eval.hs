@@ -107,6 +107,9 @@ quickSpecWithBackground sig1 sig2 = do
 
 quickSpec :: Signature -> IO [Prop]
 quickSpec sig = unbuffered $ do
+  putStrLn "== Signature =="
+  prettyPrint sig
+  putStrLn ""
   seeds <- fmap (take 1000) (genSeeds 20)
   runPruner sig (evalStateT (runRulesT (createRules sig >> go 1 sig)) (initialState sig seeds))
 
@@ -132,8 +135,8 @@ go 10 _ = do
                      show numTerms ++ " terms, " ++
                      show numCreation ++ " creation, " ++
                      show numMisc ++ " miscellaneous).")
-  liftIO $ putStrLn (show (length eqs) ++ " equations in background theory.")
-  liftIO $ putStrLn (show h ++ " hooks installed.")
+  liftIO $ putStrLn (show (length eqs) ++ " equations in background theory, " ++
+                     show h ++ " hooks installed.\n")
   return (map (fmap fromPruningTerm) eqs)
 
 go n sig = do

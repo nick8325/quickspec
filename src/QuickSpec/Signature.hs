@@ -47,6 +47,15 @@ data Signature =
     defaultTo  :: [Type] }
   deriving Show
 
+instance Pretty Signature where
+  pretty sig = vcat (map prettyDecl decls)
+    where
+      decls = [(show (pretty (Fun c [] :: Term)), pretty (typ c)) | c <- constants sig]
+      maxWidth = maximum (0:map (length . fst) decls)
+      pad xs = replicate (maxWidth - length xs) ' ' ++ xs
+      prettyDecl (name, ty) =
+        hang (text (pad name) <+> text "::") 2 ty
+
 defaultTo_ :: Signature -> Type
 defaultTo_ sig =
   case defaultTo sig of
