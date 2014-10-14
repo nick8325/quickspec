@@ -82,7 +82,7 @@ initialState sig seeds =
 schemasOfSize :: Int -> Signature -> M [Schema]
 schemasOfSize 1 sig =
   return $
-    [Var (Var (TyVar 0))] ++
+    [Var (Hole (Var (TyVar 0)))] ++
     [Fun c [] | c <- constants sig]
 schemasOfSize n _ = do
   ss <- lift $ gets schemas
@@ -92,11 +92,11 @@ schemasOfSize n _ = do
       let j = n-i,
       (fty, fs) <- Map.toList =<< maybeToList (Map.lookup i ss),
       canApply fty (poly (Var (TyVar 0))),
-      or [ canApply f (poly (Var (Var (TyVar 0)))) | f <- fs ],
+      or [ canApply f (poly (Var (Hole (Var (TyVar 0))))) | f <- fs ],
       (xty, xs) <- Map.toList =<< maybeToList (Map.lookup j ss),
       canApply fty xty,
       f <- fs,
-      canApply f (poly (Var (Var (TyVar 0)))),
+      canApply f (poly (Var (Hole (Var (TyVar 0))))),
       x <- xs ]
 
 quickSpecWithBackground :: Signature -> Signature -> IO [Prop]

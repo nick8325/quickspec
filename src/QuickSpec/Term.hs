@@ -20,7 +20,7 @@ import qualified Data.Rewriting.Substitution.Type as T
 -- A schema is like a term but has holes instead of variables.
 type TermOf = Tm Constant
 type Term = TermOf Variable
-type Schema = TermOf Type
+type Schema = TermOf Hole
 
 -- Term ordering - size, skeleton, generality.
 type Measure f v = (Int, Int, Tm f (), Int, Tm f v)
@@ -69,6 +69,11 @@ instance Typed Variable where
 instance CoArbitrary Variable where
   coarbitrary x = coarbitrary (varNumber x) . coarbitrary (varType x)
 
+-- Holes - a newtype largely so that we can improve the pretty-printing.
+newtype Hole = Hole Type deriving (Eq, Ord, Show)
+instance Typed Hole where typ (Hole ty) = ty
+instance Pretty Hole where pretty _ = text "_"
+
 instance Typed v => Typed (TermOf v) where
   typ (Var x) = typ x
   typ (Fun f xs) = typeDrop (length xs) (typ f)
@@ -89,13 +94,13 @@ instance Typed v => Apply (TermOf v) where
 
 -- Turn a term into a schema by forgetting about its variables.
 schema :: Term -> Schema
-schema = rename typ
+schema = rename (Hole . typ)
 
 -- Instantiate a schema by making all the variables different.
 instantiate :: Schema -> Term
 instantiate s = evalState (aux s) Map.empty
   where
-    aux (Var ty) = do
+    aux (Var (Hole ty)) = do
       m <- get
       let n = Map.findWithDefault 0 ty m
       put $! Map.insert ty (n+1) m
