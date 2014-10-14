@@ -8,14 +8,14 @@ import QuickSpec.Utils
 import QuickSpec.Type
 import QuickSpec.Term
 import QuickSpec.Signature
-import QuickSpec.Equation
+import QuickSpec.Prop
 import Data.Map(Map)
 import Data.Maybe
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Set(Set)
 import Control.Monad
-import QuickSpec.Pruning
+import QuickSpec.Pruning hiding (createRules)
 import QuickSpec.Pruning.Simple hiding (S)
 import qualified QuickSpec.Pruning.Simple as Simple
 import qualified QuickSpec.Pruning.E as E
@@ -32,14 +32,13 @@ import Control.Applicative
 import QuickSpec.Test
 import Test.QuickCheck.Random
 
-type M = RulesT Event (StateT S IO)
+type M = RulesT Event (StateT S (PrunerT SimplePruner IO))
 
 data S = S {
   schemas       :: Schemas,
   terms         :: Set (TermOf Int),
   schemaTestSet :: TestSet Schema,
   termTestSet   :: Map Schema (TestSet TermFrom),
-  pruner        :: SimplePruner,
   freshTestSet  :: TestSet TermFrom,
   types         :: Set Type }
 
@@ -76,12 +75,10 @@ initialState sig seeds =
       terms         = Set.empty,
       schemaTestSet = emptyTestSet (makeTester specialise e seeds sig),
       termTestSet   = Map.empty,
-      pruner        = emptyPruner types sig,
       freshTestSet  = emptyTestSet (makeTester specialise e seeds sig),
-      types         = types }
+      types         = typeUniverse sig }
   where
     e = table (env sig)
-    types = typeUniverse sig
 
 schemasOfSize :: Int -> Signature -> M [Schema]
 schemasOfSize 1 sig =
@@ -106,14 +103,8 @@ schemasOfSize n _ = do
 quickSpec :: Signature -> IO ()
 quickSpec sig = unbuffered $ do
   seeds <- fmap (take 100) (genSeeds 20)
-  _ <- execStateT (runRulesT (createRules sig >> go 1 sig)) (initialState sig seeds)
+  _ <- runPruner sig (execStateT (runRulesT (createRules sig >> go 1 sig)) (initialState sig seeds))
   return ()
-
-typeUniverse :: Signature -> Set Type
-typeUniverse sig =
-  Set.fromList $
-    Var (TyVar 0):
-    [ oneTypeVar (typ t) | c <- constants sig, t <- subterms (typ c) ]
 
 go :: Int -> Signature -> M ()
 go 10 _ = do
@@ -236,13 +227,12 @@ class (Eq a, Typed a) => Considerable a where
 
 consider :: Considerable a => (KindOf a -> Event) -> a -> M ()
 consider makeEvent x = do
-  pruner <- lift $ gets pruner
   types  <- lift $ gets types
   let t = generalise x
-  case evalState (rep (etaExpand t)) pruner of
+  res <- lift (lift (rep (etaExpand t)))
+  case res of
     Just u | measure u < measure t ->
-      let mod = execState (unify types (t :=: u))
-      in lift $ modify (\s -> s { pruner = mod pruner })
+      lift (lift (axiom ([] :=>: t :=: u)))
     _ -> do
       ts <- getTestSet x
       case insert x ts of
@@ -293,14 +283,14 @@ instance Considerable TermFrom where
 
 found :: Term -> Term -> M ()
 found t u = do
-  Simple.S eqs <- lift $ gets pruner
+  Simple.S eqs <- lift (lift (liftPruner get))
   types <- lift $ gets types
-  res <- liftIO $ uncurry (E.eUnify eqs) (let e' = unifyEquation (t :=: u) in (toPruningTermSkolem (lhs e'), toPruningTermSkolem (rhs e')))
+  res <- liftIO $ E.eUnify eqs (toGoal ([] :=>: t :=: u))
   case res of
     True ->
       return ()
     False -> do
-      lift $ modify (\s -> s { pruner = execState (unify types (t :=: u)) (pruner s) })
+      lift (lift (axiom ([] :=>: t :=: u)))
       liftIO $ putStrLn (prettyShow t ++ " = " ++ prettyShow u)
 
 accept :: Poly Schema -> M ()

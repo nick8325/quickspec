@@ -2,38 +2,42 @@ module QuickSpec.Pruning.Simple where
 
 import QuickSpec.Base
 import QuickSpec.Term
+import QuickSpec.Prop
 import QuickSpec.Pruning
 import Control.Monad
 import Control.Monad.Trans.State.Strict
 import Data.Maybe
 
-newtype SimplePruner = S [(PruningTerm, PruningTerm)]
+newtype SimplePruner = S [PropOf PruningTerm]
 
 instance Pruner SimplePruner where
-  untypedEmptyPruner = S []
-  areEqualUntyped = simpleAreEqual
-  unifyUntyped = simpleUnify
-  repUntyped = simpleRep
+  emptyPruner = S []
+  untypedGoal  = liftM isJust . simpleAreEqual
+  untypedAxiom = simpleUnify
+  untypedRep   = simpleRep
 
-simpleAreEqual :: PruningTerm -> PruningTerm -> State SimplePruner Bool
-simpleAreEqual t u
-  | measure (fromPruningTerm t) < measure (fromPruningTerm u) = simpleAreEqual u t
-simpleAreEqual u t = do
-  S eqs <- get
-  return (isJust (simplifies eqs u))
+modifyS f = modify (\(S x) -> S (f x))
 
-simpleUnify :: PruningTerm -> PruningTerm -> State SimplePruner ()
-simpleUnify t u
-  | measure (fromPruningTerm t) < measure (fromPruningTerm u) = simpleUnify u t
-simpleUnify u t = do
-  S eqs <- get
-  case simplifies eqs u of
+simpleAreEqual :: Monad m => PropOf PruningTerm -> StateT SimplePruner m (Maybe PruningTerm)
+simpleAreEqual (lhs :=>: t :=: u)
+  | measure (fromPruningTerm t) <= measure (fromPruningTerm u) = do
+    S eqs <- get
+    return (simplifies (map unitProp lhs ++ eqs) u)
+  | otherwise =
+    simpleAreEqual (lhs :=>: u :=: t)
+simpleAreEqual _ = return Nothing
+
+simpleUnify :: Monad m => PropOf PruningTerm -> StateT SimplePruner m ()
+simpleUnify prop@(lhs :=>: t :=: u) = do
+  res <- simpleAreEqual prop
+  case res of
     Just v |
       fromPruningTerm v `alwaysSimplerThan` fromPruningTerm t ||
       fromPruningTerm v `alwaysSimplerThan` fromPruningTerm u ->
         return ()
     _ ->
-      put (S ((u,t):eqs))
+      modifyS (prop:)
+simpleUnify prop = modifyS (prop:)
 
 alwaysSimplerThan :: Term -> Term -> Bool
 t `alwaysSimplerThan` u =
@@ -43,16 +47,16 @@ t `alwaysSimplerThan` u =
     sizeOk v = occ v t <= occ v u
     occ v t = length [ v' | v' <- vars t, v == v' ]
 
-simpleRep :: PruningTerm -> State SimplePruner (Maybe PruningTerm)
+simpleRep :: Monad m => PruningTerm -> StateT SimplePruner m (Maybe PruningTerm)
 simpleRep t = do
   S eqs <- get
   return (simplifies eqs t)
 
-simplifies :: [(PruningTerm, PruningTerm)] -> PruningTerm -> Maybe PruningTerm
-simplifies eqs t = msum [ simplifies1 (u, v) t `mplus` simplifies1 (v, u) t | (u, v) <- eqs ]
+simplifies :: [PropOf PruningTerm] -> PruningTerm -> Maybe PruningTerm
+simplifies eqs t = msum [ simplifies1 u v t `mplus` simplifies1 v u t | [] :=>: u :=: v <- eqs ]
 
-simplifies1 :: (PruningTerm, PruningTerm) -> PruningTerm -> Maybe PruningTerm
-simplifies1 (t, u) v = do
+simplifies1 :: PruningTerm -> PruningTerm -> PruningTerm -> Maybe PruningTerm
+simplifies1 t u v = do
   s <- match t v
   let w = subst s u
   guard (measure (fromPruningTerm w) < measure (fromPruningTerm v))

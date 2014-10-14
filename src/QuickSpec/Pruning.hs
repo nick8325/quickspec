@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, GeneralizedNewtypeDeriving #-}
 module QuickSpec.Pruning where
 
 #include "errors.h"
@@ -8,72 +8,122 @@ import QuickSpec.Term
 import QuickSpec.Test
 import QuickSpec.Utils
 import QuickSpec.Signature
-import QuickSpec.Equation
+import QuickSpec.Prop
+import QuickSpec.Rules
 import Control.Monad.Trans.State.Strict
+import Control.Monad.Trans.Reader
+import Control.Monad.Trans.Class
+import Control.Monad.IO.Class
 import qualified Data.Set as Set
-import Data.Set(Set)
 import qualified Data.Map as Map
 import Data.Map(Map)
 import Data.Rewriting.Substitution.Type
 import Data.Maybe
+import Control.Monad
+import Control.Applicative
 
-class Pruner a where
-  untypedEmptyPruner :: a
-  repUntyped         :: PruningTerm -> State a (Maybe PruningTerm)
-  areEqualUntyped    :: PruningTerm -> PruningTerm -> State a Bool
-  unifyUntyped       :: PruningTerm -> PruningTerm -> State a ()
+class Pruner s where
+  emptyPruner   :: s
+  untypedRep    :: Monad m => PruningTerm -> StateT s m (Maybe PruningTerm)
+  untypedAxiom  :: Monad m => PropOf PruningTerm -> StateT s m ()
+  untypedGoal   :: Monad m => PropOf PruningTerm -> StateT s m Bool
 
-emptyPruner :: Pruner a => Set Type -> Signature -> a
-emptyPruner univ sig = execState go untypedEmptyPruner
+newtype PrunerT s m a =
+  PrunerT {
+    unPrunerT :: RulesT PruningConstant (ReaderT [Type] (StateT s m)) a }
+  deriving (Monad, MonadIO, Functor, Applicative)
+instance MonadTrans (PrunerT s) where
+  lift = PrunerT . lift . lift . lift
+
+askUniv :: Monad m => PrunerT s m [Type]
+askUniv = PrunerT (lift ask)
+
+liftPruner :: (Monad m, Pruner s) => StateT s m a -> PrunerT s m a
+liftPruner m = PrunerT (lift (lift m))
+
+runPruner :: (Monad m, Pruner s) => Signature -> PrunerT s m a -> m a
+runPruner sig m =
+  evalStateT (runReaderT (runRulesT (unPrunerT m')) (Set.toList (typeUniverse sig))) emptyPruner
   where
-    go = do
-      mapM_ axiom (constants sig >>= partiallyApply >>= instances >>= return . oneTypeVar)
-      mapM_ typeAxiom (Set.toList univ)
-    axiom t = unifyUntyped (Fun (HasType (typ t)) [normaliseVars (toPruningTerm t)]) (normaliseVars (toPruningTerm t))
-    -- Since we don't add any type axioms for skolem variables,
-    -- we might need type axioms for HasType, I'm not sure.
-    typeAxiom ty = unifyUntyped (hasTy (hasTy (Var 0))) (hasTy (Var 0))
-      where
-        hasTy t = Fun (HasType ty) [t]
-    instances t@(Fun _ ts) =
-      [ typeSubst (evalSubst (fromMap sub)) t
-      | sub <- foldr intersection [Map.empty] (map (constrain (Set.toList univ)) (t:ts)) ]
-    partiallyApply x =
-      [ fun (Fun x []) ts
-      | i <- [0..conArity x],
-        let ts = [ Var (Variable j (Var (TyVar 0))) | j <- [0..i-1] ] ]
-    fun x [] = x
-    fun x (t:ts) = fun (unPoly (poly x `apply` poly t)) ts
+    m' = createRules >> m
 
-unify :: Pruner a => Set Type -> Equation -> State a ()
-unify univ e =
+createRules :: (Monad m, Pruner s) => PrunerT s m ()
+createRules = PrunerT $ do
+  rule $ do
+    fun <- event
+    case fun of
+      SkolemVariable _ -> fail ""
+      HasType ty ->
+        execute $
+          unPrunerT $ liftPruner $
+            untypedAxiom
+              ([] :=>: Fun fun [Fun fun [Var 0]] :=: Fun fun [Var 0])
+      TermConstant con _ arity -> do
+        let ty = typ (Fun con (replicate arity (undefined :: Term)))
+            t = Fun fun (take arity (map Var [0..]))
+        execute $ do
+          generate (HasType ty)
+          unPrunerT $ liftPruner $
+            untypedAxiom ([] :=>: Fun (HasType ty) [t] :=: t)
+
+axiom :: (Pruner s, Monad m) => Prop -> PrunerT s m ()
+axiom p = do
+  univ <- askUniv
   sequence_
-    [ unifyUntyped t' u'
-    | (lhs, rhs) <- eqnInstances (Set.toList univ) (lhs e') (rhs e'),
-      let t = toPruningTerm lhs,
-      let u = toPruningTerm rhs,
-      let (t', u') = normaliseEquation (t, u) ]
-  where
-    e' = unifyEquation e
+    [ do sequence_ [ PrunerT (generate fun) | fun <- usort (concatMap funs (propTerms p')) ]
+         liftPruner (untypedAxiom p')
+    | p' <- map toAxiom (instances univ p) ]
 
-unifyEquation :: Equation -> Equation
-unifyEquation (lhs :=: rhs) = lhs' :=: rhs'
-  where
-    Just ty = polyMgu (poly (typ lhs)) (poly (typ rhs))
-    Just lhs' = cast (unPoly ty) lhs
-    Just rhs' = cast (unPoly ty) rhs
+goal :: (Pruner s, Monad m) => Prop -> PrunerT s m Bool
+goal p = do
+  let p' = toGoal p
+  sequence_ [ PrunerT (generate fun) | fun <- usort (concatMap funs (propTerms p')) ]
+  liftPruner (untypedGoal p')
 
-eqnInstances :: [Type] -> Term -> Term -> [(Term, Term)]
-eqnInstances univ lhs rhs =
-  [ (lhs', rhs')
-  | sub <- map fromMap cs,
-    let lhs' = typeSubst (evalSubst sub) lhs,
-    let rhs' = typeSubst (evalSubst sub) rhs ]
+toAxiom :: Prop -> PropOf PruningTerm
+toAxiom = normaliseProp . guardNakedVariables . fmap toPruningConstant
+  where
+    guardNakedVariables (lhs :=>: t :=: u) =
+      lhs :=>: guardTerm t :=: guardTerm u
+    guardNakedVariable prop = prop
+    guardTerm (Var x) = Fun (HasType (typ x)) [Var x]
+    guardTerm t = t
+
+toGoal :: Prop -> PropOf PruningTerm
+toGoal = fmap toGoalTerm
+
+toGoalTerm :: Term -> PruningTerm
+toGoalTerm = skolemise . toPruningConstant
+
+toPruningConstant :: Term -> Tm PruningConstant Variable
+toPruningConstant = mapTerm f id . withArity
+  where
+    f (fun, n) = TermConstant fun (typ fun) n
+
+skolemise :: Tm PruningConstant Variable -> PruningTerm
+skolemise (Fun f xs) = Fun f (map skolemise xs)
+skolemise (Var x) = Fun (HasType (typ x)) [Fun (SkolemVariable x) []]
+
+normaliseVars t = rename (\x -> fromMaybe __ (Map.lookup x m)) t
+  where
+    m = Map.fromList (zip (usort (vars t)) [0..])
+
+normaliseProp prop =
+  fmap (rename (\x -> fromMaybe __ (Map.lookup x m))) prop
+  where
+    m = Map.fromList (zip (usort (concatMap vars (propTerms prop))) [0..])
+
+instances :: [Type] -> Prop -> [Prop]
+instances univ prop =
+  [ fmap (typeSubst (evalSubst sub)) prop
+  | sub <- map fromMap cs ]
   where
     cs =
       foldr intersection [Map.empty]
         (map (constrain univ)
-          (concatMap subterms [lhs, rhs]))
+          (usort
+            (concatMap subterms
+              (propTerms prop))))
 
 intersection :: [Map TyVar Type] -> [Map TyVar Type] -> [Map TyVar Type]
 ms1 `intersection` ms2 = usort [ Map.union m1 m2 | m1 <- ms1, m2 <- ms2, ok m1 m2 ]
@@ -84,8 +134,8 @@ constrain :: [Type] -> Term -> [Map TyVar Type]
 constrain univ t =
   usort [ toMap sub | u <- univ, Just sub <- [match (typ t) u] ]
 
-rep :: Pruner a => Term -> State a (Maybe Term)
-rep t = fmap (fmap fromPruningTerm) (repUntyped (normaliseVars (toPruningTerm t)))
+rep :: (Pruner s, Monad m) => Term -> PrunerT s m (Maybe Term)
+rep t = liftM (liftM fromPruningTerm) (liftPruner (untypedRep (toGoalTerm t)))
 
 type PruningTerm = Tm PruningConstant Int
 
@@ -100,25 +150,6 @@ data PruningConstant
 instance Pretty PruningConstant where
   pretty (TermConstant x _ _) = pretty x
   pretty (HasType ty) = text "@" <> pretty ty
-
-toPruningTerm :: Term -> Tm PruningConstant Variable
-toPruningTerm = toPruningTerm2 . toPruningTerm1
-toPruningTermSkolem :: Term -> PruningTerm
-toPruningTermSkolem = normaliseVars . toPruningTerm2 . skolemise . toPruningTerm1
-  where
-    skolemise (Fun f xs) = Fun f (map skolemise xs)
-    skolemise (Var x) = Fun (HasType (typ x)) [Fun (SkolemVariable x) []]
-
-toPruningTerm1 :: Term -> Tm PruningConstant Variable
-toPruningTerm1 = mapTerm f id . withArity
-  where
-    f (fun, n) = TermConstant fun (typ fun) n
-
-toPruningTerm2 :: Tm PruningConstant Variable -> Tm PruningConstant Variable
-toPruningTerm2 = guardNakedVariables
-  where
-    guardNakedVariables (Var x) = Fun (HasType (typ x)) [Var x]
-    guardNakedVariables x = x
 
 fromPruningTerm :: PruningTerm -> Term
 fromPruningTerm t =
@@ -136,13 +167,3 @@ fromPruningTermWithType :: Int -> Type -> PruningTerm -> Term
 fromPruningTermWithType m ty (Var n) = Var (Variable (m+n) ty)
 fromPruningTermWithType n ty (Fun (SkolemVariable x) []) = Var x
 fromPruningTermWithType n _  t = fromPruningTermWith n t
-
-normaliseVars t = rename (\x -> fromMaybe __ (Map.lookup x m)) t
-  where
-    m = Map.fromList (zip (usort (vars t)) [0..])
-
-normaliseEquation (t, u) =
-  (rename (\x -> fromMaybe __ (Map.lookup x m)) t,
-   rename (\x -> fromMaybe __ (Map.lookup x m)) u)
-  where
-    m = Map.fromList (zip (usort (vars t ++ vars u)) [0..])

@@ -6,6 +6,6 @@ import QuickSpec.Term
 import QuickSpec.Type
 import QuickSpec.Signature
 import QuickSpec.Eval
-import QuickSpec.Equation
+import QuickSpec.Prop
 import QuickSpec.Pruning
 import QuickSpec.Pruning.Simple

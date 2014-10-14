@@ -5,11 +5,14 @@ module QuickSpec.Signature where
 
 #include "errors.h"
 import Data.Constraint
+import QuickSpec.Base
 import QuickSpec.Term
 import QuickSpec.Type
 import Data.Functor.Identity
 import Data.Monoid
-import Test.QuickCheck
+import Test.QuickCheck hiding (subterms)
+import qualified Data.Set as Set
+import Data.Set(Set)
 
 newtype Instance c a = Instance (Dict (c a))
 data Signature =
@@ -35,3 +38,9 @@ arb _ = Signature [] [] [toValue (Instance Dict :: Instance Arbitrary a)]
 
 inst :: forall a. (Typeable a, Ord a, Arbitrary a) => a -> Signature
 inst x = ord x `mappend` arb x
+
+typeUniverse :: Signature -> Set Type
+typeUniverse sig =
+  Set.fromList $
+    Var (TyVar 0):
+    [ oneTypeVar (typ t) | c <- constants sig, t <- subterms (typ c) ]

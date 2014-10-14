@@ -5,6 +5,7 @@ import QuickSpec.Base
 import QuickSpec.Term
 import QuickSpec.Type
 import QuickSpec.Utils
+import QuickSpec.Prop
 import QuickSpec.Pruning
 import System.IO
 import System.IO.Unsafe
@@ -22,11 +23,11 @@ import qualified Jukebox.TPTP.Print as Jukebox
 import qualified Text.PrettyPrint.HughesPJ as Jukebox
 import Data.Char
 
-eUnify :: [(PruningTerm, PruningTerm)] -> PruningTerm -> PruningTerm -> IO Bool
-eUnify eqs t u = do
+eUnify :: [PropOf PruningTerm] -> PropOf PruningTerm -> IO Bool
+eUnify axioms goal = do
   -- putStrLn ("\nSending to E: " ++ prettyShow (fromPruningTerm t) ++ " = " ++ prettyShow (fromPruningTerm u))
   let opts = Jukebox.EFlags "eprover" (Just 1) Nothing
-      prob = translate eqs t u
+      prob = translate (map unitProp (lhs goal) ++ axioms) (rhs goal)
   -- putStrLn (Jukebox.render (Jukebox.prettyProblem "fof" Jukebox.Normal prob))
   res <- Jukebox.runE opts prob
   --eliftIO (print res)
@@ -37,20 +38,23 @@ eUnify eqs t u = do
     _ -> do
       return False
 
-translate :: [(PruningTerm, PruningTerm)] -> PruningTerm -> PruningTerm ->
+translate :: [PropOf PruningTerm] -> Literal PruningTerm ->
              Jukebox.Closed [Jukebox.Input Jukebox.Form]
-translate eqs t u = Jukebox.close_ Jukebox.stdNames $ do
+translate axioms goal = Jukebox.close_ Jukebox.stdNames $ do
   ty <- Jukebox.newType "i"
-  let terms = [t, u] ++ concat [ [l, r] | (l, r) <- eqs ]
+  let terms = usort (concatMap propTerms (unitProp goal:axioms))
       vs = usort (concatMap vars terms)
       fs = usort (concatMap funs terms)
-  varSyms <- sequence [ Jukebox.newSymbol "X" ty | x <- vs ]
-  funSyms <- sequence [ Jukebox.newFunction (makeFunName x) [] ty | x <- fs]
-  let var = find (Map.fromList (zip vs varSyms))
-      fun = find (Map.fromList (zip fs funSyms))
+      ps = usort [ p | p :@: _ <- concatMap propLiterals (unitProp goal:axioms) ]
+  varSyms  <- sequence [ Jukebox.newSymbol "X" ty | x <- vs ]
+  funSyms  <- sequence [ Jukebox.newFunction (makeFunName x) [] ty | x <- fs]
+  propSyms <- sequence [ Jukebox.newFunction (predName x) [] Jukebox.O | x <- ps]
+  let var  = find (Map.fromList (zip vs varSyms))
+      fun  = find (Map.fromList (zip fs funSyms))
+      prop = find (Map.fromList (zip ps propSyms))
       input form = Jukebox.Input (BS.pack "clause") Jukebox.Axiom form
-  return (input (Jukebox.nt (translateEq var fun (t, u))):
-          map (input . translateEq var fun) eqs)
+  return (input (Jukebox.nt (translateLiteral var fun prop goal)):
+          map (input . translateProp var fun prop) axioms)
 
 makeFunName :: PruningConstant -> String
 makeFunName (TermConstant x n ty) = conName x
@@ -67,11 +71,24 @@ find m x = Map.findWithDefault (error $ "E: couldn't find " ++ prettyShow x ++ "
         "  " ++ prettyShow k ++ " -> " ++ show v
       | (k, v) <- xs ]
 
-translateEq :: (Int -> Jukebox.Variable) ->
-               (PruningConstant -> Jukebox.Function) ->
-               (PruningTerm, PruningTerm) -> Jukebox.Form
-translateEq var fun (t, u) =
+translateProp :: (Int -> Jukebox.Variable) ->
+             (PruningConstant -> Jukebox.Function) ->
+             (Predicate -> Jukebox.Function) ->
+             PropOf PruningTerm -> Jukebox.Form
+translateProp var fun prop p =
+  Jukebox.disj
+    (translateLiteral var fun prop (rhs p):
+     map (Jukebox.nt . translateLiteral var fun prop) (lhs p))
+
+translateLiteral ::
+  (Int -> Jukebox.Variable) ->
+  (PruningConstant -> Jukebox.Function) ->
+  (Predicate -> Jukebox.Function) ->
+  Literal PruningTerm -> Jukebox.Form
+translateLiteral var fun prop (t :=: u) =
   Jukebox.Literal (Jukebox.Pos (translateTerm var fun t Jukebox.:=: translateTerm var fun u))
+translateLiteral var fun prop (p :@: ts) =
+  Jukebox.Literal (Jukebox.Pos (Jukebox.Tru (prop p Jukebox.:@: map (translateTerm var fun) ts)))
 
 translateTerm :: (Int -> Jukebox.Variable) ->
                  (PruningConstant -> Jukebox.Function) ->
