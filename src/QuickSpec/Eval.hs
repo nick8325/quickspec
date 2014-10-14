@@ -114,18 +114,19 @@ go 10 _ = do
       isCreation (ConsiderTerm _) = True
       isCreation _ = False
       numEvents = length es
-      numSchemas = length (filter isSchema es)
-      numTerms = length (filter isTerm es)
-      numCreation = length (filter isCreation es)
+      numSchemas  = length [ () | Schema{} <- es ]
+      numTerms    = length [ () | Term{}   <- es ]
+      numCreation = length [ () | ConsiderSchema{} <- es ] + length [ () | ConsiderTerm{} <- es ]
       numMisc = numEvents - numSchemas - numTerms - numCreation
   h <- numHooks
+  Simple.S eqs <- lift (lift (liftPruner get))
   liftIO $ putStrLn (show numEvents ++ " events created in total (" ++
                      show numSchemas ++ " schemas, " ++
                      show numTerms ++ " terms, " ++
                      show numCreation ++ " creation, " ++
                      show numMisc ++ " miscellaneous).")
+  liftIO $ putStrLn (show (length eqs) ++ " equations in background theory.")
   liftIO $ putStrLn (show h ++ " hooks installed.")
-  Simple.S eqs <- lift (lift (liftPruner get))
   return (map (fmap fromPruningTerm) eqs)
 
 go n sig = do
