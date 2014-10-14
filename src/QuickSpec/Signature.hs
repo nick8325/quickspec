@@ -6,17 +6,21 @@ module QuickSpec.Signature where
 #include "errors.h"
 import Data.Constraint
 import QuickSpec.Base
+import QuickSpec.Utils
 import QuickSpec.Term
 import QuickSpec.Type
 import QuickSpec.Prop
 import Data.Functor.Identity
 import Data.Monoid
 import Test.QuickCheck hiding (subterms)
+import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Set(Set)
 import Data.Char hiding (ord)
 import Data.Maybe
+import Data.List
 import Control.Applicative
+import Control.Monad.State.Strict
 
 newtype Instance = Instance { unInstance :: [Value Instance1] } deriving (Monoid, Show)
 newtype Instance1 a = Instance1 (Value (Instance2 a))
@@ -73,8 +77,8 @@ defaultInstances = [
   makeInstance (\(dict :: Dict (Arbitrary A)) -> DictOf dict),
   names1 (\(NamesFor names :: NamesFor A) ->
             NamesFor (map (++ "s") names) :: NamesFor [A]),
-  names (NamesFor ["n", "m", "o"] :: NamesFor Int),
-  names (NamesFor ["n", "m", "o"] :: NamesFor Integer),
+  names (NamesFor ["i", "j", "k"] :: NamesFor Int),
+  names (NamesFor ["i", "j", "k"] :: NamesFor Integer),
   names (NamesFor ["p", "q", "r"] :: NamesFor (A -> Bool)),
   names (NamesFor ["f", "g", "h"] :: NamesFor (A -> B)),
   names (NamesFor ["x", "y", "z"] :: NamesFor A)]
@@ -165,3 +169,20 @@ findInstance sig ty = do
         Instance2 f `In` w2 -> do
           x <- fmap (reunwrap w2) (findInstance sig (typ i1'))
           return (wrap w1 (fmap f x))
+
+newtype Name = Name String deriving Eq
+instance Pretty Name where
+  pretty (Name x) = text x
+
+prettyRename :: Signature -> Prop -> PropOf (TermOf Name)
+prettyRename sig p = fmap (rename (\x -> Map.findWithDefault __ x m)) p
+  where
+    vs = nub (concatMap vars (propTerms p))
+    m = Map.fromList sub
+    sub = evalState (mapM assign vs) Set.empty
+    assign v = do
+      s <- get
+      let names = supply (namesFor_ sig (typ v))
+          name = head (filter (`Set.notMember` s) names)
+      modify (Set.insert name)
+      return (v, Name name)

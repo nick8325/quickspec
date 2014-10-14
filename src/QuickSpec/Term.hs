@@ -71,7 +71,9 @@ instance CoArbitrary Variable where
 
 -- Holes - a newtype largely so that we can improve the pretty-printing.
 newtype Hole = Hole Type deriving (Eq, Ord, Show)
-instance Typed Hole where typ (Hole ty) = ty
+instance Typed Hole where
+  typ (Hole ty) = ty
+  typeSubstA f (Hole ty) = Hole <$> typeSubstA f ty
 instance Pretty Hole where pretty _ = text "_"
 
 instance Typed v => Typed (TermOf v) where

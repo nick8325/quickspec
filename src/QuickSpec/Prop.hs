@@ -1,11 +1,15 @@
-{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFunctor, CPP #-}
 module QuickSpec.Prop where
 
+#include "errors.h"
 import QuickSpec.Base
 import QuickSpec.Term
 import QuickSpec.Type
 import Control.Applicative
 import Data.Traversable
+import Control.Monad.Trans.State.Strict
+import qualified Data.Set as Set
+import qualified Data.Map as Map
 
 type Prop = PropOf Term
 data PropOf a =
@@ -31,7 +35,10 @@ instance Typed a => Typed (PropOf a) where
            <*> typeSubstA f rhs
 
 instance Pretty a => Pretty (PropOf a) where
-  pretty p = pretty (lhs p) <+> text "=>" <+> pretty (rhs p)
+  pretty p =
+    fsep (map prettyLhs (lhs p) ++ [nest 2 (pretty (rhs p))])
+    where
+      prettyLhs p = pretty p <+> text "&"
 
 data Literal a = a :=: a | Predicate :@: [a] deriving (Show, Functor)
 
@@ -48,7 +55,7 @@ instance Typed a => Typed (Literal a) where
   typeSubstA f (p :@: xs) = (:@:) <$> typeSubstA f p <*> traverse (typeSubstA f) xs
 
 instance Pretty a => Pretty (Literal a) where
-  pretty (x :=: y) = pretty x <+> text "=" <+> pretty y
+  pretty (x :=: y) = hang (pretty x <+> text "=") 2 (pretty y)
   pretty (p :@: xs) = pretty p <> parens (sep (punctuate comma (map pretty xs)))
 
 data Predicate = Predicate {

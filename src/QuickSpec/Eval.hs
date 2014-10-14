@@ -174,7 +174,7 @@ createRules sig = do
       case k of
         Untestable ->
           ERROR ("Untestable instance " ++ prettyShow t ++ " of testable schema " ++ prettyShow s)
-        EqualTo (From _ u) -> found t u
+        EqualTo (From _ u) -> found sig t u
         Representative -> return ()
 
   rule $ do
@@ -287,17 +287,18 @@ instance Considerable TermFrom where
   putTestSet (From s _) ts =
     lift $ modify (\st -> st { termTestSet = Map.insert s ts (termTestSet st) })
 
-found :: Term -> Term -> M ()
-found t u = do
+found :: Signature -> Term -> Term -> M ()
+found sig t u = do
+  let prop = [] :=>: t :=: u
   Simple.S eqs <- lift (lift (liftPruner get))
   types <- lift $ gets types
-  lift (lift (axiom ([] :=>: t :=: u)))
-  res <- liftIO $ E.eUnify eqs (toGoal ([] :=>: t :=: u))
+  lift (lift (axiom prop))
+  res <- liftIO $ E.eUnify eqs (toGoal prop)
   case res of
     True ->
       return ()
     False -> do
-      liftIO $ putStrLn (prettyShow t ++ " = " ++ prettyShow u)
+      liftIO $ putStrLn (prettyShow (prettyRename sig prop))
 
 accept :: Poly Schema -> M ()
 accept s = do
