@@ -234,8 +234,8 @@ class (Eq a, Typed a) => Considerable a where
 consider :: Considerable a => (KindOf a -> Event) -> a -> M ()
 consider makeEvent x = do
   types  <- lift $ gets types
-  let t = generalise x
-  res <- lift (lift (rep (etaExpand t)))
+  let t = etaExpand (generalise x)
+  res <- lift (lift (rep t))
   case res of
     Just u | measure u < measure t ->
       lift (lift (axiom ([] :=>: t :=: u)))
