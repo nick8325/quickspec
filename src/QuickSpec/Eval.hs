@@ -36,7 +36,6 @@ type M = RulesT Event (StateT S (PrunerT SimplePruner IO))
 
 data S = S {
   schemas       :: Schemas,
-  terms         :: Set (TermOf Int),
   schemaTestSet :: TestSet Schema,
   termTestSet   :: Map Schema (TestSet TermFrom),
   freshTestSet  :: TestSet TermFrom,
@@ -72,7 +71,6 @@ type Schemas = Map Int (Map (Poly Type) [Poly Schema])
 initialState :: Signature -> [(QCGen, Int)] -> S
 initialState sig seeds =
   S { schemas       = Map.empty,
-      terms         = Set.empty,
       schemaTestSet = emptyTestSet (makeTester specialise e seeds sig),
       termTestSet   = Map.empty,
       freshTestSet  = emptyTestSet (makeTester specialise e seeds sig),
@@ -167,7 +165,7 @@ createRules sig = do
         Untestable ->
           ERROR ("Untestable instance " ++ prettyShow t ++ " of testable schema " ++ prettyShow s)
         EqualTo (From _ u) -> found t u
-        Representative -> acceptTerm t
+        Representative -> return ()
 
   rule $ do
     ConsiderSchema s <- event
@@ -177,8 +175,6 @@ createRules sig = do
 
   rule $ do
     ConsiderTerm t@(From _ t') <- event
-    terms <- execute $ lift $ gets terms
-    require (and [ normaliseVars u `Set.member` terms | u <- properSubterms t' ])
     execute (consider (Term t) t)
 
   rule $ do
@@ -298,7 +294,3 @@ accept s = do
   lift $ modify (\st -> st { schemas = Map.adjust f (size (unPoly s)) (schemas st) })
   where
     f m = Map.insertWith (++) (polyTyp s) [s] m
-
-acceptTerm :: Term -> M ()
-acceptTerm t = do
-  lift $ modify (\st -> st { terms = Set.insert (normaliseVars t) (terms st) })

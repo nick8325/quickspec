@@ -53,7 +53,14 @@ simpleRep t = do
   return (simplifies eqs t)
 
 simplifies :: [PropOf PruningTerm] -> PruningTerm -> Maybe PruningTerm
-simplifies eqs t = msum [ simplifies1 u v t `mplus` simplifies1 v u t | [] :=>: u :=: v <- eqs ]
+simplifies eqs t =
+  msum [ simplifies1 u v t `mplus` simplifies1 v u t | [] :=>: u :=: v <- eqs ] `mplus`
+  simplifiesThere eqs t
+simplifiesThere eqs (Fun f ts) =
+  fmap (Fun f) (simplifiesList eqs ts)
+simplifiesThere _ _ = Nothing
+simplifiesList eqs [] = Nothing
+simplifiesList eqs (t:ts) = fmap (:ts) (simplifies eqs t) `mplus` fmap (t:) (simplifiesList eqs ts)
 
 simplifies1 :: PruningTerm -> PruningTerm -> PruningTerm -> Maybe PruningTerm
 simplifies1 t u v = do
