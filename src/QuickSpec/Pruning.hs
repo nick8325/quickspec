@@ -24,7 +24,7 @@ import Control.Applicative
 
 class Pruner s where
   emptyPruner   :: s
-  untypedRep    :: Monad m => PruningTerm -> StateT s m (Maybe PruningTerm)
+  untypedRep    :: Monad m => [PropOf PruningTerm] -> PruningTerm -> StateT s m (Maybe PruningTerm)
   untypedAxiom  :: Monad m => PropOf PruningTerm -> StateT s m ()
   untypedGoal   :: Monad m => PropOf PruningTerm -> StateT s m Bool
 
@@ -45,7 +45,7 @@ runPruner :: (Monad m, Pruner s) => Signature -> PrunerT s m a -> m a
 runPruner sig m =
   evalStateT (runReaderT (runRulesT (unPrunerT m')) (Set.toList (typeUniverse sig))) emptyPruner
   where
-    m' = createRules >> m
+    m' = createRules >> mapM_ axiom (background sig) >> m
 
 createRules :: (Monad m, Pruner s) => PrunerT s m ()
 createRules = PrunerT $ do
@@ -90,10 +90,16 @@ toAxiom = normaliseProp . guardNakedVariables . fmap toPruningConstant
     guardTerm t = t
 
 toGoal :: Prop -> PropOf PruningTerm
-toGoal = fmap toGoalTerm
+toGoal p = (axs ++ lhs p') :=>: rhs p'
+  where
+    p' = fmap (skolemise . toPruningConstant) p
+    axs = [ skolemAxiom x | SkolemVariable x <- usort (concatMap funs (propTerms p')) ]
 
-toGoalTerm :: Term -> PruningTerm
-toGoalTerm = skolemise . toPruningConstant
+toGoalTerm :: Term -> ([Literal PruningTerm], PruningTerm)
+toGoalTerm t = (axs, u)
+  where
+    u = skolemise (toPruningConstant t)
+    axs = [ skolemAxiom x | SkolemVariable x <- usort (funs u) ]
 
 toPruningConstant :: Term -> Tm PruningConstant Variable
 toPruningConstant = mapTerm f id . withArity
@@ -102,7 +108,13 @@ toPruningConstant = mapTerm f id . withArity
 
 skolemise :: Tm PruningConstant Variable -> PruningTerm
 skolemise (Fun f xs) = Fun f (map skolemise xs)
-skolemise (Var x) = Fun (HasType (typ x)) [Fun (SkolemVariable x) []]
+skolemise (Var x) = Fun (SkolemVariable x) []
+
+skolemAxiom :: Variable -> Literal PruningTerm
+skolemAxiom x =
+  Fun (HasType (typ x)) [t] :=: t
+  where
+    t = Fun (SkolemVariable x) []
 
 normaliseVars t = rename (\x -> fromMaybe __ (Map.lookup x m)) t
   where
@@ -135,7 +147,9 @@ constrain univ t =
   usort [ toMap sub | u <- univ, Just sub <- [match (typ t) u] ]
 
 rep :: (Pruner s, Monad m) => Term -> PrunerT s m (Maybe Term)
-rep t = liftM (liftM fromPruningTerm) (liftPruner (untypedRep (toGoalTerm t)))
+rep t = liftM (liftM fromPruningTerm) (liftPruner (untypedRep (map unitProp axs) u))
+  where
+    (axs, u) = toGoalTerm t
 
 type PruningTerm = Tm PruningConstant Int
 
@@ -149,6 +163,7 @@ data PruningConstant
 
 instance Pretty PruningConstant where
   pretty (TermConstant x _ _) = pretty x
+  pretty (SkolemVariable x) = pretty x
   pretty (HasType ty) = text "@" <> pretty ty
 
 fromPruningTerm :: PruningTerm -> Term
@@ -161,9 +176,9 @@ fromPruningTermWith :: Int -> PruningTerm -> Term
 fromPruningTermWith n (Fun (TermConstant fun _ _) xs) =
   Fun fun (zipWith (fromPruningTermWithType n) (typeArgs (typ fun)) xs)
 fromPruningTermWith n (Fun (HasType ty) [t]) = fromPruningTermWithType n ty t
+fromPruningTermWith n (Fun (SkolemVariable x) []) = Var x
 fromPruningTermWith _ _ = ERROR "ill-typed term?"
 
 fromPruningTermWithType :: Int -> Type -> PruningTerm -> Term
 fromPruningTermWithType m ty (Var n) = Var (Variable (m+n) ty)
-fromPruningTermWithType n ty (Fun (SkolemVariable x) []) = Var x
 fromPruningTermWithType n _  t = fromPruningTermWith n t

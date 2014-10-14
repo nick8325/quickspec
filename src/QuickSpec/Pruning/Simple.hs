@@ -47,10 +47,10 @@ t `alwaysSimplerThan` u =
     sizeOk v = occ v t <= occ v u
     occ v t = length [ v' | v' <- vars t, v == v' ]
 
-simpleRep :: Monad m => PruningTerm -> StateT SimplePruner m (Maybe PruningTerm)
-simpleRep t = do
+simpleRep :: Monad m => [PropOf PruningTerm] -> PruningTerm -> StateT SimplePruner m (Maybe PruningTerm)
+simpleRep axioms t = do
   S eqs <- get
-  return (simplifies eqs t)
+  return (simplifies (axioms++eqs) t)
 
 simplifies :: [PropOf PruningTerm] -> PruningTerm -> Maybe PruningTerm
 simplifies eqs t =
