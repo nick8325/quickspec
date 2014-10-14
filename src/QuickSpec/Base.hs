@@ -79,7 +79,7 @@ prettyStyle (Tuple arity) p d xs
 prettyStyle TupleType p d xs =
   prettyStyle (Tuple (length xs)) p d xs
 prettyStyle ListType p d [x] =
-  brackets d
+  brackets (pretty x)
 prettyStyle ListType p d xs =
   prettyStyle Curried p d xs
 prettyStyle style p d xs =
