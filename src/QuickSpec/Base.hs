@@ -8,7 +8,8 @@ module QuickSpec.Base(
   module Data.Rewriting.Term.Ops,
   module Data.Rewriting.Substitution, evalSubst, subst, substA, unifyMany,
   module QuickSpec.Pretty,
-  module Text.PrettyPrint.HughesPJ) where
+  module Text.PrettyPrint.HughesPJ,
+  PrettyTerm(..), TermStyle(..), prettyStyle) where
 
 #include "errors.h"
 
@@ -49,8 +50,50 @@ substA s (Fun f xs) = Fun f <$> sequenceA (map (substA s) xs)
 unifyMany :: (Eq f, Ord v) => f -> [(Tm f v, Tm f v)] -> Maybe (Subst f v)
 unifyMany f xs = unify (Fun f (map fst xs)) (Fun f (map snd xs))
 
-instance (Pretty f, Pretty v) => Pretty (Tm f v) where
+class Pretty a => PrettyTerm a where
+  termStyle :: a -> TermStyle
+
+data TermStyle = Curried | Uncurried | Tuple Int | TupleType | ListType | Infix Int | Infixr Int deriving Show
+
+instance (PrettyTerm f, Pretty v) => Pretty (Tm f v) where
   prettyPrec p (Var x) = prettyPrec p x
   prettyPrec p (Fun f xs) =
-    prettyPrecApp p f
-      [ \p -> prettyPrec p x | x <- xs ]
+    prettyStyle (termStyle f) p (pretty f) xs
+
+prettyStyle Curried p d [] = d
+prettyStyle Curried p d xs =
+  prettyParen (p > 10) $
+    hang d 2
+      (fsep (map (prettyPrec 11) xs))
+prettyStyle Uncurried p d [] = d
+prettyStyle Uncurried p d xs =
+  d <> parens (fsep (map pretty xs))
+prettyStyle (Tuple arity) p d xs
+  | length xs >= arity =
+    prettyStyle Curried p
+      (prettyTuple (take arity (map pretty xs)))
+      (drop arity xs)
+  | otherwise =
+    prettyStyle Curried p
+      (text ("(" ++ replicate arity ',' ++ ")")) xs
+prettyStyle TupleType p d xs =
+  prettyStyle (Tuple (length xs)) p d xs
+prettyStyle ListType p d [x] =
+  brackets d
+prettyStyle ListType p d xs =
+  prettyStyle Curried p d xs
+prettyStyle style p d xs =
+  case xs of
+    [x, y] ->
+      prettyParen (p > pOp) $
+        hang (prettyPrec (pOp+1) x <+> d) 2
+             (prettyPrec (pOp+r) y)
+    _ ->
+      prettyParen (p > pOp) $
+        hang (parens d) 2
+          (fsep (map (prettyPrec 11) xs))
+  where
+    (r, pOp) =
+      case style of
+        Infixr pOp -> (0, pOp)
+        Infix  pOp -> (1, pOp)

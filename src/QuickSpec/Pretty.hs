@@ -8,28 +8,13 @@ import Data.Set(Set)
 
 class Pretty a where
   pretty :: a -> Doc
-  pretty x = prettyPrecApp 0 x []
+  pretty = prettyPrec 0
 
-  prettyPrec :: Integer -> a -> Doc
+  prettyPrec :: Int -> a -> Doc
   prettyPrec _ = pretty
   
   prettyList :: [a] -> Doc
   prettyList = brackets . fsep . punctuate comma . map pretty
-
-  prettyPrecApp :: Integer -> a -> [Integer -> Doc] -> Doc
-  prettyPrecApp p x = prettyPrecGenericApp p (prettyPrec p x)
-
-prettyPrecGenericApp :: Integer -> Doc -> [Integer -> Doc] -> Doc
-prettyPrecGenericApp p d [] = d
-prettyPrecGenericApp p d xs =
-  prettyParen (p > 10) $
-    hang d 2
-      (fsep (map ($ 11) xs))
-
-prettyPrecUncurriedApp :: Integer -> Doc -> [Integer -> Doc] -> Doc
-prettyPrecUncurriedApp _ d [] = d
-prettyPrecUncurriedApp _ d xs =
-  d <> parens (fsep (map ($ 0) xs))
 
 instance Pretty Int where pretty = int
 instance Pretty Integer where pretty = integer
@@ -69,30 +54,6 @@ instance (Pretty k, Pretty v) => Pretty (Map k v) where
   pretty = prettySet . map binding . Map.toList
     where
       binding (x, v) = hang (pretty x <+> text "=>") 2 (pretty v)
-
-tupleOp :: Int -> Doc -> Integer -> [Integer -> Doc] -> Doc
-tupleOp arity d p xs
-  | length xs >= arity =
-    prettyPrecGenericApp p
-      (prettyTuple (take arity (map ($ 0) xs)))
-      (drop arity xs)
-  | otherwise =
-    prettyPrecGenericApp p
-      (text ("(" ++ replicate arity ',' ++ ")"))
-      xs
-
-infixOp :: Integer -> Doc -> Integer -> [Integer -> Doc] -> Doc
-infixOp = infixOp' 1 1
-
-infixOp' :: Integer -> Integer -> Integer -> Doc -> Integer -> [Integer -> Doc] -> Doc
-infixOp' l r pOp d p [x, y] =
-  prettyParen (p > pOp) $
-    hang (x (pOp+l) <+> d) 2
-         (y (pOp+r))
-infixOp' l r pOp d p xs =
-  prettyParen (p > pOp) $
-    hang (parens d) 2
-      (fsep (map ($ 11) xs))
 
 supply :: [String] -> [String]
 supply names =

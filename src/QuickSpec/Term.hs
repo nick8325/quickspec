@@ -39,14 +39,15 @@ data Constant =
     conValue        :: Value Identity,
     conGeneralValue :: Poly (Value Identity),
     conArity        :: Int,
-    conPretty       :: Doc -> Integer -> [Integer -> Doc] -> Doc }
+    conStyle        :: TermStyle }
 instance Show Constant where
   show c = show (conName c, conValue c, conGeneralValue c, conArity c)
 instance Eq Constant where x == y = x `compare` y == EQ
 instance Ord Constant where compare = comparing conName
 instance Pretty Constant where
-  prettyPrecApp p x ys =
-    conPretty x (text (conName x)) p ys
+  pretty = text . conName
+instance PrettyTerm Constant where
+  termStyle = conStyle
 instance Typed Constant where
   typ = typ . conValue
   typeSubstA s (Constant name value generalValue arity pretty) =

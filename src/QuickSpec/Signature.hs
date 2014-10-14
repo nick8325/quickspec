@@ -32,13 +32,13 @@ signature :: Signature
 signature = mempty
 
 constant :: Typeable a => String -> a -> Constant
-constant name x = Constant name value (poly value) (arity (typeOf x)) pretty
+constant name x = Constant name value (poly value) (arity (typeOf x)) style
   where
     value = toValue (Identity x)
-    pretty
-      | head name == ',' = tupleOp (arity (typeOf x))
-      | isOp name = infixOp 5
-      | otherwise = flip prettyPrecGenericApp
+    style
+      | head name == ',' = Tuple (arity (typeOf x))
+      | isOp name = Infix 5
+      | otherwise = Curried
 
 isOp :: String -> Bool
 isOp "[]" = False

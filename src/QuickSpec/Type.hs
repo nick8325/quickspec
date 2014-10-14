@@ -46,14 +46,14 @@ data TyCon = Arrow | TyCon Ty.TyCon deriving (Eq, Ord, Show)
 newtype TyVar = TyVar { tyVarNumber :: Int } deriving (Eq, Ord, Show, Enum)
 
 instance Pretty TyCon where
-  prettyPrecApp p Arrow xs =
-    infixOp' 1 0 8 (text "->") p xs
-  prettyPrecApp _ (TyCon list) [x]
-    | list == listTyCon = brackets (x 0)
-  prettyPrecApp _ (TyCon tuple) xs
-    | take 2 (show tuple) == "(," = prettyTuple (map ($ 0) xs)
-  prettyPrecApp p (TyCon x) xs =
-    prettyPrecGenericApp p (text (show x)) xs
+  pretty Arrow = text "->"
+  pretty (TyCon x) = text (show x)
+instance PrettyTerm TyCon where
+  termStyle Arrow = Infixr 8
+  termStyle (TyCon con)
+    | con == listTyCon = ListType
+    | take 2 (show con) == "(," = TupleType
+  termStyle _ = Curried
 instance Pretty TyVar where
   pretty (TyVar n) = text (supply [[c] | c <- ['a'..'z']] !! n)
 
