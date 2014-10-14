@@ -38,12 +38,12 @@ newtype Complex = Complex (Rational, Rational) deriving (Eq, Ord, Num, Typeable,
 newtype Quaternion = Quaternion (Complex, Complex) deriving (Eq, Ord, Num, Typeable, Fractional, Conj, Arbitrary, CoArbitrary)
 newtype Octonion = Octonion (Quaternion, Quaternion) deriving (Eq, Ord, Num, Typeable, Fractional, Conj, Arbitrary, CoArbitrary)
 newtype It = It Octonion deriving (Eq, Ord, Num, Typeable, Fractional)
-newtype Fun = Fun (It -> It) deriving (Arbitrary, CoArbitrary, Typeable)
+newtype ItFun = ItFun (It -> It) deriving (Arbitrary, CoArbitrary, Typeable)
 
-instance Eq Fun where
+instance Eq ItFun where
   f == g = compare f g == EQ
-instance Ord Fun where
-  compare = comparing (\(Fun f) -> map f vals)
+instance Ord ItFun where
+  compare = comparing (\(ItFun f) -> map f vals)
 
 vals :: [It]
 vals = unGen (vector 5) (mkQCGen 12345) 10

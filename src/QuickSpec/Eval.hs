@@ -98,13 +98,12 @@ schemasOfSize n _ = do
       canApply f (poly (Var (Var (TyVar 0)))),
       x <- xs ]
 
-quickSpec :: Signature -> IO ()
+quickSpec :: Signature -> IO [Prop]
 quickSpec sig = unbuffered $ do
-  seeds <- fmap (take 100) (genSeeds 20)
-  _ <- runPruner sig (execStateT (runRulesT (createRules sig >> go 1 sig)) (initialState sig seeds))
-  return ()
+  seeds <- fmap (take 1000) (genSeeds 20)
+  runPruner sig (evalStateT (runRulesT (createRules sig >> go 1 sig)) (initialState sig seeds))
 
-go :: Int -> Signature -> M ()
+go :: Int -> Signature -> M [Prop]
 go 10 _ = do
   es <- getEvents
   let isSchema (Schema _ _) = True
@@ -126,6 +125,9 @@ go 10 _ = do
                      show numCreation ++ " creation, " ++
                      show numMisc ++ " miscellaneous).")
   liftIO $ putStrLn (show h ++ " hooks installed.")
+  Simple.S eqs <- lift (lift (liftPruner get))
+  return (map (fmap fromPruningTerm) eqs)
+
 go n sig = do
   lift $ modify (\s -> s { schemas = Map.insert n Map.empty (schemas s) })
   ss <- fmap (sortBy (comparing measure)) (schemasOfSize n sig)
@@ -281,12 +283,12 @@ found :: Term -> Term -> M ()
 found t u = do
   Simple.S eqs <- lift (lift (liftPruner get))
   types <- lift $ gets types
+  lift (lift (axiom ([] :=>: t :=: u)))
   res <- liftIO $ E.eUnify eqs (toGoal ([] :=>: t :=: u))
   case res of
     True ->
       return ()
     False -> do
-      lift (lift (axiom ([] :=>: t :=: u)))
       liftIO $ putStrLn (prettyShow t ++ " = " ++ prettyShow u)
 
 accept :: Poly Schema -> M ()

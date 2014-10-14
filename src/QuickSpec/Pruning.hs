@@ -76,7 +76,7 @@ toAxiom = normaliseProp . guardNakedVariables . fmap toPruningConstant
   where
     guardNakedVariables (lhs :=>: t :=: u) =
       lhs :=>: guardTerm t :=: guardTerm u
-    guardNakedVariable prop = prop
+    guardNakedVariables prop = prop
     guardTerm (Var x) = Fun (HasType (typ x)) [Var x]
     guardTerm t = t
 

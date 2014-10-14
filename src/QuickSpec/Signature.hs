@@ -28,7 +28,10 @@ instance Monoid Signature where
   Signature cs os as b `mappend` Signature cs' os' as' b' = Signature (cs++cs') (os++os') (as++as') (b++b')
 
 constant :: Typeable a => String -> a -> Signature
-constant name x = Signature [Constant name value (poly value) (arity (typeOf x))] [] [] []
+constant name x = Signature [mkConstant name x] [] [] []
+
+mkConstant :: Typeable a => String -> a -> Constant
+mkConstant name x = Constant name value (poly value) (arity (typeOf x))
   where
     value = toValue (Identity x)
 
