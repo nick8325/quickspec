@@ -32,52 +32,66 @@ t x = r x `compose` l1 x
 compose :: ItFun -> ItFun -> ItFun
 compose (ItFun f) (ItFun g) = ItFun (f . g)
 
-listsSig = mconcat [
-  constant "rev" (reverse :: [A] -> [A]),
-  constant "app" ((++) :: [A] -> [A] -> [A]),
-  constant "[]" ([] :: [A]),
-  arb (undefined :: Default -> Default),
-  constant "map" (map :: (A -> B) -> [A] -> [B]),
-  inst (undefined :: Default),
-  inst (undefined :: [Default])]
+listsSig =
+  signature {
+    constants = [
+       constant "rev" (reverse :: [A] -> [A]),
+       constant "app" ((++) :: [A] -> [A] -> [A]),
+       constant "[]" ([] :: [A]),
+       constant "map" (map :: (A -> B) -> [A] -> [B]) ],
+    arbs = [arb (undefined :: Default -> Default),
+            arb (undefined :: Default),
+            arb (undefined :: [Default])],
+    ords = [ord (undefined :: Default),
+            ord (undefined :: [Default])]}
 
-constSig = mconcat [
-  constant "const" ((\x y -> [const x y]) :: A -> B -> [A]),
-  constant "asTypeOf" ((\x y -> [asTypeOf x y]) :: A -> A -> [A]),
-  inst (undefined :: [Int]),
-  inst (undefined :: Int)]
+constSig =
+  mconcat [
+    signature {
+       constants = [
+          constant "const" ((\x y -> [const x y]) :: A -> B -> [A]),
+          constant "asTypeOf" ((\x y -> [asTypeOf x y]) :: A -> A -> [A]) ] },
+    inst (undefined :: [Int]),
+    inst (undefined :: Int)]
 
-boolSig = mconcat [
-  constant "True" True,
-  constant "False" False,
-  constant "||" (||),
-  constant "&&" (&&),
-  constant "not" not,
-  inst (undefined :: Int),
-  inst (undefined :: Bool),
-  inst (undefined :: Default)]
+boolSig =
+  mconcat [
+     signature {
+        constants = [
+           constant "True" True,
+           constant "False" False,
+           constant "||" (||),
+           constant "&&" (&&),
+           constant "not" not ]},
+     inst (undefined :: Int),
+     inst (undefined :: Bool),
+     inst (undefined :: Default) ]
 
-octSig = (mconcat [
-  constant "1" (1 :: It),
-  constant "*" ((*) :: It -> It -> It),
---  constant "/" ((/) :: It -> It -> It),
---  constant "\\" ((\\) :: It -> It -> It),
-  constant "id" (ItFun id),
-  constant "l" l,
-  constant "r" r,
-  constant "l1" l1,
-  constant "r1" r1,
-  constant "t" t,
-  constant "." compose,
-  inst (undefined :: Int),
-  inst (undefined :: ItFun),
-  inst (undefined :: It),
-  inst (undefined :: Default) ]) { background = octBackground }
+octSig =
+  mconcat [
+    signature {
+       constants = [
+          constant "1" (1 :: It),
+          constant "*" ((*) :: It -> It -> It),
+          --  constant "/" ((/) :: It -> It -> It),
+          --  constant "\\" ((\\) :: It -> It -> It),
+          constant "id" (ItFun id),
+          (constant "l" l) { conPretty = flip prettyPrecUncurriedApp },
+          (constant "r" r) { conPretty = flip prettyPrecUncurriedApp },
+          (constant "l1" l1) { conPretty = flip prettyPrecUncurriedApp },
+          (constant "r1" r1) { conPretty = flip prettyPrecUncurriedApp },
+          (constant "t" t) { conPretty = flip prettyPrecUncurriedApp },
+          constant "." compose ],
+       background = octBackground },
+    inst (undefined :: Int),
+    inst (undefined :: ItFun),
+    inst (undefined :: It),
+    inst (undefined :: Default) ]
   where
-    star = mkConstant "*" ((*) :: It -> It -> It)
-    lc = mkConstant "l" l
-    rc = mkConstant "r" r
-    dot = mkConstant "." compose
+    star = constant "*" ((*) :: It -> It -> It)
+    lc = constant "l" l
+    rc = constant "r" r
+    dot = constant "." compose
     bi = Predicate "bi" (typeOf (undefined :: It -> It -> It -> Bool))
     x  = Var $ Variable 0 (typeOf (undefined :: It))
     y  = Var $ Variable 1 (typeOf (undefined :: It))
@@ -125,44 +139,58 @@ times D B = A
 times D C = B
 times D D = B
 
-table9point1 = mconcat [
-  constant "times" times,
-  constant "i" I,
-  constant "a" A,
-  constant "b" B,
-  constant "c" C,
-  constant "d" D,
-  inst (undefined :: Default),
-  inst (undefined :: Table9Point1) ]
+table9point1 =
+  mconcat [
+    signature {
+       constants = [
+          constant "times" times,
+          constant "i" I,
+          constant "a" A,
+          constant "b" B,
+          constant "c" C,
+          constant "d" D ]},
+    inst (undefined :: Default),
+    inst (undefined :: Table9Point1) ]
 
-arithSig = mconcat [
-  constant "0" (0 :: Int),
-  constant "1" (1 :: Int),
-  constant "+" ((+) :: Int -> Int -> Int),
-  constant "*" ((*) :: Int -> Int -> Int),
-  inst (undefined :: Int),
-  inst (undefined :: Default)]
+arithSig =
+  mconcat [
+    signature {
+       constants = [
+          constant "0" (0 :: Int),
+          constant "1" (1 :: Int),
+          constant "+" ((+) :: Int -> Int -> Int),
+          constant "*" ((*) :: Int -> Int -> Int) ]},
+    inst (undefined :: Int),
+    inst (undefined :: Default) ]
 
-prettyBackgroundSig = mconcat [
-  constant "[]" ([] :: [Bool]),
-  constant "++" ((++) :: [Bool] -> [Bool] -> [Bool]),
-  constant "0" (0 :: Int),
-  constant "+" ((+) :: Int -> Int -> Int),
-  constant "length" (length :: [Bool] -> Int),
-  inst (undefined :: [Bool]),
-  inst (undefined :: Int),
-  inst (undefined :: Default)]
+prettyBackgroundSig =
+  mconcat [
+    signature {
+       constants = [
+          constant "[]" ([] :: [Bool]),
+          constant "++" ((++) :: [Bool] -> [Bool] -> [Bool]),
+          constant "0" (0 :: Int),
+          constant "+" ((+) :: Int -> Int -> Int),
+          constant "length" (length :: [Bool] -> Int) ]},
+    inst (undefined :: [Bool]),
+    inst (undefined :: Int),
+    inst (undefined :: Default) ]
 
-prettySig = prettyBackgroundSig `mappend` mconcat [
-  constant "text" (text :: [Bool] -> Layout Bool),
-  constant "nest" (nest :: Int -> Layout Bool -> Layout Bool),
-  constant "$$" (($$) :: Layout Bool -> Layout Bool -> Layout Bool),
-  constant "<>" ((<>) :: Layout Bool -> Layout Bool -> Layout Bool),
-  inst (undefined :: Layout Bool) ]
-
+prettySig =
+  prettyBackgroundSig `mappend`
+  mconcat [
+    signature {
+       constants = [
+          constant "text" (text :: [Bool] -> Layout Bool),
+          constant "nest" (nest :: Int -> Layout Bool -> Layout Bool),
+          constant "$$" (($$) :: Layout Bool -> Layout Bool -> Layout Bool),
+          constant "<>" ((<>) :: Layout Bool -> Layout Bool -> Layout Bool) ]},
+    inst (undefined :: Layout Bool) ]
+{-
 main = do
   eqs <- quickSpec prettyBackgroundSig
-  quickSpec prettySig { background = eqs }
+  quickSpec prettySig { background = eqs }-}
+main = quickSpec octSig
 
 {-
 sig1 = [

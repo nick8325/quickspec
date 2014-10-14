@@ -51,4 +51,6 @@ unifyMany f xs = unify (Fun f (map fst xs)) (Fun f (map snd xs))
 
 instance (Pretty f, Pretty v) => Pretty (Tm f v) where
   prettyPrec p (Var x) = prettyPrec p x
-  prettyPrec p (Fun f xs) = prettyPrecApp p f xs
+  prettyPrec p (Fun f xs) =
+    prettyPrecApp p f
+      [ \p -> prettyPrec p x | x <- xs ]

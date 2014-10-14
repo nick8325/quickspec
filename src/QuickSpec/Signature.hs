@@ -14,6 +14,7 @@ import Data.Monoid
 import Test.QuickCheck hiding (subterms)
 import qualified Data.Set as Set
 import Data.Set(Set)
+import Data.Char hiding (ord)
 
 newtype Instance c a = Instance (Dict (c a))
 data Signature =
@@ -27,22 +28,32 @@ instance Monoid Signature where
   mempty = Signature [] [] [] []
   Signature cs os as b `mappend` Signature cs' os' as' b' = Signature (cs++cs') (os++os') (as++as') (b++b')
 
-constant :: Typeable a => String -> a -> Signature
-constant name x = Signature [mkConstant name x] [] [] []
+signature :: Signature
+signature = mempty
 
-mkConstant :: Typeable a => String -> a -> Constant
-mkConstant name x = Constant name value (poly value) (arity (typeOf x))
+constant :: Typeable a => String -> a -> Constant
+constant name x = Constant name value (poly value) (arity (typeOf x)) pretty
   where
     value = toValue (Identity x)
+    pretty
+      | head name == ',' = tupleOp (arity (typeOf x))
+      | isOp name = infixOp 5
+      | otherwise = flip prettyPrecGenericApp
 
-ord :: forall a. (Typeable a, Ord a) => a -> Signature
-ord _ = Signature [] [toValue (Instance Dict :: Instance Ord a)] [] []
+isOp :: String -> Bool
+isOp "[]" = False
+isOp xs = not (all isIdent xs)
+  where
+    isIdent x = isAlphaNum x || x == '\'' || x == '_'
 
-arb :: forall a. (Typeable a, Arbitrary a) => a -> Signature
-arb _ = Signature [] [] [toValue (Instance Dict :: Instance Arbitrary a)] []
+ord :: forall a. (Typeable a, Ord a) => a -> Value (Instance Ord)
+ord _ = toValue (Instance Dict :: Instance Ord a)
+
+arb :: forall a. (Typeable a, Arbitrary a) => a -> Value (Instance Arbitrary)
+arb _ = toValue (Instance Dict :: Instance Arbitrary a)
 
 inst :: forall a. (Typeable a, Ord a, Arbitrary a) => a -> Signature
-inst x = ord x `mappend` arb x
+inst x = signature { ords = [ord x], arbs = [arb x] }
 
 typeUniverse :: Signature -> Set Type
 typeUniverse sig =

@@ -47,11 +47,11 @@ newtype TyVar = TyVar { tyVarNumber :: Int } deriving (Eq, Ord, Show, Enum)
 
 instance Pretty TyCon where
   prettyPrecApp p Arrow xs =
-    infixOp' 1 0 8 p (text "->") xs
+    infixOp' 1 0 8 (text "->") p xs
   prettyPrecApp _ (TyCon list) [x]
-    | list == listTyCon = brackets (pretty x)
+    | list == listTyCon = brackets (x 0)
   prettyPrecApp _ (TyCon tuple) xs
-    | take 2 (show tuple) == "(," = prettyTuple (map pretty xs)
+    | take 2 (show tuple) == "(," = prettyTuple (map ($ 0) xs)
   prettyPrecApp p (TyCon x) xs =
     prettyPrecGenericApp p (text (show x)) xs
 instance Pretty TyVar where
