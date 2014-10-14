@@ -46,10 +46,16 @@ data TyCon = Arrow | TyCon Ty.TyCon deriving (Eq, Ord, Show)
 newtype TyVar = TyVar { tyVarNumber :: Int } deriving (Eq, Ord, Show, Enum)
 
 instance Pretty TyCon where
-  pretty Arrow = text "->"
-  pretty (TyCon x) = text (show x)
+  prettyPrecApp p Arrow xs =
+    infixOp' 1 0 8 p (text "->") xs
+  prettyPrecApp _ (TyCon list) [x]
+    | list == listTyCon = brackets (pretty x)
+  prettyPrecApp _ (TyCon tuple) xs
+    | take 2 (show tuple) == "(," = prettyTuple (map pretty xs)
+  prettyPrecApp p (TyCon x) xs =
+    prettyPrecGenericApp p (text (show x)) xs
 instance Pretty TyVar where
-  pretty (TyVar n) = text ("a" ++ show n)
+  pretty (TyVar n) = text (supply [[c] | c <- ['a'..'z']] !! n)
 
 -- Type variables.
 type A = TyVarNumber Zero
@@ -95,9 +101,10 @@ fromTypeRep ty =
         (tyCon, [ty']) | tyCon == succTyCon -> succ (fromTyVar ty')
         (tyCon, []) | tyCon == zeroTyCon -> 0
 
-arrowTyCon, commaTyCon, varTyCon, succTyCon, zeroTyCon :: Ty.TyCon
+arrowTyCon, commaTyCon, listTyCon, varTyCon, succTyCon, zeroTyCon :: Ty.TyCon
 arrowTyCon = con (undefined :: () -> ())
 commaTyCon = con (undefined :: ((),()))
+listTyCon  = con (undefined :: [()])
 varTyCon   = con (undefined :: TyVarNumber ())
 succTyCon  = con (undefined :: Succ ())
 zeroTyCon  = con (undefined :: Zero)

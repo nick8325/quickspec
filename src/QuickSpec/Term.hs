@@ -15,6 +15,7 @@ import Data.Functor.Identity
 import Control.Applicative
 import Data.Traversable(traverse)
 import qualified Data.Rewriting.Substitution.Type as T
+import Data.Char
 
 -- Terms and schemas.
 -- A schema is like a term but has holes instead of variables.
@@ -43,11 +44,19 @@ data Constant =
 instance Eq Constant where x == y = x `compare` y == EQ
 instance Ord Constant where compare = comparing conName
 instance Pretty Constant where
-  pretty x = text (conName x)
+  prettyPrecApp p x ys
+    | isOp (conName x) = infixOp 5 p (text (conName x)) ys
+    | otherwise = prettyPrecGenericApp p (text (conName x)) ys
 instance Typed Constant where
   typ = typ . conValue
   typeSubstA s (Constant name value generalValue arity) =
     Constant name <$> typeSubstA s value <*> pure generalValue <*> pure arity
+
+isOp :: String -> Bool
+isOp "[]" = False
+isOp xs = not (all isIdent xs)
+  where
+    isIdent x = isAlphaNum x || x == '\'' || x == '_'
 
 -- We're not allowed to have two variables with the same number
 -- but unifiable types.
@@ -57,7 +66,7 @@ data Variable =
     varType   :: Type }
   deriving (Show, Eq, Ord)
 instance Pretty Variable where
-  pretty x = text ("v" ++ show (varNumber x))
+  pretty x = text (supply ["x","y","z"] !! varNumber x)
 instance Typed Variable where
   typ = varType
   typeSubstA s (Variable n ty) =

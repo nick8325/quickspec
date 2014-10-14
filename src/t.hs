@@ -9,7 +9,7 @@ import Data.Typeable hiding (typeOf)
 import Octonions
 import QuickSpec.Type
 import QuickSpec.Term
-import QuickSpec.Base hiding (text, (<>), compose, nest)
+import QuickSpec.Base hiding (text, (<>), compose, nest, ($$))
 import QuickSpec.Eval
 import QuickSpec.Test
 import QuickSpec.Prop
