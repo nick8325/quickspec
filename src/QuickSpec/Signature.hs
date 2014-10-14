@@ -22,8 +22,13 @@ newtype Instance = Instance { unInstance :: [Value Instance1] } deriving (Monoid
 newtype Instance1 a = Instance1 (Value (Instance2 a))
 data Instance2 a b = Instance2 (b -> a)
 
-makeInstance :: (Typeable a, Typeable b) => (b -> a) -> Instance
-makeInstance f = Instance [toValue (Instance1 (toValue (Instance2 f)))]
+makeInstance :: forall a b. (Typeable a, Typeable b) => (b -> a) -> Instance
+makeInstance f =
+  case typeOf (undefined :: a) of
+    Fun Arrow _ ->
+      ERROR "makeInstance: curried functions not supported"
+    _ ->
+      Instance [toValue (Instance1 (toValue (Instance2 f)))]
 
 deriving instance Typeable Ord
 deriving instance Typeable Arbitrary
@@ -57,14 +62,29 @@ defaultInstances = [
   inst (Sub Dict :: Ord A :- Ord [A]),
   inst (Sub Dict :: CoArbitrary A :- CoArbitrary [A]),
   baseType (undefined :: Int),
+  baseType (undefined :: Integer),
   baseType (undefined :: Bool),
   inst (Sub Dict :: () :- CoArbitrary Int),
+  inst (Sub Dict :: () :- CoArbitrary Integer),
   inst (Sub Dict :: () :- CoArbitrary Bool),
   inst2 (Sub Dict :: (CoArbitrary A, Arbitrary B) :- Arbitrary (A -> B)),
   makeInstance (\() -> Dict :: Dict ()),
   makeInstance (\(dict :: Dict (Ord A)) -> DictOf dict),
-  makeInstance (\(dict :: Dict (Arbitrary A)) -> DictOf dict)]
+  makeInstance (\(dict :: Dict (Arbitrary A)) -> DictOf dict),
+  names1 (\(NamesFor names :: NamesFor A) ->
+            NamesFor (map (++ "s") names) :: NamesFor [A]),
+  names (NamesFor ["n", "m", "o"] :: NamesFor Int),
+  names (NamesFor ["n", "m", "o"] :: NamesFor Integer),
+  names (NamesFor ["p", "q", "r"] :: NamesFor (A -> Bool)),
+  names (NamesFor ["f", "g", "h"] :: NamesFor (A -> B)),
+  names (NamesFor ["x", "y", "z"] :: NamesFor A)]
 
+namesFor_ :: Signature -> Type -> [String]
+namesFor_ sig ty =
+  case findInstanceOf sig ty of
+    (x:_) -> ofValue unNamesFor x
+
+newtype NamesFor a = NamesFor { unNamesFor :: [String] } deriving Typeable
 newtype DictOf c a = DictOf { unDictOf :: Dict (c a) } deriving Typeable
 
 instance Monoid Signature where
@@ -106,6 +126,12 @@ inst2 ins = makeInstance f
   where
     f :: (Dict c1, Dict c2) -> Dict c3
     f (Dict, Dict) = case ins of Sub dict -> dict
+
+names  :: Typeable a => NamesFor a -> Instance
+names x = makeInstance (\() -> x)
+
+names1 :: (Typeable a, Typeable b) => (a -> NamesFor b) -> Instance
+names1 = makeInstance
 
 typeUniverse :: Signature -> Set Type
 typeUniverse sig =
