@@ -50,21 +50,12 @@ runPruner sig m =
 createRules :: (Monad m, Pruner s) => PrunerT s m ()
 createRules = PrunerT $ do
   rule $ do
-    fun <- event
-    case fun of
-      SkolemVariable _ -> fail ""
-      HasType ty ->
-        execute $
-          unPrunerT $ liftPruner $
-            untypedAxiom
-              ([] :=>: Fun fun [Fun fun [Var 0]] :=: Fun fun [Var 0])
-      TermConstant con _ arity -> do
-        let ty = typ (Fun con (replicate arity (undefined :: Term)))
-            t = Fun fun (take arity (map Var [0..]))
-        execute $ do
-          generate (HasType ty)
-          unPrunerT $ liftPruner $
-            untypedAxiom ([] :=>: Fun (HasType ty) [t] :=: t)
+    fun@(TermConstant con _ arity) <- event
+    execute $ do
+      let ty = typ (Fun con (replicate arity (undefined :: Term)))
+          t = Fun fun (take arity (map Var [0..]))
+      unPrunerT $ liftPruner $
+        untypedAxiom ([] :=>: Fun (HasType ty) [t] :=: t)
 
 axiom :: (Pruner s, Monad m) => Prop -> PrunerT s m ()
 axiom p = do
