@@ -100,16 +100,27 @@ schemasOfSize n _ = do
       x <- xs ]
 
 quickSpecWithBackground :: Signature -> Signature -> IO [Prop]
-quickSpecWithBackground sig1 sig2 = do
-  eqs <- quickSpec sig1
+quickSpecWithBackground sig1 sig2 = unbuffered $ do
+  putStrLn "== Signature for background theory =="
+  prettyPrint sig1
+  putStrLn ""
+  eqs <- quickSpecMain sig1
+
+  putStrLn "== Signature (excluding background theory) =="
+  prettyPrint sig2
+  putStrLn ""
   let sig = sig1 `mappend` sig2
-  quickSpec sig { background = eqs ++ background sig }
+  quickSpecMain sig { background = eqs ++ background sig }
 
 quickSpec :: Signature -> IO [Prop]
 quickSpec sig = unbuffered $ do
   putStrLn "== Signature =="
   prettyPrint sig
   putStrLn ""
+  quickSpecMain sig
+
+quickSpecMain :: Signature -> IO [Prop]
+quickSpecMain sig = do
   seeds <- fmap (take 1000) (genSeeds 20)
   runPruner sig (evalStateT (runRulesT (createRules sig >> go 1 sig)) (initialState sig seeds))
 
