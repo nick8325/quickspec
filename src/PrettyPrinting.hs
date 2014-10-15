@@ -10,6 +10,9 @@ newtype Layout a = Layout [(Int, [a])] deriving (Typeable, Eq, Ord, Show)
 instance Arbitrary a => Arbitrary (Layout a) where
   arbitrary = fmap Layout (liftM2 (:) arbitrary arbitrary)
 
+instance CoArbitrary a => CoArbitrary (Layout a) where
+  coarbitrary (Layout a) = coarbitrary a
+
 text :: [a] -> Layout a
 text s = Layout [(0, s)]
 

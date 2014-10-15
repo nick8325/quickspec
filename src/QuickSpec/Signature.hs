@@ -4,6 +4,7 @@
 module QuickSpec.Signature where
 
 #include "errors.h"
+import Prelude hiding (sequence)
 import Data.Constraint
 import QuickSpec.Base
 import QuickSpec.Utils
@@ -20,19 +21,31 @@ import Data.Char hiding (ord)
 import Data.Maybe
 import Data.List
 import Control.Applicative
-import Control.Monad.State.Strict
+import Control.Monad.Trans.State.Strict
+import Data.Traversable hiding (mapM)
+import Debug.Trace
 
-newtype Instance = Instance { unInstance :: [Value Instance1] } deriving (Monoid, Show)
+newtype Instance = Instance (Value Instance1) deriving Show
 newtype Instance1 a = Instance1 (Value (Instance2 a))
 data Instance2 a b = Instance2 (b -> a)
 
-makeInstance :: forall a b. (Typeable a, Typeable b) => (b -> a) -> Instance
+instance Typed Instance where
+  typ (Instance x) = typ x
+  typeSubstA f (Instance x) =
+    Instance <$> do
+      y <- typeSubstA f x
+      case unwrap y of
+        Instance1 y `In` w -> do
+          z <- typeSubstA f y
+          return (wrap w (Instance1 z))
+
+makeInstance :: forall a b. (Typeable a, Typeable b) => (b -> a) -> [Instance]
 makeInstance f =
   case typeOf (undefined :: a) of
     Fun Arrow _ ->
       ERROR "makeInstance: curried functions not supported"
     _ ->
-      Instance [toValue (Instance1 (toValue (Instance2 f)))]
+      [Instance (toValue (Instance1 (toValue (Instance2 f))))]
 
 deriving instance Typeable Ord
 deriving instance Typeable Arbitrary
@@ -42,7 +55,7 @@ deriving instance Typeable (() :: Constraint)
 data Signature =
   Signature {
     constants  :: [Constant],
-    instances  :: [Instance],
+    instances  :: [[Instance]],
     background :: [Prop],
     defaultTo  :: [Type] }
   deriving Show
@@ -66,10 +79,10 @@ defaultTo_ sig =
         error $ "Default type is not ground: " ++ prettyShow ty
     tys -> error $ "Several default types specified: " ++ prettyShow tys
 
-instances_ :: Signature -> [Value Instance1]
-instances_ sig = concatMap unInstance (instances sig ++ defaultInstances)
+instances_ :: Signature -> [Instance]
+instances_ sig = concat (instances sig ++ defaultInstances)
 
-defaultInstances :: [Instance]
+defaultInstances :: [[Instance]]
 defaultInstances = [
   inst (Sub Dict :: Arbitrary A :- Arbitrary [A]),
   inst (Sub Dict :: Ord A :- Ord [A]),
@@ -85,7 +98,6 @@ defaultInstances = [
   inst (Sub Dict :: () :- CoArbitrary Bool),
   inst2 (Sub Dict :: (CoArbitrary A, Arbitrary B) :- Arbitrary (A -> B)),
   makeInstance (\() -> Dict :: Dict ()),
-  makeInstance (\(dict :: Dict (Ord A)) -> DictOf dict),
   makeInstance (\(dict :: Dict (Arbitrary A)) -> DictOf dict),
   names1 (\(NamesFor names :: NamesFor A) ->
             NamesFor (map (++ "s") names) :: NamesFor [A]),
@@ -93,11 +105,30 @@ defaultInstances = [
   names (NamesFor ["i", "j", "k"] :: NamesFor Integer),
   names (NamesFor ["p", "q", "r"] :: NamesFor (A -> Bool)),
   names (NamesFor ["f", "g", "h"] :: NamesFor (A -> B)),
-  names (NamesFor ["x", "y", "z"] :: NamesFor A)]
+  names (NamesFor ["x", "y", "z"] :: NamesFor A),
+  makeInstance (\(dict :: Dict (Ord A)) -> Observe dict return),
+  makeInstance (\(obs :: Observe A B) -> observeTraversable ins obs :: Observe [A] [B]),
+  makeInstance (\(Dict :: Dict (Arbitrary A),
+                  obs :: Observe B C) -> observeFunction obs :: Observe (A -> B) C ),
+  makeInstance (\(obs :: Observe A B) -> Observe1 (toValue obs))]
+
+data Observe a b = Observe (Dict (Ord b)) (a -> Gen b) deriving Typeable
+newtype Observe1 a = Observe1 (Value (Observe a)) deriving Typeable
+
+observeTraversable :: Traversable f => (forall a. Ord a :- Ord (f a)) -> Observe a b -> Observe (f a) (f b)
+observeTraversable ins (Observe dict f) =
+  Observe (applyInstance dict ins) $ \x -> sequence (fmap f x)
+  where
+    applyInstance :: Dict c -> (c :- d) -> Dict d
+    applyInstance Dict (Sub Dict) = Dict
+
+observeFunction :: Arbitrary a => Observe b c -> Observe (a -> b) c
+observeFunction (Observe dict f) =
+  Observe dict $ \g -> do { x <- arbitrary; f (g x) }
 
 namesFor_ :: Signature -> Type -> [String]
 namesFor_ sig ty =
-  case findInstanceOf sig ty of
+  case findInstanceOf sig (skolemiseTypeVars ty) of
     (x:_) -> ofValue unNamesFor x
 
 newtype NamesFor a = NamesFor { unNamesFor :: [String] } deriving Typeable
@@ -125,28 +156,28 @@ isOp xs = not (all isIdent xs)
   where
     isIdent x = isAlphaNum x || x == '\'' || x == '_'
 
-baseType :: forall a. (Ord a, Arbitrary a, Typeable a) => a -> Instance
+baseType :: forall a. (Ord a, Arbitrary a, Typeable a) => a -> [Instance]
 baseType _ =
   mconcat [
     inst (Sub Dict :: () :- Ord a),
     inst (Sub Dict :: () :- Arbitrary a)]
 
-inst :: forall c1 c2. (Typeable c1, Typeable c2) => c1 :- c2 -> Instance
+inst :: forall c1 c2. (Typeable c1, Typeable c2) => c1 :- c2 -> [Instance]
 inst ins = makeInstance f
   where
     f :: Dict c1 -> Dict c2
     f Dict = case ins of Sub dict -> dict
 
-inst2 :: forall c1 c2 c3. (Typeable c1, Typeable c2, Typeable c3) => (c1, c2) :- c3 -> Instance
+inst2 :: forall c1 c2 c3. (Typeable c1, Typeable c2, Typeable c3) => (c1, c2) :- c3 -> [Instance]
 inst2 ins = makeInstance f
   where
     f :: (Dict c1, Dict c2) -> Dict c3
     f (Dict, Dict) = case ins of Sub dict -> dict
 
-names  :: Typeable a => NamesFor a -> Instance
+names  :: Typeable a => NamesFor a -> [Instance]
 names x = makeInstance (\() -> x)
 
-names1 :: (Typeable a, Typeable b) => (a -> NamesFor b) -> Instance
+names1 :: (Typeable a, Typeable b) => (a -> NamesFor b) -> [Instance]
 names1 = makeInstance
 
 typeUniverse :: Signature -> Set Type
@@ -172,15 +203,19 @@ findInstance sig (Fun pair [ty1, ty2])
     return (pairValues (liftA2 (,)) x y)
 findInstance sig ty = do
   i <- instances_ sig
-  sub <- maybeToList (match (typ i) ty)
-  let i' = typeSubst (evalSubst sub) i
-  case unwrap i' of
-    Instance1 i1 `In` w1 -> do
-      let i1' = typeSubst (evalSubst sub) i1
-      case unwrap i1' of
-        Instance2 f `In` w2 -> do
-          x <- fmap (reunwrap w2) (findInstance sig (typ i1'))
-          return (wrap w1 (fmap f x))
+  let (i', ty') = unPoly (polyPair (poly i) (poly ty))
+  sub <- maybeToList (unify (typ i') ty')
+  let Instance i0 = typeSubst (evalSubst sub) i'
+  withValue i0 $ \(Instance1 i1) -> do
+    withValue i1 $ \(Instance2 f) -> do
+      i2 <- findInstance sig (typ i1)
+      sub <- maybeToList (match (typ i1) (typ i2))
+      let Instance i0' = typeSubst (evalSubst sub) (Instance i0)
+      case unwrap i0' of
+        Instance1 i1' `In` w1 ->
+          case unwrap i1' of
+            Instance2 f `In` w2 ->
+              return $! wrap w1 $! fmap f $! reunwrap w2 $! i2
 
 newtype Name = Name String deriving Eq
 instance Pretty Name where

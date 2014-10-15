@@ -7,7 +7,7 @@ module QuickSpec.Type(
   Typeable,
   Type, TyCon(..), tyCon, TyVar(..), A, B, C, D,
   typeOf, typeRep, applyType, toTypeRep, fromTypeRep,
-  arrowType, typeArgs, typeRes, arity, oneTypeVar,
+  arrowType, typeArgs, typeRes, arity, oneTypeVar, skolemiseTypeVars,
   -- Things that have types.
   Typed(..), typeSubst, tyVars, cast,
   Apply(..), apply, canApply,
@@ -16,7 +16,7 @@ module QuickSpec.Type(
   -- Dynamic values.
   Value, toValue, fromValue,
   Unwrapped(..), unwrap, Wrapper(..),
-  mapValue, forValue, ofValue, pairValues, unwrapFunctor) where
+  mapValue, forValue, ofValue, withValue, pairValues, unwrapFunctor) where
 
 #include "errors.h"
 
@@ -94,6 +94,11 @@ arity = length . typeArgs
 oneTypeVar :: Typed a => a -> a
 oneTypeVar = typeSubst (const (Var (TyVar 0)))
 
+skolemiseTypeVars :: Typed a => a -> a
+skolemiseTypeVars = typeSubst (const aTy)
+  where
+    aTy = Fun (fromTyCon (con (undefined :: A))) []
+
 fromTypeRep :: Ty.TypeRep -> Type
 fromTypeRep ty =
   case Ty.splitTyConApp ty of
@@ -148,7 +153,7 @@ class Typed a where
   -- The type.
   typ :: a -> Type
   -- Substitute for all type variables.
-  typeSubstA :: Applicative f => (TyVar -> f Type) -> a -> f a
+  typeSubstA :: (Functor m, Applicative m, Monad m) => (TyVar -> m Type) -> a -> m a
 
 typeSubst :: Typed a => (TyVar -> Type) -> a -> a
 typeSubst f t = runIdentity (typeSubstA (return . f) t)
@@ -297,6 +302,9 @@ ofValue :: (forall a. f a -> b) -> Value f -> b
 ofValue f v =
   case unwrap v of
     x `In` _ -> f x
+
+withValue :: Value f -> (forall a. f a -> b) -> b
+withValue x f = ofValue f x
 
 pairValues :: forall f g. Typeable g => (forall a b. f a -> f b -> f (g a b)) -> Value f -> Value f -> Value f
 pairValues f x y =

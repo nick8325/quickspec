@@ -167,8 +167,9 @@ prettySig =
        constant "$$" (($$) :: Layout A -> Layout A -> Layout A),
        constant "<>" ((<>) :: Layout A -> Layout A -> Layout A) ],
     instances = [
-      inst (Sub Dict :: Ord A :- Ord (Layout A)),
-      inst (Sub Dict :: Arbitrary A :- Arbitrary (Layout A)) ],
+      inst (Sub Dict :: Ord A         :- Ord       (Layout A)),
+      inst (Sub Dict :: Arbitrary A   :- Arbitrary (Layout A)),
+      inst (Sub Dict :: CoArbitrary A :- CoArbitrary (Layout A)) ],
     defaultTo = [typeOf (undefined :: Bool)] }
 
 ordSig =
