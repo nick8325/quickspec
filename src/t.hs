@@ -18,6 +18,8 @@ import qualified QuickSpec.Signature as S
 import Data.Monoid hiding ((<>))
 import PrettyPrinting
 import Data.Constraint hiding ((\\))
+import qualified Ords
+import Zipper
 
 (\\), (/) :: It -> It -> It
 a / b = a * recip b
@@ -169,6 +171,34 @@ prettySig =
       inst (Sub Dict :: Arbitrary A :- Arbitrary (Layout A)) ],
     defaultTo = [typeOf (undefined :: Bool)] }
 
-main = quickSpec listsSig
---main = quickSpecWithBackground prettyBackgroundSig prettySig
+ordSig =
+  signature {
+    constants = [
+       constant "0" Ords.Zero,
+       (constant "s" Ords.Succ) { conStyle = Uncurried },
+       constant "+" Ords.plus,
+       constant "*" Ords.times ],
+    instances = [
+      baseType (undefined :: Ords.Ordinal) ]}
+
+zipperSig =
+  signature {
+    constants = [
+       constant "nothing" (Nothing :: Maybe A),
+       constant "nil" Nil,
+       constant "cons" Cons,
+       constant "change" change,
+       constant "up" up,
+       constant "upLeft" upLeft,
+       constant "upRight" upRight,
+       constant "left" left,
+       constant "right" right,
+       constant "fromZipper" fromZipper,
+       constant "toZipper" toZipper ],
+    instances = [
+      baseType (undefined :: Zipper),
+      baseType (undefined :: Tree) ]}
+
+-- main = quickSpec zipperSig
+main = quickSpecWithBackground prettyBackgroundSig prettySig
 --main = quickSpec octSig
