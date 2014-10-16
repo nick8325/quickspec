@@ -20,6 +20,8 @@ import PrettyPrinting
 import Data.Constraint hiding ((\\))
 import qualified Ords
 import Zipper
+import Process hiding ( Nil )
+import qualified Process as P
 
 (\\), (/) :: It -> It -> It
 a / b = a * recip b
@@ -200,6 +202,41 @@ zipperSig =
       baseType (undefined :: Zipper),
       baseType (undefined :: Tree) ]}
 
--- main = quickSpec zipperSig
-main = quickSpecWithBackground prettyBackgroundSig prettySig
+processBackgroundSig =
+  signature
+
+processSig =
+  signature
+  { constants =
+    -- Name
+    [ con "#" (#)
+    
+    -- Event
+    , con "?" P.In
+    , con "!" Out
+    , con "t" Tau -- "τ" Tau
+    
+    -- P
+    , con "0"    P.Nil
+    , con "."    Act
+    , con "+"    (:+:)
+    , con "|"    (:|:)
+    , con "star" Star
+    , con "new"  New
+    , con "/"    (//)
+    ]
+    
+  , instances =
+    [ baseTypeNames ["a","b","c"] (undefined :: P.Name)
+    , baseTypeNames ["e"]         (undefined :: P.Event)
+    , baseTypeNames ["p","q","r"] (undefined :: P)
+    ]
+    
+  , defaultTo = [typeOf (undefined :: Bool)]
+  }
+ where
+  con op f = constant op f
+
+main = quickSpec processSig
+--main = quickSpecWithBackground prettyBackgroundSig prettySig
 --main = quickSpec octSig
