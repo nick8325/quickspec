@@ -100,10 +100,13 @@ octSig =
        bi :@: [x, y, b],
        bi :@: [x, y, c]] :=>: Fun star [a, Fun star [b, c]] :=: Fun star [Fun star [a, b], c]]
 
-data Table9Point1 = I | A | B | C | D deriving (Eq, Ord, Typeable)
+data Table9Point1 = I | A | B | C | D deriving (Eq, Ord, Show, Typeable)
 
 instance Arbitrary Table9Point1 where
   arbitrary = elements [I, A, B, C, D]
+
+instance CoArbitrary Table9Point1 where
+  coarbitrary = coarbitraryShow
 
 times :: Table9Point1 -> Table9Point1 -> Table9Point1
 times I I = I
