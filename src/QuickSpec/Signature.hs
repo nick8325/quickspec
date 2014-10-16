@@ -163,6 +163,13 @@ baseType _ =
     inst (Sub Dict :: () :- Arbitrary a),
     inst (Sub Dict :: () :- CoArbitrary a)]
 
+baseTypeNames :: forall a. (Ord a, Arbitrary a, CoArbitrary a, Typeable a) => [String] -> a -> [Instance]
+baseTypeNames xs _ =
+  mconcat [
+    inst (Sub Dict :: () :- Ord a),
+    inst (Sub Dict :: () :- Arbitrary a),
+    inst (Sub Dict :: () :- CoArbitrary a),
+    names (NamesFor xs :: NamesFor a)]
 
 inst :: forall c1 c2. (Typeable c1, Typeable c2) => c1 :- c2 -> [Instance]
 inst ins = makeInstance f
