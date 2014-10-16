@@ -12,12 +12,17 @@ data Zipper = Zipper Tree Path deriving (Eq, Ord, Typeable)
 
 instance Arbitrary Zipper where
   arbitrary = liftM2 Zipper arbitrary arbitrary
+instance CoArbitrary Zipper where
+  coarbitrary (Zipper t p) = coarbitrary (t,p)
 instance Arbitrary Tree where
   arbitrary =
     sized $ \n -> resize (n `div` 2) $
       oneof $
         [ return Nil ] ++
         [ liftM2 Cons arbitrary arbitrary | n > 0 ]
+instance CoArbitrary Tree where
+  coarbitrary Nil        = variant 0
+  coarbitrary (Cons x y) = variant 1 . coarbitrary (x,y)
 instance Arbitrary Path where
   arbitrary =
     sized $ \n -> resize (n `div` 2) $
@@ -25,6 +30,10 @@ instance Arbitrary Path where
         [ return Top ] ++
         [ liftM2 Left arbitrary arbitrary | n > 0 ] ++
         [ liftM2 Right arbitrary arbitrary | n > 0 ]
+instance CoArbitrary Path where
+  coarbitrary Top         = variant 0
+  coarbitrary (Left  p t) = variant 1 . coarbitrary (p,t)
+  coarbitrary (Right p t) = variant 2 . coarbitrary (p,t)
 
 change :: Maybe Zipper -> Maybe Tree -> Maybe Zipper
 change (Just (Zipper _ p)) (Just t) = Just (Zipper t p)
