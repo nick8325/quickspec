@@ -20,6 +20,11 @@ instance Arbitrary Ordinal where
       toOrdinal 0 = Zero
       toOrdinal n = Succ (toOrdinal (n-1))
 
+instance CoArbitrary Ordinal where
+  coarbitrary Zero     = variant 0
+  coarbitrary (Succ o) = variant 1 . coarbitrary o
+  coarbitrary (Lim h)  = variant 2 . coarbitrary h
+
 instance Eq Ordinal where
   x == y = compare x y == EQ
 
