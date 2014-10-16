@@ -156,11 +156,13 @@ isOp xs = not (all isIdent xs)
   where
     isIdent x = isAlphaNum x || x == '\'' || x == '_'
 
-baseType :: forall a. (Ord a, Arbitrary a, Typeable a) => a -> [Instance]
+baseType :: forall a. (Ord a, Arbitrary a, CoArbitrary a, Typeable a) => a -> [Instance]
 baseType _ =
   mconcat [
     inst (Sub Dict :: () :- Ord a),
-    inst (Sub Dict :: () :- Arbitrary a)]
+    inst (Sub Dict :: () :- Arbitrary a),
+    inst (Sub Dict :: () :- CoArbitrary a)]
+
 
 inst :: forall c1 c2. (Typeable c1, Typeable c2) => c1 :- c2 -> [Instance]
 inst ins = makeInstance f
