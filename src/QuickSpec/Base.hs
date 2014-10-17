@@ -53,7 +53,7 @@ unifyMany f xs = unify (Fun f (map fst xs)) (Fun f (map snd xs))
 class Pretty a => PrettyTerm a where
   termStyle :: a -> TermStyle
 
-data TermStyle = Curried | Uncurried | Tuple Int | TupleType | ListType | Infix Int | Infixr Int deriving Show
+data TermStyle = Curried | Uncurried | Tuple Int | TupleType | ListType | Infix Int | Infixr Int | Postfix deriving Show
 
 instance (PrettyTerm f, Pretty v) => Pretty (Tm f v) where
   prettyPrec p (Var x) = prettyPrec p x
@@ -76,6 +76,10 @@ prettyStyle (Tuple arity) p d xs
   | otherwise =
     prettyStyle Curried p
       (text ("(" ++ replicate arity ',' ++ ")")) xs
+prettyStyle Postfix p d [x] =
+  prettyPrec 11 x <> d
+prettyStyle Postfix p d xs =
+  prettyStyle Curried p (parens d) xs
 prettyStyle TupleType p d xs =
   prettyStyle (Tuple (length xs)) p d xs
 prettyStyle ListType p d [x] =

@@ -143,12 +143,13 @@ signature :: Signature
 signature = mempty
 
 constant :: Typeable a => String -> a -> Constant
-constant name x = Constant name value (poly value) (arity (typeOf x)) style
+constant name x = Constant name value (poly value) ar style
   where
     value = toValue (Identity x)
+    ar = arity (typeOf x)
     style
-      | head name == ',' = Tuple (arity (typeOf x))
-      | isOp name = Infix 5
+      | head name == ',' = Tuple ar
+      | isOp name && ar >= 2 = Infix 5
       | otherwise = Curried
 
 isOp :: String -> Bool
