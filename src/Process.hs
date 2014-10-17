@@ -8,6 +8,8 @@ import Data.List hiding ((//))
 import Data.Char
 import Test.QuickCheck hiding ((><))
 import Data.Typeable
+import System.IO.Unsafe
+import System.Timeout
 
 --------------------------------------------------------------------------------
 
@@ -15,16 +17,12 @@ newtype Name
   = Name{ unName :: Char }
  deriving ( Eq, Ord, Enum, Typeable )
 
-(#) :: Name -> Name -> Name
-Name a # Name b | a == b    = Name (succ a)
-                | otherwise = Name a
-
 instance Show Name where
   show (Name a) = [a]
 
 instance Arbitrary Name where
-  arbitrary       = Name `fmap` growingElements ['a'..'c']
-  shrink (Name a) = [ Name a' | a' <- ['a'..'c'], a' < a ]
+  arbitrary       = Name `fmap` growingElements ['a'..'d']
+  shrink (Name a) = [ Name a' | a' <- ['a'..'d'], a' < a ]
 
 instance CoArbitrary Name where
   coarbitrary n = coarbitrary (show n)
@@ -84,7 +82,7 @@ instance Eq P where
   p == q = (p `compare` q) == EQ
 
 instance Ord P where
-  p `compare` q = steps 4 p `compare` steps 4 q
+  p `compare` q = p `unsafeCompare` q
 
 instance Show P where
   show Nil       = "0"
@@ -216,6 +214,65 @@ bisim k p q = steps k p == steps k q
 
 --------------------------------------------------------------------------------
 
+data WSteps
+  = WStep [(Event,WSteps)] Bool
+  | WStop
+ deriving ( Eq, Ord, Show, Typeable )
+
+wstep :: Int -> P -> ([(Event,P)],Bool)
+wstep 0 _ = ([], False)
+wstep n p = ([(e,q)|(e,q)<-eqs, e/= Tau] ++ concat eqs',done)
+ where
+  eqs          = step p
+  (eqs',dones) = unzip [ wstep (n-1) q | (Tau,q) <- eqs ]
+  done         = and dones
+
+wsteps :: Int -> P -> WSteps
+wsteps 0 _ = WStop
+wsteps k p = WStep (usort [ (e,wsteps (k-1) q) | (e,q) <- eqs ]) done
+ where
+  (eqs,done) = wstep 100 p
+
+p = New a
+    (     Act (Out a) Nil
+      :|: Star (Act (In a)
+            ( Act (Out b) Nil
+          :+: {- Act (Out c) -} (Act (Out a) Nil)
+            ))
+    )
+
+p1 = Act (Out b) Nil
+p2 = Star (Act Tau Nil)
+p3 = Star (Act Tau (Act Tau (Act (Out a) Nil)))
+p4 = Star (Act Tau (Act (Out a) Nil))
+
+a = Name 'a'
+b = Name 'b'
+c = Name 'c'
+
+--------------------------------------------------------------------------------
+
+unsafeCompare :: P -> P -> Ordering
+unsafeCompare p q =
+  unsafePerformIO $
+    do mres <- timeout 10000 (res `seq` return ())
+       case mres of
+         Nothing -> return EQ
+         Just _  -> return res
+ where
+  h p = [ steps i p | i <- [2..7] ]
+  res = p ~~ q
+
+  p ~~ q =
+    case (step p, step q) of
+      ([], qs) | null qs   -> EQ
+               | otherwise -> LT
+      (ps, []) | null ps   -> EQ
+               | otherwise -> GT
+      ([(a,p')],[(b,q')])
+               | a == b   -> p' ~~ q'
+      _                   -> h p `compare` h q
+
 {-
 sig :: [Sig]
 sig =
@@ -250,12 +307,23 @@ main = quickSpec sig
 
 --------------------------------------------------------------------------------
 
-(~~) :: P -> P -> Bool
-p ~~ q = bisim 5 p q
-
 prop_new_no a p =
   expectFailure $
-    New a (p // a) ~~ New a p
+    New a (p // a) == New a p
+
+prop_star_new a p =
+  expectFailure $
+    Star (New a p) == New a (Star p)
+
+prop_star_new2 a b p =
+  expectFailure $
+    Star (New a (New b p)) == New a (New b (Star p))
+
+prop_star_tau_tau p =
+  Star (p :+: Act Tau (Act Tau p)) == Star (p :+: Act Tau p)
+
+prop_new_in_out a p q =
+  New a (Act (In a) p :|: Act (Out a) q) == Act Tau (New a (p :|: q))
 
 --testAll = $(quickCheckAll)
 
