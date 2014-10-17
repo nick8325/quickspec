@@ -248,7 +248,7 @@ class (Eq a, Typed a) => Considerable a where
 consider :: Considerable a => (KindOf a -> Event) -> a -> M ()
 consider makeEvent x = do
   types  <- lift $ gets types
-  let t = etaExpand (generalise x)
+  let t = generalise x
   res <- lift (lift (rep t))
   case res of
     Just u | measure u < measure t ->
@@ -263,19 +263,6 @@ consider makeEvent x = do
         Just (New ts) -> do
           putTestSet x ts
           generate (makeEvent Representative)
-
--- NOTE: this is not quite correct because we might get
--- t x --> u x x
--- so we need to check the "all instances are reduced" thing instead.
-etaExpand :: Term -> Term
-etaExpand t = aux (1+maximum (0:map varNumber (vars t))) t
-  where
-    aux n t =
-      let f = poly t
-          x = poly (Var (Variable n (Var (TyVar 0))))
-      in case tryApply f x of
-        Nothing -> t
-        Just u -> aux (n+1) (unPoly u)
 
 instance Considerable Schema where
   generalise = instantiate . oneTypeVar
