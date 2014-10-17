@@ -116,6 +116,9 @@ defaultInstances = [
 data Observe a b = Observe (Dict (Ord b)) (a -> Gen b) deriving Typeable
 newtype Observe1 a = Observe1 (Value (Observe a)) deriving Typeable
 
+observe :: Ord b => (a -> Gen b) -> Observe a b
+observe = Observe Dict
+
 observeTraversable :: Traversable f => (forall a. Ord a :- Ord (f a)) -> Observe a b -> Observe (f a) (f b)
 observeTraversable ins (Observe dict f) =
   Observe (applyInstance dict ins) $ \x -> sequence (fmap f x)
