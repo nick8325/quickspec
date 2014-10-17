@@ -127,14 +127,7 @@ quickSpecMain sig = do
 go :: Int -> Signature -> M [Prop]
 go 10 _ = do
   es <- getEvents
-  let isSchema (Schema _ _) = True
-      isSchema _ = False
-      isTerm (Term _ _) = True
-      isTerm _ = False
-      isCreation (ConsiderSchema _) = True
-      isCreation (ConsiderTerm _) = True
-      isCreation _ = False
-      numEvents = length es
+  let numEvents = length es
       numSchemas  = length [ () | Schema{} <- es ]
       numTerms    = length [ () | Term{}   <- es ]
       numCreation = length [ () | ConsiderSchema{} <- es ] + length [ () | ConsiderTerm{} <- es ]
