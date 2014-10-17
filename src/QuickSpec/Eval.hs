@@ -40,6 +40,7 @@ data S = S {
   schemaTestSet :: TestSet Schema,
   termTestSet   :: Map Schema (TestSet TermFrom),
   freshTestSet  :: TestSet TermFrom,
+  proved        :: Set (PropOf PruningTerm),
   types         :: Set Type,
   allTypes      :: Set Type }
 
@@ -76,6 +77,7 @@ initialState sig seeds =
       schemaTestSet = emptyTestSet (makeTester specialise e seeds sig),
       termTestSet   = Map.empty,
       freshTestSet  = emptyTestSet (makeTester specialise e seeds sig),
+      proved        = Set.empty,
       types         = typeUniverse sig,
       allTypes      = bigTypeUniverse sig }
   where
@@ -290,10 +292,12 @@ found :: Signature -> Term -> Term -> M ()
 found sig t u = do
   let prop = [] :=>: t :=: u
   Simple.S eqs <- lift (lift (liftPruner get))
+  proved <- lift (gets proved)
+  let eqs' = Set.toList (Set.fromList eqs Set.\\ proved)
   lift (lift (axiom prop))
-  res <- liftIO $ E.eUnify eqs (toGoal prop)
+  res <- liftIO $ E.eUnify eqs' (toGoal prop)
   case res of
-    True ->
+    True -> do
       return ()
     False -> do
       liftIO $ putStrLn (prettyShow (prettyRename sig prop))

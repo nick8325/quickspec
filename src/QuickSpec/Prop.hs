@@ -5,17 +5,24 @@ module QuickSpec.Prop where
 import QuickSpec.Base
 import QuickSpec.Term
 import QuickSpec.Type
+import QuickSpec.Utils
 import Control.Applicative
 import Data.Traversable
 import Control.Monad.Trans.State.Strict
 import qualified Data.Set as Set
 import qualified Data.Map as Map
+import Data.Ord
 
 type Prop = PropOf Term
 data PropOf a =
   (:=>:) {
     lhs :: [Literal a],
     rhs :: Literal a } deriving (Show, Functor)
+
+instance Ord a => Eq (PropOf a) where
+  x == y = x `compare` y == EQ
+instance Ord a => Ord (PropOf a) where
+  compare = comparing (\p -> (usort (lhs p), rhs p))
 
 infix 4 :=>:
 
@@ -40,7 +47,7 @@ instance Pretty a => Pretty (PropOf a) where
     where
       prettyLhs p = pretty p <+> text "&"
 
-data Literal a = a :=: a | Predicate :@: [a] deriving (Show, Functor)
+data Literal a = a :=: a | Predicate :@: [a] deriving (Show, Functor, Eq, Ord)
 
 infix 5 :@:
 infix 5 :=:
