@@ -97,6 +97,7 @@ defaultInstances = [
   inst (Sub Dict :: () :- CoArbitrary Integer),
   inst (Sub Dict :: () :- CoArbitrary Bool),
   inst2 (Sub Dict :: (CoArbitrary A, Arbitrary B) :- Arbitrary (A -> B)),
+  inst2 (Sub Dict :: (Arbitrary A, CoArbitrary B) :- CoArbitrary (A -> B)),
   makeInstance (\() -> Dict :: Dict ()),
   makeInstance (\(dict :: Dict (Arbitrary A)) -> DictOf dict),
   names1 (\(NamesFor names :: NamesFor A) ->
