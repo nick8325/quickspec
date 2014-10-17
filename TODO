@@ -1,3 +1,14 @@
+New todo:
+  * Introduce a type constructor ForAll whose effect is to normalise all variables in the term.
+  * Add useful function: "is this simpler for all values of these variables?"
+    Make the main pruning infrastructure check this?
+  * When ordering terms, compare number of non-background functions after comparing size?
+    That would get rid of nest i (nest j d) = nest j (nest i d).
+  * Fix bug where schemas are generated twice
+  * Fix eta-expansion
+  * Make it so that arbitrary instances are not compulsory
+  * Make it so that you don't need coarbitrary for everything
+
 Really take care of partiality.
 
 Two things after testing alpha-renamed terms:

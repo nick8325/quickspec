@@ -41,10 +41,13 @@ compose (ItFun f) (ItFun g) = ItFun (f . g)
 listsSig =
   signature {
     constants = [
-      constant "rev" (reverse :: [A] -> [A]),
-      constant "app" ((++) :: [A] -> [A] -> [A]),
+      --constant "reverse" (reverse :: [A] -> [A]),
+      constant "sum" (sum :: [Int] -> Int),
+      constant "++" ((++) :: [A] -> [A] -> [A]),
       constant "[]" ([] :: [A]),
-      constant "map" (map :: (A -> B) -> [A] -> [B]) ]}
+      constant "map" (map :: (A -> B) -> [A] -> [B]),
+      constant "length" (length :: [A] -> Int),
+      constant "concat" (concat :: [[A]] -> [A]) ]}
 
 constSig =
   mconcat [
@@ -257,6 +260,6 @@ processSig =
  where
   con op f = constant op f
 
-main = quickSpec processSig
+main = quickSpecWithBackground arithSig listsSig
 --main = quickSpecWithBackground processBackgroundSig processSig
 --main = quickSpec octSig

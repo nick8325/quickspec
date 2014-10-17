@@ -40,7 +40,8 @@ data S = S {
   schemaTestSet :: TestSet Schema,
   termTestSet   :: Map Schema (TestSet TermFrom),
   freshTestSet  :: TestSet TermFrom,
-  types         :: Set Type }
+  types         :: Set Type,
+  allTypes      :: Set Type }
 
 data Event =
     Schema (Poly Schema) (KindOf Schema)
@@ -75,7 +76,8 @@ initialState sig seeds =
       schemaTestSet = emptyTestSet (makeTester specialise e seeds sig),
       termTestSet   = Map.empty,
       freshTestSet  = emptyTestSet (makeTester specialise e seeds sig),
-      types         = typeUniverse sig }
+      types         = typeUniverse sig,
+      allTypes      = bigTypeUniverse sig }
   where
     e = table (env sig)
 
@@ -184,9 +186,15 @@ createRules sig = do
 
   rule $ do
     ConsiderSchema s <- event
-    types <- execute $ lift $ gets types
-    require (and [ oneTypeVar (typ t) `Set.member` types | t <- subterms (unPoly s) ])
-    execute (consider (Schema s) (unPoly (oneTypeVar s)))
+    allTypes <- execute $ lift $ gets allTypes
+    types    <- execute $ lift $ gets types
+    require (and [ oneTypeVar (typ t) `Set.member` allTypes | t <- subterms (unPoly s) ])
+    execute $
+      case oneTypeVar (typ (unPoly s)) `Set.member` types of
+        True ->
+          consider (Schema s) (unPoly (oneTypeVar s))
+        False ->
+          generate (Schema s Untestable)
 
   rule $ do
     ConsiderTerm t@(From _ t') <- event
@@ -238,7 +246,6 @@ class (Eq a, Typed a) => Considerable a where
 
 consider :: Considerable a => (KindOf a -> Event) -> a -> M ()
 consider makeEvent x = do
-  types  <- lift $ gets types
   let t = generalise x
   res <- lift (lift (rep t))
   case res of
@@ -283,7 +290,6 @@ found :: Signature -> Term -> Term -> M ()
 found sig t u = do
   let prop = [] :=>: t :=: u
   Simple.S eqs <- lift (lift (liftPruner get))
-  types <- lift $ gets types
   lift (lift (axiom prop))
   res <- liftIO $ E.eUnify eqs (toGoal prop)
   case res of

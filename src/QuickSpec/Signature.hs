@@ -214,6 +214,17 @@ typeUniverse :: Signature -> Set Type
 typeUniverse sig =
   Set.fromList $
     Var (TyVar 0):
+    [ oneTypeVar (typ t) | c <- constants sig, t <- subterms' (typ c) ]
+  where
+    subterms' t = t:subterms1' t
+    subterms1' (Fun Arrow [t, u]) = subterms' t ++ subterms1' u
+    subterms1' (Fun _ ts) = concatMap subterms' ts
+    subterms1' _ = []
+
+bigTypeUniverse :: Signature -> Set Type
+bigTypeUniverse sig =
+  Set.fromList $
+    Var (TyVar 0):
     [ oneTypeVar (typ t) | c <- constants sig, t <- subterms (typ c) ]
 
 findInstanceOf :: forall f. Typeable f => Signature -> Type -> [Value f]
