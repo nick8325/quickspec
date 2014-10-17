@@ -240,7 +240,7 @@ processSig =
     , con "tau"  (Act Tau)
     , con "+"    (:+:)
     , con "|"    (:|:)
-    , con "star" Star
+    , (con "*"   Star){ conStyle = Postfix }
     , con "new"  New
     ]
     
