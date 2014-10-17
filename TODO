@@ -8,6 +8,11 @@ New todo:
   * Fix eta-expansion
   * Make it so that arbitrary instances are not compulsory
   * Make it so that you don't need coarbitrary for everything
+  * Teach E about application?
+    Alternatively, eta-expand all laws before passing on.
+  * Implement big-universe/small-universe thing in a more principled way.
+    I don't think it works at the moment!
+  * Generalise type variables after discovering equations!
 
 Really take care of partiality.
 
