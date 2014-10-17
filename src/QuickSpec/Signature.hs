@@ -24,6 +24,7 @@ import Control.Applicative
 import Control.Monad.Trans.State.Strict
 import Data.Traversable hiding (mapM)
 import Debug.Trace
+import Control.Monad hiding (sequence)
 
 newtype Instance = Instance (Value Instance1) deriving Show
 newtype Instance1 a = Instance1 (Value (Instance2 a))
@@ -54,10 +55,13 @@ deriving instance Typeable (() :: Constraint)
 
 data Signature =
   Signature {
-    constants  :: [Constant],
-    instances  :: [[Instance]],
-    background :: [Prop],
-    defaultTo  :: [Type] }
+    constants          :: [Constant],
+    instances          :: [[Instance]],
+    background         :: [Prop],
+    defaultTo          :: Maybe Type,
+    maxTermSize        :: Maybe Int,
+    maxCommutativeSize :: Maybe Int,
+    maxTests           :: Maybe Int }
   deriving Show
 
 instance Pretty Signature where
@@ -72,12 +76,19 @@ instance Pretty Signature where
 defaultTo_ :: Signature -> Type
 defaultTo_ sig =
   case defaultTo sig of
-    [] -> typeOf (undefined :: Int)
-    [ty]
+    Nothing -> typeOf (undefined :: Int)
+    Just ty
       | null (vars ty) -> ty
       | otherwise ->
         error $ "Default type is not ground: " ++ prettyShow ty
-    tys -> error $ "Several default types specified: " ++ prettyShow tys
+
+maxTermSize_ :: Signature -> Int
+maxTermSize_ = fromMaybe 9 . maxTermSize
+
+maxCommutativeSize_ = fromMaybe 5 . maxCommutativeSize
+
+maxTests_ :: Signature -> Int
+maxTests_ = fromMaybe 100 . maxTests
 
 instances_ :: Signature -> [Instance]
 instances_ sig = concat (instances sig ++ defaultInstances)
@@ -139,14 +150,19 @@ newtype NamesFor a = NamesFor { unNamesFor :: [String] } deriving Typeable
 newtype DictOf c a = DictOf { unDictOf :: Dict (c a) } deriving Typeable
 
 instance Monoid Signature where
-  mempty = Signature [] [] [] []
-  Signature cs is b d `mappend` Signature cs' is' b' d' = Signature (cs++cs') (is++is') (b++b') (d `mappend` d')
+  mempty = Signature [] [] [] Nothing Nothing Nothing Nothing
+  Signature cs is b d s s1 t `mappend` Signature cs' is' b' d' s' s1' t' =
+    Signature (cs++cs') (is++is') (b++b')
+      (d `mplus` d')
+      (s `mplus` s')
+      (s1 `mplus` s1')
+      (t `mplus` t')
 
 signature :: Signature
 signature = mempty
 
 constant :: Typeable a => String -> a -> Constant
-constant name x = Constant name value (poly value) ar style
+constant name x = Constant name value (poly value) ar style 1
   where
     value = toValue (Identity x)
     ar = arity (typeOf x)

@@ -39,9 +39,10 @@ data Constant =
     conValue        :: Value Identity,
     conGeneralValue :: Poly (Value Identity),
     conArity        :: Int,
-    conStyle        :: TermStyle }
+    conStyle        :: TermStyle,
+    conSize         :: Int }
 instance Show Constant where
-  show c = show (conName c, conValue c, conGeneralValue c, conArity c)
+  show c = show (conName c, conValue c, conGeneralValue c, conArity c, conSize c)
 instance Eq Constant where x == y = x `compare` y == EQ
 instance Ord Constant where compare = comparing conName
 instance Pretty Constant where
@@ -50,8 +51,8 @@ instance PrettyTerm Constant where
   termStyle = conStyle
 instance Typed Constant where
   typ = typ . conValue
-  typeSubstA s (Constant name value generalValue arity pretty) =
-    Constant name <$> typeSubstA s value <*> pure generalValue <*> pure arity <*> pure pretty
+  typeSubstA s (Constant name value generalValue arity pretty size) =
+    Constant name <$> typeSubstA s value <*> pure generalValue <*> pure arity <*> pure pretty <*> pure size
 
 -- We're not allowed to have two variables with the same number
 -- but unifiable types.

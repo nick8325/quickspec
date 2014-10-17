@@ -80,13 +80,11 @@ initialState sig seeds =
     e = table (env sig)
 
 schemasOfSize :: Int -> Signature -> M [Schema]
-schemasOfSize 1 sig =
-  return $
-    [Var (Hole (Var (TyVar 0)))] ++
-    [Fun c [] | c <- constants sig]
-schemasOfSize n _ = do
+schemasOfSize n sig = do
   ss <- lift $ gets schemas
   return $
+    [ Var (Hole (Var (TyVar 0))) | n == 1 ] ++
+    [ Fun c [] | c <- constants sig, n == conSize c ] ++
     [ unPoly (apply f x)
     | i <- [1..n-1],
       let j = n-i,
@@ -121,11 +119,11 @@ quickSpec sig = unbuffered $ do
 
 quickSpecMain :: Signature -> IO [Prop]
 quickSpecMain sig = do
-  seeds <- fmap (take 1000) (genSeeds 20)
+  seeds <- fmap (take (maxTests_ sig)) (genSeeds 20)
   runPruner sig (evalStateT (runRulesT (createRules sig >> go 1 sig)) (initialState sig seeds))
 
 go :: Int -> Signature -> M [Prop]
-go 10 _ = do
+go n sig | n > maxTermSize_ sig = do
   es <- getEvents
   let numEvents = length es
       numSchemas  = length [ () | Schema{} <- es ]
@@ -172,7 +170,7 @@ createRules sig = do
           considerRenamings t t
           considerRenamings t ms
         Representative -> do
-          when (size ms <= 5) $
+          when (size ms <= maxCommutativeSize_ sig) $
             considerRenamings ms ms
 
   rule $ do

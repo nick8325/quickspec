@@ -176,7 +176,7 @@ prettySig =
       inst (Sub Dict :: Ord A         :- Ord       (Layout A)),
       inst (Sub Dict :: Arbitrary A   :- Arbitrary (Layout A)),
       inst (Sub Dict :: CoArbitrary A :- CoArbitrary (Layout A)) ],
-    defaultTo = [typeOf (undefined :: Bool)] }
+    defaultTo = Just (typeOf (undefined :: Bool)) }
 
 ordSig =
   signature {
@@ -252,7 +252,7 @@ processSig =
     , baseTypeNames ["r"] (undefined :: P_)
     ]
     
-  , defaultTo = [typeOf (undefined :: Bool)]
+  , defaultTo = Just (typeOf (undefined :: Bool))
   }
  where
   con op f = constant op f
