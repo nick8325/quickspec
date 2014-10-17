@@ -52,6 +52,7 @@ unifyMany f xs = unify (Fun f (map fst xs)) (Fun f (map snd xs))
 
 class Pretty a => PrettyTerm a where
   termStyle :: a -> TermStyle
+  termStyle _ = Uncurried
 
 data TermStyle = Curried | Uncurried | Tuple Int | TupleType | ListType | Infix Int | Infixr Int | Postfix deriving Show
 
@@ -67,7 +68,7 @@ prettyStyle Curried p d xs =
       (fsep (map (prettyPrec 11) xs))
 prettyStyle Uncurried p d [] = d
 prettyStyle Uncurried p d xs =
-  d <> parens (fsep (map pretty xs))
+  d <> parens (fsep (punctuate comma (map pretty xs)))
 prettyStyle (Tuple arity) p d xs
   | length xs >= arity =
     prettyStyle Curried p

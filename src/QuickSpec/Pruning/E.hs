@@ -71,7 +71,7 @@ find m x = Map.findWithDefault (error $ "E: couldn't find " ++ prettyShow x ++ "
         "  " ++ prettyShow k ++ " -> " ++ show v
       | (k, v) <- xs ]
 
-translateProp :: (Int -> Jukebox.Variable) ->
+translateProp :: (PruningVariable -> Jukebox.Variable) ->
              (PruningConstant -> Jukebox.Function) ->
              (Predicate -> Jukebox.Function) ->
              PropOf PruningTerm -> Jukebox.Form
@@ -81,7 +81,7 @@ translateProp var fun prop p =
      map (Jukebox.nt . translateLiteral var fun prop) (lhs p))
 
 translateLiteral ::
-  (Int -> Jukebox.Variable) ->
+  (PruningVariable -> Jukebox.Variable) ->
   (PruningConstant -> Jukebox.Function) ->
   (Predicate -> Jukebox.Function) ->
   Literal PruningTerm -> Jukebox.Form
@@ -90,7 +90,7 @@ translateLiteral var fun prop (t :=: u) =
 translateLiteral var fun prop (p :@: ts) =
   Jukebox.Literal (Jukebox.Pos (Jukebox.Tru (prop p Jukebox.:@: map (translateTerm var fun) ts)))
 
-translateTerm :: (Int -> Jukebox.Variable) ->
+translateTerm :: (PruningVariable -> Jukebox.Variable) ->
                  (PruningConstant -> Jukebox.Function) ->
                  PruningTerm -> Jukebox.Term
 translateTerm var _fun (Var x) = Jukebox.Var (var x)

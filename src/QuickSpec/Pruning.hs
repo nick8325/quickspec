@@ -142,7 +142,7 @@ rep t = liftM (liftM fromPruningTerm) (liftPruner (untypedRep (map unitProp axs)
   where
     (axs, u) = toGoalTerm t
 
-type PruningTerm = Tm PruningConstant Int
+type PruningTerm = Tm PruningConstant PruningVariable
 
 data PruningConstant
   = TermConstant Constant Type Int
@@ -152,10 +152,16 @@ data PruningConstant
   | HasType Type
   deriving (Eq, Ord, Show)
 
+newtype PruningVariable = PruningVariable Int deriving (Eq, Ord, Num, Enum)
+
 instance Pretty PruningConstant where
   pretty (TermConstant x _ _) = pretty x
-  pretty (SkolemVariable x) = pretty x
+  pretty (SkolemVariable x) = text "s" <> pretty x
   pretty (HasType ty) = text "@" <> pretty ty
+instance PrettyTerm PruningConstant where
+
+instance Pretty PruningVariable where
+  pretty (PruningVariable x) = text "v" <> pretty x
 
 fromPruningTerm :: PruningTerm -> Term
 fromPruningTerm t =
@@ -171,5 +177,5 @@ fromPruningTermWith n (Fun (SkolemVariable x) []) = Var x
 fromPruningTermWith _ _ = ERROR "ill-typed term?"
 
 fromPruningTermWithType :: Int -> Type -> PruningTerm -> Term
-fromPruningTermWithType m ty (Var n) = Var (Variable (m+n) ty)
+fromPruningTermWithType m ty (Var (PruningVariable n)) = Var (Variable (m+n) ty)
 fromPruningTermWithType n _  t = fromPruningTermWith n t
