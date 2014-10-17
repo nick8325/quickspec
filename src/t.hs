@@ -22,6 +22,7 @@ import qualified Ords
 import Zipper
 import Process hiding ( Nil )
 import qualified Process as P
+import Data.List ( delete )
 
 (\\), (/) :: It -> It -> It
 a / b = a * recip b
@@ -205,34 +206,50 @@ zipperSig =
       baseType (undefined :: Zipper),
       baseType (undefined :: Tree) ]}
 
-processBackgroundSig =
-  signature
+newtype P_ = P_ P
+ deriving ( Eq, Ord, Arbitrary, CoArbitrary, Typeable )
+
+newtype Name_ = Name_ [P.Name]
+ deriving ( Eq, Ord, CoArbitrary, Typeable )
+
+instance Arbitrary Name_ where
+  arbitrary =
+    do a <- arbitrary
+       b <- arbitrary `suchThat` (/=a)
+       return (Name_ [a,b])
 
 processSig =
   signature
   { constants =
-    -- Name
-    [ con "#" (#)
-    
     -- Event
-    , con "?" P.In
-    , con "!" Out
-    , con "t" Tau -- "τ" Tau
+    [ -- con "in"  P.In
+    -- , con "out" Out
+    -- , con "tau" Tau
+    
+    -- Restricted processes
+      con "/"    (\(P_ p) a -> p // a)
+    
+    -- Restricted names
+    , con "#"    (\(Name_ as) b -> head (filter (/=b) as))
     
     -- P
     , con "0"    P.Nil
-    , con "."    Act
+    -- , con "."    Act
+    , con "?"    (Act . P.In)
+    , con "!"    (Act . Out)
+    , con "tau"  (Act Tau)
     , con "+"    (:+:)
     , con "|"    (:|:)
     , con "star" Star
     , con "new"  New
-    , con "/"    (//)
     ]
     
   , instances =
     [ baseTypeNames ["a","b","c"] (undefined :: P.Name)
-    , baseTypeNames ["e"]         (undefined :: P.Event)
+    , baseTypeNames ["c"] (undefined :: Name_)
+    -- , baseTypeNames ["e"]         (undefined :: P.Event)
     , baseTypeNames ["p","q","r"] (undefined :: P)
+    , baseTypeNames ["r"] (undefined :: P_)
     ]
     
   , defaultTo = [typeOf (undefined :: Bool)]
@@ -241,5 +258,5 @@ processSig =
   con op f = constant op f
 
 main = quickSpec processSig
---main = quickSpecWithBackground prettyBackgroundSig prettySig
+--main = quickSpecWithBackground processBackgroundSig processSig
 --main = quickSpec octSig
