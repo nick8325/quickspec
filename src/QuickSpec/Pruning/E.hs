@@ -25,7 +25,7 @@ import Data.Char
 
 eUnify :: [PropOf PruningTerm] -> PropOf PruningTerm -> IO Bool
 eUnify axioms goal = do
-  -- putStrLn ("\nSending to E: " ++ prettyShow (fmap fromPruningTerm goal))
+  --putStrLn ("\nSending to E: " ++ prettyShow (fmap fromPruningTerm goal))
   let opts = Jukebox.EFlags "eprover" (Just 0) Nothing
       prob = translate (map unitProp (lhs goal) ++ axioms) (rhs goal)
   -- putStrLn (Jukebox.render (Jukebox.prettyProblem "fof" Jukebox.Normal prob))
