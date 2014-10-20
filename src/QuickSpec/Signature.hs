@@ -162,7 +162,7 @@ signature :: Signature
 signature = mempty
 
 constant :: Typeable a => String -> a -> Constant
-constant name x = Constant name value (poly value) ar style 1
+constant name x = Constant name value (poly value) ar style 1 False
   where
     value = toValue (Identity x)
     ar = arity (typeOf x)

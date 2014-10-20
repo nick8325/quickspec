@@ -111,7 +111,9 @@ quickSpecWithBackground sig1 sig2 = unbuffered $ do
   putStrLn "== Signature (excluding background theory) =="
   prettyPrint sig2
   putStrLn ""
-  let sig = sig1 `mappend` sig2
+  let makeBackground sig =
+        sig { constants = [ c { conIsBackground = True } | c <- constants sig ] }
+      sig = makeBackground sig1 `mappend` sig2
   quickSpecMain sig { background = eqs ++ background sig }
 
 quickSpec :: Signature -> IO [Prop]

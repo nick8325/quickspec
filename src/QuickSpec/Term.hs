@@ -23,9 +23,11 @@ type Term = TermOf Variable
 type Schema = TermOf Hole
 
 -- Term ordering - size, skeleton, generality.
-type Measure f v = (Int, Int, Tm f (), Int, Tm f v)
-measure :: Ord v => Tm f v -> Measure f v
-measure t = (size t, -length (vars t), rename (const ()) t, -length (usort (vars t)), t)
+type Measure v = (Int, Int, Int, TermOf (), Int, TermOf v)
+measure :: Ord v => TermOf v -> Measure v
+measure t = (size t, -length (vars t),
+             size t - length (filter conIsBackground (funs t)),
+             rename (const ()) t, -length (usort (vars t)), t)
 
 size :: Tm f v -> Int
 size Var{} = 1
@@ -40,9 +42,10 @@ data Constant =
     conGeneralValue :: Poly (Value Identity),
     conArity        :: Int,
     conStyle        :: TermStyle,
-    conSize         :: Int }
+    conSize         :: Int,
+    conIsBackground :: Bool }
 instance Show Constant where
-  show c = show (conName c, conValue c, conGeneralValue c, conArity c, conSize c)
+  show c = show (conName c, conValue c, conGeneralValue c, conArity c, conSize c, conIsBackground c)
 instance Eq Constant where x == y = x `compare` y == EQ
 instance Ord Constant where compare = comparing conName
 instance Pretty Constant where
@@ -51,8 +54,8 @@ instance PrettyTerm Constant where
   termStyle = conStyle
 instance Typed Constant where
   typ = typ . conValue
-  typeSubstA s (Constant name value generalValue arity pretty size) =
-    Constant name <$> typeSubstA s value <*> pure generalValue <*> pure arity <*> pure pretty <*> pure size
+  typeSubstA s (Constant name value generalValue arity pretty size isBackground) =
+    Constant name <$> typeSubstA s value <*> pure generalValue <*> pure arity <*> pure pretty <*> pure size <*> pure isBackground
 
 -- We're not allowed to have two variables with the same number
 -- but unifiable types.
