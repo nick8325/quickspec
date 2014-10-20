@@ -68,5 +68,4 @@ library
     QuickSpec.Pruning
     QuickSpec.Pruning.Simple
 
-  Build-depends:
-    base < 5, containers, transformers, QuickCheck >= 2.7, spoon >= 0.2, term-rewriting, constraints, dlist, pretty, data-memocombinators, random, bytestring, jukebox
+  Build-depends: base < 5, containers, transformers, QuickCheck >= 2.7, spoon >= 0.2, term-rewriting, constraints, dlist, pretty, data-memocombinators, random, bytestring, jukebox, parsec <= 3.1.5
