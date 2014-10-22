@@ -15,7 +15,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Set(Set)
 import Control.Monad
-import QuickSpec.Pruning hiding (createRules)
+import QuickSpec.Pruning hiding (createRules, instances)
 import QuickSpec.Pruning.Simple hiding (S)
 import qualified QuickSpec.Pruning.Simple as Simple
 import qualified QuickSpec.Pruning.E as E
@@ -106,34 +106,24 @@ schemasOfSize n sig = do
       canApply f (poly (Var (Hole (Var (TyVar 0))))),
       x <- xs ]
 
-quickSpecWithBackground :: Signature -> Signature -> IO [Prop]
-quickSpecWithBackground sig1 sig2 = unbuffered $ do
-  putStrLn "== Signature for background theory =="
-  prettyPrint sig1
-  putStrLn ""
-  eqs <- quickSpecMain sig1
+quickSpecWithBackground :: Signature -> Signature -> IO Signature
+quickSpecWithBackground sig1 sig2 = do
+  thy <- quickSpec sig1
+  quickSpec (thy `mappend` sig2)
 
-  putStrLn "== Signature (excluding background theory) =="
-  prettyPrint sig2
-  putStrLn ""
-  let makeBackground sig =
-        sig { constants = [ c { conIsBackground = True } | c <- constants sig ] }
-      sig = makeBackground sig1 `mappend` sig2
-  quickSpecMain sig { background = eqs ++ background sig }
-
-quickSpec :: Signature -> IO [Prop]
+quickSpec :: Signature -> IO Signature
 quickSpec sig = unbuffered $ do
   putStrLn "== Signature =="
   prettyPrint sig
   putStrLn ""
-  quickSpecMain sig
-
-quickSpecMain :: Signature -> IO [Prop]
-quickSpecMain sig =
   runM sig $ do
     quickSpecLoop sig
     summarise
-    lift (gets (reverse . discovered))
+    props <- lift (gets (reverse . discovered))
+    return signature {
+      constants = [ c { conIsBackground = True } | c <- constants sig ],
+      instances = instances sig,
+      background = background sig ++ props }
 
 runM :: Signature -> M a -> IO a
 runM sig m = do
