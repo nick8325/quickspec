@@ -5,7 +5,7 @@
 module QuickSpec.Type(
   -- Types.
   Typeable,
-  Type, TyCon(..), tyCon, TyVar(..), A, B, C, D,
+  Type, TyCon(..), tyCon, toTyCon, fromTyCon, TyVar(..), A, B, C, D,
   typeOf, typeRep, applyType, toTypeRep, fromTypeRep,
   arrowType, typeArgs, typeRes, arity, oneTypeVar, skolemiseTypeVars,
   -- Things that have types.
@@ -132,13 +132,14 @@ tyCon = fromTyCon . con
 -- For showing types.
 toTypeRep :: Type -> Ty.TypeRep
 toTypeRep (Fun tyCon tys) = Ty.mkTyConApp (toTyCon tyCon) (map toTypeRep tys)
-  where
-    toTyCon Arrow = arrowTyCon
-    toTyCon (TyCon tyCon) = tyCon
 toTypeRep (Var (TyVar n)) = Ty.mkTyConApp varTyCon [toTyVar n]
   where
     toTyVar 0 = Ty.mkTyConApp zeroTyCon []
     toTyVar n = Ty.mkTyConApp succTyCon [toTyVar (n-1)]
+
+toTyCon :: TyCon -> Ty.TyCon
+toTyCon Arrow = arrowTyCon
+toTyCon (TyCon tyCon) = tyCon
 
 -- CoArbitrary instances.
 instance CoArbitrary Ty.TypeRep where
