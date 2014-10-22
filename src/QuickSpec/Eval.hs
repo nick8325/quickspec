@@ -131,10 +131,9 @@ quickSpec sig = unbuffered $ do
 quickSpecMain :: Signature -> IO [Prop]
 quickSpecMain sig =
   runM sig $ do
-    createOutputRules sig
     quickSpecLoop sig
     summarise
-    lift (gets discovered)
+    lift (gets (reverse . discovered))
 
 runM :: Signature -> M a -> IO a
 runM sig m = do
@@ -202,6 +201,7 @@ createRules sig = do
         Untestable ->
           ERROR ("Untestable instance " ++ prettyShow t ++ " of testable schema " ++ prettyShow s)
         EqualTo (From _ u) -> do
+          found sig ([] :=>: t :=: u)
           generate (Found ([] :=>: t :=: u))
         Representative -> return ()
 
@@ -256,12 +256,6 @@ createRules sig = do
     execute $ do
       lift $ modify (\s -> s { discovered = prop:discovered s })
       lift $ lift $ axiom prop
-
-createOutputRules :: Signature -> M ()
-createOutputRules sig = do
-  rule $ do
-    Found prop <- event
-    execute $ found sig prop
 
   -- rule $ event >>= execute . liftIO . prettyPrint
 
