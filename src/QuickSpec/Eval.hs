@@ -19,6 +19,7 @@ import QuickSpec.Pruning hiding (createRules)
 import QuickSpec.Pruning.Simple hiding (S)
 import qualified QuickSpec.Pruning.Simple as Simple
 import qualified QuickSpec.Pruning.E as E
+import qualified QuickSpec.Pruning.Z3 as Z3
 import Data.List hiding (insert)
 import Data.Ord
 import Control.Monad.Trans.State.Strict
@@ -333,6 +334,7 @@ found sig prop = do
 pruner :: ExtraPruner -> [PropOf PruningTerm] -> PropOf PruningTerm -> IO Bool
 pruner SPASS = E.spassUnify
 pruner E = E.eUnify
+pruner Z3 = Z3.z3Unify
 pruner None = \_ _ -> return False
 
 accept :: Poly Schema -> M ()

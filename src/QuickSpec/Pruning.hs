@@ -151,7 +151,7 @@ data PruningConstant
   | HasType Type
   deriving (Eq, Ord, Show)
 
-newtype PruningVariable = PruningVariable Int deriving (Eq, Ord, Num, Enum)
+newtype PruningVariable = PruningVariable Int deriving (Eq, Ord, Num, Enum, Show)
 
 instance Pretty PruningConstant where
   pretty (TermConstant x _ _) = pretty x

@@ -65,6 +65,7 @@ library
     QuickSpec.Prop
     QuickSpec.Pruning
     QuickSpec.Pruning.E
+    QuickSpec.Pruning.Z3
     QuickSpec.Pruning.Simple
     QuickSpec.Rules
     QuickSpec.Signature
@@ -74,4 +75,4 @@ library
     QuickSpec.Type
     QuickSpec.Utils
 
-  Build-depends: base < 5, containers, transformers, QuickCheck >= 2.7, spoon >= 0.2, term-rewriting, constraints, dlist, pretty, data-memocombinators, random, bytestring, jukebox, parsec <= 3.1.5
+  Build-depends: base < 5, containers, transformers, QuickCheck >= 2.7, spoon >= 0.2, term-rewriting, constraints, dlist, pretty, data-memocombinators, random, bytestring, jukebox, parsec <= 3.1.5, z3
