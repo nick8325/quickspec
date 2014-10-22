@@ -58,14 +58,20 @@ library
   include-dirs: src
   Exposed-modules:
     QuickSpec
-    QuickSpec.Utils
     QuickSpec.Base
-    QuickSpec.Type
-    QuickSpec.Term
-    QuickSpec.Signature
     QuickSpec.Eval
+    QuickSpec.Memo
+    QuickSpec.Pretty
     QuickSpec.Prop
     QuickSpec.Pruning
+    QuickSpec.Pruning.E
     QuickSpec.Pruning.Simple
+    QuickSpec.Rules
+    QuickSpec.Signature
+    QuickSpec.Term
+    QuickSpec.Test
+    QuickSpec.TestSet
+    QuickSpec.Type
+    QuickSpec.Utils
 
   Build-depends: base < 5, containers, transformers, QuickCheck >= 2.7, spoon >= 0.2, term-rewriting, constraints, dlist, pretty, data-memocombinators, random, bytestring, jukebox, parsec <= 3.1.5
