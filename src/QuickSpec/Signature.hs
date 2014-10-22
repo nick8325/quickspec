@@ -61,7 +61,8 @@ data Signature =
     defaultTo          :: Maybe Type,
     maxTermSize        :: Maybe Int,
     maxCommutativeSize :: Maybe Int,
-    maxTests           :: Maybe Int }
+    maxTests           :: Maybe Int,
+    extraPruner        :: Maybe ExtraPruner }
   deriving Show
 
 instance Pretty Signature where
@@ -89,6 +90,11 @@ maxCommutativeSize_ = fromMaybe 5 . maxCommutativeSize
 
 maxTests_ :: Signature -> Int
 maxTests_ = fromMaybe 100 . maxTests
+
+data ExtraPruner = E | SPASS | Z3 | None deriving Show
+
+extraPruner_ :: Signature -> ExtraPruner
+extraPruner_ = fromMaybe SPASS . extraPruner
 
 instances_ :: Signature -> [Instance]
 instances_ sig = concat (instances sig ++ defaultInstances)
@@ -150,13 +156,14 @@ newtype NamesFor a = NamesFor { unNamesFor :: [String] } deriving Typeable
 newtype DictOf c a = DictOf { unDictOf :: Dict (c a) } deriving Typeable
 
 instance Monoid Signature where
-  mempty = Signature [] [] [] Nothing Nothing Nothing Nothing
-  Signature cs is b d s s1 t `mappend` Signature cs' is' b' d' s' s1' t' =
+  mempty = Signature [] [] [] Nothing Nothing Nothing Nothing Nothing
+  Signature cs is b d s s1 t p `mappend` Signature cs' is' b' d' s' s1' t' p' =
     Signature (cs++cs') (is++is') (b++b')
       (d `mplus` d')
       (s `mplus` s')
       (s1 `mplus` s1')
       (t `mplus` t')
+      (p `mplus` p')
 
 signature :: Signature
 signature = mempty

@@ -16,6 +16,7 @@ import qualified Data.ByteString.Char8 as BS
 import qualified Jukebox.Form as Jukebox
 import qualified Jukebox.Name as Jukebox
 import qualified Jukebox.Provers.E as Jukebox
+import qualified Jukebox.Provers.SPASS as Jukebox
 import qualified Jukebox.Toolbox as Jukebox
 import qualified Jukebox.Monotonox.ToFOF as Jukebox
 import qualified Jukebox.Clausify as Jukebox
@@ -23,20 +24,17 @@ import qualified Jukebox.TPTP.Print as Jukebox
 import qualified Text.PrettyPrint.HughesPJ as Jukebox
 import Data.Char
 
-eUnify :: [PropOf PruningTerm] -> PropOf PruningTerm -> IO Bool
-eUnify axioms goal = do
-  --putStrLn ("\nSending to E: " ++ prettyShow (fmap fromPruningTerm goal))
-  let opts = Jukebox.EFlags "eprover" (Just 0) Nothing
-      prob = translate (map unitProp (lhs goal) ++ axioms) (rhs goal)
-  -- putStrLn (Jukebox.render (Jukebox.prettyProblem "fof" Jukebox.Normal prob))
-  res <- Jukebox.runE opts prob
-  --eliftIO (print res)
-  case res of
-    Left Jukebox.Unsatisfiable ->
-      -- Pruned
-      return True
-    _ -> do
-      return False
+eUnify, spassUnify :: [PropOf PruningTerm] -> PropOf PruningTerm -> IO Bool
+eUnify = foUnify (Jukebox.runE (Jukebox.EFlags "eprover" (Just 1) Nothing)) (Left Jukebox.Unsatisfiable)
+spassUnify = foUnify (Jukebox.runSPASS (Jukebox.SPASSFlags "SPASS" (Just 1) False)) Jukebox.Unsatisfiable
+
+foUnify prove unsat axioms goal = do
+  -- putStrLn ("\nSending to prover: " ++ prettyShow (fmap fromPruningTerm goal))
+  let prob = translate (map unitProp (lhs goal) ++ axioms) (rhs goal)
+  -- putStrLn (Jukebox.render (Jukebox.prettyProblem "cnf" Jukebox.Normal prob))
+  res <- prove prob
+  -- print res
+  return (res == unsat)
 
 translate :: [PropOf PruningTerm] -> Literal PruningTerm ->
              Jukebox.Closed [Jukebox.Input Jukebox.Form]

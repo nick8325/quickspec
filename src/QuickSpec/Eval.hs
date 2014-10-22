@@ -323,12 +323,17 @@ found sig prop = do
   Simple.S props <- lift (lift (liftPruner get))
   proved0 <- lift (gets proved)
   let props' = Set.toList (Set.fromList props Set.\\ Set.insert (toAxiom prop) proved0)
-  res <- liftIO $ E.eUnify props' (toGoal prop)
+  res <- liftIO $ pruner (extraPruner_ sig) props' (toGoal prop)
   case res of
     True ->
       lift $ modify (\s -> s { proved = Set.insert (toAxiom prop) (proved s) })
     False ->
       liftIO $ putStrLn (prettyShow (prettyRename sig prop))
+
+pruner :: ExtraPruner -> [PropOf PruningTerm] -> PropOf PruningTerm -> IO Bool
+pruner SPASS = E.spassUnify
+pruner E = E.eUnify
+pruner None = \_ _ -> return False
 
 accept :: Poly Schema -> M ()
 accept s = do

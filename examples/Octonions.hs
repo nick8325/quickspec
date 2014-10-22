@@ -76,6 +76,7 @@ sig =
        constant "." compose ],
     background = octBackground,
     maxTests = Just 5,
+    extraPruner = Just E,
     instances = [
       inst (Sub Dict :: () :- Arbitrary ItFun),
       makeInstance (\() -> observe obsItFun),

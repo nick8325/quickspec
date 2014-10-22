@@ -5,7 +5,6 @@ module QuickSpec.Pruning where
 import QuickSpec.Base
 import QuickSpec.Type
 import QuickSpec.Term
-import QuickSpec.Test
 import QuickSpec.Utils
 import QuickSpec.Signature hiding (instances)
 import QuickSpec.Prop
