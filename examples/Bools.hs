@@ -1,14 +1,12 @@
--- A simple booleans example.
+import QuickSpec
 
-import Test.QuickSpec hiding (bools)
+sig =
+  signature {
+    constants = [
+       constant "True" True,
+       constant "False" False,
+       constant "||" (||),
+       constant "&&" (&&),
+       constant "not" not ]}
 
-bools = [
-  ["x", "y", "z"] `vars` (undefined :: Bool),
-
-  "||"    `fun2` (||),
-  "&&"    `fun2` (&&),
-  "not"   `fun1` not,
-  "True"  `fun0` True,
-  "False" `fun0` False]
-
-main = quickSpec bools
+main = quickSpec sig

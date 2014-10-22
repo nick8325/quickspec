@@ -1,15 +1,13 @@
 {-# LANGUAGE DeriveDataTypeable
            , GeneralizedNewtypeDeriving
   #-}
-module Process where
-
 import Data.Maybe
 import Data.List hiding ((//))
 import Data.Char
 import Test.QuickCheck hiding ((><))
-import Data.Typeable
 import System.IO.Unsafe
 import System.Timeout
+import QuickSpec hiding (New, In, Name, Event)
 
 --------------------------------------------------------------------------------
 
@@ -206,9 +204,6 @@ steps :: Int -> P -> Steps
 steps 0 _ = Stop
 steps k p = Step (usort [ (a, steps (k-1) q) | (a,q) <- step p ])
 
-usort :: Ord a => [a] -> [a]
-usort = map head . group . sort
-
 bisim :: Int -> P -> P -> Bool
 bisim k p q = steps k p == steps k q
 
@@ -329,3 +324,55 @@ prop_new_in_out a p q =
 
 --------------------------------------------------------------------------------
 
+newtype P_ = P_ P
+ deriving ( Eq, Ord, Arbitrary, CoArbitrary, Typeable )
+
+newtype Name_ = Name_ [Name]
+ deriving ( Eq, Ord, CoArbitrary, Typeable )
+
+instance Arbitrary Name_ where
+  arbitrary =
+    do a <- arbitrary
+       b <- arbitrary `suchThat` (/=a)
+       return (Name_ [a,b])
+
+sig =
+  signature
+  { constants =
+    -- Event
+    [ -- con "in"  In
+    -- , con "out" Out
+    -- , con "tau" Tau
+    
+    -- Restricted processes
+      con "/"    (\(P_ p) a -> p // a)
+    
+    -- Restricted names
+    , con "#"    (\(Name_ as) b -> head (filter (/=b) as))
+    
+    -- P
+    , con "0"    Nil
+    -- , con "."    Act
+    , con "?"    (Act . In)
+    , con "!"    (Act . Out)
+    , con "tau"  (Act Tau)
+    , con "+"    (:+:)
+    , con "|"    (:|:)
+    , (con "*"   Star){ conStyle = Postfix }
+    , con "new"  New
+    ]
+    
+  , instances =
+    [ baseTypeNames ["a","b","c"] (undefined :: Name)
+    , baseTypeNames ["c"] (undefined :: Name_)
+    -- , baseTypeNames ["e"]         (undefined :: Event)
+    , baseTypeNames ["p","q","r"] (undefined :: P)
+    , baseTypeNames ["r"] (undefined :: P_)
+    ]
+    
+  , defaultTo = Just (typeOf (undefined :: Bool))
+  }
+ where
+  con op f = constant op f
+
+main = quickSpec sig

@@ -1,10 +1,8 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving, DeriveDataTypeable #-}
-module Ords where
-
 import Prelude hiding (exp)
 import Test.QuickCheck
-import Data.Typeable
 import Data.Ord
+import QuickSpec
 
 newtype Nat = Nat Int deriving (Eq, Ord, Num, Enum, CoArbitrary)
 
@@ -60,3 +58,15 @@ exp :: Ordinal -> Ordinal -> Ordinal
 exp m Zero = Succ Zero
 exp m (Succ n) = times (exp m n) m
 exp m (Lim f) = Lim (\n -> exp m (f n))
+
+sig =
+  signature {
+    constants = [
+       constant "0" Zero,
+       (constant "s" Succ) { conStyle = Uncurried },
+       constant "+" plus,
+       constant "*" times ],
+    instances = [
+      baseType (undefined :: Ordinal) ]}
+
+main = quickSpec sig

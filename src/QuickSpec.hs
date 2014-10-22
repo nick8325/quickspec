@@ -13,7 +13,8 @@ module QuickSpec(
   module QuickSpec.Test,
   module QuickSpec.TestSet,
   module QuickSpec.Type,
-  module QuickSpec.Utils) where
+  module QuickSpec.Utils,
+  module Data.Constraint) where
 
 import QuickSpec.Base
 import QuickSpec.Eval
@@ -30,3 +31,4 @@ import QuickSpec.Test
 import QuickSpec.TestSet
 import QuickSpec.Type
 import QuickSpec.Utils
+import Data.Constraint

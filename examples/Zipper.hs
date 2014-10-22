@@ -1,10 +1,9 @@
 {-# LANGUAGE DeriveDataTypeable #-}
-module Zipper where
-
 import Test.QuickCheck
 import Prelude hiding (Left, Right)
 import Control.Monad
 import Data.Typeable
+import QuickSpec
 
 data Tree = Nil | Cons Tree Tree deriving (Eq, Ord, Typeable)
 data Path = Top | Left Path Tree | Right Tree Path deriving (Eq, Ord)
@@ -62,3 +61,23 @@ fromZipper _ = Nothing
 toZipper :: Maybe Tree -> Maybe Zipper
 toZipper (Just t) = Just (Zipper t Top)
 toZipper _ = Nothing
+
+sig =
+  signature {
+    constants = [
+       constant "nothing" (Nothing :: Maybe A),
+       constant "nil" Nil,
+       constant "cons" Cons,
+       constant "change" change,
+       constant "up" up,
+       constant "upLeft" upLeft,
+       constant "upRight" upRight,
+       constant "left" left,
+       constant "right" right,
+       constant "fromZipper" fromZipper,
+       constant "toZipper" toZipper ],
+    instances = [
+      baseType (undefined :: Zipper),
+      baseType (undefined :: Tree) ]}
+
+main = quickSpec sig
