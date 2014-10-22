@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE CPP, GeneralizedNewtypeDeriving, FlexibleInstances #-}
 module QuickSpec.Pruning where
 
 #include "errors.h"
@@ -27,6 +27,12 @@ class Pruner s where
   untypedAxiom  :: Monad m => PropOf PruningTerm -> StateT s m ()
   untypedGoal   :: Monad m => PropOf PruningTerm -> StateT s m Bool
 
+instance Pruner [PropOf PruningTerm] where
+  emptyPruner = []
+  untypedRep _ _    = return Nothing
+  untypedAxiom prop = modify (prop:)
+  untypedGoal _     = return False
+
 newtype PrunerT s m a =
   PrunerT {
     unPrunerT :: RulesT PruningConstant (ReaderT [Type] (StateT s m)) a }
@@ -40,9 +46,12 @@ askUniv = PrunerT (lift ask)
 liftPruner :: (Monad m, Pruner s) => StateT s m a -> PrunerT s m a
 liftPruner m = PrunerT (lift (lift m))
 
-runPruner :: (Monad m, Pruner s) => Signature -> PrunerT s m a -> m a
+evalPruner :: (Monad m, Pruner s) => Signature -> PrunerT s m a -> m a
+evalPruner sig m = liftM fst (runPruner sig m)
+
+runPruner :: (Monad m, Pruner s) => Signature -> PrunerT s m a -> m (a, s)
 runPruner sig m =
-  evalStateT (runReaderT (runRulesT (unPrunerT m')) (Set.toList (typeUniverse sig))) emptyPruner
+  runStateT (runReaderT (runRulesT (unPrunerT m')) (Set.toList (typeUniverse sig))) emptyPruner
   where
     m' = createRules >> mapM_ axiom (background sig) >> m
 

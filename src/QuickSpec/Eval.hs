@@ -82,7 +82,7 @@ initialState sig seeds =
       termTestSet   = Map.empty,
       freshTestSet  = emptyTestSet (makeTester specialise e seeds sig),
       proved        = Set.empty,
-      discovered    = [],
+      discovered    = background sig,
       types         = typeUniverse sig,
       allTypes      = bigTypeUniverse sig }
   where
@@ -138,7 +138,7 @@ quickSpecMain sig =
 runM :: Signature -> M a -> IO a
 runM sig m = do
   seeds <- fmap (take (maxTests_ sig)) (genSeeds 20)
-  runPruner sig (evalStateT (runRulesT m) (initialState sig seeds))
+  evalPruner sig (evalStateT (runRulesT m) (initialState sig seeds))
 
 quickSpecLoop :: Signature -> M ()
 quickSpecLoop sig = do
@@ -161,14 +161,12 @@ summarise = do
       numCreation = length [ () | ConsiderSchema{} <- es ] + length [ () | ConsiderTerm{} <- es ]
       numMisc = numEvents - numSchemas - numTerms - numCreation
   h <- numHooks
-  numDiscovered <- lift (gets (length . discovered))
   liftIO $ putStrLn (show numEvents ++ " events created in total (" ++
                      show numSchemas ++ " schemas, " ++
                      show numTerms ++ " terms, " ++
                      show numCreation ++ " creation, " ++
                      show numMisc ++ " miscellaneous).")
-  liftIO $ putStrLn (show numDiscovered ++ " equations in background theory, " ++
-                     show h ++ " hooks installed.\n")
+  liftIO $ putStrLn (show h ++ " hooks installed.\n")
 
 allUnifications :: Term -> [Term]
 allUnifications t = map f ss
@@ -201,7 +199,6 @@ createRules sig = do
         Untestable ->
           ERROR ("Untestable instance " ++ prettyShow t ++ " of testable schema " ++ prettyShow s)
         EqualTo (From _ u) -> do
-          found sig ([] :=>: t :=: u)
           generate (Found ([] :=>: t :=: u))
         Representative -> return ()
 
@@ -253,9 +250,8 @@ createRules sig = do
 
   rule $ do
     Found prop <- event
-    execute $ do
-      lift $ modify (\s -> s { discovered = prop:discovered s })
-      lift $ lift $ axiom prop
+    execute $
+      found sig prop
 
   -- rule $ event >>= execute . liftIO . prettyPrint
 
@@ -315,14 +311,17 @@ instance Considerable TermFrom where
 
 found :: Signature -> Prop -> M ()
 found sig prop = do
-  Simple.S props <- lift (lift (liftPruner get))
-  proved0 <- lift (gets proved)
-  let props' = Set.toList (Set.fromList props Set.\\ Set.insert (toAxiom prop) proved0)
+  lift (lift (axiom prop))
+
+  props <- lift (gets discovered)
+  (_, props') <- runPruner sig $ mapM_ axiom props
+
   res <- liftIO $ pruner (extraPruner_ sig) props' (toGoal prop)
   case res of
     True ->
-      lift $ modify (\s -> s { proved = Set.insert (toAxiom prop) (proved s) })
-    False ->
+      return ()
+    False -> do
+      lift $ modify (\s -> s { discovered = prop:discovered s })
       liftIO $ putStrLn (prettyShow (prettyRename sig prop))
 
 pruner :: ExtraPruner -> [PropOf PruningTerm] -> PropOf PruningTerm -> IO Bool
