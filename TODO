@@ -1,11 +1,5 @@
-Introduce a type constructor ForAll whose effect is to normalise all variables in the term.
-
-Add useful function: "is this simpler for all values of these variables?"
-
-Make the main pruning infrastructure check this?
-
-When ordering terms, compare number of non-background functions after comparing size?
-That would get rid of nest i (nest j d) = nest j (nest i d).
+High-priority
+-------------
 
 Fix bug where schemas are generated twice
 
@@ -13,15 +7,23 @@ Fix eta-expansion
 
 Make it so that arbitrary instances are not compulsory
 
-Make it so that you don't need coarbitrary for everything
-
-Teach E about application?
-Alternatively, eta-expand all laws before passing on.
-
 Implement big-universe/small-universe thing in a more principled way.
 I don't think it works at the moment!
 
+Make E-pruning work in a more principled way!
+
 Generalise type variables after discovering equations!
+
+Put examples in a sensible place!
+
+Make main QuickSpec module export sensible stuff and clean up code
+
+Longer term
+-----------
+
+Make main loop understand conditions in some way or other
+
+Generalise to other things than equalities
 
 Really take care of partiality.
 
@@ -31,11 +33,17 @@ E.g., if we have f x y = g x z, then we should also find f x y = g x k,
 where k is an arbitrary constant - if we don't find this then we don't
 need to search for f x y = g x z.
 
-Try optimising the set of test cases - e.g., after completing each size,
-analyse the test set and find the "most effective" set of test cases,
-then move it to the front.
+Teach E about application?
+Alternatively, eta-expand all laws before passing on.
 
 Teach crappy pruner about commutativity-like (schema-preserving) laws.
+Or improve pruning.
+
+Regexes: use Brzozowski derivatives to get a useful specification?
+
+Print out definitions
+
+Add "ask why an equation is not printed".
 
 It isn't always true that if two schemas end up in the same class we
 print an equation! It might be that we can't simplify the schema but
@@ -43,12 +51,26 @@ can simplify the one-variable case. Investigate how common this is and
 perhaps try using the pruner to find the schema equation, to avoid
 needlessly testing.
 
-Put examples in a sensible place!
+Try optimising the set of test cases - e.g., after completing each size,
+analyse the test set and find the "most effective" set of test cases,
+then move it to the front.
 
-Make main QuickSpec module export sensible stuff and clean up code
+Cleanup ideas
+-------------
 
-Regexes: use Brzozowski derivatives to get a useful specification?
+Introduce a type constructor ForAll whose effect is to normalise all variables in the term.
 
-Print out definitions
+Add useful function: "is this simpler for all values of these variables?"
+Make the main pruning infrastructure check this?
 
-Add "ask why an equation is not printed".
+Maybe add a type wrapper for preserving the original type of a polymorphic value
+(store as original value + type subst??)
+
+Stuff for HipSpec
+-----------------
+
+Incrementally add functions to the signature?
+Incrementally increase size?
+(Rule? - "consider this size".
+ Needs a notion of quiescence/ordering maybe?)
+Alternatively, implement everything just by restarting.
