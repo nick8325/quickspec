@@ -41,6 +41,7 @@ data S = S {
   termTestSet   :: Map Schema (TestSet TermFrom),
   freshTestSet  :: TestSet TermFrom,
   proved        :: Set (PropOf PruningTerm),
+  discovered    :: [Prop],
   types         :: Set Type,
   allTypes      :: Set Type }
 
@@ -51,6 +52,7 @@ data Event =
   | ConsiderTerm   TermFrom
   | Type           (Poly Type)
   | UntestableType (Poly Type)
+  | Found          Prop
   deriving (Eq, Ord)
 
 instance Pretty Event where
@@ -60,6 +62,7 @@ instance Pretty Event where
   pretty (ConsiderTerm t) = text "consider term" <+> pretty t
   pretty (Type ty) = text "type" <+> pretty ty
   pretty (UntestableType ty) = text "untestable type" <+> pretty ty
+  pretty (Found prop) = text "found" <+> pretty prop
 
 data KindOf a = Untestable | Representative | EqualTo a
   deriving (Eq, Ord)
@@ -78,6 +81,7 @@ initialState sig seeds =
       termTestSet   = Map.empty,
       freshTestSet  = emptyTestSet (makeTester specialise e seeds sig),
       proved        = Set.empty,
+      discovered    = [],
       types         = typeUniverse sig,
       allTypes      = bigTypeUniverse sig }
   where
@@ -124,12 +128,32 @@ quickSpec sig = unbuffered $ do
   quickSpecMain sig
 
 quickSpecMain :: Signature -> IO [Prop]
-quickSpecMain sig = do
-  seeds <- fmap (take (maxTests_ sig)) (genSeeds 20)
-  runPruner sig (evalStateT (runRulesT (createRules sig >> go 1 sig)) (initialState sig seeds))
+quickSpecMain sig =
+  runM sig $ do
+    createOutputRules sig
+    quickSpecLoop sig
+    summarise
+    lift (gets discovered)
 
-go :: Int -> Signature -> M [Prop]
-go n sig | n > maxTermSize_ sig = do
+runM :: Signature -> M a -> IO a
+runM sig m = do
+  seeds <- fmap (take (maxTests_ sig)) (genSeeds 20)
+  runPruner sig (evalStateT (runRulesT m) (initialState sig seeds))
+
+quickSpecLoop :: Signature -> M ()
+quickSpecLoop sig = do
+  createRules sig
+  mapM_ (exploreSize sig) [1..maxTermSize_ sig]
+
+exploreSize sig n = do
+  lift $ modify (\s -> s { schemas = Map.insert n Map.empty (schemas s) })
+  ss <- fmap (sortBy (comparing measure)) (schemasOfSize n sig)
+  liftIO $ putStrLn ("Size " ++ show n ++ ", " ++ show (length ss) ++ " schemas to consider:")
+  mapM_ (generate . ConsiderSchema . poly) ss
+  liftIO $ putStrLn ""
+
+summarise :: M ()
+summarise = do
   es <- getEvents
   let numEvents = length es
       numSchemas  = length [ () | Schema{} <- es ]
@@ -137,23 +161,14 @@ go n sig | n > maxTermSize_ sig = do
       numCreation = length [ () | ConsiderSchema{} <- es ] + length [ () | ConsiderTerm{} <- es ]
       numMisc = numEvents - numSchemas - numTerms - numCreation
   h <- numHooks
-  Simple.S eqs <- lift (lift (liftPruner get))
+  numDiscovered <- lift (gets (length . discovered))
   liftIO $ putStrLn (show numEvents ++ " events created in total (" ++
                      show numSchemas ++ " schemas, " ++
                      show numTerms ++ " terms, " ++
                      show numCreation ++ " creation, " ++
                      show numMisc ++ " miscellaneous).")
-  liftIO $ putStrLn (show (length eqs) ++ " equations in background theory, " ++
+  liftIO $ putStrLn (show numDiscovered ++ " equations in background theory, " ++
                      show h ++ " hooks installed.\n")
-  return (map (fmap fromPruningTerm) eqs)
-
-go n sig = do
-  lift $ modify (\s -> s { schemas = Map.insert n Map.empty (schemas s) })
-  ss <- fmap (sortBy (comparing measure)) (schemasOfSize n sig)
-  liftIO $ putStrLn ("Size " ++ show n ++ ", " ++ show (length ss) ++ " schemas to consider:")
-  mapM_ (generate . ConsiderSchema . poly) ss
-  liftIO $ putStrLn ""
-  go (n+1) sig
 
 allUnifications :: Term -> [Term]
 allUnifications t = map f ss
@@ -185,7 +200,8 @@ createRules sig = do
       case k of
         Untestable ->
           ERROR ("Untestable instance " ++ prettyShow t ++ " of testable schema " ++ prettyShow s)
-        EqualTo (From _ u) -> found sig t u
+        EqualTo (From _ u) -> do
+          generate (Found ([] :=>: t :=: u))
         Representative -> return ()
 
   rule $ do
@@ -233,6 +249,18 @@ createRules sig = do
     execute $
       liftIO $ putStrLn $
         "Warning: generated term of untestable type " ++ prettyShow ty
+
+  rule $ do
+    Found prop <- event
+    execute $ do
+      lift $ modify (\s -> s { discovered = prop:discovered s })
+      lift $ lift $ axiom prop
+
+createOutputRules :: Signature -> M ()
+createOutputRules sig = do
+  rule $ do
+    Found prop <- event
+    execute $ found sig prop
 
   -- rule $ event >>= execute . liftIO . prettyPrint
 
@@ -290,18 +318,16 @@ instance Considerable TermFrom where
   putTestSet (From s _) ts =
     lift $ modify (\st -> st { termTestSet = Map.insert s ts (termTestSet st) })
 
-found :: Signature -> Term -> Term -> M ()
-found sig t u = do
-  let prop = [] :=>: t :=: u
-  Simple.S eqs <- lift (lift (liftPruner get))
-  proved <- lift (gets proved)
-  let eqs' = Set.toList (Set.fromList eqs Set.\\ proved)
-  lift (lift (axiom prop))
-  res <- liftIO $ E.eUnify eqs' (toGoal prop)
+found :: Signature -> Prop -> M ()
+found sig prop = do
+  Simple.S props <- lift (lift (liftPruner get))
+  proved0 <- lift (gets proved)
+  let props' = Set.toList (Set.fromList props Set.\\ Set.insert (toAxiom prop) proved0)
+  res <- liftIO $ E.eUnify props' (toGoal prop)
   case res of
-    True -> do
-      return ()
-    False -> do
+    True ->
+      lift $ modify (\s -> s { proved = Set.insert (toAxiom prop) (proved s) })
+    False ->
       liftIO $ putStrLn (prettyShow (prettyRename sig prop))
 
 accept :: Poly Schema -> M ()
