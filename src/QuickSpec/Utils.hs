@@ -32,17 +32,6 @@ usort = usortBy compare
 usortBy :: (a -> a -> Ordering) ->[a] -> [a]
 usortBy f = map head . groupBy (\x y -> f x y == EQ) . sortBy f
 
-merge :: Ord b => (a -> a -> a) -> (a -> b) -> [a] -> [a] -> [a]
-merge f c = aux
-  where
-    aux [] ys = ys
-    aux xs [] = xs
-    aux (x:xs) (y:ys) =
-      case comparing c x y of
-        LT -> x:aux xs (y:ys)
-        GT -> y:aux (x:xs) ys
-        EQ -> f x y:aux xs ys
-
 orElse :: Ordering -> Ordering -> Ordering
 EQ `orElse` x = x
 x  `orElse` _ = x
