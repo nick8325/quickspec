@@ -43,6 +43,8 @@ Regexes: use Brzozowski derivatives to get a useful specification?
 
 Print out definitions
 
+If we have an equation where both sides contain a variable that doesn't appear on the other side, introduce (even if only internally) a new constant
+
 Add "ask why an equation is not printed".
 
 It isn't always true that if two schemas end up in the same class we
