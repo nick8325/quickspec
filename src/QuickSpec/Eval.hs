@@ -198,11 +198,11 @@ createRules sig = do
     types    <- execute $ lift $ gets types
     require (and [ oneTypeVar (typ t) `Set.member` allTypes | t <- subterms (unPoly s) ])
     execute $
-      case oneTypeVar (typ (unPoly s)) `Set.member` types of
-        True ->
+      {-case oneTypeVar (typ (unPoly s)) `Set.member` types of
+        True ->-}
           consider (Schema s) (unPoly (oneTypeVar s))
-        False ->
-          generate (Schema s Untestable)
+{-        False ->
+          generate (Schema s Untestable)-}
 
   rule $ do
     ConsiderTerm t@(From _ t') <- event
