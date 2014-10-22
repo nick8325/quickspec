@@ -42,6 +42,7 @@ simpleUnify prop = modifyS (prop:)
 alwaysSimplerThan :: Term -> Term -> Bool
 t `alwaysSimplerThan` u =
   size t <= size u &&
+  measure (schema t) < measure (schema u) &&
   and [ sizeOk v | v <- vars t, v `elem` vars u ]
   where
     sizeOk v = occ v t <= occ v u
