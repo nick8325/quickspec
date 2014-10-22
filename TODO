@@ -14,8 +14,6 @@ Make E-pruning work in a more principled way!
 
 Generalise type variables after discovering equations!
 
-Put examples in a sensible place!
-
 Make main QuickSpec module export sensible stuff and clean up code
 
 Longer term
