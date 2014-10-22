@@ -42,10 +42,13 @@ instance Typed a => Typed (PropOf a) where
            <*> typeSubstA f rhs
 
 instance Pretty a => Pretty (PropOf a) where
+  pretty ([] :=>: rhs) = pretty rhs
   pretty p =
-    fsep (map prettyLhs (lhs p) ++ [nest 2 (pretty (rhs p))])
-    where
-      prettyLhs p = pretty p <+> text "&"
+    sep [
+      fsep
+        (punctuate (text "" <+> text "&")
+          (map pretty (lhs p))) <+> text "=>",
+      nest 2 (pretty (rhs p))]
 
 data Literal a = a :=: a | Predicate :@: [a] deriving (Show, Functor, Eq, Ord)
 
