@@ -61,6 +61,7 @@ library
     QuickSpec.Base
     QuickSpec.Eval
     QuickSpec.Memo
+    QuickSpec.Parse
     QuickSpec.Pretty
     QuickSpec.Prop
     QuickSpec.Pruning
