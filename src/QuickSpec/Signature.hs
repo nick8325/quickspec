@@ -63,7 +63,7 @@ data Signature =
     maxCommutativeSize :: Maybe Int,
     maxTests           :: Maybe Int,
     extraPruner        :: Maybe ExtraPruner }
-  deriving Show
+  deriving (Show,Typeable)
 
 instance Pretty Signature where
   pretty sig = vcat (map prettyDecl decls)
