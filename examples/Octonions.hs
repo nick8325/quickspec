@@ -100,42 +100,44 @@ instance Group a => Group (Ext a) where
   op (Weird x)  (Weird y)  = Normal (op (inv y) x)
 
 newtype It = It (Octonion, Ext Perms) deriving (Eq, Ord, Typeable, CoArbitrary, Group, Show)
-newtype ItFun = ItFun (It -> It) deriving (Arbitrary, CoArbitrary, Typeable)
-apply :: ItFun -> It -> It
-apply (ItFun f) x = f x
-
 instance Arbitrary It where arbitrary = liftM2 (curry It) it arbitrary
 
 (\\), (/) :: It -> It -> It
 a / b = a `op` inv b
 b \\ a = inv b `op` a
 
-l, r, l', r', t :: It -> ItFun
-l x = ItFun (\y -> x `op` y)
-r x = ItFun (\y -> y `op` x)
-l' x = ItFun (\y -> x \\ y)
-r' x = ItFun (\y -> y / x)
-t x = r x `compose` l' x
-t' x = l x `compose` r' x
+newtype ItFun = ItFun [PrimItFun] deriving (Typeable, Arbitrary)
+data PrimItFun = L It | R It | Invert
+instance Arbitrary PrimItFun where
+  arbitrary = oneof [fmap L arbitrary, fmap R arbitrary, return Invert]
 
-l2, r2, l2', r2', c :: It -> It -> ItFun
-l2 x y = l x `compose` l y `compose` l' (y `op` x)
-r2 x y = r x `compose` r y `compose` r' (x `op` y)
-l2' x y = l (y `op` x) `compose` l' y `compose` l' x
-r2' x y = r (x `op` y) `compose` r' y `compose` r' x
-c x y = r x `compose` l y `compose` r (inv x) `compose` l (inv y)
-j :: ItFun
-j = ItFun inv
+apply :: ItFun -> It -> It
+apply (ItFun xs) = foldr (.) id (map apply1 xs)
+  where
+    apply1 (L x) y = x `op` y
+    apply1 (R x) y = y `op` x
+    apply1 Invert x = inv x
 
-jconj :: ItFun -> ItFun
-jconj f = j `compose` f `compose` j
+instance Group ItFun where
+  ident = ItFun []
+  op (ItFun xs) (ItFun ys) = ItFun (xs++ys)
+  inv (ItFun xs) = ItFun (map inv1 (reverse xs))
+    where
+      inv1 (L x) = L (inv x)
+      inv1 (R x) = R (inv x)
+      inv1 Invert = Invert
 
-infixr `compose`
-compose :: ItFun -> ItFun -> ItFun
-compose (ItFun f) (ItFun g) = ItFun (f . g)
+l x = ItFun [L x]
+r x = ItFun [R x]
+j   = ItFun [Invert]
+t x = r x `op` inv (l x)
+l2 x y = l x `op` l y `op` inv (l (y `op` x))
+r2 x y = r x `op` r y `op` inv (r (x `op` y))
+c x y = r x `op` l y `op` r (inv x) `op` l (inv y)
+jconj f = j `op` f `op` j
 
 obsItFun :: ItFun -> Gen It
-obsItFun (ItFun f) = fmap f arbitrary
+obsItFun f = fmap (apply f) arbitrary
 
 sig1 =
   signature {
@@ -165,8 +167,8 @@ sig2 =
     extraPruner = Just None,
     maxTests = Just 5,
     constants = [
-      constant "id" (ItFun id),
-      constant "." compose ],
+      constant "id" (ident :: ItFun),
+      constant "."  (op :: ItFun -> ItFun -> ItFun)],
     instances = [
       names (NamesFor ["f", "g", "h"] :: NamesFor ItFun),
       inst (Sub Dict :: () :- Arbitrary ItFun),
