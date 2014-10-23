@@ -40,22 +40,20 @@ data Constant =
     conName         :: String,
     conValue        :: Value Identity,
     conGeneralValue :: Poly (Value Identity),
-    conArity        :: Int,
     conStyle        :: TermStyle,
     conSize         :: Int,
     conIsBackground :: Bool }
-instance Show Constant where
-  show c = show (conName c, conValue c, conGeneralValue c, conArity c, conSize c, conIsBackground c)
+  deriving Show
 instance Eq Constant where x == y = x `compare` y == EQ
-instance Ord Constant where compare = comparing conName
+instance Ord Constant where compare = comparing (\c -> (conName c, typ (conGeneralValue c)))
 instance Pretty Constant where
   pretty = text . conName
 instance PrettyTerm Constant where
   termStyle = conStyle
 instance Typed Constant where
   typ = typ . conValue
-  typeSubstA s (Constant name value generalValue arity pretty size isBackground) =
-    Constant name <$> typeSubstA s value <*> pure generalValue <*> pure arity <*> pure pretty <*> pure size <*> pure isBackground
+  typeSubstA s (Constant name value generalValue pretty size isBackground) =
+    Constant name <$> typeSubstA s value <*> pure generalValue <*> pure pretty <*> pure size <*> pure isBackground
 
 -- We're not allowed to have two variables with the same number
 -- but unifiable types.
@@ -92,10 +90,11 @@ instance Typed v => Typed (TermOf v) where
     Fun <$> typeSubstA s f <*> traverse (typeSubstA s) xs
 
 instance Typed v => Apply (TermOf v) where
-  tryApply t@(Fun f xs) u | conArity f > length xs =
-    case typ t of
-      Fun Arrow [arg, _] | arg == typ u -> Just (Fun f (xs ++ [u]))
-      _ -> Nothing
+  tryApply t@(Fun f xs) u
+    | arity (typ (conGeneralValue f)) > length xs =
+      case typ t of
+        Fun Arrow [arg, _] | arg == typ u -> Just (Fun f (xs ++ [u]))
+        _ -> Nothing
   tryApply _ _ = Nothing
 
 -- Turn a term into a schema by forgetting about its variables.
