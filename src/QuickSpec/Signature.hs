@@ -62,8 +62,9 @@ data Signature =
     maxTermSize        :: Maybe Int,
     maxCommutativeSize :: Maybe Int,
     maxTests           :: Maybe Int,
+    simplify           :: Maybe (Signature -> Prop -> Prop),
     extraPruner        :: Maybe ExtraPruner }
-  deriving (Show,Typeable)
+  deriving Typeable
 
 instance Pretty Signature where
   pretty sig = vcat (map prettyDecl decls)
@@ -90,6 +91,12 @@ maxCommutativeSize_ = fromMaybe 5 . maxCommutativeSize
 
 maxTests_ :: Signature -> Int
 maxTests_ = fromMaybe 100 . maxTests
+
+simplify_ :: Signature -> Prop -> Prop
+simplify_ sig =
+  case simplify sig of
+    Nothing -> id
+    Just f -> f sig
 
 data ExtraPruner = E Int | SPASS Int | Z3 Int | None deriving Show
 
@@ -156,13 +163,14 @@ newtype NamesFor a = NamesFor { unNamesFor :: [String] } deriving Typeable
 newtype DictOf c a = DictOf { unDictOf :: Dict (c a) } deriving Typeable
 
 instance Monoid Signature where
-  mempty = Signature [] [] [] Nothing Nothing Nothing Nothing Nothing
-  Signature cs is b d s s1 t p `mappend` Signature cs' is' b' d' s' s1' t' p' =
+  mempty = Signature [] [] [] Nothing Nothing Nothing Nothing Nothing Nothing
+  Signature cs is b d s s1 t simp p `mappend` Signature cs' is' b' d' s' s1' t' simp' p' =
     Signature (cs++cs') (is++is') (b++b')
       (d `mplus` d')
       (s `mplus` s')
       (s1 `mplus` s1')
       (t `mplus` t')
+      (simp `mplus` simp')
       (p `mplus` p')
 
 signature :: Signature

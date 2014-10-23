@@ -304,9 +304,9 @@ found sig prop = do
   lift (lift (axiom prop))
 
   props <- lift (gets discovered)
-  (_, props') <- runPruner sig $ mapM_ axiom props
+  (_, props') <- runPruner sig $ mapM_ axiom (map (simplify_ sig) props)
 
-  res <- liftIO $ pruner (extraPruner_ sig) props' (toGoal prop)
+  res <- liftIO $ pruner (extraPruner_ sig) props' (toGoal (simplify_ sig prop))
   case res of
     True ->
       return ()
