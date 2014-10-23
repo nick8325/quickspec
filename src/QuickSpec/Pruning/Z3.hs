@@ -8,9 +8,9 @@ import QuickSpec.Base
 import Z3.Monad hiding (Symbol, Context, reset)
 import Z3.Opts
 
-z3Unify :: [PropOf PruningTerm] -> PropOf PruningTerm -> IO Bool
-z3Unify axioms goal =
-  evalZ3With Nothing (opt "SOFT_TIMEOUT" (1000 :: Int)) $ do
+z3Unify :: Int -> [PropOf PruningTerm] -> PropOf PruningTerm -> IO Bool
+z3Unify timeout axioms goal =
+  evalZ3With Nothing (opt "SOFT_TIMEOUT" (timeout * 1000)) $ do
     bool <- mkBoolSort
     ind  <- mkStringSymbol "$i" >>= mkUninterpretedSort
     sequence_ [ flatten bool ind prop >>= assertCnstr | prop <- axioms ]

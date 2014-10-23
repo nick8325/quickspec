@@ -315,9 +315,9 @@ found sig prop = do
       liftIO $ putStrLn (prettyShow (prettyRename sig prop))
 
 pruner :: ExtraPruner -> [PropOf PruningTerm] -> PropOf PruningTerm -> IO Bool
-pruner SPASS = E.spassUnify
-pruner E = E.eUnify
-pruner Z3 = Z3.z3Unify
+pruner (SPASS timeout) = E.spassUnify timeout
+pruner (E timeout) = E.eUnify timeout
+pruner (Z3 timeout) = Z3.z3Unify timeout
 pruner None = \_ _ -> return False
 
 accept :: Poly Schema -> M ()

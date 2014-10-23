@@ -24,10 +24,9 @@ import qualified Jukebox.TPTP.Print as Jukebox
 import qualified Text.PrettyPrint.HughesPJ as Jukebox
 import Data.Char
 
-timeout = 1
-eUnify, spassUnify :: [PropOf PruningTerm] -> PropOf PruningTerm -> IO Bool
-eUnify = foUnify (Jukebox.runE (Jukebox.EFlags "eprover" (Just timeout) Nothing)) (Left Jukebox.Unsatisfiable)
-spassUnify = foUnify (Jukebox.runSPASS (Jukebox.SPASSFlags "SPASS" (Just timeout) False)) Jukebox.Unsatisfiable
+eUnify, spassUnify :: Int -> [PropOf PruningTerm] -> PropOf PruningTerm -> IO Bool
+eUnify timeout = foUnify (Jukebox.runE (Jukebox.EFlags "eprover" (Just timeout) Nothing)) (Left Jukebox.Unsatisfiable)
+spassUnify timeout = foUnify (Jukebox.runSPASS (Jukebox.SPASSFlags "SPASS" (Just timeout) False)) Jukebox.Unsatisfiable
 
 foUnify prove unsat axioms goal = do
   -- putStrLn ("\nSending to prover: " ++ prettyShow (fmap fromPruningTerm goal))

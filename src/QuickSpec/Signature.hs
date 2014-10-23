@@ -91,10 +91,10 @@ maxCommutativeSize_ = fromMaybe 5 . maxCommutativeSize
 maxTests_ :: Signature -> Int
 maxTests_ = fromMaybe 100 . maxTests
 
-data ExtraPruner = E | SPASS | Z3 | None deriving Show
+data ExtraPruner = E Int | SPASS Int | Z3 Int | None deriving Show
 
 extraPruner_ :: Signature -> ExtraPruner
-extraPruner_ = fromMaybe SPASS . extraPruner
+extraPruner_ = fromMaybe (SPASS 1) . extraPruner
 
 instances_ :: Signature -> [Instance]
 instances_ sig = concat (instances sig ++ defaultInstances)
