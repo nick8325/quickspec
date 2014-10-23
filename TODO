@@ -16,6 +16,9 @@ Generalise type variables after discovering equations!
 
 Make main QuickSpec module export sensible stuff and clean up code
 
+Add an explicit application constructor, use it when oversaturating
+functions.
+
 Longer term
 -----------
 
