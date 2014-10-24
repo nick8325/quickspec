@@ -184,6 +184,7 @@ constant name x = Constant name value (poly value) style 1 False
     style
       | head name == ',' = Tuple ar
       | isOp name && ar >= 2 = Infix 5
+      | isOp name = Prefix
       | otherwise = Curried
 
 isOp :: String -> Bool

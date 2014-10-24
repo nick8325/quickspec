@@ -54,7 +54,7 @@ class Pretty a => PrettyTerm a where
   termStyle :: a -> TermStyle
   termStyle _ = Uncurried
 
-data TermStyle = Curried | Uncurried | Tuple Int | TupleType | ListType | Infix Int | Infixr Int | Postfix deriving Show
+data TermStyle = Curried | Uncurried | Tuple Int | TupleType | ListType | Infix Int | Infixr Int | Prefix | Postfix | Gyrator deriving Show
 
 instance (PrettyTerm f, Pretty v) => Pretty (Tm f v) where
   prettyPrec p (Var x) = prettyPrec p x
@@ -81,12 +81,21 @@ prettyStyle Postfix p d [x] =
   prettyPrec 11 x <> d
 prettyStyle Postfix p d xs =
   prettyStyle Curried p (parens d) xs
+prettyStyle Prefix p d [x] =
+  d <> prettyPrec 11 x
+prettyStyle Prefix p d xs =
+  prettyStyle Curried p (parens d) xs
 prettyStyle TupleType p d xs =
   prettyStyle (Tuple (length xs)) p d xs
 prettyStyle ListType p d [x] =
   brackets (pretty x)
 prettyStyle ListType p d xs =
   prettyStyle Curried p d xs
+prettyStyle Gyrator p d [x, y] =
+  d <> brackets (sep (punctuate comma [pretty x, pretty y]))
+prettyStyle Gyrator p d (x:y:zs) =
+  prettyStyle Curried p (prettyStyle Gyrator p d [x, y]) zs
+prettyStyle Gyrator p d xs = prettyStyle Curried p d xs
 prettyStyle style p d xs =
   case xs of
     [x, y] ->

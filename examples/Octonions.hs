@@ -3,6 +3,7 @@ import Prelude hiding ((/))
 import qualified Prelude
 import Data.Ratio
 import Control.Monad
+import Control.Monad.IO.Class
 import Test.QuickCheck hiding (Result)
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Random
@@ -106,19 +107,20 @@ instance Arbitrary It where arbitrary = liftM2 (curry It) it arbitrary
 a / b = a `op` inv b
 b \\ a = inv b `op` a
 
-newtype ItFun = ItFun [PrimItFun] deriving (Typeable, Arbitrary)
-data PrimItFun = L It | R It | Invert
-instance Arbitrary PrimItFun where
+type ItFun = Fun It
+newtype Fun a = ItFun [PrimFun a] deriving (Typeable, Arbitrary)
+data PrimFun a = L a | R a | Invert
+instance Arbitrary a => Arbitrary (PrimFun a) where
   arbitrary = oneof [fmap L arbitrary, fmap R arbitrary, return Invert]
 
-apply :: ItFun -> It -> It
+apply :: Group a => Fun a -> a -> a
 apply (ItFun xs) = foldr (.) id (map apply1 xs)
   where
     apply1 (L x) y = x `op` y
     apply1 (R x) y = y `op` x
     apply1 Invert x = inv x
 
-instance Group ItFun where
+instance Group a => Group (Fun a) where
   ident = ItFun []
   op (ItFun xs) (ItFun ys) = ItFun (xs++ys)
   inv (ItFun xs) = ItFun (map inv1 (reverse xs))
@@ -139,18 +141,40 @@ jconj f = j `op` f `op` j
 obsItFun :: ItFun -> Gen It
 obsItFun f = fmap (apply f) arbitrary
 
+data Const =
+  -- Base constants
+  One | Star | Inverse |
+  -- Functionals
+  Id | Compose | Inversion | L1 | R1 | L2 | R2 | Apply | C | T | J | ConjJ
+  deriving (Enum, Bounded, Show)
+instance Pretty Const where
+  pretty = text . prettyShow
+
+instance ConLike Const where
+  toConstant One       =  constant "1"   (ident :: It)
+  toConstant Star      =  constant "*"   (op :: It -> It -> It)
+  toConstant Inverse   = (constant "^-1" (inv :: It -> It)) { conStyle = Postfix }
+  toConstant Id        =  constant "id"  (ident :: ItFun)
+  toConstant Compose   =  constant "."   (op    :: ItFun -> ItFun -> ItFun)
+  toConstant Inversion = (constant "^-1" (inv   :: ItFun -> ItFun)) { conStyle = Postfix }
+  toConstant L1        = (constant "L"   (l :: It -> ItFun))     { conStyle = Uncurried }
+  toConstant R1        = (constant "R"   (r :: It -> ItFun))     { conStyle = Uncurried }
+  toConstant L2        = (constant "L"  (l2 :: It -> It -> ItFun))    { conStyle = Uncurried }
+  toConstant R2        = (constant "R"  (r2 :: It -> It -> ItFun))    { conStyle = Uncurried }
+  toConstant Apply     =  constant "@"   (flip apply :: It -> ItFun -> It)
+  toConstant C         = (constant "C"   (c :: It -> It -> ItFun))     { conStyle = Uncurried }
+  toConstant T         = (constant "T"   (t :: It -> ItFun))     { conStyle = Uncurried }
+  toConstant J         = (constant "J"   (j :: ItFun))
+  toConstant ConjJ     = (constant "^J"  (jconj :: ItFun -> ItFun)) { conStyle = Postfix }
+
 sig1 =
   signature {
-    constants = [
-      constant "1" (ident :: It),
-      star,
-      (constant "^-1" (inv :: It -> It)) { conStyle = Postfix } ],
+    constants = map toConstant [One, Star, Inverse],
     maxTests = Just 5,
-    extraPruner = Just None,
+    extraPruner = Just (E 10),
     instances = [
       baseType (undefined :: It) ]}
   where
-    star = constant "*" (op :: It -> It -> It)
 
 diassociativity :: [Prop]
 diassociativity = map (parseProp (constants sig1 ++ [bi])) background
@@ -164,11 +188,9 @@ diassociativity = map (parseProp (constants sig1 ++ [bi])) background
 
 sig2 =
   signature {
-    extraPruner = Just None,
+    extraPruner = Just (E 60),
     maxTests = Just 5,
-    constants = [
-      constant "id" (ident :: ItFun),
-      constant "."  (op :: ItFun -> ItFun -> ItFun)],
+    constants = map toConstant [Id, Compose, Inversion],
     instances = [
       names (NamesFor ["f", "g", "h"] :: NamesFor ItFun),
       inst (Sub Dict :: () :- Arbitrary ItFun),
@@ -176,27 +198,63 @@ sig2 =
 
 sig3 =
   signature {
-    constants = [
-      (constant "L" l)   { conStyle = Uncurried },
-      (constant "R" r)   { conStyle = Uncurried },
-      --(constant "L^-1" l') { conStyle = Uncurried },
-      --(constant "R^-1" r') { conStyle = Uncurried },
-      (constant "L2" l2)  { conStyle = Uncurried },
-      (constant "R2" r2)  { conStyle = Uncurried },
-      --(constant "L2^-1" l2')  { conStyle = Uncurried },
-      --(constant "R2^-1" r2')  { conStyle = Uncurried },
-      constant "@" (flip apply),
-      --(constant "" Result) { conStyle = Curried },
-      (constant "C" c)   { conStyle = Uncurried },
-      (constant "T" t)   { conStyle = Uncurried },
-      (constant "J" j),
-      (constant "^J" jconj) { conStyle = Postfix }],
-      --(constant "T^-1" t')   { conStyle = Uncurried }],
+    extraPruner = Just (E 60),
+    constants = map toConstant [L1, R1, L2, R2, Apply, C, T, J, ConjJ],
+    --QuickSpec.simplify = Just Main.simplify,
     maxTests = Just 5}
     --instances = [baseType (undefined :: Result)],
     --background = background,
 
+class (Enum a, Bounded a) => ConLike a where
+  toConstant :: a -> Constant
+
+fromConstant :: ConLike a => Signature -> Constant -> a
+fromConstant sig c =
+  head [ x | x <- [minBound..maxBound], toConstant x == c ]
+
+simplify :: Signature -> Prop -> Prop
+simplify sig ([] :=>: t :=: u) | typ t == typeOf (undefined :: ItFun) =
+  [] :=>:
+    toTerm (simplifyTerm (Fun Apply [Var v, fromTerm t])) :=:
+    toTerm (simplifyTerm (Fun Apply [Var v, fromTerm u]))
+  where
+    v = Variable (n+1) (typeOf (undefined :: It))
+    n = 1+maximum (0:map varNumber (vars t ++ vars u))
+    toTerm = mapTerm toConstant id
+    fromTerm = mapTerm (fromConstant sig) id
+simplify sig prop = prop
+
+simplifyTerm :: Tm Const Variable -> Tm Const Variable
+simplifyTerm (Fun Apply [x, t]) | groundFuns t = simplifyTerm (apply (toFun t) x)
+simplifyTerm (Fun f ts) = Fun f (map simplifyTerm ts)
+simplifyTerm x = x
+
+groundFuns t = null [ x | x <- vars t, typ x == typeOf (undefined :: ItFun) ]
+
+toFun :: Tm Const Variable -> Fun (Tm Const Variable)
+toFun (Fun Id []) = ident
+toFun (Fun Compose [f, g]) = toFun f `op` toFun g
+toFun (Fun Inversion [f]) = inv (toFun f)
+toFun (Fun L1 [x]) = l x
+toFun (Fun R1 [x]) = r x
+toFun (Fun L2 [x, y]) = l2 x y
+toFun (Fun R2 [x, y]) = r2 x y
+toFun (Fun C [x, y]) = c x y
+toFun (Fun T [x]) = t x
+toFun (Fun J []) = j
+toFun (Fun ConjJ [f]) = jconj (toFun f)
+toFun t = error $ show t
+
+instance Group (Tm Const Variable) where
+  ident = Fun One []
+  op x y = Fun Star [x, y]
+  inv x = Fun Inverse [x]
+{-
 main = do
   thy1 <- quickSpec sig1
   thy2 <- quickSpec sig2
-  quickSpec (thy1 `mappend` thy2 `mappend` sig3)
+  let sig = thy1 `mappend` thy2 `mappend` sig3
+  quickSpec sig
+-}
+
+main = quickSpec sig1 { maxTermSize = Just 7 }
