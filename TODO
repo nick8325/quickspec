@@ -25,6 +25,9 @@ equalities on function types during pruning?)
 Longer term
 -----------
 
+Make timeouts a bit cleverer e.g. reduce test size
+Instead of timeouts, allow the test evaluator to return a Maybe (if Nothing, throw out the test)
+
 Fix heuristics so we get sum . map length = length . concat
 
 Make main loop understand conditions in some way or other
