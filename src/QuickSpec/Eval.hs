@@ -65,11 +65,12 @@ instance Pretty Event where
   pretty (UntestableType ty) = text "untestable type" <+> pretty ty
   pretty (Found prop) = text "found" <+> pretty prop
 
-data KindOf a = Untestable | Representative | EqualTo a
+data KindOf a = Untestable | TimedOut | Representative | EqualTo a
   deriving (Eq, Ord)
 
 instance Pretty a => Pretty (KindOf a) where
   pretty Untestable = text "untestable"
+  pretty TimedOut = text "timed out"
   pretty Representative = text "representative"
   pretty (EqualTo x) = text "equal to" <+> pretty x
 
@@ -171,9 +172,11 @@ createRules sig = do
   rule $ do
     Schema s k <- event
     execute $ do
-      accept s
+      unless (k == TimedOut) $ accept s
       let ms = oneTypeVar (unPoly s)
       case k of
+        TimedOut ->
+          liftIO $ print (text "Schema" <+> pretty s <+> text "timed out")
         Untestable -> return ()
         EqualTo t -> do
           considerRenamings t t
@@ -186,6 +189,8 @@ createRules sig = do
     Term (From s t) k <- event
     execute $
       case k of
+        TimedOut ->
+          liftIO $ print (text "Term" <+> pretty t <+> text "timed out")
         Untestable ->
           ERROR ("Untestable instance " ++ prettyShow t ++ " of testable schema " ++ prettyShow s)
         EqualTo (From _ u) -> do
@@ -200,13 +205,13 @@ createRules sig = do
     execute $
       {-case oneTypeVar (typ (unPoly s)) `Set.member` types of
         True ->-}
-          consider (Schema s) (unPoly (oneTypeVar s))
+          consider sig (Schema s) (unPoly (oneTypeVar s))
 {-        False ->
           generate (Schema s Untestable)-}
 
   rule $ do
     ConsiderTerm t@(From _ t') <- event
-    execute (consider (Term t) t)
+    execute (consider sig (Term t) t)
 
   rule $ do
     Schema s _ <- event
@@ -257,8 +262,8 @@ class (Eq a, Typed a) => Considerable a where
   getTestSet :: a -> M (TestSet a)
   putTestSet :: a -> TestSet a -> M ()
 
-consider :: Considerable a => (KindOf a -> Event) -> a -> M ()
-consider makeEvent x = do
+consider :: Considerable a => Signature -> (KindOf a -> Event) -> a -> M ()
+consider sig makeEvent x = do
   let t = generalise x
   res <- lift (lift (rep t))
   case res of
@@ -266,14 +271,17 @@ consider makeEvent x = do
       lift (lift (axiom ([] :=>: t :=: u)))
     _ -> do
       ts <- getTestSet x
-      case insert x ts of
-        Nothing ->
-          generate (makeEvent Untestable)
-        Just (Old y) ->
-          generate (makeEvent (EqualTo y))
-        Just (New ts) -> do
-          putTestSet x ts
-          generate (makeEvent Representative)
+      res <-
+        liftIO . testTimeout_ sig $
+        case insert x ts of
+          Nothing -> return $ do
+            generate (makeEvent Untestable)
+          Just (Old y) -> return $ do
+            generate (makeEvent (EqualTo y))
+          Just (New ts) -> return $ do
+            putTestSet x ts
+            generate (makeEvent Representative)
+      fromMaybe (generate (makeEvent TimedOut)) res
 
 instance Considerable Schema where
   generalise = instantiate . oneTypeVar

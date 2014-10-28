@@ -25,6 +25,7 @@ import Control.Monad.Trans.State.Strict
 import Data.Traversable hiding (mapM)
 import Debug.Trace
 import Control.Monad hiding (sequence)
+import System.Timeout
 
 newtype Instance = Instance (Value Instance1) deriving Show
 newtype Instance1 a = Instance1 (Value (Instance2 a))
@@ -62,6 +63,7 @@ data Signature =
     maxTermSize        :: Maybe Int,
     maxCommutativeSize :: Maybe Int,
     maxTests           :: Maybe Int,
+    testTimeout        :: Maybe Int,
     simplify           :: Maybe (Signature -> Prop -> Prop),
     extraPruner        :: Maybe ExtraPruner }
   deriving Typeable
@@ -91,6 +93,12 @@ maxCommutativeSize_ = fromMaybe 5 . maxCommutativeSize
 
 maxTests_ :: Signature -> Int
 maxTests_ = fromMaybe 100 . maxTests
+
+testTimeout_ :: Signature -> IO a -> IO (Maybe a)
+testTimeout_ sig =
+  case testTimeout sig of
+    Nothing -> fmap Just
+    Just time -> timeout time
 
 simplify_ :: Signature -> Prop -> Prop
 simplify_ sig =
@@ -163,13 +171,14 @@ newtype NamesFor a = NamesFor { unNamesFor :: [String] } deriving Typeable
 newtype DictOf c a = DictOf { unDictOf :: Dict (c a) } deriving Typeable
 
 instance Monoid Signature where
-  mempty = Signature [] [] [] Nothing Nothing Nothing Nothing Nothing Nothing
-  Signature cs is b d s s1 t simp p `mappend` Signature cs' is' b' d' s' s1' t' simp' p' =
+  mempty = Signature [] [] [] Nothing Nothing Nothing Nothing Nothing Nothing Nothing
+  Signature cs is b d s s1 t tim simp p `mappend` Signature cs' is' b' d' s' s1' t' tim' simp' p' =
     Signature (cs++cs') (is++is') (b++b')
       (d `mplus` d')
       (s `mplus` s')
       (s1 `mplus` s1')
       (t `mplus` t')
+      (tim `mplus` tim')
       (simp `mplus` simp')
       (p `mplus` p')
 
