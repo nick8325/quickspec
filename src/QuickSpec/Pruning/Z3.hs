@@ -10,7 +10,7 @@ import Z3.Opts
 
 z3Unify :: Int -> [PropOf PruningTerm] -> PropOf PruningTerm -> IO Bool
 z3Unify timeout axioms goal =
-  evalZ3With Nothing (opt "SOFT_TIMEOUT" (timeout * 1000)) $ do
+  evalZ3With Nothing (opt "SOFT_TIMEOUT" timeout) $ do
     bool <- mkBoolSort
     ind  <- mkStringSymbol "$i" >>= mkUninterpretedSort
     sequence_ [ flatten bool ind prop >>= assertCnstr | prop <- axioms ]

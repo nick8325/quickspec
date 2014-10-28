@@ -101,7 +101,7 @@ simplify_ sig =
 data ExtraPruner = E Int | SPASS Int | Z3 Int | None deriving Show
 
 extraPruner_ :: Signature -> ExtraPruner
-extraPruner_ = fromMaybe (SPASS 1) . extraPruner
+extraPruner_ = fromMaybe (Z3 400) . extraPruner -- Tuned by Dan :)
 
 instances_ :: Signature -> [Instance]
 instances_ sig = concat (instances sig ++ defaultInstances)
