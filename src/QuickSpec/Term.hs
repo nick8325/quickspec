@@ -29,9 +29,9 @@ measure t = (size t, -length (vars t),
              size t - length (filter conIsBackground (funs t)),
              rename (const ()) t, -length (usort (vars t)), t)
 
-size :: Tm f v -> Int
+size :: TermOf v -> Int
 size Var{} = 1
-size (Fun _f xs) = 1+sum (map size xs)
+size (Fun f xs) = conSize f+sum (map size xs)
 
 -- Constants have values, while variables do not (as only monomorphic
 -- variables have generators, so we need a separate defaulting phase).
