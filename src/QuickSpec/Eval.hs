@@ -59,8 +59,8 @@ data Event =
 instance Pretty Event where
   pretty (Schema s k) = text "schema" <+> pretty s <> text ":" <+> pretty k
   pretty (Term t k) = text "term" <+> pretty t <> text ":" <+> pretty k
-  pretty (ConsiderSchema s) = text "consider schema" <+> pretty s
-  pretty (ConsiderTerm t) = text "consider term" <+> pretty t
+  pretty (ConsiderSchema s) = text "consider schema" <+> pretty s <+> text "::" <+> pretty (typ s)
+  pretty (ConsiderTerm t) = text "consider term" <+> pretty t <+> text "::" <+> pretty (typ t)
   pretty (Type ty) = text "type" <+> pretty ty
   pretty (UntestableType ty) = text "untestable type" <+> pretty ty
   pretty (Found prop) = text "found" <+> pretty prop
