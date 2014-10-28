@@ -1,6 +1,8 @@
 High-priority
 -------------
 
+Fix bug where ++ and zip generates loads of laws!
+
 Fix bug where schemas are generated twice
 
 Fix eta-expansion
