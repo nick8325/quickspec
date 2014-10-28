@@ -16,11 +16,16 @@ Generalise type variables after discovering equations!
 
 Make main QuickSpec module export sensible stuff and clean up code
 
-Add an explicit application constructor, use it when oversaturating
-functions.
+Add an explicit application constructor, use it when applying variables.
+
+Make combinator example work (bug with polymorphic instantiation,
+eta-expand laws about functions - perhaps just don't generate any
+equalities on function types during pruning?)
 
 Longer term
 -----------
+
+Fix heuristics so we get sum . map length = length . concat
 
 Make main loop understand conditions in some way or other
 
