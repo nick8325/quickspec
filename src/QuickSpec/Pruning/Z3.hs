@@ -1,5 +1,9 @@
+{-# LANGUAGE CPP #-}
 module QuickSpec.Pruning.Z3 where
 
+#ifdef NO_Z3
+z3Unify _ _ _ = return False
+#else
 import QuickSpec.Pruning
 import QuickSpec.Prop
 import QuickSpec.Utils
@@ -58,3 +62,4 @@ quantify ind [] t = return t
 quantify ind xs t = do
   apps <- mapM (flattenTerm ind . Var) xs >>= mapM toApp
   mkForallConst [] apps t
+#endif

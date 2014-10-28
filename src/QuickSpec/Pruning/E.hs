@@ -1,6 +1,10 @@
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GADTs, CPP #-}
 module QuickSpec.Pruning.E where
 
+#ifdef NO_JUKEBOX
+eUnify _ _ _ = return False
+spassUnify _ _ _ = return False
+#else
 import QuickSpec.Base
 import QuickSpec.Term
 import QuickSpec.Type
@@ -93,4 +97,4 @@ translateTerm :: (PruningVariable -> Jukebox.Variable) ->
                  PruningTerm -> Jukebox.Term
 translateTerm var _fun (Var x) = Jukebox.Var (var x)
 translateTerm var  fun (Fun f ts) = fun f Jukebox.:@: map (translateTerm var fun) ts
-
+#endif

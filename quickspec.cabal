@@ -52,6 +52,14 @@ source-repository head
   location: git://github.com/nick8325/quickspec.git
   branch:   master
 
+flag z3
+  Description: Use the Z3 prover for pruning.
+  Default: True
+
+flag jukebox
+  Description: Use the E and SPASS provers for pruning.
+  Default: True
+
 library
   ghc-options: -Wall -fno-warn-name-shadowing -fno-warn-incomplete-patterns
   hs-source-dirs: src
@@ -76,4 +84,13 @@ library
     QuickSpec.Type
     QuickSpec.Utils
 
-  Build-depends: base < 5, containers, transformers, QuickCheck >= 2.7, spoon >= 0.2, term-rewriting >= 0.1.2, constraints, dlist, pretty, data-memocombinators, random, bytestring, jukebox >= 0.1.2, z3
+  Build-depends: base < 5, containers, transformers, QuickCheck >= 2.7, spoon >= 0.2, term-rewriting >= 0.1.2, constraints, dlist, pretty, data-memocombinators, random, bytestring
+
+  if flag(jukebox)
+    Build-depends: jukebox >= 0.1.2
+  else
+    cpp-options: -DNO_JUKEBOX
+  if flag(z3)
+    Build-depends: z3
+  else
+    cpp-options: -DNO_Z3
