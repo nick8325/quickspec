@@ -79,6 +79,10 @@ Make the main pruning infrastructure check this?
 Maybe add a type wrapper for preserving the original type of a polymorphic value
 (store as original value + type subst??)
 
+Instead of conGeneralValue/regeneralise nonsense, have a type
+constructor "Mono a" which wraps its argument while having its Typed
+instance unify all types.
+
 Stuff for HipSpec
 -----------------
 
