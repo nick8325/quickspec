@@ -15,6 +15,9 @@ import Data.Functor.Identity
 import Control.Applicative
 import Data.Traversable(traverse)
 import qualified Data.Rewriting.Substitution.Type as T
+import Data.List
+import Control.Monad
+import Data.Maybe
 
 -- Terms and schemas.
 -- A schema is like a term but has holes instead of variables.
@@ -22,16 +25,61 @@ type TermOf = Tm Constant
 type Term = TermOf Variable
 type Schema = TermOf Hole
 
--- Term ordering - size, skeleton, generality.
-type Measure v = (Int, Int, Int, TermOf (), Int, TermOf v)
-measure :: Ord v => TermOf v -> Measure v
-measure t = (size t, -length (vars t),
-             size t - length (filter conIsBackground (funs t)),
-             rename (const ()) t, -length (usort (vars t)), t)
+class Sized a where
+  funSize :: a -> Int
+  -- Map all Skolem constants to the same constant.
+  schematise :: a -> a
+  schematise = id
 
-size :: TermOf v -> Int
-size Var{} = 1
-size (Fun f xs) = conSize f+sum (map size xs)
+-- Term ordering.
+-- Satisfies the property:
+-- if Measure (schema t) < Measure (schema u) then Measure t < Measure u.
+newtype Measure f v = Measure (Tm f v)
+instance (Sized f, Ord f, Ord v) => Eq (Measure f v) where
+  t == u = compare t u == EQ
+instance (Sized f, Ord f, Ord v) => Ord (Measure f v) where
+  compare (Measure t) (Measure u) =
+    compareSchema t u `orElse` comparing rest t u
+    where
+      -- Order instances of the same schema by generality
+      -- Look at funs t too to deal with Skolem constants
+      rest t = (-length (usort (vars t)), vars t,
+                -length (usort (funs t)), funs t)
+
+compareSchema :: (Sized f, Ord f) => Tm f v -> Tm f v -> Ordering
+compareSchema t u =
+  case compareTerms (toSchema t) (toSchema u) of
+    Nothing -> EQ
+    Just (_, _, ord) -> ord
+  where
+    toSchema = mapTerm schematise (const ())
+
+-- Take two terms and find the first place where they differ.
+compareTerms :: (Sized f, Ord f, Ord v) => Tm f v -> Tm f v -> Maybe (Tm f v, Tm f v, Ordering)
+compareTerms t u =
+  here (comparing size t u) `mplus`
+  case (t, u) of
+    (Var x, Var y) -> here (compare x y)
+    (Var{}, Fun{}) -> here LT
+    (Fun{}, Var{}) -> here GT
+    (Fun f xs, Fun g ys) ->
+      here (compare f g) `mplus` msum (zipWith compareTerms xs ys)
+  where
+    here EQ = Nothing
+    here ord = Just (t, u, ord)
+
+-- Reduction ordering (i.e., a partial order closed under substitution).
+-- Has the property:
+-- if t `simplerThan` u then Measure (schema t) < Measure (schema u).
+simplerThan :: (Sized f, Ord f, Ord v) => Tm f v -> Tm f v -> Bool
+t `simplerThan` u =
+  case compareTerms t u of
+    Just (t', u', LT) -> sort (vars t') `isSubsequenceOf` sort (vars u')
+    _ -> False
+
+size :: Sized f => Tm f v -> Int
+size (Var x) = 1
+size (Fun f xs) = funSize f + sum (map size xs)
 
 -- Constants have values, while variables do not (as only monomorphic
 -- variables have generators, so we need a separate defaulting phase).
@@ -54,6 +102,8 @@ instance Typed Constant where
   typ = typ . conValue
   typeSubstA s (Constant name value generalValue pretty size isBackground) =
     Constant name <$> typeSubstA s value <*> pure generalValue <*> pure pretty <*> pure size <*> pure isBackground
+instance Sized Constant where
+  funSize = conSize
 
 -- We're not allowed to have two variables with the same number
 -- but unifiable types.

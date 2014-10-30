@@ -138,7 +138,7 @@ quickSpecLoop sig = do
 
 exploreSize sig n = do
   lift $ modify (\s -> s { schemas = Map.insert n Map.empty (schemas s) })
-  ss <- fmap (sortBy (comparing measure)) (schemasOfSize n sig)
+  ss <- fmap (sortBy (comparing Measure)) (schemasOfSize n sig)
   liftIO $ putStrLn ("Size " ++ show n ++ ", " ++ show (length ss) ++ " schemas to consider:")
   mapM_ (generate . ConsiderSchema . poly) ss
   liftIO $ putStrLn ""
@@ -254,7 +254,7 @@ considerRenamings :: Schema -> Schema -> M ()
 considerRenamings s s' = do
   sequence_ [ generate (ConsiderTerm (From s t)) | t <- ts ]
   where
-    ts = sortBy (comparing measure) (allUnifications (instantiate s'))
+    ts = sortBy (comparing Measure) (allUnifications (instantiate s'))
 
 class (Eq a, Typed a) => Considerable a where
   generalise :: a -> Term
@@ -267,7 +267,7 @@ consider sig makeEvent x = do
   let t = generalise x
   res <- lift (lift (rep t))
   case res of
-    Just u | measure u < measure t ->
+    Just u | Measure u < Measure t ->
       lift (lift (axiom ([] :=>: t :=: u)))
     _ -> do
       ts <- getTestSet x
