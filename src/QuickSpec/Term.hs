@@ -63,17 +63,12 @@ compareTerms t u =
     (Var{}, Fun{}) -> here LT
     (Fun{}, Var{}) -> here GT
     (Fun f xs, Fun g ys) ->
-      -- Symbol order inspired by Prover9:
-      -- https://www.cs.unm.edu/~mccune/prover9/manual/2009-02A/term-order.html
-      -- Effectively order constants by arity first
-      here (compare (twiddle (length xs)) (twiddle (length ys))) `mplus`
+      -- Order constants by arity first
+      here (compare (length xs) (length ys)) `mplus`
       here (compare f g) `mplus` msum (zipWith compareTerms xs ys)
   where
     here EQ = Nothing
     here ord = Just (t, u, ord)
-    twiddle 2 = 1
-    twiddle 1 = 2
-    twiddle x = x
 
 -- Reduction ordering (i.e., a partial order closed under substitution).
 -- Has the property:
@@ -81,7 +76,9 @@ compareTerms t u =
 simplerThan :: (Sized f, Ord f, Ord v) => Tm f v -> Tm f v -> Bool
 t `simplerThan` u =
   case compareTerms t u of
-    Just (t', u', LT) -> sort (vars t') `isSubsequenceOf` sort (vars u')
+    Just (t', u', LT) ->
+      sort (vars t') `isSubsequenceOf` sort (vars u') &&
+      sort (vars t)  `isSubsequenceOf` sort (vars u)
     _ -> False
 
 size :: Sized f => Tm f v -> Int
