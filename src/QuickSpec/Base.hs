@@ -4,7 +4,7 @@
 {-# LANGUAGE CPP, TypeSynonymInstances #-}
 module QuickSpec.Base(
   Tm,
-  module Data.Rewriting.Term, foldTerm, mapTerm,
+  module Data.Rewriting.Term, foldTerm, mapTerm, symbols,
   module Data.Rewriting.Term.Ops,
   module Data.Rewriting.Substitution, evalSubst, subst, substA, unifyMany,
   module QuickSpec.Pretty,
@@ -24,6 +24,8 @@ import qualified Data.Map as Map
 import Data.Map(Map)
 import QuickSpec.Pretty
 import Text.PrettyPrint.HughesPJ
+import qualified Data.DList as DList
+import Control.Monad
 
 -- Renamings of functionality from term-rewriting.
 type Tm = T.Term
@@ -33,6 +35,12 @@ foldTerm = T.fold
 
 mapTerm :: (f -> f') -> (v -> v') -> Tm f v -> Tm f' v'
 mapTerm = T.map
+
+symbols :: Tm f v -> [Either f v]
+symbols t = DList.toList (aux t)
+  where
+    aux (Fun f xs) = return (Left f) `mplus` msum (map aux xs)
+    aux (Var x)    = return (Right x)
 
 evalSubst :: Ord v => Subst f v -> v -> Tm f v
 evalSubst s = subst s . Var
