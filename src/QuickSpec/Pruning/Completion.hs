@@ -1,5 +1,4 @@
 {-# LANGUAGE FlexibleInstances #-}
--- https://hal.inria.fr/inria-00075875/document
 --module QuickSpec.Pruning.Completion where
 
 import QuickSpec.Base hiding ((<>), nest, ($$), empty)
@@ -72,13 +71,6 @@ x === y
   | Measure x < Measure y = y :==: x
   | otherwise = x :==: y
 
-renameVars x y = x' :==: y'
-  where
-    vs = nub (vars x ++ vars y)
-    sub' = Subst.fromMap (Map.fromList (zip vs (map Var [0..])))
-    Just x' = Subst.gApply sub' x
-    Just y' = Subst.gApply sub' y
-
 instance Ord Equation where
   compare = comparing (\(l :==: r) -> (Measure l, Measure r))
 
@@ -92,25 +84,26 @@ orient eq@(l :==: r) =
 criticalPairs :: Rule -> Rule -> [Equation]
 criticalPairs r1 r2 = do
   cp <- CP.cps [r1] [r2]
-  let sub = subst (CP.subst cp)
-      top = sub (CP.top cp)
-      --left = sub (CP.left cp)
-      --right = sub (CP.right cp)
+  let top = CP.top cp
       left = CP.left cp
       right = CP.right cp
 
   -- XXX for equations
   -- unless (oriented [r1]) $ guard (not (top `simplerThan` left))
   -- unless (oriented [r2]) $ guard (not (top `simplerThan` right))
-  return (renameVars left right)
+
+  let (left', right') = canonicalise (left, right)
+      f (Left x) = x
+      f (Right x) = x
+  return (rename f left' === rename f right')
 
 type Strategy f v = Tm f v -> [Tm f v]
 
-normalise :: Strategy f v -> Tm f v -> Tm f v
-normalise strat t =
+normaliseWith :: Strategy f v -> Tm f v -> Tm f v
+normaliseWith strat t =
   case strat t of
     [] -> t
-    (r:_) -> normalise strat r
+    (r:_) -> normaliseWith strat r
 
 anywhere :: Strategy f v -> Strategy f v
 anywhere strat t = strat t ++ nested (anywhere strat) t
@@ -126,15 +119,15 @@ nested strat (Fun f xs) = map (Fun f) (combine xs (map strat xs))
 rewrite :: (Ord f, Ord v) => RuleSet f v -> Strategy f v
 rewrite rules t = fmap Rule.rhs (RuleSet.match t rules)
 
-normaliseM :: Monad m => PruningTerm -> StateT Completion m PruningTerm
-normaliseM t = do
+normalise :: Monad m => PruningTerm -> StateT Completion m PruningTerm
+normalise t = do
   Completion { rules = rules } <- get
-  return (normalise (anywhere (rewrite rules)) t)
+  return (normaliseWith (anywhere (rewrite rules)) t)
 
 newEquation :: Monad m => Equation -> StateT Completion m ()
 newEquation (l :==: r) = do
-  l <- normaliseM l
-  r <- normaliseM r
+  l <- normalise l
+  r <- normalise r
   unless (l == r) $
     modify (\s -> s { queue = Set.insert (l === r) (queue s) })
 
@@ -150,16 +143,13 @@ complete = do
 
 consider :: Monad m => Equation -> StateT Completion m ()
 consider (l :==: r) = do
-  l <- normaliseM l
-  r <- normaliseM r
+  l <- normalise l
+  r <- normalise r
   maxSize <- gets maxSize
   when (size l <= maxSize && size r <= maxSize) $
-    case orient (l :==: r) of
+    case fmap canonicalise (orient (l :==: r)) of
       Nothing -> return ()
-      Just rule@(Rule.Rule l r) -> do
-        -- HACK rename variables
-        let l' :==: r' = renameVars l r
-            rule = Rule.Rule l' r'
+      Just rule -> do
         trace (show (pretty (size l) <+> pretty rule)) $ return ()
         modify (\s -> s { rules = RuleSet.insert rule (rules s) })
         interreduce rule
@@ -203,7 +193,7 @@ deleteRule r = modify (\s -> s { rules = RuleSet.delete r (rules s) })
 
 simplifyRule :: Monad m => Rule -> StateT Completion m ()
 simplifyRule r = do
-  rhs' <- normaliseM (Rule.rhs r)
+  rhs' <- normalise (Rule.rhs r)
   let r' = r { Rule.rhs = rhs' }
   deleteRule r
   addRule r'

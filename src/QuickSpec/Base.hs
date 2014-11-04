@@ -74,6 +74,26 @@ instance Symbolic (Tm f v) where
   substf sub = foldTerm sub Fun
   term = id
 
+instance Symbolic (Rule.Rule f v) where
+  type ConstantOf (Rule.Rule f v) = f
+  type VariableOf (Rule.Rule f v) = v
+  termsDL (Rule.Rule lhs rhs) = return lhs `mplus` return rhs
+  substf sub (Rule.Rule lhs rhs) = Rule.Rule (substf sub lhs) (substf sub rhs)
+
+instance (ConstantOf a ~ ConstantOf b,
+          VariableOf a ~ VariableOf b,
+          Symbolic a, Symbolic b) => Symbolic (a, b) where
+  type ConstantOf (a, b) = ConstantOf a
+  type VariableOf (a, b) = VariableOf b
+  termsDL (x, y) = termsDL x `mplus` termsDL y
+  substf sub (x, y) = (substf sub x, substf sub y)
+
+instance Symbolic a => Symbolic [a] where
+  type ConstantOf [a] = ConstantOf a
+  type VariableOf [a] = VariableOf a
+  termsDL ts = msum (map termsDL ts)
+  substf sub = map (substf sub)
+
 vars :: Symbolic a => a -> [VariableOf a]
 vars = DList.toList . varsDL
 
@@ -106,6 +126,10 @@ class Numbered a where
 
 instance Numbered Int where
   withNumber = const
+
+instance (Numbered a, Numbered b) => Numbered (Either a b) where
+  withNumber n (Left x)  = Left  (withNumber n x)
+  withNumber n (Right x) = Right (withNumber n x)
 
 canonicalise :: (Ord (VariableOf a), Numbered (VariableOf a), Symbolic a) => a -> a
 canonicalise t = substf (evalSubst sub) t
