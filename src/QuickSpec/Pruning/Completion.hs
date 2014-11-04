@@ -22,7 +22,10 @@ import Data.List
 import Debug.Trace
 import Data.Ord
 import qualified QuickSpec.Pruning.Index as Index
+import qualified QuickSpec.Pruning.Equations as Equations
 import QuickSpec.Pruning.Index(Index)
+import QuickSpec.Pruning.Equations(Equations)
+import QuickSpec.Pruning.Equation
 
 instance PrettyTerm String
 type PruningTerm = Tm PruningConstant PruningVariable
@@ -57,31 +60,16 @@ data Completion =
     maxSize   :: Int,
     sizeDelta :: Int,
     rules     :: Index Rule,
-    queue     :: Set Equation }
+    queue     :: Set Eqn }
   deriving Show
 
 initialState = Completion 0 1 Index.empty Set.empty
 
-data Equation = PruningTerm :==: PruningTerm deriving (Eq, Show)
+type Eqn = EquationOf PruningTerm
 type Rule = RuleOf PruningTerm
 type PruningCP = CPOf PruningTerm
 
-(===) :: PruningTerm -> PruningTerm -> Equation
-x === y
-  | Measure x < Measure y = y :==: x
-  | otherwise = x :==: y
-
-instance Ord Equation where
-  compare = comparing (\(l :==: r) -> (Measure l, Measure r))
-
-orient :: Equation -> Maybe Rule
-orient eq@(l :==: r) =
-  case orientTerms l r of
-    Just LT -> Just (Rule.Rule r l)
-    Just GT -> Just (Rule.Rule l r)
-    _       -> Nothing
-
-criticalPairs :: Rule -> Rule -> [Equation]
+criticalPairs :: Rule -> Rule -> [Eqn]
 criticalPairs r1 r2 = do
   cp <- CP.cps [r1] [r2]
   let top = CP.top cp
@@ -124,7 +112,7 @@ normalise t = do
   Completion { rules = rules } <- get
   return (normaliseWith (anywhere (rewrite rules)) t)
 
-newEquation :: Monad m => Equation -> StateT Completion m ()
+newEquation :: Monad m => Eqn -> StateT Completion m ()
 newEquation (l :==: r) = do
   l <- normalise l
   r <- normalise r
@@ -141,13 +129,13 @@ complete = do
       complete
     _ -> return ()
 
-consider :: Monad m => Equation -> StateT Completion m ()
+consider :: Monad m => Eqn -> StateT Completion m ()
 consider (l :==: r) = do
   l <- normalise l
   r <- normalise r
   maxSize <- gets maxSize
   when (size l <= maxSize && size r <= maxSize) $
-    case fmap canonicalise (orient (l :==: r)) of
+    case orient (l :==: r) of
       Nothing -> return ()
       Just rule -> do
         trace (show (pretty (size l) <+> pretty rule)) $ return ()
