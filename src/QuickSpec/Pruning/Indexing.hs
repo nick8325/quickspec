@@ -27,17 +27,24 @@ updateHere :: Ord a => (Set a -> Set a) -> Index f v a -> Index f v a
 updateHere f idx = idx { here = f (here idx) }
 
 updateFun :: (Ord f, Ord v) => f -> (Index f v a -> Index f v a) -> Index f v a -> Index f v a
-updateFun x f idx =
-  idx {
-    fun = Map.insert x (f (Map.findWithDefault QuickSpec.Pruning.Indexing.empty x (fun idx))) (fun idx) }
+updateFun x f idx
+  | QuickSpec.Pruning.Indexing.null idx' = idx { fun = Map.delete x (fun idx) }
+  | otherwise = idx { fun = Map.insert x idx' (fun idx) }
+  where
+    idx' = f (Map.findWithDefault QuickSpec.Pruning.Indexing.empty x (fun idx))
 
 updateVar :: (Ord f, Ord v) => v -> (Index f v a -> Index f v a) -> Index f v a -> Index f v a
-updateVar x f idx =
-  idx {
-    var = Map.insert x (f (Map.findWithDefault QuickSpec.Pruning.Indexing.empty x (var idx))) (var idx) }
+updateVar x f idx
+  | QuickSpec.Pruning.Indexing.null idx' = idx { var = Map.delete x (var idx) }
+  | otherwise = idx { var = Map.insert x idx' (var idx) }
+  where
+    idx' = f (Map.findWithDefault QuickSpec.Pruning.Indexing.empty x (var idx))
 
 empty :: Index f v a
 empty = Index Set.empty Map.empty Map.empty
+
+null :: Index f v a -> Bool
+null idx = Set.null (here idx) && Map.null (fun idx) && Map.null (var idx)
 
 insert :: (Ord f, Ord v, Ord a) => Tm f v -> a -> Index f v a -> Index f v a
 insert t = insertFlat (symbols t)
