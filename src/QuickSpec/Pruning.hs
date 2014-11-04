@@ -151,7 +151,6 @@ rep t = liftM (liftM fromPruningTerm) (liftPruner (untypedRep (map unitProp axs)
     (axs, u) = toGoalTerm t
 
 type PruningTerm = Tm PruningConstant PruningVariable
-type PruningSubst = Subst PruningConstant PruningVariable
 
 data PruningConstant
     -- N.B. variables are less than constants so that skolemisation

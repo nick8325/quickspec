@@ -3,7 +3,7 @@
 
 {-# LANGUAGE CPP, TypeSynonymInstances, TypeFamilies, FlexibleContexts #-}
 module QuickSpec.Base(
-  Tm,
+  Tm, TmOf, SubstOf, RuleOf, CPOf,
   module Data.Rewriting.Term, foldTerm, mapTerm,
   module Data.Rewriting.Term.Ops,
   module Data.Rewriting.Substitution, evalSubst, subst,
@@ -31,6 +31,7 @@ import qualified Data.DList as DList
 import Data.DList(DList)
 import Control.Monad
 import qualified Data.Rewriting.Rule as Rule
+import qualified Data.Rewriting.CriticalPair as CP
 import QuickSpec.Utils
 import Data.List
 
@@ -55,17 +56,20 @@ class Symbolic a where
   type ConstantOf a
   type VariableOf a
 
-  term :: a -> Tm (ConstantOf a) (VariableOf a)
+  term :: a -> TmOf a
   term t = DList.head (termsDL t)
 
-  termsDL :: a -> DList (Tm (ConstantOf a) (VariableOf a))
+  termsDL :: a -> DList (TmOf a)
   termsDL t = return (term t)
 
-  substf ::
-    (VariableOf a -> Tm (ConstantOf a) (VariableOf a)) ->
-    a -> a
+  substf :: (VariableOf a -> TmOf a) -> a -> a
 
-terms :: Symbolic a => a -> [Tm (ConstantOf a) (VariableOf a)]
+type TmOf a = Tm (ConstantOf a) (VariableOf a)
+type SubstOf a = Subst (ConstantOf a) (VariableOf a)
+type RuleOf a = Rule.Rule (ConstantOf a) (VariableOf a)
+type CPOf a = CP.CP (ConstantOf a) (VariableOf a)
+
+terms :: Symbolic a => a -> [TmOf a]
 terms = DList.toList . termsDL
 
 instance Symbolic (Tm f v) where

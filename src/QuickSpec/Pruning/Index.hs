@@ -1,8 +1,6 @@
-{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFunctor, StandaloneDeriving, FlexibleContexts, UndecidableInstances #-}
 -- Term indexing (perfect discrimination trees).
--- Note: for efficiency, terms should be canonically alpha-renamed before
--- being inserted into the index.
-module QuickSpec.Pruning.Indexing where
+module QuickSpec.Pruning.Index where
 
 import QuickSpec.Base hiding (empty)
 import qualified Data.Map as Map
@@ -17,53 +15,64 @@ import Data.Maybe
 import Control.Applicative
 import Control.Monad
 
-data Index f v a =
+data Index a =
   Index {
     here :: Set a,
-    fun  :: Map f (Index f v a),
-    var  :: Map v (Index f v a) } deriving Show
+    fun  :: Map (ConstantOf a) (Index a),
+    var  :: Map (VariableOf a) (Index a) }
+deriving instance (Show a, Show (ConstantOf a), Show (VariableOf a)) => Show (Index a)
 
-updateHere :: Ord a => (Set a -> Set a) -> Index f v a -> Index f v a
+updateHere :: Ord a => (Set a -> Set a) -> Index a -> Index a
 updateHere f idx = idx { here = f (here idx) }
 
-updateFun :: (Ord f, Ord v) => f -> (Index f v a -> Index f v a) -> Index f v a -> Index f v a
+updateFun ::
+  Ord (ConstantOf a) =>
+  ConstantOf a -> (Index a -> Index a) -> Index a -> Index a
 updateFun x f idx
-  | QuickSpec.Pruning.Indexing.null idx' = idx { fun = Map.delete x (fun idx) }
+  | QuickSpec.Pruning.Index.null idx' = idx { fun = Map.delete x (fun idx) }
   | otherwise = idx { fun = Map.insert x idx' (fun idx) }
   where
-    idx' = f (Map.findWithDefault QuickSpec.Pruning.Indexing.empty x (fun idx))
+    idx' = f (Map.findWithDefault QuickSpec.Pruning.Index.empty x (fun idx))
 
-updateVar :: (Ord f, Ord v) => v -> (Index f v a -> Index f v a) -> Index f v a -> Index f v a
+updateVar ::
+  Ord (VariableOf a) =>
+  VariableOf a -> (Index a -> Index a) -> Index a -> Index a
 updateVar x f idx
-  | QuickSpec.Pruning.Indexing.null idx' = idx { var = Map.delete x (var idx) }
+  | QuickSpec.Pruning.Index.null idx' = idx { var = Map.delete x (var idx) }
   | otherwise = idx { var = Map.insert x idx' (var idx) }
   where
-    idx' = f (Map.findWithDefault QuickSpec.Pruning.Indexing.empty x (var idx))
+    idx' = f (Map.findWithDefault QuickSpec.Pruning.Index.empty x (var idx))
 
-empty :: Index f v a
+empty :: Index a
 empty = Index Set.empty Map.empty Map.empty
 
-null :: Index f v a -> Bool
+null :: Index a -> Bool
 null idx = Set.null (here idx) && Map.null (fun idx) && Map.null (var idx)
 
-insert :: (Ord f, Ord v, Ord a) => Tm f v -> a -> Index f v a -> Index f v a
-insert t = insertFlat (symbols t)
+insert ::
+  (Symbolic a, Ord (ConstantOf a), Ord (VariableOf a), Numbered (VariableOf a), Ord a) =>
+  a -> Index a -> Index a
+insert t = insertFlat (symbols (term u))
   where
-    insertFlat [] y idx = updateHere (Set.insert y) idx
-    insertFlat (Left x:xs) y idx = updateFun x (insertFlat xs y) idx
-    insertFlat (Right x:xs) y idx = updateVar x (insertFlat xs y) idx
+    u = canonicalise t
+    insertFlat [] = updateHere (Set.insert u)
+    insertFlat (Left x:xs) = updateFun x (insertFlat xs)
+    insertFlat (Right x:xs) = updateVar x (insertFlat xs)
 
-delete :: (Ord f, Ord v, Ord a) => Tm f v -> a -> Index f v a -> Index f v a
-delete t = deleteFlat (symbols t)
+delete ::
+  (Symbolic a, Ord (ConstantOf a), Ord (VariableOf a), Numbered (VariableOf a), Ord a) =>
+  a -> Index a -> Index a
+delete t = deleteFlat (symbols (term u))
   where
-    deleteFlat [] y idx = updateHere (Set.delete y) idx
-    deleteFlat (Left x:xs) y idx = updateFun x (deleteFlat xs y) idx
-    deleteFlat (Right x:xs) y idx = updateVar x (deleteFlat xs y) idx
+    u = canonicalise t
+    deleteFlat [] = updateHere (Set.delete u)
+    deleteFlat (Left x:xs) = updateFun x (deleteFlat xs)
+    deleteFlat (Right x:xs) = updateVar x (deleteFlat xs)
 
 data Result f v a =
   Result {
     result :: a,
-    subst :: Subst f v }
+    substitution :: Subst f v }
   deriving (Functor, Show)
 
 newtype Results f v a =
@@ -92,15 +101,18 @@ instance (Ord f, Ord v) => MonadPlus (Results f v) where
   mzero = Results mzero
   Results x `mplus` Results y = Results (x `mplus` y)
 
-lookup :: (Ord f, Ord v) => Tm f v -> Index f v a -> [Result f v a]
+lookup ::
+  (Symbolic a, Ord (ConstantOf a), Ord (VariableOf a)) =>
+  TmOf a -> Index a -> [a]
 lookup t idx =
   concatMap flattenResult (DList.toList (unResults (lookupPartial t idx)))
   where
     flattenResult (Result idx' sub) =
-      [ Result m sub | m <- Set.toList (here idx') ]
+      [ substf (evalSubst sub) m | m <- Set.toList (here idx') ]
 
 lookupPartial, lookupVar, lookupFun ::
-  (Ord f, Ord v) => Tm f v -> Index f v a -> Results f v (Index f v a)
+  (Ord (ConstantOf a), Ord (VariableOf a)) =>
+  TmOf a -> Index a -> Results (ConstantOf a) (VariableOf a) (Index a)
 lookupPartial t idx = lookupVar t idx `mplus` lookupFun t idx
 
 lookupVar t idx =
@@ -114,7 +126,7 @@ lookupFun (Fun f ts) idx =
     Just idx' -> foldr (>=>) return (map lookupPartial ts) idx'
 lookupFun _ _ = mzero
 
-elems :: Index f v a -> [a]
+elems :: Index a -> [a]
 elems idx = DList.toList (aux idx)
   where
     aux idx =

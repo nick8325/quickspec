@@ -21,8 +21,8 @@ import qualified Data.Map as Map
 import Data.List
 import Debug.Trace
 import Data.Ord
-import qualified QuickSpec.Pruning.RuleSet as RuleSet
-import QuickSpec.Pruning.RuleSet(RuleSet)
+import qualified QuickSpec.Pruning.Index as Index
+import QuickSpec.Pruning.Index(Index)
 
 instance PrettyTerm String
 type PruningTerm = Tm PruningConstant PruningVariable
@@ -56,15 +56,15 @@ data Completion =
   Completion {
     maxSize   :: Int,
     sizeDelta :: Int,
-    rules     :: RuleSet PruningConstant PruningVariable,
+    rules     :: Index Rule,
     queue     :: Set Equation }
   deriving Show
 
-initialState = Completion 0 1 RuleSet.empty Set.empty
+initialState = Completion 0 1 Index.empty Set.empty
 
 data Equation = PruningTerm :==: PruningTerm deriving (Eq, Show)
-type Rule = Rule.Rule PruningConstant PruningVariable
-type PruningCP = CP.CP PruningConstant PruningVariable PruningVariable
+type Rule = RuleOf PruningTerm
+type PruningCP = CPOf PruningTerm
 
 (===) :: PruningTerm -> PruningTerm -> Equation
 x === y
@@ -116,8 +116,8 @@ nested strat (Fun f xs) = map (Fun f) (combine xs (map strat xs))
     combine (x:xs) (ys:yss) =
       [ y:xs | y <- ys ] ++ [ x:zs | zs <- combine xs yss ]
 
-rewrite :: (Ord f, Ord v) => RuleSet f v -> Strategy f v
-rewrite rules t = fmap Rule.rhs (RuleSet.match t rules)
+rewrite :: Index Rule -> Strategy PruningConstant PruningVariable
+rewrite rules t = map Rule.rhs (Index.lookup t rules)
 
 normalise :: Monad m => PruningTerm -> StateT Completion m PruningTerm
 normalise t = do
@@ -151,15 +151,15 @@ consider (l :==: r) = do
       Nothing -> return ()
       Just rule -> do
         trace (show (pretty (size l) <+> pretty rule)) $ return ()
-        modify (\s -> s { rules = RuleSet.insert rule (rules s) })
+        modify (\s -> s { rules = Index.insert rule (rules s) })
         interreduce rule
         addCriticalPairs rule
 
 addCriticalPairs :: Monad m => Rule -> StateT Completion m ()
 addCriticalPairs rule = do
   Completion { rules = rules } <- get
-  mapM_ newEquation (concat [ criticalPairs rule rule' | rule' <- RuleSet.elems rules ])
-  mapM_ newEquation (concat [ criticalPairs rule' rule | rule' <- RuleSet.elems rules ])
+  mapM_ newEquation (concat [ criticalPairs rule rule' | rule' <- Index.elems rules ])
+  mapM_ newEquation (concat [ criticalPairs rule' rule | rule' <- Index.elems rules ])
 
 data Reduction = Simplify Rule | Reorient Rule
 
@@ -170,7 +170,7 @@ instance Show Reduction where
 interreduce :: Monad m => Rule -> StateT Completion m ()
 interreduce rule = do
   Completion { rules = rs } <- get
-  let reductions = catMaybes (map (interreduction rule) (RuleSet.elems rs))
+  let reductions = catMaybes (map (interreduction rule) (Index.elems rs))
   sequence_ [ traceShow r (return ()) | r <- reductions ]
   sequence_ [ simplifyRule r | Simplify r <- reductions ]
   sequence_ [ newEquation (Rule.lhs r :==: Rule.rhs r) | Reorient r <- reductions ]
@@ -186,10 +186,10 @@ interreduction new old
   | otherwise = Nothing
 
 addRule :: Monad m => Rule -> StateT Completion m ()
-addRule r = modify (\s -> s { rules = RuleSet.insert r (rules s) })
+addRule r = modify (\s -> s { rules = Index.insert r (rules s) })
 
 deleteRule :: Monad m => Rule -> StateT Completion m ()
-deleteRule r = modify (\s -> s { rules = RuleSet.delete r (rules s) })
+deleteRule r = modify (\s -> s { rules = Index.delete r (rules s) })
 
 simplifyRule :: Monad m => Rule -> StateT Completion m ()
 simplifyRule r = do
@@ -199,7 +199,7 @@ simplifyRule r = do
   addRule r'
 
 main = do
-  let rs = reverse (RuleSet.elems (rules (execState (mapM_ newEquation eqs >> complete) initialState { maxSize = 15 })))
+  let rs = reverse (Index.elems (rules (execState (mapM_ newEquation eqs >> complete) initialState { maxSize = 15 })))
   print (length rs)
   mapM_ prettyPrint rs
 
