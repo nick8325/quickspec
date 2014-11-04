@@ -79,6 +79,8 @@ then move it to the front.
 Cleanup ideas
 -------------
 
+Add typeclass of "stuff which contains variables" that we can e.g. alpha-rename.
+
 Introduce a type constructor ForAll whose effect is to normalise all variables in the term.
 
 Add useful function: "is this simpler for all values of these variables?"
