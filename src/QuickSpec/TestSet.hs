@@ -1,5 +1,7 @@
+{-# LANGUAGE FunctionalDependencies #-}
 module QuickSpec.TestSet where
 
+import QuickSpec.Base
 import QuickSpec.Type
 import qualified Data.Map as Map
 import Data.Map(Map)
@@ -22,7 +24,7 @@ data TestResults t a = TestCase (Map a (TestResults t a)) | Singleton (Tested t 
 
 data Tested t a =
   Tested {
-    term  :: t,
+    testedTerm  :: t,
     tests :: [a] }
 
 emptyTestSet :: (Type -> Maybe (Value (TypedTestSet t))) -> TestSet t
@@ -54,7 +56,7 @@ data Result1 t a = New1 (TypedTestSet t a) | Old1 t
 insert1 :: Typed t => Tested t a -> TypedTestSet t a -> Result1 t a
 insert1 x ts =
   case dict ts of
-    Dict -> aux k (term x) (tests x) (testResults ts)
+    Dict -> aux k (testedTerm x) (tests x) (testResults ts)
   where
     k res = ts { testResults = res }
     aux _ _ [] (Singleton (Tested y [])) = Old1 y

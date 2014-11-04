@@ -2,7 +2,7 @@
 -- https://hal.inria.fr/inria-00075875/document
 --module QuickSpec.Pruning.Completion where
 
-import QuickSpec.Base hiding ((<>), nest)
+import QuickSpec.Base hiding ((<>), nest, ($$), empty)
 import QuickSpec.Term
 --import QuickSpec.Pruning
 import QuickSpec.Prop
@@ -35,14 +35,22 @@ v = Var
 x = v 0
 y = v 1
 z = v 2
-op t u = Fun "plus" [t, u]
-inv t = Fun "minus" [t]
-ident = Fun "zero" []
 
+plus t u = Fun "plus" [t, u]
+times t u = Fun "times" [t, u]
+zero = Fun "zero" []
+one = Fun "one" []
 eqs = [
-  (ident `op` x) === x,
-  (inv x `op` x) === ident,
-  (x `op` (y `op` z)) === ((x `op` y) `op` z)]
+  plus x y === plus y x,
+  plus zero x === x,
+  --plus x (plus y z) === plus y (plus x z),
+  plus x (plus y z) === plus (plus x y) z,
+  times x y === times y x,
+  times zero x === zero,
+  times one x === x,
+  --times x (times y z) === times y (times x z),
+  times x (times y z) === times (times x y) z,
+  times x (plus y z) === plus (times x y) (times x z)]
 
 type T = StateT Completion
 data Completion =
@@ -201,7 +209,7 @@ simplifyRule r = do
   addRule r'
 
 main = do
-  let rs = reverse (RuleSet.elems (rules (execState (mapM_ newEquation eqs >> complete) initialState { maxSize = 10 })))
+  let rs = reverse (RuleSet.elems (rules (execState (mapM_ newEquation eqs >> complete) initialState { maxSize = 15 })))
   print (length rs)
   mapM_ prettyPrint rs
 

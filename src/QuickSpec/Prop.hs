@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveFunctor, CPP #-}
+{-# LANGUAGE DeriveFunctor, CPP, TypeFamilies #-}
 module QuickSpec.Prop where
 
 #include "errors.h"
@@ -12,6 +12,8 @@ import Control.Monad.Trans.State.Strict
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import Data.Ord
+import Control.Monad
+import qualified Data.DList as DList
 
 type Prop = PropOf Term
 data PropOf a =
@@ -26,20 +28,22 @@ instance Ord a => Ord (PropOf a) where
 
 infix 4 :=>:
 
-propTerms :: PropOf a -> [a]
-propTerms p = concatMap atomicTerms (lhs p) ++ atomicTerms (rhs p)
-
-propLiterals :: PropOf a -> [Literal a]
-propLiterals p = rhs p:lhs p
+literals :: PropOf a -> [Literal a]
+literals p = rhs p:lhs p
 
 unitProp :: Literal a -> PropOf a
 unitProp p = [] :=>: p
 
-instance Typed a => Typed (PropOf a) where
+instance (Symbolic a, Typed a) => Typed (PropOf a) where
   typ _ = boolType
-  typeSubstA f (lhs :=>: rhs) =
-    (:=>:) <$> traverse (typeSubstA f) lhs
-           <*> typeSubstA f rhs
+  otherTypesDL p = DList.fromList (literals p) >>= typesDL
+  typeSubst sub (lhs :=>: rhs) =
+    map (typeSubst sub) lhs :=>: typeSubst sub rhs
+instance Symbolic a => Symbolic (PropOf a) where
+  type ConstantOf (PropOf a) = ConstantOf a
+  type VariableOf (PropOf a) = VariableOf a
+  termsDL p = DList.fromList (literals p) >>= termsDL
+  substf sub (lhs :=>: rhs) = map (substf sub) lhs :=>: substf sub rhs
 
 instance Pretty a => Pretty (PropOf a) where
   pretty ([] :=>: rhs) = pretty rhs
@@ -55,14 +59,22 @@ data Literal a = a :=: a | Predicate :@: [a] deriving (Show, Functor, Eq, Ord)
 infix 5 :@:
 infix 5 :=:
 
-atomicTerms :: Literal a -> [a]
-atomicTerms (x :=: y) = [x, y]
-atomicTerms (p :@: xs) = xs
+instance Symbolic a => Symbolic (Literal a) where
+  type ConstantOf (Literal a) = ConstantOf a
+  type VariableOf (Literal a) = VariableOf a
+  termsDL l = literalTermsDL l >>= termsDL
+  substf sub (t :=: u) = substf sub t :=: substf sub u
+  substf sub (p :@: ts) = p :@: map (substf sub) ts
 
-instance Typed a => Typed (Literal a) where
+instance (Symbolic a, Typed a) => Typed (Literal a) where
   typ _ = boolType
-  typeSubstA f (x :=: y) = (:=:) <$> typeSubstA f x <*> typeSubstA f y
-  typeSubstA f (p :@: xs) = (:@:) <$> typeSubstA f p <*> traverse (typeSubstA f) xs
+  otherTypesDL l = literalTermsDL l >>= typesDL
+  typeSubst sub (x :=: y) = typeSubst sub x :=: typeSubst sub y
+  typeSubst sub (p :@: ts) = typeSubst sub p :@: map (typeSubst sub) ts
+
+literalTermsDL :: Literal a -> DList.DList a
+literalTermsDL (t :=: u) = return t `mplus` return u
+literalTermsDL (p :@: ts) = DList.fromList ts
 
 instance Pretty a => Pretty (Literal a) where
   pretty (x :=: y) = hang (pretty x <+> text "=") 2 (pretty y)
@@ -78,7 +90,7 @@ instance Pretty Predicate where
 
 instance Typed Predicate where
   typ = predType
-  typeSubstA f (Predicate x ty) = Predicate x <$> typeSubstA f ty
+  typeSubst sub (Predicate x ty) = Predicate x (typeSubst sub ty)
 
 boolType :: Type
 boolType = typeOf (undefined :: Bool)

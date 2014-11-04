@@ -44,10 +44,9 @@ translate :: [PropOf PruningTerm] -> Literal PruningTerm ->
              Jukebox.Closed [Jukebox.Input Jukebox.Form]
 translate axioms goal = Jukebox.close_ Jukebox.stdNames $ do
   ty <- Jukebox.newType "i"
-  let terms = usort (concatMap propTerms (unitProp goal:axioms))
-      vs = usort (concatMap vars terms)
-      fs = usort (concatMap funs terms)
-      ps = usort [ p | p :@: _ <- concatMap propLiterals (unitProp goal:axioms) ]
+  let vs = usort (concatMap vars (unitProp goal:axioms))
+      fs = usort (concatMap funs (unitProp goal:axioms))
+      ps = usort [ p | p :@: _ <- concatMap literals (unitProp goal:axioms) ]
   varSyms  <- sequence [ Jukebox.newSymbol "X" ty | x <- vs ]
   funSyms  <- sequence [ Jukebox.newFunction (makeFunName x) [] ty | x <- fs]
   propSyms <- sequence [ Jukebox.newFunction (predName x) [] Jukebox.O | x <- ps]

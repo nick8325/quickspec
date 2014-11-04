@@ -18,6 +18,7 @@ import qualified Data.Rewriting.Substitution.Type as T
 import Data.List
 import Control.Monad
 import Data.Maybe
+import qualified Data.DList as DList
 
 -- Terms and schemas.
 -- A schema is like a term but has holes instead of variables.
@@ -110,8 +111,7 @@ instance PrettyTerm Constant where
   termStyle = conStyle
 instance Typed Constant where
   typ = typ . conValue
-  typeSubstA s (Constant name value generalValue pretty size isBackground) =
-    Constant name <$> typeSubstA s value <*> pure generalValue <*> pure pretty <*> pure size <*> pure isBackground
+  typeSubst sub x = x { conValue = typeSubst sub (conValue x) }
 instance Sized Constant where
   funSize = conSize
 
@@ -126,16 +126,12 @@ instance Pretty Variable where
   pretty x = text (supply ["x","y","z"] !! varNumber x)
 instance Typed Variable where
   typ = varType
-  typeSubstA s (Variable n ty) =
-    Variable n <$> typeSubstA s ty
+  typeSubst sub (Variable n ty) = Variable n (typeSubst sub ty)
 instance CoArbitrary Variable where
   coarbitrary x = coarbitrary (varNumber x) . coarbitrary (varType x)
 
 -- Holes - a newtype largely so that we can improve the pretty-printing.
-newtype Hole = Hole Type deriving (Eq, Ord, Show)
-instance Typed Hole where
-  typ (Hole ty) = ty
-  typeSubstA f (Hole ty) = Hole <$> typeSubstA f ty
+newtype Hole = Hole Type deriving (Eq, Ord, Show, Typed)
 instance Pretty Hole where pretty _ = text "_"
 
 instance Typed v => Typed (TermOf v) where
@@ -144,10 +140,10 @@ instance Typed v => Typed (TermOf v) where
     where
       typeDrop 0 ty = ty
       typeDrop n (Fun Arrow [_, ty]) = typeDrop (n-1) ty
+  otherTypesDL t = (varsDL t >>= typesDL) `mplus` (funsDL t >>= typesDL)
 
-  typeSubstA s (Var x) = Var <$> typeSubstA s x
-  typeSubstA s (Fun f xs) =
-    Fun <$> typeSubstA s f <*> traverse (typeSubstA s) xs
+  typeSubst sub (Var x) = Var (typeSubst sub x)
+  typeSubst sub (Fun f ts) = Fun (typeSubst sub f) (map (typeSubst sub) ts)
 
 instance Typed v => Apply (TermOf v) where
   tryApply t@(Fun f xs) u

@@ -33,13 +33,14 @@ data Instance2 a b = Instance2 (b -> a)
 
 instance Typed Instance where
   typ (Instance x) = typ x
-  typeSubstA f (Instance x) =
-    Instance <$> do
-      y <- typeSubstA f x
-      case unwrap y of
-        Instance1 y `In` w -> do
-          z <- typeSubstA f y
-          return (wrap w (Instance1 z))
+  otherTypesDL (Instance x) =
+    otherTypesDL x `mplus`
+    case unwrap x of
+      Instance1 y `In` _ -> typesDL y
+  typeSubst sub (Instance x) =
+    case unwrap (typeSubst sub x) of
+      Instance1 y `In` w ->
+        Instance (wrap w (Instance1 (typeSubst sub y)))
 
 makeInstance :: forall a b. (Typeable a, Typeable b) => (b -> a) -> [Instance]
 makeInstance f =
@@ -291,7 +292,7 @@ instance Pretty Name where
 prettyRename :: Signature -> Prop -> PropOf (TermOf Name)
 prettyRename sig p = fmap (rename (\x -> Map.findWithDefault __ x m)) p
   where
-    vs = nub (concatMap vars (propTerms p))
+    vs = nub (vars p)
     m = Map.fromList sub
     sub = evalState (mapM assign vs) Set.empty
     assign v = do

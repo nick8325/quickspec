@@ -21,8 +21,7 @@ data StringVar = StringVar String Type deriving (Eq, Ord, Show)
 
 instance Typed StringVar where
   typ (StringVar _ ty) = ty
-  typeSubstA f (StringVar name ty) =
-    liftM (StringVar name) (typeSubstA f ty)
+  typeSubst sub (StringVar name ty) = StringVar name (typeSubst sub ty)
 
 instance Parse StringVar where
   parse _ = do
@@ -79,5 +78,5 @@ parseProp cs xs = toProp (parse' cs xs)
 toProp :: PropOf (TermOf StringVar) -> Prop
 toProp prop = fmap (rename (\x -> Variable (Map.findWithDefault __ x sub) (typ x))) prop
   where
-    vs = usort (concatMap vars (propTerms prop))
+    vs = usort (vars prop)
     sub = Map.fromList (zip vs [0..])

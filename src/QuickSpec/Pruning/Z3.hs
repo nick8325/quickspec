@@ -31,7 +31,7 @@ flatten bool ind (lhs :=>: rhs) = do
   lhs' <- mapM (flattenLit bool ind) lhs >>= mkAnd'
   rhs' <- flattenLit bool ind rhs
   res <- mkImplies lhs' rhs'
-  quantify ind (usort (concatMap vars (propTerms (lhs :=>: rhs)))) res
+  quantify ind (usort (vars (lhs :=>: rhs))) res
 
 mkAnd' [] = mkTrue
 mkAnd' [x] = return x

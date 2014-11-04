@@ -43,7 +43,7 @@ data S = S {
   freshTestSet  :: TestSet TermFrom,
   proved        :: Set (PropOf PruningTerm),
   discovered    :: [Prop],
-  types         :: Set Type,
+  someTypes     :: Set Type,
   allTypes      :: Set Type }
 
 data Event =
@@ -84,7 +84,7 @@ initialState sig seeds =
       freshTestSet  = emptyTestSet (makeTester specialise e seeds sig),
       proved        = Set.empty,
       discovered    = background sig,
-      types         = typeUniverse sig,
+      someTypes     = typeUniverse sig,
       allTypes      = bigTypeUniverse sig }
   where
     e = table (env sig)
@@ -199,11 +199,11 @@ createRules sig = do
 
   rule $ do
     ConsiderSchema s <- event
-    allTypes <- execute $ lift $ gets allTypes
-    types    <- execute $ lift $ gets types
+    allTypes  <- execute $ lift $ gets allTypes
+    someTypes <- execute $ lift $ gets someTypes
     require (and [ oneTypeVar (typ t) `Set.member` allTypes | t <- subterms (unPoly s) ])
     execute $
-      {-case oneTypeVar (typ (unPoly s)) `Set.member` types of
+      {-case oneTypeVar (typ (unPoly s)) `Set.member` someTypes of
         True ->-}
           consider sig (Schema s) (unPoly (oneTypeVar s))
 {-        False ->
@@ -296,7 +296,8 @@ instance Pretty TermFrom where
 
 instance Typed TermFrom where
   typ (From _ t) = typ t
-  typeSubstA f (From s t) = From s <$> typeSubstA f t
+  otherTypesDL (From _ t) = otherTypesDL t
+  typeSubst sub (From s t) = From s (typeSubst sub t)
 
 instance Considerable TermFrom where
   generalise (From _ t) = t

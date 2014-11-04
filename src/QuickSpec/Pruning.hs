@@ -69,14 +69,14 @@ axiom :: (Pruner s, Monad m) => Prop -> PrunerT s m ()
 axiom p = do
   univ <- askUniv
   sequence_
-    [ do sequence_ [ PrunerT (generate fun) | fun <- usort (concatMap funs (propTerms p')) ]
+    [ do sequence_ [ PrunerT (generate fun) | fun <- usort (funs p') ]
          liftPruner (untypedAxiom p')
     | p' <- map toAxiom (instances univ p) ]
 
 goal :: (Pruner s, Monad m) => Prop -> PrunerT s m Bool
 goal p = do
   let p' = toGoal p
-  sequence_ [ PrunerT (generate fun) | fun <- usort (concatMap funs (propTerms p')) ]
+  sequence_ [ PrunerT (generate fun) | fun <- usort (funs p') ]
   liftPruner (untypedGoal p')
 
 toAxiom :: Prop -> PropOf PruningTerm
@@ -92,7 +92,7 @@ toGoal :: Prop -> PropOf PruningTerm
 toGoal p = (axs ++ lhs p') :=>: rhs p'
   where
     p' = fmap (skolemise . toPruningConstant) p
-    axs = [ skolemAxiom x | SkolemVariable x <- usort (concatMap funs (propTerms p')) ]
+    axs = [ skolemAxiom x | SkolemVariable x <- usort (funs p') ]
 
 toGoalTerm :: Term -> ([Literal PruningTerm], PruningTerm)
 toGoalTerm t = (axs, u)
@@ -122,7 +122,7 @@ normaliseVars t = rename (\x -> fromMaybe __ (Map.lookup x m)) t
 normaliseProp prop =
   fmap (rename (\x -> fromMaybe __ (Map.lookup x m))) prop
   where
-    m = Map.fromList (zip (usort (concatMap vars (propTerms prop))) [0..])
+    m = Map.fromList (zip (usort (vars prop)) [0..])
 
 instances :: [Type] -> Prop -> [Prop]
 instances univ prop =
@@ -134,7 +134,7 @@ instances univ prop =
         (map (constrain univ)
           (usort
             (concatMap subterms
-              (propTerms prop))))
+              (terms prop))))
 
 intersection :: [Map TyVar Type] -> [Map TyVar Type] -> [Map TyVar Type]
 ms1 `intersection` ms2 = usort [ Map.union m1 m2 | m1 <- ms1, m2 <- ms2, ok m1 m2 ]

@@ -1,5 +1,5 @@
 -- Polymorphic types and dynamic values.
-{-# LANGUAGE DeriveDataTypeable, CPP, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances, GeneralizedNewtypeDeriving, Rank2Types, ExistentialQuantification, PolyKinds #-}
+{-# LANGUAGE DeriveDataTypeable, CPP, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances, GeneralizedNewtypeDeriving, Rank2Types, ExistentialQuantification, PolyKinds, TypeFamilies #-}
 -- To avoid a warning about TyVarNumber's constructor being unused:
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
 module QuickSpec.Type(
@@ -9,7 +9,8 @@ module QuickSpec.Type(
   typeOf, typeRep, applyType, toTypeRep, fromTypeRep,
   arrowType, typeArgs, typeRes, arity, oneTypeVar, skolemiseTypeVars,
   -- Things that have types.
-  Typed(..), typeSubst, tyVars, cast,
+  Typed(..), typesDL, tyVars, cast,
+  TypeView(..),
   Apply(..), apply, canApply,
   -- Polymorphic types.
   Poly, poly, unPoly, polyTyp, polyPair, polyMgu,
@@ -30,6 +31,7 @@ import Unsafe.Coerce
 import Control.Applicative
 import Data.Maybe
 import qualified Data.DList as DList
+import Data.DList(DList)
 import Data.Functor.Identity
 import Data.Traversable(traverse)
 import qualified Data.Map as Map
@@ -43,7 +45,7 @@ import Test.QuickCheck
 type Type = Tm TyCon TyVar
 
 data TyCon = Arrow | TyCon Ty.TyCon deriving (Eq, Ord, Show)
-newtype TyVar = TyVar { tyVarNumber :: Int } deriving (Eq, Ord, Show, Enum)
+newtype TyVar = TyVar { tyVarNumber :: Int } deriving (Eq, Ord, Show, Enum, Numbered)
 
 instance Pretty TyCon where
   pretty Arrow = text "->"
@@ -153,18 +155,26 @@ instance CoArbitrary Type where
 class Typed a where
   -- The type.
   typ :: a -> Type
+  -- Any other types that may appear in subterms etc
+  -- (enough at least to collect all type variables and type constructors).
+  otherTypesDL :: a -> DList Type
+  otherTypesDL _ = mzero
   -- Substitute for all type variables.
-  typeSubstA :: (Functor m, Applicative m, Monad m) => (TyVar -> m Type) -> a -> m a
+  typeSubst :: (TyVar -> Type) -> a -> a
 
-typeSubst :: Typed a => (TyVar -> Type) -> a -> a
-typeSubst f t = runIdentity (typeSubstA (return . f) t)
+-- Using the normal term machinery on types.
+newtype TypeView a = TypeView { unTypeView :: a }
+instance Typed a => Symbolic (TypeView a) where
+  type ConstantOf (TypeView a) = TyCon
+  type VariableOf (TypeView a) = TyVar
+  termsDL = typesDL . unTypeView
+  substf sub = TypeView . typeSubst sub . unTypeView
+
+typesDL :: Typed a => a -> DList Type
+typesDL ty = return (typ ty) `mplus` otherTypesDL ty
 
 tyVars :: Typed a => a -> [TyVar]
-tyVars t = DList.toList (execWriter (typeSubstA f t))
-  where
-    f x = do
-      tell (DList.singleton x)
-      return (Var x)
+tyVars = vars . TypeView
 
 cast :: Typed a => Type -> a -> Maybe a
 cast ty x = do
@@ -189,9 +199,7 @@ canApply f x = isJust (tryApply f x)
 -- Instances.
 instance Typed Type where
   typ = id
-  typeSubstA s (Var x) = s x
-  typeSubstA s (Fun f xs) =
-    Fun f <$> traverse (typeSubstA s) xs
+  typeSubst = substf
 
 instance Apply Type where
   tryApply (Fun Arrow [arg, res]) t | t == arg = Just res
@@ -199,7 +207,8 @@ instance Apply Type where
 
 instance (Typed a, Typed b) => Typed (a, b) where
   typ (x, y) = Fun (TyCon commaTyCon) [typ x, typ y]
-  typeSubstA f (x, y) = liftA2 (,) (typeSubstA f x) (typeSubstA f y)
+  otherTypesDL (x, y) = otherTypesDL x `mplus` otherTypesDL y
+  typeSubst f (x, y) = (typeSubst f x, typeSubst f y)
 
 -- Represents a forall-quantifier over all the type variables in a type.
 -- Wrapping a term in Poly normalises the type by alpha-renaming
@@ -208,14 +217,10 @@ newtype Poly a = Poly { unPoly :: a }
   deriving (Eq, Ord, Show, Pretty, Typeable)
 
 poly :: Typed a => a -> Poly a
-poly x = Poly (normaliseType x)
+poly x = Poly (canonicaliseType x)
 
-normaliseType :: Typed a => a -> a
-normaliseType t = typeSubst (evalSubst s) t
-  where
-    s = T.fromMap (Map.fromList (zip tvs (map (Var . TyVar) [0..])))
-    tvs = tvs' ++ (usort (tyVars t) \\ tvs')
-    tvs' = usort (tyVars (typ t))
+canonicaliseType :: Typed a => a -> a
+canonicaliseType = unTypeView . canonicalise . TypeView
 
 polyTyp :: Typed a => Poly a -> Poly Type
 polyTyp (Poly x) = Poly (typ x)
@@ -233,7 +238,8 @@ polyMgu ty1 ty2 = do
 
 instance Typed a => Typed (Poly a) where
   typ = typ . unPoly
-  typeSubstA f (Poly x) = fmap poly (typeSubstA f x)
+  otherTypesDL = otherTypesDL . unPoly
+  typeSubst f (Poly x) = poly (typeSubst f x)
 
 instance Apply a => Apply (Poly a) where
   tryApply f x = do
@@ -267,7 +273,7 @@ fromValue x = do
 
 instance Typed (Value f) where
   typ = valueType
-  typeSubstA f (Value ty x) = Value <$> typeSubstA f ty <*> pure x
+  typeSubst f (Value ty x) = Value (typeSubst f ty) x
 instance Applicative f => Apply (Value f) where
   tryApply f x = do
     ty <- tryApply (typ f) (typ x)

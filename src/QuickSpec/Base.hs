@@ -1,23 +1,26 @@
 -- Imports the relevant parts of the term-rewriting package
 -- and provides a few things on top.
 
-{-# LANGUAGE CPP, TypeSynonymInstances #-}
+{-# LANGUAGE CPP, TypeSynonymInstances, TypeFamilies, FlexibleContexts #-}
 module QuickSpec.Base(
   Tm,
-  module Data.Rewriting.Term, foldTerm, mapTerm, symbols,
+  module Data.Rewriting.Term, foldTerm, mapTerm,
   module Data.Rewriting.Term.Ops,
-  module Data.Rewriting.Substitution, evalSubst, subst, substA, unifyMany,
+  module Data.Rewriting.Substitution, evalSubst, subst,
+  Symbolic(..), terms, varsDL, vars, funsDL, funs, symbolsDL, symbols,
+  Numbered(..), canonicalise,
   module QuickSpec.Pretty,
   module Text.PrettyPrint.HughesPJ,
   PrettyTerm(..), TermStyle(..), prettyStyle) where
 
 #include "errors.h"
 
-import Data.Rewriting.Term hiding (Term, fold, map, fromString, parse, parseIO, parseFun, parseVar, parseWST)
+import Data.Rewriting.Term hiding (Term, fold, map, fromString, parse, parseIO, parseFun, parseVar, parseWST, vars, funs, varsDL, funsDL)
 import Data.Rewriting.Term.Ops(subterms)
 import qualified Data.Rewriting.Term as T
 import Data.Rewriting.Substitution hiding (apply, fromString, parse, parseIO)
 import qualified Data.Rewriting.Substitution as T
+import qualified Data.Rewriting.Substitution.Type as T
 import Control.Applicative
 import Data.Traversable(sequenceA)
 import qualified Data.Map as Map
@@ -25,8 +28,11 @@ import Data.Map(Map)
 import QuickSpec.Pretty
 import Text.PrettyPrint.HughesPJ
 import qualified Data.DList as DList
+import Data.DList(DList)
 import Control.Monad
-import Data.Rewriting.Rule
+import qualified Data.Rewriting.Rule as Rule
+import QuickSpec.Utils
+import Data.List
 
 -- Renamings of functionality from term-rewriting.
 type Tm = T.Term
@@ -37,27 +43,77 @@ foldTerm = T.fold
 mapTerm :: (f -> f') -> (v -> v') -> Tm f v -> Tm f' v'
 mapTerm = T.map
 
-symbols :: Tm f v -> [Either f v]
-symbols t = DList.toList (aux t)
-  where
-    aux (Fun f xs) = return (Left f) `mplus` msum (map aux xs)
-    aux (Var x)    = return (Right x)
-
 evalSubst :: Ord v => Subst f v -> v -> Tm f v
 evalSubst s = subst s . Var
 
 subst :: Ord v => Subst f v -> Tm f v -> Tm f v
 subst = T.apply
 
-substA :: Applicative f => (v -> f (Tm c v)) -> Tm c v -> f (Tm c v)
-substA s (Var x) = s x
-substA s (Fun f xs) = Fun f <$> sequenceA (map (substA s) xs)
+-- Generalisation of term functionality to things that contain terms.
+class Symbolic a where
+  {-# MINIMAL (term|termsDL), substf #-}
+  type ConstantOf a
+  type VariableOf a
 
--- Unify several pairs of terms at once.
--- The first argument is a dummy function symbol which can be any
--- (non-bottom) value.
-unifyMany :: (Eq f, Ord v) => f -> [(Tm f v, Tm f v)] -> Maybe (Subst f v)
-unifyMany f xs = unify (Fun f (map fst xs)) (Fun f (map snd xs))
+  term :: a -> Tm (ConstantOf a) (VariableOf a)
+  term t = DList.head (termsDL t)
+
+  termsDL :: a -> DList (Tm (ConstantOf a) (VariableOf a))
+  termsDL t = return (term t)
+
+  substf ::
+    (VariableOf a -> Tm (ConstantOf a) (VariableOf a)) ->
+    a -> a
+
+terms :: Symbolic a => a -> [Tm (ConstantOf a) (VariableOf a)]
+terms = DList.toList . termsDL
+
+instance Symbolic (Tm f v) where
+  type ConstantOf (Tm f v) = f
+  type VariableOf (Tm f v) = v
+  substf sub = foldTerm sub Fun
+  term = id
+
+vars :: Symbolic a => a -> [VariableOf a]
+vars = DList.toList . varsDL
+
+varsDL :: Symbolic a => a -> DList (VariableOf a)
+varsDL t = termsDL t >>= aux
+  where
+    aux (Fun _ xs) = msum (map aux xs)
+    aux (Var x)    = return x
+
+funs :: Symbolic a => a -> [ConstantOf a]
+funs = DList.toList . funsDL
+
+funsDL :: Symbolic a => a -> DList (ConstantOf a)
+funsDL t = termsDL t >>= aux
+  where
+    aux (Fun f xs) = return f `mplus` msum (map aux xs)
+    aux (Var _)    = mzero
+
+symbols :: Symbolic a => a -> [Either (ConstantOf a) (VariableOf a)]
+symbols = DList.toList . symbolsDL
+
+symbolsDL :: Symbolic a => a -> DList (Either (ConstantOf a) (VariableOf a))
+symbolsDL t = termsDL t >>= aux
+  where
+    aux (Fun f xs) = return (Left f) `mplus` msum (map aux xs)
+    aux (Var x)    = return (Right x)
+
+class Numbered a where
+  withNumber :: Int -> a -> a
+
+instance Numbered Int where
+  withNumber = const
+
+canonicalise :: (Ord (VariableOf a), Numbered (VariableOf a), Symbolic a) => a -> a
+canonicalise t = substf (evalSubst sub) t
+  where
+    sub = T.fromMap (Map.fromList (zipWith f vs [0..]))
+    f x n = (x, Var (withNumber n x))
+    vs  = vs' ++ (usort (concatMap vars (terms t)) \\ vs')
+    vs' = usort (vars (term t))
 
 class Pretty a => PrettyTerm a where
   termStyle :: a -> TermStyle
@@ -121,5 +177,6 @@ prettyStyle style p d xs =
         Infixr pOp -> (0, pOp)
         Infix  pOp -> (1, pOp)
 
-instance (PrettyTerm f, Pretty v) => Pretty (Rule f v) where
-  pretty (Rule lhs rhs) = sep [pretty lhs <+> text "->", nest 2 (pretty rhs)]
+instance (PrettyTerm f, Pretty v) => Pretty (Rule.Rule f v) where
+  pretty (Rule.Rule lhs rhs) =
+    sep [pretty lhs <+> text "->", nest 2 (pretty rhs)]
