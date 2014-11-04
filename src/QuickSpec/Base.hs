@@ -26,6 +26,7 @@ import QuickSpec.Pretty
 import Text.PrettyPrint.HughesPJ
 import qualified Data.DList as DList
 import Control.Monad
+import Data.Rewriting.Rule
 
 -- Renamings of functionality from term-rewriting.
 type Tm = T.Term
@@ -119,3 +120,6 @@ prettyStyle style p d xs =
       case style of
         Infixr pOp -> (0, pOp)
         Infix  pOp -> (1, pOp)
+
+instance (PrettyTerm f, Pretty v) => Pretty (Rule f v) where
+  pretty (Rule lhs rhs) = sep [pretty lhs <+> text "->", nest 2 (pretty rhs)]

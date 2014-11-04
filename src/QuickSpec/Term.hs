@@ -73,13 +73,19 @@ compareTerms t u =
 -- Reduction ordering (i.e., a partial order closed under substitution).
 -- Has the property:
 -- if t `simplerThan` u then Measure (schema t) < Measure (schema u).
-simplerThan :: (Sized f, Ord f, Ord v) => Tm f v -> Tm f v -> Bool
-t `simplerThan` u =
+orientTerms :: (Sized f, Ord f, Ord v) => Tm f v -> Tm f v -> Maybe Ordering
+orientTerms t u =
   case compareTerms t u of
-    Just (t', u', LT) ->
+    Just (t', u', LT) -> do { guard (check t u t' u'); return LT }
+    Just (t', u', GT) -> do { guard (check u t u' t'); return GT }
+    Nothing           -> return EQ
+  where
+    check t u t' u' =
       sort (vars t') `isSubsequenceOf` sort (vars u') &&
       sort (vars t)  `isSubsequenceOf` sort (vars u)
-    _ -> False
+
+simplerThan :: (Sized f, Ord f, Ord v) => Tm f v -> Tm f v -> Bool
+t `simplerThan` u = orientTerms t u == Just LT
 
 size :: Sized f => Tm f v -> Int
 size (Var x) = 1

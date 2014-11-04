@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 -- https://hal.inria.fr/inria-00075875/document
-module QuickSpec.Pruning.Completion where
+--module QuickSpec.Pruning.Completion where
 
 import QuickSpec.Base hiding ((<>), nest)
 import QuickSpec.Term
@@ -10,8 +10,6 @@ import QuickSpec.Utils
 import qualified Data.Rewriting.CriticalPair as CP
 import qualified Data.Rewriting.Rule as Rule
 import qualified Data.Rewriting.Rules as Rules
-import Data.Rewriting.Rules(Strategy)
-import qualified Data.Rewriting.Rules.Rewrite as Rules
 import qualified Data.Rewriting.Substitution.Type as Subst
 import qualified Data.Rewriting.Substitution.Ops as Subst
 import Data.Either
@@ -22,8 +20,12 @@ import qualified Data.Set as Set
 import Data.Set(Set)
 import qualified Data.Map as Map
 import Data.List
+import Debug.Trace
 import Data.Ord
+import qualified QuickSpec.Pruning.RuleSet as RuleSet
+import QuickSpec.Pruning.RuleSet(RuleSet)
 
+instance PrettyTerm String
 type PruningTerm = Tm PruningConstant PruningVariable
 type PruningConstant = String
 type PruningVariable = Int
@@ -33,27 +35,37 @@ v = Var
 x = v 0
 y = v 1
 z = v 2
-op t u = Fun "+" [t, u]
-inv t = Fun "-" [t]
-ident = Fun "z" []
+op t u = Fun "plus" [t, u]
+inv t = Fun "minus" [t]
+ident = Fun "zero" []
 
 eqs = [
   (ident `op` x) === x,
   (inv x `op` x) === ident,
   (x `op` (y `op` z)) === ((x `op` y) `op` z)]
 
+type T = StateT Completion
+data Completion =
+  Completion {
+    maxSize   :: Int,
+    sizeDelta :: Int,
+    rules     :: RuleSet PruningConstant PruningVariable,
+    queue     :: Set Equation }
+  deriving Show
+
+initialState = Completion 0 1 RuleSet.empty Set.empty
+
 data Equation = PruningTerm :==: PruningTerm deriving (Eq, Show)
 type Rule = Rule.Rule PruningConstant PruningVariable
 type PruningCP = CP.CP PruningConstant PruningVariable PruningVariable
 
-equationSize :: Equation -> Int
-equationSize (l :==: _r) = size l
+(===) :: PruningTerm -> PruningTerm -> Equation
+x === y
+  | Measure x < Measure y = y :==: x
+  | otherwise = x :==: y
 
-(===) :: Ord v => Tm PruningConstant v -> Tm PruningConstant v -> Equation
-x === y | Measure x < Measure y = y === x
-x === y = x' :==: y'
+renameVars x y = x' :==: y'
   where
-    -- Rename variables in a nice way
     vs = nub (vars x ++ vars y)
     sub' = Subst.fromMap (Map.fromList (zip vs (map Var [0..])))
     Just x' = Subst.gApply sub' x
@@ -62,154 +74,136 @@ x === y = x' :==: y'
 instance Ord Equation where
   compare = comparing (\(l :==: r) -> (Measure l, Measure r))
 
-type T = StateT Completion
-data Completion =
-  Completion {
-    maxSize   :: Int,
-    sizeDelta :: Int,
-    rules     :: [Rule],
-    equations :: Set Equation,
-    queue     :: Set Equation }
-  deriving Show
-
-initialState = Completion 0 1 [] Set.empty Set.empty
-
-class Ruling a where
-  rule :: a -> Rule
-  oriented :: proxy a -> Bool
-
-rewrite :: Ruling a => [a] -> Strategy PruningConstant PruningVariable PruningVariable
-rewrite rs
-  | oriented rs = Rules.fullRewrite (map rule rs)
-  | otherwise = ordered (Rules.fullRewrite (map rule rs))
-
-instance Ruling Rule where
-  rule = id
-  oriented _ = True
-
-data DirectedEquation =
-    LeftToRight { undirect ::  Equation }
-  | RightToLeft { undirect :: Equation }
-
-instance Ruling DirectedEquation where
-  rule (LeftToRight (l :==: r)) = Rule.Rule l r
-  rule (RightToLeft (l :==: r)) = Rule.Rule r l
-  oriented _ = False
-
-direct :: Equation -> [DirectedEquation]
-direct eq = [LeftToRight eq, RightToLeft eq]
-
 orient :: Equation -> Maybe Rule
-orient eq@(l :==: r)
-  | l `simplerThan` r = Just (Rule.Rule r l)
-  | r `simplerThan` l = Just (Rule.Rule l r)
-  | otherwise = Nothing
+orient eq@(l :==: r) =
+  case orientTerms l r of
+    Just LT -> Just (Rule.Rule r l)
+    Just GT -> Just (Rule.Rule l r)
+    _       -> Nothing
 
-criticalPairs :: (Ruling a, Ruling b) => a -> b -> [Equation]
+criticalPairs :: Rule -> Rule -> [Equation]
 criticalPairs r1 r2 = do
-  cp <- CP.cps [rule r1] [rule r2]
+  cp <- CP.cps [r1] [r2]
   let sub = subst (CP.subst cp)
       top = sub (CP.top cp)
-      left = sub (CP.left cp)
-      right = sub (CP.right cp)
+      --left = sub (CP.left cp)
+      --right = sub (CP.right cp)
+      left = CP.left cp
+      right = CP.right cp
 
-  unless (oriented [r1]) $ guard (not (top `simplerThan` left))
-  unless (oriented [r2]) $ guard (not (top `simplerThan` right))
-  return (left === right)
+  -- XXX for equations
+  -- unless (oriented [r1]) $ guard (not (top `simplerThan` left))
+  -- unless (oriented [r2]) $ guard (not (top `simplerThan` right))
+  return (renameVars left right)
 
-normalise :: Strategy f v v -> Tm f v -> Tm f v
+type Strategy f v = Tm f v -> [Tm f v]
+
+normalise :: Strategy f v -> Tm f v -> Tm f v
 normalise strat t =
   case strat t of
     [] -> t
-    (r:_) -> normalise strat (Rules.result r)
+    (r:_) -> normalise strat r
 
-choice :: Strategy f v v' -> Strategy f v v' -> Strategy f v v'
-choice s1 s2 t = s1 t ++ s2 t
+anywhere :: Strategy f v -> Strategy f v
+anywhere strat t = strat t ++ nested (anywhere strat) t
 
-ordered :: (Sized f, Ord f, Ord v) => Strategy f v v -> Strategy f v v
-ordered s1 t = do
-  r <- s1 t
-  guard (Rules.result r `simplerThan` t)
-  return r
-
-reduceEquations :: Set Equation -> Strategy PruningConstant PruningVariable PruningVariable
-reduceEquations eqs = rewrite (concatMap direct (Set.toList eqs))
-
-normaliseEquation :: Monad m => Equation -> StateT Completion m Equation
-normaliseEquation eq = do
-  Completion { rules = rules, equations = equations, maxSize = maxSize } <- get
-  let strat = choice (rewrite rules) (reduceEquations equations)
-  return (normaliseEquationWith strat eq)
-
-normaliseEquationWith :: Strategy PruningConstant PruningVariable PruningVariable -> Equation -> Equation
-normaliseEquationWith strat (l :==: r) = l' === r'
+nested :: Strategy f v -> Strategy f v
+nested strat Var{} = []
+nested strat (Fun f xs) = map (Fun f) (combine xs (map strat xs))
   where
-    l' = normalise strat l
-    r' = normalise strat r
+    combine [] [] = []
+    combine (x:xs) (ys:yss) =
+      [ y:xs | y <- ys ] ++ [ x:zs | zs <- combine xs yss ]
+
+rewrite :: (Ord f, Ord v) => RuleSet f v -> Strategy f v
+rewrite rules t = fmap Rule.rhs (RuleSet.match t rules)
+
+normaliseM :: Monad m => PruningTerm -> StateT Completion m PruningTerm
+normaliseM t = do
+  Completion { rules = rules } <- get
+  return (normalise (anywhere (rewrite rules)) t)
 
 newEquation :: Monad m => Equation -> StateT Completion m ()
-newEquation eq = do
-  l :==: r <- normaliseEquation eq
-  if l == r then return ()
-    else modify (\s -> s { queue = Set.insert (l :==: r) (queue s) })
-
-addEquation :: Monad m => Equation -> StateT Completion m ()
-addEquation eq = do
-  l :==: r <- normaliseEquation eq
-  if l == r then return () else
-    case orient (l :==: r) of
-      Just rule -> addRule rule
-      Nothing -> modify (\s -> s { equations = Set.insert (l :==: r) (equations s) })
-
-addRule :: Monad m => Rule -> StateT Completion m ()
-addRule r = do
-  simplifyQueueWith r
-  simplifyRulesWith r
-  simplifyEquationsWith r
-  modify (\s -> s { rules = r:rules s })
-  rs <- gets rules
-  let cps = usort (concat [ criticalPairs r r' ++ criticalPairs r' r | r' <- rs ])
-  mapM_ newEquation cps
-
-simplifyRulesWith :: (Monad m, Ruling a) => a -> StateT Completion m ()
-simplifyRulesWith r = do
-  Completion { rules = rules } <- get
-  let (rules', eqs') = partitionEithers (map (simplifyRuleWith r) rules)
-  modify (\s -> s { rules = rules',
-                    queue = Set.union (queue s) (Set.fromList eqs') })
-
-simplifyEquationsWith :: (Monad m, Ruling a) => a -> StateT Completion m ()
-simplifyEquationsWith r = do
-  Completion { equations = eqs } <- get
-  modify (\s -> s { equations = Set.empty })
-  mapM_ newEquation (Set.toList eqs)
-
-simplifyQueueWith :: (Monad m, Ruling a) => a -> StateT Completion m ()
-simplifyQueueWith r =
-  modify $
-    \s -> s {
-      queue =
-        Set.fromList
-          (map (normaliseEquationWith (rewrite [r]))
-            (Set.toList (queue s))) }
-
-simplifyRuleWith :: Ruling a => a -> Rule -> Either Rule Equation
-simplifyRuleWith r (Rule.Rule lhs rhs)
-  | lhs == lhs' && rhs == rhs' = Left (Rule.Rule lhs rhs)
-  | otherwise = Right (lhs' === rhs')
-  where
-    lhs' = normalise (rewrite [r]) lhs
-    rhs' = normalise (rewrite [r]) rhs
+newEquation (l :==: r) = do
+  l <- normaliseM l
+  r <- normaliseM r
+  unless (l == r) $
+    modify (\s -> s { queue = Set.insert (l === r) (queue s) })
 
 complete :: Monad m => StateT Completion m ()
 complete = do
   Completion { maxSize = maxSize, queue = queue } <- get
   case Set.minView queue of
-    Just (eq@(l:==:r), queue') | equationSize eq <= maxSize -> do
+    Just (eq, queue') -> do
       modify (\s -> s { queue = queue' })
-      addEquation eq
+      consider eq
       complete
     _ -> return ()
+
+consider :: Monad m => Equation -> StateT Completion m ()
+consider (l :==: r) = do
+  l <- normaliseM l
+  r <- normaliseM r
+  maxSize <- gets maxSize
+  when (size l <= maxSize && size r <= maxSize) $
+    case orient (l :==: r) of
+      Nothing -> return ()
+      Just rule@(Rule.Rule l r) -> do
+        -- HACK rename variables
+        let l' :==: r' = renameVars l r
+            rule = Rule.Rule l' r'
+        trace (show (pretty (size l) <+> pretty rule)) $ return ()
+        modify (\s -> s { rules = RuleSet.insert rule (rules s) })
+        interreduce rule
+        addCriticalPairs rule
+
+addCriticalPairs :: Monad m => Rule -> StateT Completion m ()
+addCriticalPairs rule = do
+  Completion { rules = rules } <- get
+  mapM_ newEquation (concat [ criticalPairs rule rule' | rule' <- RuleSet.elems rules ])
+  mapM_ newEquation (concat [ criticalPairs rule' rule | rule' <- RuleSet.elems rules ])
+
+data Reduction = Simplify Rule | Reorient Rule
+
+instance Show Reduction where
+  show (Simplify r) = "simplify rhs of " ++ prettyShow r
+  show (Reorient r) = "simplify lhs of " ++ prettyShow r
+
+interreduce :: Monad m => Rule -> StateT Completion m ()
+interreduce rule = do
+  Completion { rules = rs } <- get
+  let reductions = catMaybes (map (interreduction rule) (RuleSet.elems rs))
+  sequence_ [ traceShow r (return ()) | r <- reductions ]
+  sequence_ [ simplifyRule r | Simplify r <- reductions ]
+  sequence_ [ newEquation (Rule.lhs r :==: Rule.rhs r) | Reorient r <- reductions ]
+  sequence_ [ deleteRule r | Reorient r <- reductions ]
+
+interreduction :: Rule -> Rule -> Maybe Reduction
+interreduction new old
+  | not (Rule.lhs new `isInstanceOf` Rule.lhs old) &&
+    not (null (Rules.fullRewrite [new] (Rule.lhs old))) =
+      Just (Reorient old)
+  | not (null (Rules.fullRewrite [new] (Rule.rhs old))) =
+      Just (Simplify old)
+  | otherwise = Nothing
+
+addRule :: Monad m => Rule -> StateT Completion m ()
+addRule r = modify (\s -> s { rules = RuleSet.insert r (rules s) })
+
+deleteRule :: Monad m => Rule -> StateT Completion m ()
+deleteRule r = modify (\s -> s { rules = RuleSet.delete r (rules s) })
+
+simplifyRule :: Monad m => Rule -> StateT Completion m ()
+simplifyRule r = do
+  rhs' <- normaliseM (Rule.rhs r)
+  let r' = r { Rule.rhs = rhs' }
+  deleteRule r
+  addRule r'
+
+main = do
+  let rs = reverse (RuleSet.elems (rules (execState (mapM_ newEquation eqs >> complete) initialState { maxSize = 10 })))
+  print (length rs)
+  mapM_ prettyPrint rs
 
 newAxiom :: Monad m => PropOf PruningTerm -> StateT Completion m ()
 newAxiom ([] :=>: (t :=: u)) = do
@@ -217,5 +211,5 @@ newAxiom ([] :=>: (t :=: u)) = do
   let newSize = size t `max` size u
   when (newSize > maxSize) $
     modify (\s -> s { maxSize = newSize + sizeDelta })
-  newEquation (t === u)
+  newEquation (t :==: u)
   complete

@@ -106,3 +106,11 @@ lookupFun (Fun f ts) idx =
     Nothing -> mzero
     Just idx' -> foldr (>=>) return (map lookupPartial ts) idx'
 lookupFun _ _ = mzero
+
+elems :: Index f v a -> [a]
+elems idx = DList.toList (aux idx)
+  where
+    aux idx =
+      DList.fromList (Set.toList (here idx)) `mplus`
+      msum (map aux (Map.elems (fun idx))) `mplus`
+      msum (map aux (Map.elems (var idx)))
