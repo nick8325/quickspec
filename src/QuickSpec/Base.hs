@@ -26,7 +26,7 @@ import Data.Traversable(sequenceA)
 import qualified Data.Map as Map
 import Data.Map(Map)
 import QuickSpec.Pretty
-import Text.PrettyPrint.HughesPJ
+import Text.PrettyPrint.HughesPJ hiding (empty)
 import qualified Data.DList as DList
 import Data.DList(DList)
 import Control.Monad
@@ -145,7 +145,7 @@ canonicalise t = substf (evalSubst sub) t
 
 class Pretty a => PrettyTerm a where
   termStyle :: a -> TermStyle
-  termStyle _ = Uncurried
+  termStyle _ = Curried
 
 data TermStyle = Curried | Uncurried | Tuple Int | TupleType | ListType | Infix Int | Infixr Int | Prefix | Postfix | Gyrator deriving Show
 

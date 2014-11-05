@@ -16,6 +16,9 @@ instance Symbolic (Equation f v) where
   termsDL (t :==: u) = termsDL t `mplus` termsDL u
   substf sub (t :==: u) = substf sub t :==: substf sub u
 
+instance (PrettyTerm f, Pretty v) => Pretty (Equation f v) where
+  pretty (x :==: y) = hang (pretty x <+> text "=") 2 (pretty y)
+
 order :: (Sized f, Ord f, Ord v) => Equation f v -> Rule.Rule f v
 order (l :==: r)
   | Measure l >= Measure r =
@@ -23,8 +26,8 @@ order (l :==: r)
   | otherwise =
     Rule.Rule r l
 
-undirect :: Rule.Rule f v -> Equation f v
-undirect (Rule.Rule l r) = l :==: r
+unorient :: Rule.Rule f v -> Equation f v
+unorient (Rule.Rule l r) = l :==: r
 
 orient :: (Sized f, Ord f, Ord v) => Equation f v -> Maybe (Rule.Rule f v)
 orient (l :==: r) =
@@ -33,5 +36,11 @@ orient (l :==: r) =
     Just GT -> Just (Rule.Rule l r)
     _       -> Nothing
 
-instance (PrettyTerm f, Pretty v) => Pretty (Equation f v) where
-  pretty (x :==: y) = hang (pretty x <+> text "=") 2 (pretty y)
+bothSides :: (Tm f v -> Tm f v) -> Equation f v -> Equation f v
+bothSides f (t :==: u) = f t :==: f u
+
+trivial :: (Ord f, Ord v) => Equation f v -> Bool
+trivial (t :==: u) = t == u
+
+equationSize :: Sized f => Equation f v -> Int
+equationSize (t :==: u) = size t `max` size u
