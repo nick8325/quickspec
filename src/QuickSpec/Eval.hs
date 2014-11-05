@@ -16,8 +16,9 @@ import qualified Data.Set as Set
 import Data.Set(Set)
 import Control.Monad
 import QuickSpec.Pruning hiding (createRules, instances)
-import QuickSpec.Pruning.Simple hiding (S)
-import qualified QuickSpec.Pruning.Simple as Simple
+--import QuickSpec.Pruning.Simple hiding (S)
+--import qualified QuickSpec.Pruning.Simple as Simple
+import qualified QuickSpec.Pruning.Completion as Completion
 import qualified QuickSpec.Pruning.E as E
 import qualified QuickSpec.Pruning.Z3 as Z3
 import Data.List hiding (insert)
@@ -34,7 +35,7 @@ import QuickSpec.Test
 import Test.QuickCheck.Random
 import Data.Monoid hiding ((<>))
 
-type M = RulesT Event (StateT S (PrunerT SimplePruner IO))
+type M = RulesT Event (StateT S (PrunerT Completion.Completion IO))
 
 data S = S {
   schemas       :: Schemas,
@@ -268,7 +269,8 @@ consider sig makeEvent x = do
   res <- lift (lift (rep t))
   case res of
     Just u | Measure u < Measure t ->
-      lift (lift (axiom ([] :=>: t :=: u)))
+      return ()
+      --lift (lift (axiom ([] :=>: t :=: u)))
     _ -> do
       ts <- getTestSet x
       res <-

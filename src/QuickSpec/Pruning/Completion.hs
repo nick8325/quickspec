@@ -1,11 +1,13 @@
 {-# LANGUAGE FlexibleInstances, GeneralizedNewtypeDeriving, TypeFamilies, DeriveFunctor #-}
---module QuickSpec.Pruning.Completion where
+module QuickSpec.Pruning.Completion where
 
-import QuickSpec.Base hiding ((<>), nest, ($$), empty)
+import QuickSpec.Base
 import QuickSpec.Term
---import QuickSpec.Pruning
+import QuickSpec.Type
+import QuickSpec.Pruning
 import QuickSpec.Prop
 import QuickSpec.Utils
+import QuickSpec.Signature(constant)
 import qualified Data.Rewriting.CriticalPair as CP
 import qualified Data.Rewriting.Rule as Rule
 import qualified Data.Rewriting.Rules as Rules
@@ -27,32 +29,38 @@ import QuickSpec.Pruning.Equation
 import qualified Data.PQueue.Min as Queue
 import Data.PQueue.Min(MinQueue)
 import Control.Applicative
+import QuickSpec.Pretty
 
-instance PrettyTerm String
-type PruningTerm = Tm PruningConstant PruningVariable
-type PruningConstant = String
-type PruningVariable = Int
-instance Sized [Char] where funSize _ = 1
-v :: Int -> PruningTerm
-v = Var
-x = v 0
-y = v 1
-z = v 2
+-- type PruningTerm = Tm PruningConstant PruningVariable
+-- data PruningConstant = Skolem PruningVariable | Plus | Times | Zero | One deriving (Show, Eq, Ord)
+-- allFuns = [Plus, Times, Zero, One]
+-- newtype PruningVariable = V Int deriving (Show, Eq, Ord, Numbered)
+-- instance Sized PruningConstant where funSize _ = 1
+-- x = Var (V 0)
+-- y = Var (V 1)
+-- z = Var (V 2)
 
-plus t u = Fun "plus" [t, u]
-times t u = Fun "times" [t, u]
-zero = Fun "zero" []
-one = Fun "one" []
+plus t u = Fun (termConstant (constant "+" ((+) :: Int -> Int -> Int))) [t, u]
+times t u = Fun (termConstant (constant "*" ((*) :: Int -> Int -> Int))) [t, u]
+inv t = Fun (termConstant (constant "-" (negate :: Int -> Int))) [t]
+zero = Fun (termConstant (constant "0" (0 :: Int))) []
+one = Fun (termConstant (constant "1" (1 :: Int))) []
+x = Var (PruningVariable 0)
+y = Var (PruningVariable 1)
+z = Var (PruningVariable 2)
+
+termConstant con = TermConstant con (typ con) (arity (typ con))
+
 eqs = [
   plus x y :==: plus y x,
   plus zero x :==: x,
-  plus x (plus y z) :==: plus y (plus x z),
-  --plus x (plus y z) :==: plus (plus x y) z,
+  --plus x (plus y z) :==: plus y (plus x z),
+  plus x (plus y z) :==: plus (plus x y) z,
   times x y :==: times y x,
   times zero x :==: zero,
   times one x :==: x,
-  times x (times y z) :==: times y (times x z),
---  times x (times y z) :==: times (times x y) z,
+  --times x (times y z) :==: times y (times x z),
+  times x (times y z) :==: times (times x y) z,
   times x (plus y z) :==: plus (times x y) (times x z)]
 
 type Eqn = EquationOf PruningTerm
@@ -62,28 +70,30 @@ type PruningCP = CPOf PruningTerm
 type T = StateT Completion
 data Completion =
   Completion {
-    maxSize   :: Int,
-    maxEqSize :: Int,
-    sizeDelta :: Int,
-    nextLabel :: Label,
-    labels    :: Set Label,
-    rules     :: Index (Labelled Rule),
-    left      :: Index (Labelled Rule),
-    right     :: Index (Labelled Rule),
-    queue     :: MinQueue (Labelled SubQueue),
-    paused    :: [Eqn] }
+    maxSize     :: Int,
+    sizeDelta   :: Int,
+    nextLabel   :: Label,
+    labels      :: Set Label,
+    rules       :: Index (Labelled Rule),
+    left        :: Index (Labelled Rule),
+    right       :: Index (Labelled Rule),
+    functions   :: Set PruningConstant,
+    acFunctions :: Set PruningConstant,
+    queue       :: MinQueue (Labelled SubQueue),
+    paused      :: [Eqn] }
   deriving Show
 
 initialState =
   Completion {
     maxSize = 0,
-    maxEqSize = 0,
     sizeDelta = 1,
     nextLabel = 1,
     labels = Set.singleton 0,
     rules = Index.empty,
     left = Index.empty,
     right = Index.empty,
+    functions = Set.empty,
+    acFunctions = Set.empty,
     queue = Queue.empty,
     paused = [] }
 
@@ -190,11 +200,49 @@ direct (t :==: u) = [Eqn (t :==: u), Eqn (u :==: t)]
 
 directedEqns :: Monad m => StateT Completion m [Labelled DirectedEqn]
 directedEqns = do
-  Completion { rules = rules, left = left, right = right } <- get
+  Completion { rules = rules, left = left, right = right, acFunctions = acFunctions } <- get
+  let redundant = acRedundant acFunctions
   return $
     map (fmap Rule) (Index.elems rules) ++
-    map (fmap (Eqn . undirect)) (Index.elems left) ++
-    map (fmap (Eqn . undirect)) (Index.elems right)
+    map (fmap Eqn) (filter (not . redundant . peel) (map (fmap undirect) (Index.elems left)))
+
+acRedundant :: Set PruningConstant -> Eqn -> Bool
+acRedundant acFuns =
+  \eqn@(l :==: r) ->
+    not (or [ subsumes eqn' eqn | eqn' <- map undirect rules ++ eqns ] ||
+    not (null [ Index.lookup t ruleIdx | t <- [l, r] ]) ||
+    not (null [ rule | t <- [l, r], rule <- Index.lookup t eqnIdx, Rule.rhs rule `simplerThan` Rule.lhs rule ])) &&
+    normaliseAC acFuns l == normaliseAC acFuns r
+  where
+    stuff = map acStuff (Set.toList acFuns)
+    rules = map fst stuff
+    eqns  = concatMap snd stuff
+    ruleIdx = foldr Index.insert Index.empty rules
+    eqnIdx  = foldr Index.insert Index.empty (concat [[Rule.Rule l r, Rule.Rule r l] | l :==: r <- eqns ])
+
+normaliseAC :: Set PruningConstant -> PruningTerm -> PruningTerm
+normaliseAC acFuns (Var x) = Var x
+normaliseAC acFuns (Fun f xs)
+  | f `Set.member` acFuns = reassociate (map (normaliseAC acFuns) (sort (concatMap (flattenAC f) xs)))
+    where
+      reassociate xs = foldr1 (\x y -> Fun f [x, y]) xs
+normaliseAC acFuns (Fun f xs) = Fun f (map (normaliseAC acFuns) xs)
+
+flattenAC :: PruningConstant -> PruningTerm -> [PruningTerm]
+flattenAC f (Fun g xs) | g == f = concatMap (flattenAC f) xs
+flattenAC f t = [t]
+
+acStuff :: PruningConstant -> (Rule, [Eqn])
+acStuff f =
+  (Rule.Rule (Fun f [Fun f [x, y], z]) (Fun f [x, Fun f [y, z]]),
+   [Fun f [x, y] :==: Fun f [y, x],
+    Fun f [x, Fun f [y, z]] :==: Fun f [y, Fun f [x, z]],
+    Fun f [x, Fun f [y, z]] :==: Fun f [z, Fun f [y, x]],
+    Fun f [x, Fun f [y, z]] :==: Fun f [y, Fun f [z, x]]])
+  where
+    x = Var (PruningVariable 0)
+    y = Var (PruningVariable 1)
+    z = Var (PruningVariable 2)
 
 halfDirectedEqns :: Monad m => StateT Completion m [Labelled DirectedEqn]
 halfDirectedEqns = do
@@ -224,7 +272,7 @@ normaliseWith :: Strategy -> PruningTerm -> PruningTerm
 normaliseWith strat t =
   case strat t of
     [] -> t
-    (r:_) -> normaliseWith strat r
+    (r:_) -> {- trace (prettyShow t ++ " -> " ++ prettyShow r) $ -} normaliseWith strat r
 
 anywhere :: Strategy -> Strategy
 anywhere strat t = strat t ++ nested (anywhere strat) t
@@ -259,11 +307,36 @@ rewriteEqn = do
     guard (u `simplerThan` t)
     return u
 
+rewriteAc :: Monad m => StateT Completion m Strategy
+rewriteAc = do
+  acFunctions <- gets acFunctions
+  let go s (Fun f _) | s == Just f = []
+      go s (Fun f ts) | f `Set.member` acFunctions = go' f ts ++ nested (go (Just f)) (Fun f ts)
+      go s (Fun f ts) = nested (go Nothing) (Fun f ts)
+      go s (Var x) = []
+      go' f ts = [ u | u <- usort (perms (concatMap (flattenAC f) ts)) >>= build f, u `simplerThan` Fun f ts ]
+      build :: PruningConstant -> [PruningTerm] -> [PruningTerm]
+      build _ [t] = [t]
+      build f ts = [ Fun f [u, v] | (us, vs) <- splits ts, not (null us), not (null vs), u <- build f us, v <- build f vs ]
+      splits :: [a] -> [([a], [a])]
+      splits [] = [([], [])]
+      splits (t:ts) = do
+        (us, vs) <- splits ts
+        [(t:us,vs), (us,t:vs)]
+      perms :: [a] -> [[a]]
+      perms [] = [[]]
+      perms (x:xs) = perms xs >>= ins x
+      ins :: a -> [a] -> [[a]]
+      ins x [] = [[x]]
+      ins x (y:ys) = (x:y:ys):map (y:) (ins x ys)
+  return (go Nothing)
+
 rewriteFully :: Monad m => StateT Completion m Strategy
 rewriteFully = do
   rules <- rewriteRules
   eqns  <- rewriteEqn
-  return $ \t -> anywhere rules t ++ anywhere eqns t
+  ac    <- rewriteAc
+  return $ \t -> anywhere rules t ++ anywhere eqns t -- ++ ac t
 
 normalise :: Monad m => PruningTerm -> StateT Completion m PruningTerm
 normalise t = do
@@ -298,35 +371,66 @@ complete = do
       consider eq
       complete
     Nothing -> trace "stopped" $ do
-      paused <- gets paused
       rewrite <- rewriteFully
-      when (or [ rewrite t /= [] || rewrite u /= [] | t :==: u <- paused ]) $ do
-        modify (\s -> s { paused = [] })
-        forM_ paused $ \(t :==: u) ->
-          newEqn (normaliseWith rewrite t :==: normaliseWith rewrite u)
-        complete
+      paused <- gets paused
+      when (or [ rewrite t /= [] || rewrite u /= [] | t :==: u <- paused ]) unpause
+
+unpause :: Monad m => StateT Completion m ()
+unpause = trace "unpausing" $ do
+  discoverAC
+  paused <- gets paused
+  rewrite <- rewriteFully
+  modify (\s -> s { paused = [] })
+  forM_ paused $ \(t :==: u) ->
+    newEqn (normaliseWith rewrite t :==: normaliseWith rewrite u)
+  complete
 
 consider :: Monad m => Eqn -> StateT Completion m ()
 consider (l :==: r) = do
+  acFunctions <- gets acFunctions
   l <- normaliseFully l
   r <- normaliseFully r
-  when (l /= r) $ do
+  when (l /= r && not (acRedundant acFunctions (l :==: r))) $ do
     let eqn = l :==: r
-    Completion { maxSize = maxSize, maxEqSize = maxEqSize } <- get
+    Completion { maxSize = maxSize } <- get
     case orient eqn of
       Just rule | size l <= maxSize && size r <= maxSize -> do
         l <- add (Rule rule)
         interreduce (Rule rule)
+        discoverAC
         addCriticalPairs l (Rule rule)
-      Nothing | size l <= maxEqSize && size r <= maxEqSize -> do
+      Nothing | size l <= maxSize && size r <= maxSize -> do
         left1  <- gets (map peel . Index.elems . left)
         unless (or [ undirect rule `subsumes` eqn | rule <- left1 ]) $ do
           removeSubsumptions eqn
           left  <- gets (map peel . Index.elems . left)
           l <- add (Eqn eqn)
           mapM_ interreduce (direct eqn)
+          discoverAC
           mapM_ (addCriticalPairs l) (usort (map canonicalise (direct eqn)))
       _ -> modify (\s -> s { paused = eqn:paused s })
+
+discoverAC :: Monad m => StateT Completion m ()
+discoverAC = do
+  Completion { functions = functions, acFunctions = acFunctions } <- get
+  rewrite <- rewriteFully
+  let newAC = filter (isAC rewrite) (Set.toList (functions Set.\\ acFunctions))
+  unless (null newAC) $ trace ("Discovered AC functions " ++ prettyShow newAC) (return ())
+  modify (\s -> s { acFunctions = acFunctions `Set.union` Set.fromList newAC })
+
+isAC :: Strategy -> PruningConstant -> Bool
+isAC strat con =
+  normaliseWith strat l1 == normaliseWith strat r1 &&
+  normaliseWith strat l2 == normaliseWith strat r2
+  where
+    x = Fun (skolemVariable 0) []
+    y = Fun (skolemVariable 1) []
+    z = Fun (skolemVariable 2) []
+    l1 = Fun con [x, y]
+    r1 = Fun con [y, x]
+    l2 = Fun con [x, Fun con [y, z]]
+    r2 = Fun con [Fun con [x, y], z]
+    skolemVariable n = SkolemVariable (Variable n (typeOf ()))
 
 removeSubsumptions :: Monad m => Eqn -> StateT Completion m ()
 removeSubsumptions eqn = do
@@ -344,11 +448,15 @@ eqn1 `subsumes` eqn2 =
 
 addCriticalPairs :: Monad m => Label -> DirectedEqn -> StateT Completion m ()
 addCriticalPairs l eqn = do
-  directedEqns <- directedEqns
-  newCPs l $
-    [ Labelled l' cp
-    | Labelled l' eqn' <- directedEqns,
-      cp <- usort (criticalPairs eqn eqn' ++ criticalPairs eqn' eqn) ]
+  Completion { acFunctions = acFunctions } <- get
+  case eqn of
+    Eqn eqn | acRedundant acFunctions eqn -> return ()
+    _ -> do
+      directedEqns <- directedEqns
+      newCPs l $
+        [ Labelled l' cp
+        | Labelled l' eqn' <- directedEqns,
+          cp <- usort (criticalPairs eqn eqn' ++ criticalPairs eqn' eqn) ]
 
 add :: Monad m => DirectedEqn -> StateT Completion m Label
 add eqn = trace ("add " ++ prettyShow eqn) $ do
@@ -382,8 +490,8 @@ interreduce eqn = do
   eqns <- halfDirectedEqns
   let reductions = catMaybes (map (moveLabel . fmap (reduce eqn)) eqns)
   sequence_ [ trace ("simplified " ++ prettyShow eqn) $ simplify l eqn | Labelled l (Simplify eqn) <- reductions ]
-  sequence_ [ trace ("reoriented 1 " ++ prettyShow eqn) $ newEqn (undirect (rule eqn)) | Reorient eqn <- map peel reductions ]
-  sequence_ [ trace ("reoriented 2 " ++ prettyShow eqn) $ delete (Labelled l eqn) | Labelled l (Reorient eqn) <- reductions ]
+  sequence_ [ trace ("reoriented " ++ prettyShow eqn) $ newEqn (undirect (rule eqn)) | Reorient eqn <- map peel reductions ]
+  sequence_ [ delete (Labelled l eqn) | Labelled l (Reorient eqn) <- reductions ]
 
 reduce :: DirectedEqn -> DirectedEqn -> Maybe Reduction
 reduce new old =
@@ -413,15 +521,43 @@ simplify l r = do
                                 (rules s)) })
 
 main = do
-  let rs = reverse (Index.elems (rules (execState (mapM_ newEqn eqs >> complete) initialState { maxSize = 11, maxEqSize = 5 })))
-  print (length rs)
-  mapM_ prettyPrint rs
+ let s = execState (mapM_ newEqn eqs >> complete) initialState { maxSize = 9, functions = Set.fromList (funs eqs) }
+ mapM_ prettyPrint (Index.elems (rules s))
+ putStrLn "Equations:"
+ mapM_ prettyPrint (Index.elems (left s))
+
+seenTerm :: Monad m => PruningTerm -> StateT Completion m ()
+seenTerm t = do
+  modify (\s -> s { functions = Set.union (Set.fromList (funs t)) (functions s) })
+  Completion { maxSize = maxSize, sizeDelta = sizeDelta } <- get
+  when (size t > maxSize) $ do
+    modify (\s -> s { maxSize = size t + sizeDelta })
+    unpause
 
 newAxiom :: Monad m => PropOf PruningTerm -> StateT Completion m ()
 newAxiom ([] :=>: (t :=: u)) = do
-  Completion { maxSize = maxSize, sizeDelta = sizeDelta } <- get
-  let newSize = size t `max` size u
-  when (newSize > maxSize) $
-    modify (\s -> s { maxSize = newSize + sizeDelta })
+  seenTerm t
+  seenTerm u
   newEqn (t :==: u)
   complete
+
+findRep :: Monad m => [PropOf PruningTerm] -> PruningTerm -> StateT Completion m (Maybe PruningTerm)
+findRep axioms t = do
+  seenTerm t
+  sequence_ [ do { seenTerm t; seenTerm u } | [] :=>: (t :=: u) <- axioms ]
+  locally $ do
+    sequence_ [ newEqn (t :==: u) | [] :=>: (t :=: u) <- axioms ]
+    u <- normaliseFully t
+    if t == u then return Nothing else return (Just u)
+
+locally :: Monad m => StateT s m a -> StateT s m a
+locally m = do
+  s <- get
+  x <- m
+  put s
+  return x
+
+instance Pruner Completion where
+  emptyPruner = initialState
+  untypedRep = findRep
+  untypedAxiom = newAxiom

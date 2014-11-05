@@ -12,7 +12,6 @@ newtype SimplePruner = S [PropOf PruningTerm]
 
 instance Pruner SimplePruner where
   emptyPruner = S []
-  untypedGoal  = liftM isJust . simpleAreEqual
   untypedAxiom = simpleUnify
   untypedRep   = simpleRep
 

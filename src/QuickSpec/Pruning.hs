@@ -25,13 +25,11 @@ class Pruner s where
   emptyPruner   :: s
   untypedRep    :: Monad m => [PropOf PruningTerm] -> PruningTerm -> StateT s m (Maybe PruningTerm)
   untypedAxiom  :: Monad m => PropOf PruningTerm -> StateT s m ()
-  untypedGoal   :: Monad m => PropOf PruningTerm -> StateT s m Bool
 
 instance Pruner [PropOf PruningTerm] where
   emptyPruner = []
   untypedRep _ _    = return Nothing
   untypedAxiom prop = modify (prop:)
-  untypedGoal _     = return False
 
 newtype PrunerT s m a =
   PrunerT {
@@ -72,12 +70,6 @@ axiom p = do
     [ do sequence_ [ PrunerT (generate fun) | fun <- usort (funs p') ]
          liftPruner (untypedAxiom p')
     | p' <- map toAxiom (instances univ p) ]
-
-goal :: (Pruner s, Monad m) => Prop -> PrunerT s m Bool
-goal p = do
-  let p' = toGoal p
-  sequence_ [ PrunerT (generate fun) | fun <- usort (funs p') ]
-  liftPruner (untypedGoal p')
 
 toAxiom :: Prop -> PropOf PruningTerm
 toAxiom = normaliseProp . guardNakedVariables . fmap toPruningConstant
@@ -168,17 +160,19 @@ data PruningConstant
 instance Sized PruningConstant where
   funSize (TermConstant c _ _) = funSize c
   funSize (SkolemVariable _) = 1
-  funSize (HasType _) = 0
+  funSize (HasType _) = 1
   schematise (SkolemVariable _) = SkolemVariable (Variable 0 (typeOf (undefined :: A)))
   schematise x = x
 
-newtype PruningVariable = PruningVariable Int deriving (Eq, Ord, Num, Enum, Show)
+newtype PruningVariable = PruningVariable Int deriving (Eq, Ord, Num, Enum, Show, Numbered)
 
 instance Pretty PruningConstant where
   pretty (TermConstant x _ _) = pretty x
   pretty (SkolemVariable x) = text "s" <> pretty x
   pretty (HasType ty) = text "@" <> pretty ty
 instance PrettyTerm PruningConstant where
+  termStyle (TermConstant x _ _) = termStyle x
+  termStyle _ = Uncurried
 
 instance Pretty PruningVariable where
   pretty (PruningVariable x) = text "v" <> pretty x
