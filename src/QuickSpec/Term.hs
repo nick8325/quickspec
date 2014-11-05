@@ -65,11 +65,15 @@ compareTerms t u =
     (Fun{}, Var{}) -> here GT
     (Fun f xs, Fun g ys) ->
       -- Order constants by arity first
-      here (compare (length xs) (length ys)) `mplus`
+      here (compare (twiddle (length xs)) (twiddle (length ys))) `mplus`
       here (compare f g) `mplus` msum (zipWith compareTerms xs ys)
   where
     here EQ = Nothing
     here ord = Just (t, u, ord)
+    -- This tweak is taken from Otter
+    twiddle 2 = 1
+    twiddle 1 = 2
+    twiddle n = n
 
 -- Reduction ordering (i.e., a partial order closed under substitution).
 -- Has the property:
