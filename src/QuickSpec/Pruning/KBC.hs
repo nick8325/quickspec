@@ -93,7 +93,7 @@ complete = do
     Just eqn -> do
       consider eqn
       complete
-    Nothing -> unpause
+    Nothing -> return ()
 
 unpause ::
   (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
@@ -108,6 +108,7 @@ unpause = do
     mapM_ newEquation (Set.toList resumed)
     modify (\s -> s { paused = paused' })
     complete
+    unpause
 
 increaseSize ::
   (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>

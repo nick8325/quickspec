@@ -45,6 +45,7 @@ newAxiom ([] :=>: (t :=: u)) = do
   liftKBC $ do
     KBC.newEquation (t :==: u)
     KBC.complete
+    KBC.unpause
 
 findRep :: Monad m => [PropOf PruningTerm] -> PruningTerm -> StateT Completion m (Maybe PruningTerm)
 findRep axioms t = do
@@ -52,6 +53,7 @@ findRep axioms t = do
   sequence_ [ do { seenTerm t; seenTerm u } | [] :=>: (t :=: u) <- axioms ]
   localKBC $ do
     sequence_ [ KBC.newEquation (t :==: u) | [] :=>: (t :=: u) <- axioms ]
+    KBC.complete
     norm <- KBC.normaliser
     let u = norm t
     if t == u then return Nothing else return (Just u)
