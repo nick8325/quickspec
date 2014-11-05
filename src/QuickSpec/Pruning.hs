@@ -60,8 +60,19 @@ createRules = PrunerT $ do
     execute $ do
       let ty = typ (Fun con (replicate arity (undefined :: Term)))
           t = Fun fun (take arity (map Var [0..]))
-      unPrunerT $ liftPruner $
+          args = take arity (typeArgs (typ con))
+      unPrunerT $ liftPruner $ do
         untypedAxiom ([] :=>: Fun (HasType ty) [t] :=: t)
+        forM_ (zip [0..] args) $ \(i, ty) -> do
+          let vs = map (Var . PruningVariable) [0..arity-1]
+              tm f = Fun fun (take i vs ++ [f (vs !! i)] ++ drop (i+1) vs)
+          untypedAxiom ([] :=>: tm (\t -> Fun (HasType ty) [t]) :=: tm id)
+
+  rule $ do
+    fun@(HasType ty) <- event
+    execute $
+      unPrunerT $ liftPruner $
+        untypedAxiom ([] :=>: Fun fun [Fun fun [Var 0]] :=: Fun fun [Var 0])
 
 axiom :: (Pruner s, Monad m) => Prop -> PrunerT s m ()
 axiom p = do
