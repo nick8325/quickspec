@@ -7,11 +7,8 @@ import Data.Ord
 import Control.Monad
 import qualified Data.Rewriting.Rule as Rule
 
-data Equation f v = Tm f v :==: Tm f v deriving (Eq, Show)
+data Equation f v = Tm f v :==: Tm f v deriving (Eq, Ord, Show)
 type EquationOf a = Equation (ConstantOf a) (VariableOf a)
-
-instance (Sized f, Ord f, Ord v) => Ord (Equation f v) where
-  compare = comparing (\(l :==: r) -> (Measure l, Measure r))
 
 instance Symbolic (Equation f v) where
   type ConstantOf (Equation f v) = f
@@ -19,13 +16,18 @@ instance Symbolic (Equation f v) where
   termsDL (t :==: u) = termsDL t `mplus` termsDL u
   substf sub (t :==: u) = substf sub t :==: substf sub u
 
-(===) :: (Sized f, Ord f, Ord v) => Tm f v -> Tm f v -> Equation f v
-x === y
-  | Measure x < Measure y = y :==: x
-  | otherwise = x :==: y
+order :: (Sized f, Ord f, Ord v) => Equation f v -> Rule.Rule f v
+order (l :==: r)
+  | Measure l >= Measure r =
+    Rule.Rule l r
+  | otherwise =
+    Rule.Rule r l
+
+undirect :: Rule.Rule f v -> Equation f v
+undirect (Rule.Rule l r) = l :==: r
 
 orient :: (Sized f, Ord f, Ord v) => Equation f v -> Maybe (Rule.Rule f v)
-orient eq@(l :==: r) =
+orient (l :==: r) =
   case orientTerms l r of
     Just LT -> Just (Rule.Rule r l)
     Just GT -> Just (Rule.Rule l r)
