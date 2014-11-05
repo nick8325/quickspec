@@ -92,16 +92,10 @@ toAxiom = normaliseProp . guardNakedVariables . fmap toPruningConstant
     guardTerm t = t
 
 toGoal :: Prop -> PropOf PruningTerm
-toGoal p = (axs ++ lhs p') :=>: rhs p'
-  where
-    p' = fmap (skolemise . toPruningConstant) p
-    axs = [ skolemAxiom x | SkolemVariable x <- usort (funs p') ]
+toGoal = fmap toGoalTerm
 
-toGoalTerm :: Term -> ([Literal PruningTerm], PruningTerm)
-toGoalTerm t = (axs, u)
-  where
-    u = skolemise (toPruningConstant t)
-    axs = [ skolemAxiom x | SkolemVariable x <- usort (funs u) ]
+toGoalTerm :: Term -> PruningTerm
+toGoalTerm = skolemise . toPruningConstant
 
 toPruningConstant :: Term -> Tm PruningConstant Variable
 toPruningConstant = mapTerm f id . withArity
@@ -110,7 +104,7 @@ toPruningConstant = mapTerm f id . withArity
 
 skolemise :: Tm PruningConstant Variable -> PruningTerm
 skolemise (Fun f xs) = Fun f (map skolemise xs)
-skolemise (Var x) = Fun (SkolemVariable x) []
+skolemise (Var x) = Fun (HasType (typ x)) [Fun (SkolemVariable x) []]
 
 skolemAxiom :: Variable -> Literal PruningTerm
 skolemAxiom x =
@@ -149,9 +143,7 @@ constrain univ t =
   usort [ toMap sub | u <- univ, Just sub <- [match (typ t) u] ]
 
 rep :: (Pruner s, Monad m) => Term -> PrunerT s m (Maybe Term)
-rep t = liftM (liftM fromPruningTerm) (liftPruner (untypedRep (map unitProp axs) u))
-  where
-    (axs, u) = toGoalTerm t
+rep t = liftM (liftM fromPruningTerm) (liftPruner (untypedRep [] (toGoalTerm t)))
 
 type PruningTerm = Tm PruningConstant PruningVariable
 
@@ -170,7 +162,7 @@ data PruningConstant
 -- t `simplerThan` u => fromPruningTerm t `simplerThan` fromPruningTerm u
 instance Sized PruningConstant where
   funSize (TermConstant c _ _) = funSize c
-  funSize (SkolemVariable _) = 1
+  funSize (SkolemVariable _) = 0
   funSize (HasType _) = 1
   schematise (SkolemVariable _) = SkolemVariable (Variable 0 (typeOf (undefined :: A)))
   schematise x = x
