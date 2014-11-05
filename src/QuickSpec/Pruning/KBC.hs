@@ -21,7 +21,9 @@ import Control.Monad.Trans.State.Strict
 import qualified Data.Rewriting.CriticalPair as CP
 import Data.Ord
 import Data.Maybe
-import Debug.Trace
+
+--import Debug.Trace
+traceM _ = return ()
 
 data KBC f v =
   KBC {
@@ -144,12 +146,15 @@ consider eqn = do
       else
         case orient eqn' of
           Just rule -> do
+            traceM ("New rule " ++ prettyShow rule)
             l <- addRule rule
             interreduce rule
             addCriticalPairs l rule
-          Nothing -> pause eqn'
+          Nothing -> do
+            traceM ("Couldn't orient " ++ prettyShow eqn')
+            pause eqn'
 
-addRule :: (Monad m, Ord f, Ord v, Numbered v) => Rule f v -> StateT (KBC f v) m Label
+addRule :: (Monad m, PrettyTerm f, Ord f, Ord v, Numbered v, Pretty v) => Rule f v -> StateT (KBC f v) m Label
 addRule rule = do
   l <- newLabelM
   modify (\s -> s { rules = Index.insert (Labelled l rule) (rules s) })
@@ -161,12 +166,17 @@ deleteRule l rule =
     s { rules = Index.delete (Labelled l rule) (rules s),
         queue = deleteLabel l (queue s) }
 
-data Reduction f v = Simplify (Rule f v) | Reorient (Rule f v)
+data Reduction f v = Simplify (Rule f v) | Reorient (Rule f v) deriving Show
 
-interreduce :: (Monad m, Ord f, Sized f, Ord v, Numbered v) => Rule f v -> StateT (KBC f v) m ()
+instance (PrettyTerm f, Pretty v) => Pretty (Reduction f v) where
+  pretty (Simplify rule) = text "Simplify" <+> pretty rule
+  pretty (Reorient rule) = text "Reorient" <+> pretty rule
+
+interreduce :: (Monad m, PrettyTerm f, Ord f, Sized f, Ord v, Numbered v, Pretty v) => Rule f v -> StateT (KBC f v) m ()
 interreduce new = do
   rules <- gets (Index.elems . rules)
   let reductions = catMaybes (map (moveLabel . fmap (reduce new)) rules)
+  sequence_ [ traceM (prettyShow red ++ " using " ++ prettyShow new) | red <- map peel reductions ]
   sequence_ [ simplifyRule l rule | Labelled l (Simplify rule) <- reductions ]
   sequence_ [ newEquation (unorient rule) | Reorient rule <- map peel reductions ]
   sequence_ [ deleteRule l rule | Labelled l (Reorient rule) <- reductions ]
