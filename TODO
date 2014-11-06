@@ -27,6 +27,8 @@ equalities on function types during pruning?)
 Longer term
 -----------
 
+Allow the user to attach extra data to a constant.
+
 Does the rewriting ordering need to be compatible with the term ordering?
 Or would it be enough to keep a mapping from representatives to their normal forms?
 
