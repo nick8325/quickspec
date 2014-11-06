@@ -33,7 +33,7 @@ traceM Complete = traceIf True "Finished completion"
 traceM Unpausing = traceIf True "Found rules to unpause"
 traceIf :: Monad m => Bool -> String -> m ()
 traceIf True s = Debug.Trace.traceM s
-traceIf False s = return ()
+traceIf _ s = return ()
 
 data KBC f v =
   KBC {
