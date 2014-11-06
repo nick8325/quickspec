@@ -151,24 +151,24 @@ rep t = liftM (liftM fromPruningTerm) (liftPruner (untypedRep [] (toGoalTerm t))
 type PruningTerm = Tm PruningConstant PruningVariable
 
 data PruningConstant
-    -- N.B. variables are less than constants so that skolemisation
+    -- Skolem variables are less than constants so that skolemisation
     -- doesn't change the term order
   = SkolemVariable Variable
+    -- The type of a TermConstant is always the same as the underlying
+    -- constant's type, it's only included here so that it's counted
+    -- in the Ord instance
   | TermConstant Constant Type Int
-    -- The type is always the same as the constant's type,
-    -- it's only included here so that it's counted in the Ord instance
+    -- HasType is the biggest constant so that it's allowed to have
+    -- size 0
   | HasType Type
-    -- N.B. the normal form of a skolemised term cannot contain HasType.
   deriving (Eq, Ord, Show)
 
 -- Hopefully we have the property:
 -- t `simplerThan` u => fromPruningTerm t `simplerThan` fromPruningTerm u,
--- if t and u have both been normalised wrt the typing axioms.
--- Oops: only true for ground terms!
 instance Sized PruningConstant where
   funSize (TermConstant c _ _) = funSize c
-  funSize (SkolemVariable _) = 0
-  funSize (HasType _) = 1
+  funSize (SkolemVariable _) = 1
+  funSize (HasType _) = 0
   schematise (SkolemVariable _) = SkolemVariable (Variable 0 (typeOf (undefined :: A)))
   schematise x = x
 
