@@ -22,8 +22,18 @@ import qualified Data.Rewriting.CriticalPair as CP
 import Data.Ord
 import Data.Maybe
 
---import Debug.Trace
-traceM _ = return ()
+import qualified Debug.Trace
+
+data Event f v = NewRule (Rule f v) | NewEquation (Equation f v) | Reduce (Reduction f v) (Rule f v) | Complete | Unpausing
+traceM :: (Monad m, PrettyTerm f, Pretty v) => Event f v -> m ()
+traceM (NewRule rule) = traceIf True ("New rule " ++ prettyShow rule)
+traceM (NewEquation eqn) = traceIf True ("New equation " ++ prettyShow eqn)
+traceM (Reduce red rule) = traceIf True (prettyShow red ++ " using " ++ prettyShow rule)
+traceM Complete = traceIf True "Finished completion"
+traceM Unpausing = traceIf True "Found rules to unpause"
+traceIf :: Monad m => Bool -> String -> m ()
+traceIf True s = Debug.Trace.traceM s
+traceIf False s = return ()
 
 data KBC f v =
   KBC {
@@ -95,7 +105,8 @@ complete = do
     Just eqn -> do
       consider eqn
       complete
-    Nothing -> return ()
+    Nothing ->
+      traceM (Complete :: Event Constant Variable)
 
 unpause ::
   (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
@@ -107,6 +118,7 @@ unpause = do
   let resumable (t :==: u) = reduce t /= [] || reduce u /= []
       (resumed, paused') = Set.partition resumable paused
   when (not (Set.null resumed)) $ do
+    traceM (Unpausing :: Event Constant Variable)
     mapM_ newEquation (Set.toList resumed)
     modify (\s -> s { paused = paused' })
     complete
@@ -146,12 +158,12 @@ consider eqn = do
       else
         case orient eqn' of
           Just rule -> do
-            traceM ("New rule " ++ prettyShow rule)
+            traceM (NewRule rule)
             l <- addRule rule
             interreduce rule
             addCriticalPairs l rule
           Nothing -> do
-            traceM ("Couldn't orient " ++ prettyShow eqn')
+            traceM (NewEquation eqn')
             pause eqn'
 
 addRule :: (Monad m, PrettyTerm f, Ord f, Ord v, Numbered v, Pretty v) => Rule f v -> StateT (KBC f v) m Label
@@ -176,7 +188,7 @@ interreduce :: (Monad m, PrettyTerm f, Ord f, Sized f, Ord v, Numbered v, Pretty
 interreduce new = do
   rules <- gets (Index.elems . rules)
   let reductions = catMaybes (map (moveLabel . fmap (reduce new)) rules)
-  sequence_ [ traceM (prettyShow red ++ " using " ++ prettyShow new) | red <- map peel reductions ]
+  sequence_ [ traceM (Reduce red new) | red <- map peel reductions ]
   sequence_ [ simplifyRule l rule | Labelled l (Simplify rule) <- reductions ]
   sequence_ [ newEquation (unorient rule) | Reorient rule <- map peel reductions ]
   sequence_ [ deleteRule l rule | Labelled l (Reorient rule) <- reductions ]
