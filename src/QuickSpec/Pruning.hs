@@ -159,7 +159,8 @@ data PruningConstant
   deriving (Eq, Ord, Show)
 
 -- Hopefully we have the property:
--- t `simplerThan` u => fromPruningTerm t `simplerThan` fromPruningTerm u
+-- t `simplerThan` u => fromPruningTerm t `simplerThan` fromPruningTerm u,
+-- if t and u have both been normalised wrt the typing axioms.
 instance Sized PruningConstant where
   funSize (TermConstant c _ _) = funSize c
   funSize (SkolemVariable _) = 0
