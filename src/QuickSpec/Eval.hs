@@ -17,8 +17,7 @@ import Data.Set(Set)
 import Control.Monad
 import QuickSpec.Pruning hiding (createRules, instances)
 import QuickSpec.Pruning.Simple hiding (S)
-import qualified QuickSpec.Pruning.Simple as Simple
-import qualified QuickSpec.Pruning.Completion as Completion
+import QuickSpec.Pruning.Completion hiding (initialState)
 import qualified QuickSpec.Pruning.E as E
 import qualified QuickSpec.Pruning.Z3 as Z3
 import Data.List hiding (insert)
