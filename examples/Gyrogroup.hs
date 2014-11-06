@@ -143,7 +143,6 @@ type It = (Gyrogroup, Int)
 sig0 =
   signature {
     instances = [baseType (undefined :: It)],
-    extraPruner = Just (E 10),
     maxTermSize = Just 8,
     maxTests = Just 500 }
 

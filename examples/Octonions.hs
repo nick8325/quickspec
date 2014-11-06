@@ -171,7 +171,6 @@ sig1 =
   signature {
     constants = map toConstant [One, Star, Inverse],
     maxTests = Just 5,
-    extraPruner = Just (E 10),
     instances = [
       baseType (undefined :: It) ]}
   where
@@ -188,7 +187,6 @@ diassociativity = map (parseProp (constants sig1 ++ [bi])) background
 
 sig2 =
   signature {
-    extraPruner = Just (E 60),
     maxTests = Just 5,
     constants = map toConstant [Id, Compose, Inversion],
     instances = [
@@ -198,7 +196,6 @@ sig2 =
 
 sig3 =
   signature {
-    extraPruner = Just (E 60),
     constants = map toConstant [L1, R1, L2, R2, Apply, C, T, J, ConjJ],
     --QuickSpec.simplify = Just Main.simplify,
     maxTests = Just 5}
@@ -257,4 +254,4 @@ main = do
   quickSpec sig
 -}
 
-main = quickSpec sig1 { maxTermSize = Just 7 }
+main = quickSpec sig1
