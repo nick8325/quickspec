@@ -61,11 +61,14 @@ createRules = PrunerT $ do
       let ty = typ (Fun con (replicate arity (undefined :: Term)))
           t = Fun fun (take arity (map Var [0..]))
           args = take arity (typeArgs (typ con))
-      unPrunerT $ liftPruner $ do
+      generate (HasType ty)
+      unPrunerT $ liftPruner $
         untypedAxiom ([] :=>: Fun (HasType ty) [t] :=: t)
-        forM_ (zip [0..] args) $ \(i, ty) -> do
-          let vs = map (Var . PruningVariable) [0..arity-1]
-              tm f = Fun fun (take i vs ++ [f (vs !! i)] ++ drop (i+1) vs)
+      forM_ (zip [0..] args) $ \(i, ty) -> do
+        let vs = map (Var . PruningVariable) [0..arity-1]
+            tm f = Fun fun (take i vs ++ [f (vs !! i)] ++ drop (i+1) vs)
+        generate (HasType ty)
+        unPrunerT $ liftPruner $
           untypedAxiom ([] :=>: tm (\t -> Fun (HasType ty) [t]) :=: tm id)
 
   rule $ do
@@ -161,6 +164,7 @@ data PruningConstant
 -- Hopefully we have the property:
 -- t `simplerThan` u => fromPruningTerm t `simplerThan` fromPruningTerm u,
 -- if t and u have both been normalised wrt the typing axioms.
+-- Oops: only true for ground terms!
 instance Sized PruningConstant where
   funSize (TermConstant c _ _) = funSize c
   funSize (SkolemVariable _) = 0
@@ -173,10 +177,10 @@ newtype PruningVariable = PruningVariable Int deriving (Eq, Ord, Num, Enum, Show
 instance Pretty PruningConstant where
   pretty (TermConstant x _ _) = pretty x
   pretty (SkolemVariable x) = text "s" <> pretty x
-  pretty (HasType ty) = text "@" <> pretty ty
+  pretty (HasType ty) = text "@" <> prettyPrec 11 ty
 instance PrettyTerm PruningConstant where
   termStyle (TermConstant x _ _) = termStyle x
-  termStyle _ = Uncurried
+  termStyle _ = Curried
 
 instance Pretty PruningVariable where
   pretty (PruningVariable x) = text "v" <> pretty x
