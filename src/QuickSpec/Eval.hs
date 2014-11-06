@@ -312,8 +312,6 @@ instance Considerable TermFrom where
 
 found :: Signature -> Prop -> M ()
 found sig prop = do
-  lift (lift (axiom prop))
-
   props <- lift (gets discovered)
   (_, props') <- runPruner sig $ mapM_ axiom (map (simplify_ sig) props)
 
@@ -324,6 +322,8 @@ found sig prop = do
     False -> do
       lift $ modify (\s -> s { discovered = prop:discovered s })
       liftIO $ putStrLn (prettyShow (prettyRename sig prop))
+
+  lift (lift (axiom prop))
 
 pruner :: ExtraPruner -> [PropOf PruningTerm] -> PropOf PruningTerm -> IO Bool
 pruner (SPASS timeout) = E.spassUnify timeout
