@@ -22,12 +22,12 @@ import Control.Monad
 import Control.Applicative
 
 class Pruner s where
-  emptyPruner   :: s
+  emptyPruner   :: Signature -> s
   untypedRep    :: Monad m => [PropOf PruningTerm] -> PruningTerm -> StateT s m (Maybe PruningTerm)
   untypedAxiom  :: Monad m => PropOf PruningTerm -> StateT s m ()
 
 instance Pruner [PropOf PruningTerm] where
-  emptyPruner = []
+  emptyPruner _     = []
   untypedRep _ _    = return Nothing
   untypedAxiom prop = modify (prop:)
 
@@ -49,7 +49,7 @@ evalPruner sig m = liftM fst (runPruner sig m)
 
 runPruner :: (Monad m, Pruner s) => Signature -> PrunerT s m a -> m (a, s)
 runPruner sig m =
-  runStateT (runReaderT (runRulesT (unPrunerT m')) (Set.toList (typeUniverse sig))) emptyPruner
+  runStateT (runReaderT (runRulesT (unPrunerT m')) (Set.toList (typeUniverse sig))) (emptyPruner sig)
   where
     m' = createRules >> mapM_ axiom (background sig) >> m
 

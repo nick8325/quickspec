@@ -5,26 +5,21 @@ import qualified QuickSpec.Pruning.KBC as KBC
 import QuickSpec.Pruning.Equation
 import QuickSpec.Prop
 import QuickSpec.Term
+import QuickSpec.Signature
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Class
+import Control.Monad
 
-data Completion =
+newtype Completion =
   Completion {
-    sizeDelta :: Int,
     kbc       :: KBC }
 
 type KBC = KBC.KBC PruningConstant PruningVariable
 
-initialState :: Completion
-initialState =
+initialState :: Int -> Completion
+initialState n =
   Completion {
-    sizeDelta = 5,
-    kbc       = KBC.initialState 0 }
-
-seenTerm :: Monad m => PruningTerm -> StateT Completion m ()
-seenTerm t = do
-  n <- gets sizeDelta
-  liftKBC $ KBC.increaseSize (size t+n)
+    kbc       = KBC.initialState n }
 
 liftKBC :: Monad m => StateT KBC m a -> StateT Completion m a
 liftKBC m = do
@@ -40,17 +35,13 @@ localKBC m = do
 
 newAxiom :: Monad m => PropOf PruningTerm -> StateT Completion m ()
 newAxiom ([] :=>: (t :=: u)) = do
-  seenTerm t
-  seenTerm u
   liftKBC $ do
     KBC.newEquation (t :==: u)
     KBC.complete
     KBC.unpause
 
 findRep :: Monad m => [PropOf PruningTerm] -> PruningTerm -> StateT Completion m (Maybe PruningTerm)
-findRep axioms t = do
-  seenTerm t
-  sequence_ [ do { seenTerm t; seenTerm u } | [] :=>: (t :=: u) <- axioms ]
+findRep axioms t =
   localKBC $ do
     sequence_ [ KBC.newEquation (t :==: u) | [] :=>: (t :=: u) <- axioms ]
     KBC.complete
@@ -59,6 +50,6 @@ findRep axioms t = do
     if t == u then return Nothing else return (Just u)
 
 instance Pruner Completion where
-  emptyPruner = initialState
-  untypedRep = findRep
-  untypedAxiom = newAxiom
+  emptyPruner sig = initialState (maxTermSize_ sig)
+  untypedRep      = findRep
+  untypedAxiom    = newAxiom

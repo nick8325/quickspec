@@ -11,9 +11,9 @@ import Data.Maybe
 newtype SimplePruner = S [PropOf PruningTerm]
 
 instance Pruner SimplePruner where
-  emptyPruner = S []
-  untypedAxiom = simpleUnify
-  untypedRep   = simpleRep
+  emptyPruner _ = S []
+  untypedAxiom  = simpleUnify
+  untypedRep    = simpleRep
 
 modifyS f = modify (\(S x) -> S (f x))
 
