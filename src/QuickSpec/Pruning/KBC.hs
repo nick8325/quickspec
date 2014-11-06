@@ -141,7 +141,7 @@ consider eqn = do
   norm    <- normaliser
   let eqn' = bothSides norm eqn
   unless (trivial eqn') $
-    if equationSize eqn' >= maxSize
+    if equationSize eqn' > maxSize
       then pause eqn'
       else
         case orient eqn' of
