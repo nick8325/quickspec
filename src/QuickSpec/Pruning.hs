@@ -158,8 +158,6 @@ data PruningConstant
     -- constant's type, it's only included here so that it's counted
     -- in the Ord instance
   | TermConstant Constant Type Int
-    -- HasType is the biggest constant so that it's allowed to have
-    -- size 0
   | HasType Type
   deriving (Eq, Ord, Show)
 
