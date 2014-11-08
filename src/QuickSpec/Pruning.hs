@@ -25,6 +25,8 @@ class Pruner s where
   emptyPruner   :: Signature -> s
   untypedRep    :: Monad m => [PropOf PruningTerm] -> PruningTerm -> StateT s m (Maybe PruningTerm)
   untypedAxiom  :: Monad m => PropOf PruningTerm -> StateT s m ()
+  pruningReport :: s -> String
+  pruningReport _ = ""
 
 instance Pruner [PropOf PruningTerm] where
   emptyPruner _     = []

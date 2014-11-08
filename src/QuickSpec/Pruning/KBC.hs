@@ -43,6 +43,12 @@ data KBC f v =
     paused    :: Set (Equation f v) }
   deriving Show
 
+report :: KBC f v -> String
+report s = show r ++ " rewrite rules, " ++ show c ++ " paused critical pairs.\n"
+  where
+    r = length (Index.elems (rules s))
+    c = Set.size (paused s)
+
 newtype QueueEquation f v =
   QueueEquation { unQueueEquation :: Rule f v } deriving (Eq, Show)
 instance (Sized f, Ord f, Ord v) => Ord (QueueEquation f v) where

@@ -158,6 +158,8 @@ summarise = do
                      show numCreation ++ " creation, " ++
                      show numMisc ++ " miscellaneous).")
   liftIO $ putStrLn (show h ++ " hooks installed.\n")
+  s <- lift (lift (liftPruner get))
+  liftIO (putStr (pruningReport s))
 
 allUnifications :: Term -> [Term]
 allUnifications t = map f ss
