@@ -64,19 +64,24 @@ compareTerms t u =
     (Var{}, Fun{}) -> here LT
     (Fun{}, Var{}) -> here GT
     (Fun f xs, Fun g ys) ->
-      -- Unary function of weight zero is biggest
-      here (comparing (isSpecial (length xs)) f g) `mplus`
-      -- Order constants by arity first
-      here (comparing (twiddle . length) xs ys) `mplus`
-      here (compare f g) `mplus` msum (zipWith compareTerms xs ys)
+      here (compare (measureFunction f (length xs))
+                    (measureFunction g (length ys))) `mplus`
+      msum (zipWith compareTerms xs ys)
   where
     here EQ = Nothing
     here ord = Just (t, u, ord)
+
+measureFunction :: (Sized f, Ord f) => f -> Int -> (Bool, Int, f)
+measureFunction f arity =
+  -- The special unary function of weight zero is the biggest
+  (funSize f == 0 && arity == 1,
+   -- Order functions by arity first
+   twiddle arity, f)
+  where
     -- This tweak is taken from Prover9
     twiddle 2 = 1
     twiddle 1 = 2
     twiddle n = n
-    isSpecial arity f = funSize f == 0 && arity == 1
 
 -- Reduction ordering (i.e., a partial order closed under substitution).
 -- Has the property:

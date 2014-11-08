@@ -268,8 +268,7 @@ consider sig makeEvent x = do
   res <- lift (lift (rep t))
   case res of
     Just u | Measure u < Measure t ->
-      return ()
-      --lift (lift (axiom ([] :=>: t :=: u)))
+      lift (lift (axiom ([] :=>: t :=: u)))
     _ -> do
       ts <- getTestSet x
       res <-
