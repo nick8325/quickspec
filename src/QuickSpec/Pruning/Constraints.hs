@@ -70,6 +70,26 @@ focus t@(Fun _ ts) u@(Fun _ us) =
     unsat p = checkSat (assert p noProps) == Nothing
 focus _ _ = Nothing
 
+toProp1 :: (Ord f, Sized f, Ord v, Numbered v) => [Constraint f v] -> Prop1 f v
+toProp1 cs = Conj [ less1 l r | l :<: r <- cs ]
+
+minSize :: (Ord f, Sized f, Ord v, Numbered v) => [Constraint f v] -> Tm f v -> Maybe Integer
+minSize cs t = do
+  let p = toProp1 cs
+      s = termSize t
+  m <- checkSat (assert (flatten p) noProps)
+  let sizeIn m = evalSize (\x -> fromMaybe __ (lookup (sizeNum x) m)) s
+      loop n =
+        case checkSat (assert (flatten (Conj [SizeIs Positive (constSize n `minus` s), p])) noProps) of
+          Nothing -> Just n
+          Just m  -> loop (sizeIn m)
+  loop (sizeIn m)
+
+subsumes :: (Ord f, Sized f, Ord v, Numbered v) => [Constraint f v] -> Constraint f v -> Bool
+subsumes cs c = checkSat (assert p noProps) == Nothing
+  where
+    p = flatten (toProp1 cs) :&& Not (flatten (toProp1 [c]))
+
 data Prop1 f v =
     Conj [Prop1 f v]
   | Disj [Prop1 f v]
@@ -144,8 +164,10 @@ eliminateEquals p = concatMap branch (dnf p)
     isEqual _       = False
 
 sizeVar, structVar :: Numbered v => v -> Expr
-sizeVar x = SAT.Var (toName (number x*2))
+sizeVar x = SAT.Var (toName (sizeNum x))
 structVar x = SAT.Var (toName (number x*2+1))
+sizeNum :: Numbered v => v -> Int
+sizeNum x = number x*2
 
 less1, less1' :: (Sized f, Ord f, Ord v, Numbered v) => Tm f v -> Tm f v -> Prop1 f v
 less1 t u =
@@ -153,7 +175,7 @@ less1 t u =
     SizeIs Positive sz,
     Conj [SizeIs Zero sz, less1' t u]]
   where
-    sz = termSize t `plus` times (-1) (termSize u)
+    sz = termSize t `minus` (termSize u)
 
 less1' (Fun f ts) (Fun g us) =
   case compare f g of
@@ -178,8 +200,11 @@ data Size a =
 
 substSize :: (Sized f, Ord v') => (v -> Tm f v') -> Size v -> Size v'
 substSize f (Size c x) =
-  foldr plus (Size Map.empty x)
+  foldr plus (constSize x)
     [k `times` termSize (f v) | (v, k) <- Map.toList c]
+
+evalSize :: (a -> Integer) -> Size a -> Integer
+evalSize f (Size c x) = x + sum [ k * f v | (v, k) <- Map.toList c ]
 
 encodeSize :: Numbered v => Size v -> Expr
 encodeSize (Size c x) =
@@ -189,11 +214,17 @@ encodeSize (Size c x) =
 termSize :: (Sized f, Ord v) => Tm f v -> Size v
 termSize = foldTerm var fun
   where
-    fun f ss = foldr plus (Size Map.empty (fromIntegral (funSize f))) ss
+    fun f ss = foldr plus (constSize (fromIntegral (funSize f))) ss
     var x    = Size (Map.singleton x 1) 0
+
+constSize :: Integer -> Size a
+constSize n = Size Map.empty n
 
 plus :: Ord a => Size a -> Size a -> Size a
 plus (Size c x) (Size d y) = Size (Map.unionWith (+) c d) (x+y)
 
 times :: Ord a => Integer -> Size a -> Size a
 times n (Size c x) = Size (fmap (* n) c) (n*x)
+
+minus :: Ord a => Size a -> Size a -> Size a
+s `minus` s' = s `plus` times (-1) s'
