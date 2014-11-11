@@ -19,6 +19,7 @@ import qualified Data.Integer.SAT as SAT
 import qualified Data.DList as DList
 import Control.Monad
 import Data.Ord
+import Data.Monoid
 
 data Constraint f v = Tm f v :<: Tm f v deriving Show
 
@@ -39,7 +40,7 @@ instance (PrettyTerm f, Pretty v) => Pretty (ConstrainedRule f v) where
 -- A critical pair can have many constraints.
 data ConstrainedPair f v =
   ConstrainedPair {
-    constraints :: PropSet,
+    constraints :: [Constraint f v],
     pair :: Equation f v }
   deriving Show
 
@@ -84,6 +85,10 @@ minSize cs t = do
           Nothing -> Just n
           Just m  -> loop (sizeIn m)
   loop (sizeIn m)
+
+minPairSize :: (Ord f, Sized f, Ord v, Numbered v) => ConstrainedPair f v -> Maybe Integer
+minPairSize (ConstrainedPair cs (l :==: r)) =
+  getMin $ Min (minSize cs l) `mappend` Min (minSize cs r)
 
 subsumes :: (Ord f, Sized f, Ord v, Numbered v) => [Constraint f v] -> Constraint f v -> Bool
 subsumes cs c = checkSat (assert p noProps) == Nothing
