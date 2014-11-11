@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, GeneralizedNewtypeDeriving, FlexibleInstances #-}
+{-# LANGUAGE CPP, GeneralizedNewtypeDeriving, FlexibleInstances, MultiParamTypeClasses #-}
 module QuickSpec.Pruning where
 
 #include "errors.h"
@@ -100,16 +100,16 @@ toGoal :: Prop -> PropOf PruningTerm
 toGoal = fmap toGoalTerm
 
 toGoalTerm :: Term -> PruningTerm
-toGoalTerm = skolemise . toPruningConstant
+toGoalTerm = skolemiseTyped . toPruningConstant
 
 toPruningConstant :: Term -> Tm PruningConstant Variable
 toPruningConstant = mapTerm f id . withArity
   where
     f (fun, n) = TermConstant fun (typ fun) n
 
-skolemise :: Tm PruningConstant Variable -> PruningTerm
-skolemise (Fun f xs) = Fun f (map skolemise xs)
-skolemise (Var x) = Fun (HasType (typ x)) [Fun (SkolemVariable x) []]
+skolemiseTyped :: Tm PruningConstant Variable -> PruningTerm
+skolemiseTyped (Fun f xs) = Fun f (map skolemiseTyped xs)
+skolemiseTyped (Var x) = Fun (HasType (typ x)) [Fun (SkolemVariable x) []]
 
 skolemAxiom :: Variable -> Literal PruningTerm
 skolemAxiom x =
@@ -184,6 +184,16 @@ instance PrettyTerm PruningConstant where
 
 instance Pretty PruningVariable where
   pretty (PruningVariable x) = text "v" <> pretty x
+
+class Skolem f v where
+  skolemVariable :: v -> f
+
+-- XX make this less icky!
+instance Skolem PruningConstant PruningVariable where
+  skolemVariable (PruningVariable x) = SkolemVariable (Variable x (typeOf ()))
+
+skolemise :: Skolem f v => Tm f v -> Tm f v
+skolemise = substf (\x -> Fun (skolemVariable x) [])
 
 fromPruningTerm :: PruningTerm -> Term
 fromPruningTerm t =

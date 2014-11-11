@@ -3,7 +3,7 @@
 
 {-# LANGUAGE CPP, TypeSynonymInstances, TypeFamilies, FlexibleContexts #-}
 module QuickSpec.Base(
-  Tm, TmOf, SubstOf, RuleOf, CPOf,
+  Tm, TmOf, SubstOf, CPOf,
   module Data.Rewriting.Term, foldTerm, mapTerm,
   module Data.Rewriting.Term.Ops,
   module Data.Rewriting.Substitution, evalSubst, subst,
@@ -30,7 +30,6 @@ import Text.PrettyPrint.HughesPJ hiding (empty)
 import qualified Data.DList as DList
 import Data.DList(DList)
 import Control.Monad
-import qualified Data.Rewriting.Rule as Rule
 import qualified Data.Rewriting.CriticalPair as CP
 import QuickSpec.Utils
 import Data.List
@@ -66,7 +65,6 @@ class Symbolic a where
 
 type TmOf a = Tm (ConstantOf a) (VariableOf a)
 type SubstOf a = Subst (ConstantOf a) (VariableOf a)
-type RuleOf a = Rule.Rule (ConstantOf a) (VariableOf a)
 type CPOf a = CP.CP (ConstantOf a) (VariableOf a)
 
 terms :: Symbolic a => a -> [TmOf a]
@@ -77,12 +75,6 @@ instance Symbolic (Tm f v) where
   type VariableOf (Tm f v) = v
   substf sub = foldTerm sub Fun
   term = id
-
-instance Symbolic (Rule.Rule f v) where
-  type ConstantOf (Rule.Rule f v) = f
-  type VariableOf (Rule.Rule f v) = v
-  termsDL (Rule.Rule lhs rhs) = return lhs `mplus` return rhs
-  substf sub (Rule.Rule lhs rhs) = Rule.Rule (substf sub lhs) (substf sub rhs)
 
 instance (ConstantOf a ~ ConstantOf b,
           VariableOf a ~ VariableOf b,
@@ -208,6 +200,3 @@ prettyStyle style p d xs =
         Infixr pOp -> (0, pOp)
         Infix  pOp -> (1, pOp)
 
-instance (PrettyTerm f, Pretty v) => Pretty (Rule.Rule f v) where
-  pretty (Rule.Rule lhs rhs) =
-    sep [pretty lhs <+> text "->", nest 2 (pretty rhs)]

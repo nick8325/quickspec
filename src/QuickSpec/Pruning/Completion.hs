@@ -9,6 +9,7 @@ import QuickSpec.Signature
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Class
 import Control.Monad
+import qualified Data.Set as Set
 
 newtype Completion =
   Completion {
@@ -36,17 +37,17 @@ localKBC m = do
 newAxiom :: Monad m => PropOf PruningTerm -> StateT Completion m ()
 newAxiom ([] :=>: (t :=: u)) = do
   liftKBC $ do
-    KBC.newEquation (t :==: u)
+    KBC.newEquation Set.empty (t :==: u)
     res <- KBC.complete
     when res KBC.unpause
 
 findRep :: Monad m => [PropOf PruningTerm] -> PruningTerm -> StateT Completion m (Maybe PruningTerm)
 findRep axioms t =
   localKBC $ do
-    sequence_ [ KBC.newEquation (t :==: u) | [] :=>: (t :=: u) <- axioms ]
+    sequence_ [ KBC.newEquation Set.empty (t :==: u) | [] :=>: t :=: u <- axioms ]
     KBC.complete
     norm <- KBC.normaliser
-    let u = norm t
+    let u = norm Set.empty t
     if t == u then return Nothing else return (Just u)
 
 instance Pruner Completion where

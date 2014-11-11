@@ -35,16 +35,16 @@ enqueue l xs q = q { queue = Queue.insert q' (queue q) }
   where
     q' = Labelled l (Subqueue (Queue.fromList xs))
 
-dequeue :: Ord a => Queue a -> Maybe (Labelled a, Queue a)
+dequeue :: Ord a => Queue a -> Maybe (Label, Label, a, Queue a)
 dequeue q@Queue{labels = ls, queue = q0} =
-  fmap (\(x, q1) -> (x, q { queue = q1 })) (dequeue1 q0)
+  fmap (\(l1, l2, x, q1) -> (l1, l2, x, q { queue = q1 })) (dequeue1 q0)
   where
     dequeue1 q = do
       (Labelled l (Subqueue sq), q) <- minView q
       case minView sq of
         Nothing -> dequeue1 q
-        Just (x, sq) ->
-          return (x, Queue.insert (Labelled l (Subqueue sq)) q)
+        Just (Labelled l' x, sq) ->
+          return (l, l', x, Queue.insert (Labelled l (Subqueue sq)) q)
 
     minView ::
       Ord a =>

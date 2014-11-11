@@ -5,7 +5,6 @@ module QuickSpec.Pruning.Constraints where
 import QuickSpec.Base
 import QuickSpec.Term
 import QuickSpec.Utils
-import QuickSpec.Pruning.Equation
 import Data.Rewriting.Rule hiding (vars)
 import qualified Data.Rewriting.Substitution.Type as Subst
 import qualified Data.Set as Set
@@ -21,35 +20,19 @@ import Control.Monad
 import Data.Ord
 import Data.Monoid
 
-data Constraint f v = Tm f v :<: Tm f v deriving Show
+data Constraint f v = Tm f v :<: Tm f v deriving (Eq, Ord, Show)
+
+substConstraint :: (v -> Tm f v') -> Constraint f v -> Constraint f v'
+substConstraint f (t :<: u) = foldTerm f Fun t :<: foldTerm f Fun u
+
+instance Symbolic (Constraint f v) where
+  type ConstantOf (Constraint f v) = f
+  type VariableOf (Constraint f v) = v
+  termsDL (t :<: u) = termsDL t `mplus` termsDL u
+  substf sub (t :<: u) = substf sub t :<: substf sub u
 
 instance (PrettyTerm f, Pretty v) => Pretty (Constraint f v) where
   pretty (t :<: u) = hang (pretty t <+> text "<") 2 (pretty u)
-
--- A rule only ever has one constraint,
--- in the worst case: rhs rule > lhs rule.
-data ConstrainedRule f v =
-    Always (Rule f v)
-  | When (Constraint f v) (Rule f v)
-  deriving Show
-
-instance (PrettyTerm f, Pretty v) => Pretty (ConstrainedRule f v) where
-  pretty (Always rule) = pretty rule
-  pretty (When cond rule) = hang (pretty rule <+> text "when") 2 (pretty cond)
-
--- A critical pair can have many constraints.
-data ConstrainedPair f v =
-  ConstrainedPair {
-    constraints :: [Constraint f v],
-    pair :: Equation f v }
-  deriving Show
-
-constrainRule :: (Sized f, Ord f, Ord v, Numbered v) => Rule f v -> Maybe (ConstrainedRule f v)
-constrainRule rule@(Rule lhs rhs) =
-  case orientTerms lhs rhs of
-    Just GT -> Just (Always rule)
-    Just _  -> Nothing
-    Nothing -> Just (When (less rhs lhs) rule)
 
 less :: (Sized f, Ord f, Ord v, Numbered v) => Tm f v -> Tm f v -> Constraint f v
 less t u =
@@ -71,29 +54,35 @@ focus t@(Fun _ ts) u@(Fun _ us) =
     unsat p = checkSat (assert p noProps) == Nothing
 focus _ _ = Nothing
 
-toProp1 :: (Ord f, Sized f, Ord v, Numbered v) => [Constraint f v] -> Prop1 f v
-toProp1 cs = Conj [ less1 l r | l :<: r <- cs ]
+toProp1 :: (Ord f, Sized f, Ord v, Numbered v) => Set (Constraint f v) -> Prop1 f v
+toProp1 cs = Conj [ less1 l r | l :<: r <- Set.toList cs ]
 
-minSize :: (Ord f, Sized f, Ord v, Numbered v) => [Constraint f v] -> Tm f v -> Maybe Integer
-minSize cs t = do
-  let p = toProp1 cs
-      s = termSize t
-  m <- checkSat (assert (flatten p) noProps)
-  let sizeIn m = evalSize (\x -> fromMaybe __ (lookup (sizeNum x) m)) s
-      loop n =
-        case checkSat (assert (flatten (Conj [SizeIs Positive (constSize n `minus` s), p])) noProps) of
-          Nothing -> Just n
-          Just m  -> loop (sizeIn m)
-  loop (sizeIn m)
+satisfiable :: (Ord f, Sized f, Ord v, Numbered v) => Set (Constraint f v) -> Bool
+satisfiable cs
+  | Set.null cs = True
+  | otherwise = checkSat (assert (flatten (toProp1 cs)) noProps) /= Nothing
 
-minPairSize :: (Ord f, Sized f, Ord v, Numbered v) => ConstrainedPair f v -> Maybe Integer
-minPairSize (ConstrainedPair cs (l :==: r)) =
-  getMin $ Min (minSize cs l) `mappend` Min (minSize cs r)
+minSize :: (Ord f, Sized f, Ord v, Numbered v) => Set (Constraint f v) -> Tm f v -> Maybe Integer
+minSize cs t
+  | Set.null cs = Just (fromIntegral (size t))
+  | otherwise = do
+    let p = toProp1 cs
+        s = termSize t
+    m <- checkSat (assert (flatten p) noProps)
+    let sizeIn m = evalSize (\x -> fromMaybe __ (lookup (sizeNum x) m)) s
+        loop n =
+          case checkSat (assert (flatten (Conj [SizeIs Positive (constSize n `minus` s), p])) noProps) of
+            Nothing -> Just n
+            Just m  -> loop (sizeIn m)
+    loop (sizeIn m)
 
-subsumes :: (Ord f, Sized f, Ord v, Numbered v) => [Constraint f v] -> Constraint f v -> Bool
-subsumes cs c = checkSat (assert p noProps) == Nothing
+subsumes :: (Ord f, Sized f, Ord v, Numbered v) => Set (Constraint f v) -> Constraint f v -> Bool
+subsumes cs c@(l :<: r) =
+  l /= r &&
+    (Set.member c cs || l `simplerThan` r ||
+     checkSat (assert p noProps) == Nothing)
   where
-    p = flatten (toProp1 cs) :&& Not (flatten (toProp1 [c]))
+    p = flatten (toProp1 cs) :&& Not (flatten (toProp1 (Set.singleton c)))
 
 data Prop1 f v =
     Conj [Prop1 f v]
@@ -123,8 +112,11 @@ substProp sub (Equal t u) = Equal (foldTerm sub Fun t) (foldTerm sub Fun u)
 substProp sub (Less t u) = less1 (foldTerm sub Fun t) (foldTerm sub Fun u)
 
 flatten :: (Ord f, Sized f, Ord v, Numbered v) => Prop1 f v -> Prop
-flatten = toProp . eliminateTerms . substProp (Var . number) . unDNF . eliminateEquals
+flatten = toProp' . eliminateTerms . substProp (Var . number) . unDNF . eliminateEquals
   where
+    toProp' p =
+      toProp p :&&
+      foldr (:&&) PTrue [ sizeVar x :>= K 1 | x <- usort (vars p) ]
     toProp (Conj ps) = foldr (:&&) PTrue  (map toProp ps)
     toProp (Disj ps) = foldr (:||) PFalse (map toProp ps)
     toProp (SizeIs op s) = f op (encodeSize s)
@@ -180,7 +172,7 @@ less1 t u =
     SizeIs Positive sz,
     Conj [SizeIs Zero sz, less1' t u]]
   where
-    sz = termSize t `minus` (termSize u)
+    sz = termSize u `minus` (termSize t)
 
 less1' (Fun f ts) (Fun g us) =
   case compare f g of
