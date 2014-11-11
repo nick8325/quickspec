@@ -1,6 +1,8 @@
 High-priority
 -------------
 
+Delay permutative laws until after all other laws of same size have been explored
+
 Fix bug where ++ and zip generates loads of laws!
 
 Fix bug where schemas are generated twice
