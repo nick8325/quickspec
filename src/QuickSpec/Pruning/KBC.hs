@@ -24,9 +24,10 @@ import Data.Maybe
 
 import qualified Debug.Trace
 
-data Event f v = NewRule (Rule f v) | Pause (Equation f v) | Reduce (Reduction f v) (Rule f v) | Complete | Unpausing
+data Event f v = NewRule (Rule f v) | NewEquation (Equation f v) | Pause (Equation f v) | Reduce (Reduction f v) (Rule f v) | Complete | Unpausing
 traceM :: (Monad m, PrettyTerm f, Pretty v) => Event f v -> m ()
 traceM (NewRule rule) = traceIf True ("New rule " ++ prettyShow rule)
+traceM (NewEquation eqn) = traceIf True ("New equation " ++ prettyShow eqn)
 traceM (Pause eqn) = traceIf True ("Pausing equation " ++ prettyShow eqn)
 traceM (Reduce red rule) = traceIf True (prettyShow red ++ " using " ++ prettyShow rule)
 traceM Complete = traceIf True "Finished completion"
@@ -177,6 +178,7 @@ consider eqn = do
             interreduce rule
             addCriticalPairs l rule
           Nothing -> do
+            traceM (NewEquation eqn')
             pause eqn'
 
 addRule :: (Monad m, PrettyTerm f, Ord f, Ord v, Numbered v, Pretty v) => Rule f v -> StateT (KBC f v) m Label
