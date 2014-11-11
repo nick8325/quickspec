@@ -31,6 +31,12 @@ instance (Pretty a, Pretty b, Pretty c) => Pretty (a, b, c) where
 instance (Pretty a, Pretty b, Pretty c, Pretty d) => Pretty (a, b, c, d) where
   pretty (x, y, z, w) = prettyTuple [pretty x, pretty y, pretty z, pretty w]
 
+instance Pretty a => Pretty (Maybe a) where
+  prettyPrec p (Just x) =
+    prettyParen (p > 11) $
+      hang (text "Just") 2 (prettyPrec 11 x)
+  prettyPrec _ Nothing = text "Nothing"
+
 prettyTuple :: [Doc] -> Doc
 prettyTuple = parens . fsep . punctuate comma
 

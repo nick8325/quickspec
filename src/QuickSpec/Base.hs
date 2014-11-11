@@ -127,13 +127,16 @@ symbolsDL t = termsDL t >>= aux
 
 class Numbered a where
   withNumber :: Int -> a -> a
+  number :: a -> Int
 
 instance Numbered Int where
   withNumber = const
+  number = id
 
 instance (Numbered a, Numbered b) => Numbered (Either a b) where
   withNumber n (Left x)  = Left  (withNumber n x)
   withNumber n (Right x) = Right (withNumber n x)
+  number = error "Can't take number of Either"
 
 canonicalise :: (Ord (VariableOf a), Numbered (VariableOf a), Symbolic a) => a -> a
 canonicalise t = substf (evalSubst sub) t
