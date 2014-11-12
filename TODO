@@ -1,6 +1,9 @@
 High-priority
 -------------
 
+Make sure that pruningTerm t < pruningTerm u <==> t < u!
+Possible fix: add type axioms for Skolem constants.
+
 Delay permutative laws until after all other laws of same size have been explored
 
 Fix bug where ++ and zip generates loads of laws!
