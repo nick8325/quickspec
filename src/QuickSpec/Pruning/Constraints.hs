@@ -78,11 +78,12 @@ minSize cs t
 
 subsumes :: (Ord f, Sized f, Ord v, Numbered v) => Set (Constraint f v) -> Constraint f v -> Bool
 subsumes cs c@(l :<: r) =
-  l /= r &&
-    (Set.member c cs || l `simplerThan` r ||
-     checkSat (assert p noProps) == Nothing)
+  l /= r && (Set.member c cs || l `simplerThan` r || (unsat c1 && unsat c2))
   where
-    p = flatten (toProp1 cs) :&& Not (flatten (toProp1 (Set.singleton c)))
+    unsat p = checkSat (assert (flatten p) noProps) == Nothing
+    c1 = Conj [less1 r l, p]
+    c2 = Conj [Equal l r, p]
+    p = toProp1 cs
 
 data Prop1 f v =
     Conj [Prop1 f v]
@@ -90,9 +91,9 @@ data Prop1 f v =
   | SizeIs Op (Size v)
   | Equal (Tm f v) (Tm f v)
   | Less  (Tm f v) (Tm f v)
-  deriving Show
+  deriving (Eq, Show)
 
-data Op = Positive | Zero deriving Show
+data Op = Positive | Zero deriving (Eq, Show)
 
 instance (Ord f, Sized f, Ord v, Numbered v) => Symbolic (Prop1 f v) where
   type ConstantOf (Prop1 f v) = f
@@ -109,56 +110,50 @@ substProp sub (Conj ps) = Conj (map (substProp sub) ps)
 substProp sub (Disj ps) = Disj (map (substProp sub) ps)
 substProp sub (SizeIs op s) = SizeIs op (substSize sub s)
 substProp sub (Equal t u) = Equal (foldTerm sub Fun t) (foldTerm sub Fun u)
-substProp sub (Less t u) = less1 (foldTerm sub Fun t) (foldTerm sub Fun u)
+substProp sub (Less t u) = less1' (foldTerm sub Fun t) (foldTerm sub Fun u)
 
 flatten :: (Ord f, Sized f, Ord v, Numbered v) => Prop1 f v -> Prop
-flatten = toProp' . eliminateTerms . substProp (Var . number) . unDNF . eliminateEquals
+flatten = flatten1 . substProp (Var . number)
+
+flatten1 :: (Ord f, Sized f) => Prop1 f Int -> Prop
+flatten1 p = axioms :&& flattenIn Set.empty [] [p]
   where
-    toProp' p =
-      toProp p :&&
+    n = maximum (0:map succ (vars p))
+    axioms =
       foldr (:&&) PTrue [ sizeVar x :>= K 1 | x <- usort (vars p) ]
-    toProp (Conj ps) = foldr (:&&) PTrue  (map toProp ps)
-    toProp (Disj ps) = foldr (:||) PFalse (map toProp ps)
-    toProp (SizeIs op s) = f op (encodeSize s)
+    flattenIn cs ls [] = branch ls
+    flattenIn cs ls (p:ps) | p `elem` ls = flattenIn cs ls ps
+    flattenIn cs ls (Conj ps:qs) = flattenIn cs ls (ps++qs)
+    flattenIn cs ls (Disj ps:qs) =
+      foldr (:||) PFalse [ flattenIn cs ls (p:qs) | p <- ps ]
+    flattenIn cs ls (p@SizeIs{}:ps) = flattenIn cs (p:ls) ps
+    flattenIn cs ls (Equal t u:ps) =
+      case unify t u of
+        Just sub ->
+          flattenIn Set.empty [] (substf (evalSubst sub) (ls++ps))
+        Nothing -> PFalse
+    flattenIn cs ls (Less t u:ps) =
+      flattenIn cs' (Less t u:ls) $
+        map (uncurry less1') (filter (`Set.notMember` cs) pairs) ++ ps
+      where
+        cs' = Set.union cs (Set.insert (t, u) (Set.fromList pairs))
+        pairs =
+          [(t, v) | Less u' v <- ls, u == u'] ++
+          [(v, u) | Less v t' <- ls, t == t']
+
+    branch ps = foldr (:&&) PTrue (map (literal (env ps)) ps)
+    env ps = structVar . f
+      where
+        sub = Map.fromList (zip ts [n..])
+        ts = filter isFun (usort (terms ps))
+        f (Var x) = x
+        f t = Map.findWithDefault __ t sub
+
+    literal _ (SizeIs op s) = f op (encodeSize s)
       where
         f Positive = (:>  K 0)
         f Zero     = (:== K 0)
-    toProp (Less (Var x) (Var y)) = structVar x :< structVar y
-    unDNF = Disj . map Conj
-
-eliminateTerms :: (Ord f, Sized f) => Prop1 f Int -> Prop1 f Int
-eliminateTerms p = elim p
-  where
-    ts  = filter isFun (usort (terms p))
-    vs  = usort (vars p)
-    n   = maximum (0:map succ vs)
-    sub = Map.fromList (zip ts [n..])
-    elim (Conj ps)  = Conj (map elim ps)
-    elim (Disj ps)  = Disj (map elim ps)
-    elim p@SizeIs{} = p
-    elim (Less t u) = Less (elimTerm t) (elimTerm u)
-    elimTerm t@Fun{} = Var (Map.findWithDefault __ t sub)
-    elimTerm t@Var{} = t
-
-eliminateEquals :: (Ord f, Sized f, Ord v, Numbered v) => Prop1 f v -> [[Prop1 f v]]
-eliminateEquals p = concatMap branch (dnf p)
-  where
-    dnf (Disj ps) = concatMap dnf ps
-    dnf (Conj ps) = map concat (sequence (map dnf ps))
-    dnf t         = [[t]]
-    branch ps =
-      case sortBy (comparing (not . isEqual)) ps of
-        (Equal t u:ps) | t == u ->
-          branch ps
-        (Equal t u:ps) ->
-          case unify t u of
-            Just sub ->
-              eliminateEquals (Conj (map (substf (evalSubst sub)) ps))
-            Nothing ->
-              []
-        _ -> [ps]
-    isEqual Equal{} = True
-    isEqual _       = False
+    literal env (Less t u) = env t :< env u
 
 sizeVar, structVar :: Numbered v => v -> Expr
 sizeVar x = SAT.Var (toName (sizeNum x))
@@ -179,6 +174,7 @@ less1' (Fun f ts) (Fun g us) =
     LT -> Conj []
     GT -> Disj []
     EQ -> argsLess ts us
+less1' t u | t == u = Disj []
 less1' t u = Less t u
 
 argsLess :: (Sized f, Ord f, Ord v, Numbered v) => [Tm f v] -> [Tm f v] -> Prop1 f v
@@ -193,7 +189,7 @@ data Size a =
   Size {
     coeffs   :: Map a Integer,
     constant :: Integer }
-  deriving Show
+  deriving (Eq, Show)
 
 substSize :: (Sized f, Ord v') => (v -> Tm f v') -> Size v -> Size v'
 substSize f (Size c x) =
