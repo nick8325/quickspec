@@ -71,12 +71,8 @@ compareTerms t u =
     here EQ = Nothing
     here ord = Just (t, u, ord)
 
-measureFunction :: (Sized f, Ord f) => f -> Int -> (Bool, Int, f)
-measureFunction f arity =
-  -- The special unary function of weight zero is the biggest
-  (funSize f == 0 && arity == 1,
-   -- Order functions by arity first
-   twiddle arity, f)
+measureFunction :: (Sized f, Ord f) => f -> Int -> (Int, f)
+measureFunction f arity = (twiddle arity, f)
   where
     -- This tweak is taken from Prover9
     twiddle 2 = 1

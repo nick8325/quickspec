@@ -59,7 +59,7 @@ translate axioms goal = Jukebox.close_ Jukebox.stdNames $ do
 
 makeFunName :: PruningConstant -> String
 makeFunName (TermConstant x n ty) = conName x
-makeFunName (SkolemVariable _)    = "x"
+makeFunName (SkolemVariable _ _)  = "x"
 makeFunName (HasType ty)          = "@"
 
 strip = filter (not . isSpace)

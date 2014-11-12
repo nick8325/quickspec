@@ -111,12 +111,12 @@ normaliser = do
   return $ \conds -> normaliseWith (anywhere (tryRules conds rules))
 
 complete ::
-  (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v, Skolem f v) =>
+  (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
   StateT (KBC f v) m Bool
 complete = complete1 False
 
 complete1 ::
-  (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v, Skolem f v) =>
+  (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
   Bool -> StateT (KBC f v) m Bool
 complete1 doneAnything = do
   res <- dequeueM
@@ -129,7 +129,7 @@ complete1 doneAnything = do
       return doneAnything
 
 unpause ::
-  (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v, Skolem f v) =>
+  (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
   StateT (KBC f v) m ()
 unpause = do
   paused  <- gets paused
@@ -146,7 +146,7 @@ unpause = do
     unpause
 
 increaseSize ::
-  (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v, Skolem f v) =>
+  (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
   Int -> StateT (KBC f v) m ()
 increaseSize n = do
   m <- gets maxSize
@@ -182,7 +182,7 @@ toCP norm (conds, l :==: r) = do
   return (CP n conds (order eqn'))
 
 consider ::
-  (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v, Skolem f v) =>
+  (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
   Label -> Label -> CP f v -> StateT (KBC f v) m ()
 consider l1 l2 cp@(CP size conds eqn) = do
   Debug.Trace.traceM ("Condering " ++ prettyShow cp)
@@ -210,7 +210,7 @@ consider l1 l2 cp@(CP size conds eqn) = do
             queueCPs l1 (map (Labelled l2) cps)
 
 findConstraint ::
-  (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v, Skolem f v) =>
+  (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) =>
   Index (Labelled (Rule f v)) -> Set (Constraint f v) -> Equation f v -> Maybe (Constraint f v)
 findConstraint rules conds (t :==: u) =
   listToMaybe (filter productive (map theConstraint (sortBy (comparing goodness) (allRules t ++ allRules u))))
