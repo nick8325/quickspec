@@ -100,6 +100,10 @@ Instead of conGeneralValue/regeneralise nonsense, have a type
 constructor "Mono a" which wraps its argument while having its Typed
 instance unify all types.
 
+Change Symbolic typeclass so you have Symbolic Tm instead of Symbolic
+(Tm f v) (and lose Symbolic instance for types), or monomorphise the entire
+pruning infrastructure.
+
 Stuff for HipSpec
 -----------------
 
