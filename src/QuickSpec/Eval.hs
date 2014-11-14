@@ -267,10 +267,11 @@ class (Eq a, Typed a) => Considerable a where
 consider :: Considerable a => Signature -> (KindOf a -> Event) -> a -> M ()
 consider sig makeEvent x = do
   let t = generalise x
-  res <- lift (lift (rep t))
+  res <- lift (lift (rep Easy t))
   case res of
     Just u | Measure u < Measure t ->
-      lift (lift (axiom ([] :=>: t :=: u)))
+      -- lift (lift (axiom ([] :=>: t :=: u)))
+      return ()
     _ -> do
       ts <- getTestSet x
       res <-
@@ -279,7 +280,12 @@ consider sig makeEvent x = do
           Nothing -> return $ do
             generate (makeEvent Untestable)
           Just (Old y) -> return $ do
-            generate (makeEvent (EqualTo y))
+            res <- lift (lift (rep Hard t))
+            case res of
+              Just u | Measure u < Measure t ->
+                return ()
+              _ ->
+                generate (makeEvent (EqualTo y))
           Just (New ts) -> return $ do
             putTestSet x ts
             generate (makeEvent Representative)

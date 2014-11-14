@@ -3,7 +3,7 @@
 
 {-# LANGUAGE CPP, TypeSynonymInstances, TypeFamilies, FlexibleContexts #-}
 module QuickSpec.Base(
-  Tm, TmOf, SubstOf, CPOf,
+  Tm, TmOf, SubstOf, CPOf, RuleOf,
   module Data.Rewriting.Term, foldTerm, mapTerm,
   module Data.Rewriting.Term.Ops,
   module Data.Rewriting.Substitution, evalSubst, subst,
@@ -67,6 +67,7 @@ class Symbolic a where
 type TmOf a = Tm (ConstantOf a) (VariableOf a)
 type SubstOf a = Subst (ConstantOf a) (VariableOf a)
 type CPOf a = CP.CP (ConstantOf a) (VariableOf a)
+type RuleOf a = Rule (ConstantOf a) (VariableOf a)
 
 terms :: Symbolic a => a -> [TmOf a]
 terms = DList.toList . termsDL

@@ -1,6 +1,8 @@
 module QuickSpec.Pruning.Completion where
 
 import QuickSpec.Base
+import QuickSpec.Type
+import QuickSpec.Utils
 import QuickSpec.Pruning
 import qualified QuickSpec.Pruning.KBC as KBC
 import QuickSpec.Pruning.Equation
@@ -16,7 +18,7 @@ import qualified Data.Set as Set
 import qualified QuickSpec.Pruning.RuleIndex as RuleIndex
 import qualified QuickSpec.Pruning.EquationIndex as EquationIndex
 import qualified Data.Rewriting.Rule as Rule
-import Debug.Trace
+import Data.Maybe
 
 newtype Completion =
   Completion {
@@ -45,8 +47,19 @@ newAxiom :: Monad m => PropOf PruningTerm -> StateT Completion m ()
 newAxiom ([] :=>: (t :=: u)) = do
   liftKBC $ do
     KBC.newEquation (t :==: u)
-    res <- KBC.complete
-    when res KBC.unpause
+    while complete KBC.unpause
+
+complete :: Monad m => StateT KBC m Bool
+complete = do
+  generaliseRules
+  KBC.complete
+
+while :: Monad m => m Bool -> m () -> m ()
+while cond m = do
+  x <- cond
+  when x $ do
+    m
+    while cond m
 
 findRep :: Monad m => [PropOf PruningTerm] -> PruningTerm -> StateT Completion m (Maybe PruningTerm)
 findRep axioms t =
@@ -64,23 +77,51 @@ findRepHarder axioms t = do
     Just u -> return (Just u)
     Nothing -> do
       predecessors t >>= mapM_ addAxiomsFor
+      liftKBC complete
       findRep axioms t
 
 predecessors :: Monad m => PruningTerm -> StateT Completion m [PruningTerm]
-predecessors t = do
-  idx <- liftKBC $ gets (RuleIndex.invert . KBC.rules)
-  return (t:anywhere (tryRules idx) t)
+--predecessors t = do
+--  idx <- liftKBC $ gets (RuleIndex.invert . KBC.rules)
+--  return (t:anywhere (tryRules idx) t)
+predecessors t = return [t]
 
 addAxiomsFor:: Monad m => PruningTerm -> StateT Completion m ()
 addAxiomsFor t = do
-  idx <- liftKBC $ gets KBC.equations
-  let eqns = concat [ EquationIndex.lookup u idx | u <- subterms t ]
-  unless (null eqns) $
-    traceM ("Adding ground equations " ++ prettyShow eqns)
-  liftKBC $ mapM_ (KBC.newEquation . peel) eqns
+  idx  <- liftKBC $ gets KBC.equations
+  norm <- liftKBC KBC.normaliser
+  let eqns =
+        [ eqn
+        | u <- subterms t,
+          eqn <- map (bothSides norm . peel) (EquationIndex.lookup u idx),
+          not (trivial eqn) ]
+  mapM_ (liftKBC . KBC.traceM . KBC.NewGroundEquation) eqns
+  liftKBC $ mapM_ KBC.newEquation eqns
+
+generaliseRules :: Monad m => StateT KBC m ()
+generaliseRules = do
+  rules <- gets (map peel . RuleIndex.elems . KBC.rules)
+  let rules' = catMaybes (map (unskolemise . unorient >=> orient) rules)
+  mapM_ (KBC.traceM . KBC.Generalise) rules'
+  mapM_ (KBC.newEquation . unorient) rules'
+
+unskolemise :: EquationOf PruningTerm -> Maybe (EquationOf PruningTerm)
+unskolemise (l :==: r)
+  | null [ () | SkolemVariable _ <- funs l ++ funs r ] = Nothing
+  | otherwise = Just (rename f l' :==: rename f r')
+  where
+    l' :==: r' = canonicalise (unskolemiseTm (guardTerm l) :==: unskolemiseTm (guardTerm r))
+    guardTerm t@(Fun (SkolemVariable x) []) = Fun (HasType (typ x)) [t]
+    guardTerm t = t
+    unskolemiseTm (Var x) = Var (Left x)
+    unskolemiseTm (Fun (SkolemVariable x) []) = Var (Right x)
+    unskolemiseTm (Fun f ts) = Fun f (map unskolemiseTm ts)
+    f (Left x)  = x
+    f (Right x) = PruningVariable (number x)
 
 instance Pruner Completion where
   emptyPruner sig = initialState (maxTermSize_ sig)
-  untypedRep      = findRepHarder
+  untypedRep Easy = findRep
+  untypedRep Hard = findRepHarder
   untypedAxiom    = newAxiom
   pruningReport   = KBC.report . kbc

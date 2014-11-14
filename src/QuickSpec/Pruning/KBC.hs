@@ -35,14 +35,18 @@ data Event f v =
   | Reduce (Reduction f v) (Rule f v)
   | Pause       (Equation f v)
   | Complete | Unpausing
+  | Generalise (Rule f v)
+  | NewGroundEquation (Equation f v)
 
 traceM :: (Monad m, PrettyTerm f, Pretty v) => Event f v -> m ()
 traceM (NewRule rule) = traceIf True ("New rule " ++ prettyShow rule)
 traceM (NewEquation eqn) = traceIf True ("New equation " ++ prettyShow eqn)
 traceM (Reduce red rule) = traceIf True (prettyShow red ++ " using " ++ prettyShow rule)
-traceM (Pause eqn) = traceIf True ("Pausing equation " ++ prettyShow eqn)
+traceM (Pause eqn) = traceIf False ("Pausing equation " ++ prettyShow eqn)
 traceM Complete = traceIf True "Finished completion"
 traceM Unpausing = traceIf True "Found rules to unpause"
+traceM (Generalise rule) = traceIf True ("Generalised ground rule " ++ prettyShow rule)
+traceM (NewGroundEquation eqn) = traceIf True ("Instantiated equation " ++ prettyShow eqn)
 traceIf :: Monad m => Bool -> String -> m ()
 traceIf True s = Debug.Trace.traceM s
 traceIf _ s = return ()

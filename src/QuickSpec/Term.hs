@@ -135,6 +135,9 @@ instance Pretty Variable where
 instance Typed Variable where
   typ = varType
   typeSubst sub (Variable n ty) = Variable n (typeSubst sub ty)
+instance Numbered Variable where
+  number = varNumber
+  withNumber n x = x { varNumber = n }
 instance CoArbitrary Variable where
   coarbitrary x = coarbitrary (varNumber x) . coarbitrary (varType x)
 
