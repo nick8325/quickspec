@@ -166,7 +166,14 @@ data PruningConstant
   | TermConstant Constant Type Int
     -- Since HasType has weight 0, it must be the biggest constant.
   | HasType Type
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Show)
+
+instance Ord PruningConstant where
+  compare = comparing f
+    where
+      f (SkolemVariable x ty) = Left (x, ty)
+      f (TermConstant x ty n) = Right (Left (measureFunction x n, ty))
+      f (HasType ty)          = Right (Right ty)
 
 -- Hopefully we have the property:
 -- t `simplerThan` u => fromPruningTerm t `simplerThan` fromPruningTerm u,
