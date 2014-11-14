@@ -37,17 +37,17 @@ localKBC m = do
 newAxiom :: Monad m => PropOf PruningTerm -> StateT Completion m ()
 newAxiom ([] :=>: (t :=: u)) = do
   liftKBC $ do
-    KBC.newEquation Set.empty (t :==: u)
+    KBC.newEquation (t :==: u)
     res <- KBC.complete
     when res KBC.unpause
 
 findRep :: Monad m => [PropOf PruningTerm] -> PruningTerm -> StateT Completion m (Maybe PruningTerm)
 findRep axioms t =
   localKBC $ do
-    sequence_ [ KBC.newEquation Set.empty (t :==: u) | [] :=>: t :=: u <- axioms ]
+    sequence_ [ KBC.newEquation (t :==: u) | [] :=>: t :=: u <- axioms ]
     KBC.complete
     norm <- KBC.normaliser
-    let u = norm Set.empty t
+    let u = norm t
     if t == u then return Nothing else return (Just u)
 
 instance Pruner Completion where

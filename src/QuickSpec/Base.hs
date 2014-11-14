@@ -33,6 +33,7 @@ import Control.Monad
 import qualified Data.Rewriting.CriticalPair as CP
 import QuickSpec.Utils
 import Data.List
+import Data.Rewriting.Rule hiding (varsDL, funsDL, vars, funs)
 
 -- Renamings of functionality from term-rewriting.
 type Tm = T.Term
@@ -200,3 +201,12 @@ prettyStyle style p d xs =
         Infixr pOp -> (0, pOp)
         Infix  pOp -> (1, pOp)
 
+instance Symbolic (Rule f v) where
+  type ConstantOf (Rule f v) = f
+  type VariableOf (Rule f v) = v
+  termsDL (Rule lhs rhs) = return lhs `mplus` return rhs
+  substf sub (Rule lhs rhs) = Rule (substf sub lhs) (substf sub rhs)
+
+instance (PrettyTerm f, Pretty v) => Pretty (Rule f v) where
+  pretty (Rule lhs rhs) =
+    sep [pretty lhs <+> text "->", nest 2 (pretty rhs)]
