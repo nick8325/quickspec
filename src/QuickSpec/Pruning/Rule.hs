@@ -1,6 +1,7 @@
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilies, CPP #-}
 module QuickSpec.Pruning.Rule where
 
+#include "errors.h"
 import QuickSpec.Base
 import QuickSpec.Term
 import QuickSpec.Pruning
@@ -20,9 +21,9 @@ data Rule f v =
     rhs :: Tm f v }
   deriving (Eq, Ord, Show)
 
-ruleConstraints :: (Ord f, Ord v) => Rule f v -> Set (Constraint f v)
-ruleConstraints (Rule Nothing _ _) = Set.empty
-ruleConstraints (Rule (Just rule) _ _) = Set.singleton rule
+ruleConstraints :: (Sized f, Ord f, Ord v, Numbered v) => Rule f v -> Constraints f v
+ruleConstraints (Rule Nothing _ _) = noConstraints
+ruleConstraints (Rule (Just rule) _ _) = fromMaybe __ (add rule noConstraints)
 
 toRewritingRule :: Rule f v -> Rule.Rule f v
 toRewritingRule rule = Rule.Rule (lhs rule) (rhs rule)
@@ -48,10 +49,9 @@ rule :: (Sized f, Ord f, Ord v, Numbered v) => Tm f v -> Tm f v -> Maybe (Rule f
 rule lhs rhs =
   case orientTerms lhs rhs of
     Just GT -> Just (Rule Nothing lhs rhs)
-    Just EQ | lhs > rhs -> Just (Rule Nothing lhs rhs) -- typing rule
     Just _  -> Nothing
-    Nothing -> Just (Rule (Just (less rhs lhs)) lhs rhs)
+    Nothing -> Just (Rule (Just (rhs `less` lhs)) lhs rhs)
 
-ruleAllowed :: (Sized f, Ord f, Ord v, Numbered v) => Set (Constraint f v) -> Rule f v -> Bool
+ruleAllowed :: (Sized f, Ord f, Ord v, Numbered v) => Constraints f v -> Rule f v -> Bool
 ruleAllowed conds (Rule Nothing _ _) = True
-ruleAllowed conds (Rule (Just cond) _ _) = subsumes conds cond
+ruleAllowed conds (Rule (Just cond) _ _) = implies conds cond

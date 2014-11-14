@@ -45,9 +45,3 @@ trivial (t :==: u) = t == u
 
 equationSize :: Sized f => Equation f v -> Int
 equationSize (t :==: u) = size t `max` size u
-
-minEquationSize :: (Sized f, Ord f, Ord v, Numbered v) => Set (Constraint f v) -> Equation f v -> Maybe Integer
-minEquationSize conds (t :==: u) =
-  getMin $
-    Min (minSize (Set.insert (t :<: u) conds) u) `mappend`
-    Min (minSize (Set.insert (u :<: t) conds) t)
