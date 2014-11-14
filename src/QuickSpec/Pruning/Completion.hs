@@ -47,12 +47,7 @@ newAxiom :: Monad m => PropOf PruningTerm -> StateT Completion m ()
 newAxiom ([] :=>: (t :=: u)) = do
   liftKBC $ do
     KBC.newEquation (t :==: u)
-    while complete KBC.unpause
-
-complete :: Monad m => StateT KBC m Bool
-complete = do
-  generaliseRules
-  KBC.complete
+    while KBC.complete (KBC.unpause >> generaliseRules)
 
 while :: Monad m => m Bool -> m () -> m ()
 while cond m = do
@@ -77,7 +72,7 @@ findRepHarder axioms t = do
     Just u -> return (Just u)
     Nothing -> do
       predecessors t >>= mapM_ addAxiomsFor
-      liftKBC $ while complete KBC.unpause
+      liftKBC $ while KBC.complete generaliseRules
       findRep axioms t
 
 predecessors :: Monad m => PruningTerm -> StateT Completion m [PruningTerm]
