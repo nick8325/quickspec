@@ -2,8 +2,10 @@ module QuickSpec.Pruning.Rewrite where
 
 import QuickSpec.Base
 import QuickSpec.Term
-import qualified QuickSpec.Pruning.Index as Index
-import QuickSpec.Pruning.Index(Index)
+import qualified QuickSpec.Pruning.RuleIndex as RuleIndex
+import QuickSpec.Pruning.RuleIndex(RuleIndex)
+import qualified QuickSpec.Pruning.EquationIndex as EquationIndex
+import QuickSpec.Pruning.EquationIndex(EquationIndex)
 import QuickSpec.Pruning.Equation
 import Data.Maybe
 import Data.Set(Set)
@@ -40,5 +42,10 @@ tryRule rule t = do
   let rule' = substf (evalSubst sub) rule
   return (rhs rule')
 
-tryRules :: (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) => Index (Labelled (Rule f v)) -> Strategy f v
-tryRules rules t = map (rhs . peel) (Index.lookup t rules)
+tryRules :: (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) => RuleIndex f v -> Strategy f v
+tryRules rules t = map (rhs . peel) (RuleIndex.lookup t rules)
+
+tryEquations :: (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) => EquationIndex f v -> Strategy f v
+tryEquations eqns t = map (eqRhs . peel) (EquationIndex.lookup t eqns)
+  where
+    eqRhs (_ :==: r) = r

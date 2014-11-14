@@ -11,8 +11,10 @@ import QuickSpec.Term
 import QuickSpec.Utils
 import QuickSpec.Pruning
 import QuickSpec.Pruning.Queue hiding (queue)
-import qualified QuickSpec.Pruning.Index as Index
-import QuickSpec.Pruning.Index(Index)
+import qualified QuickSpec.Pruning.RuleIndex as RuleIndex
+import QuickSpec.Pruning.RuleIndex(RuleIndex)
+import qualified QuickSpec.Pruning.EquationIndex as EquationIndex
+import QuickSpec.Pruning.EquationIndex(EquationIndex)
 import QuickSpec.Pruning.Equation
 import QuickSpec.Pruning.Rewrite
 import Data.Rewriting.Rule(Rule(..))
@@ -48,9 +50,9 @@ traceIf _ s = return ()
 data KBC f v =
   KBC {
     maxSize   :: Int,
-    rules     :: Index (Labelled (Rule f v)),
+    rules     :: RuleIndex f v,
     queue     :: Queue (CP f v),
-    equations :: Set (Equation f v),
+    equations :: EquationIndex f v,
     paused    :: Set (Equation f v) }
   deriving Show
 
@@ -61,17 +63,17 @@ instance (Sized f, Ord f, Ord v) => Ord (CP f v) where
 report :: KBC f v -> String
 report s = show r ++ " rewrite rules, " ++ show e ++ " equations, " ++ show c ++ " paused critical pairs.\n"
   where
-    r = length (Index.elems (rules s))
-    e = Set.size (equations s)
+    r = length (RuleIndex.elems (rules s))
+    e = length (EquationIndex.elems (equations s))
     c = Set.size (paused s)
 
 initialState :: Int -> KBC f v
 initialState maxSize =
   KBC {
     maxSize   = maxSize,
-    rules     = Index.empty,
+    rules     = RuleIndex.empty,
     queue     = empty,
-    equations = Set.empty,
+    equations = EquationIndex.empty,
     paused    = Set.empty }
 
 enqueueM ::
@@ -103,7 +105,7 @@ pause eqn = do
 pauseEquation :: (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Pretty v, Numbered v) => Equation f v -> StateT (KBC f v) m ()
 pauseEquation eqn = do
   traceM (NewEquation eqn)
-  modify (\s -> s { equations = Set.insert (canonicalise eqn) (equations s) })
+  modify (\s -> s { equations = EquationIndex.insert noLabel (canonicalise eqn) (equations s) })
 
 normaliser ::
   (Monad m, PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) =>
@@ -138,12 +140,13 @@ unpause = do
   let reduce = anywhere (tryRules rules)
       resumable (t :==: u) = reduce t /= [] || reduce u /= []
       (resumed1, paused') = Set.partition resumable paused
-      (resumed2, equations') = Set.partition resumable equations
-      resumed = resumed1 `Set.union` resumed2
+      resumed2 = filter (resumable . peel) (EquationIndex.elems equations)
+      resumed = resumed1 `Set.union` Set.fromList (map peel resumed2)
   when (not (Set.null resumed)) $ do
     traceM (Unpausing :: Event Constant Variable)
     mapM_ newEquation (Set.toList resumed)
-    modify (\s -> s { paused = paused', equations = equations' })
+    modify (\s -> s { paused = paused',
+                      equations = foldr (\(Labelled l eqn) -> EquationIndex.delete l eqn) equations resumed2 })
     complete
     unpause
 
@@ -195,13 +198,13 @@ consider l1 l2 eqn = do
 addRule :: (Monad m, PrettyTerm f, Ord f, Ord v, Numbered v, Pretty v) => Rule f v -> StateT (KBC f v) m Label
 addRule rule = do
   l <- newLabelM
-  modify (\s -> s { rules = Index.insert (Labelled l rule) (rules s) })
+  modify (\s -> s { rules = RuleIndex.insert l rule (rules s) })
   return l
 
 deleteRule :: (Monad m, Ord f, Ord v, Numbered v) => Label -> Rule f v -> StateT (KBC f v) m ()
 deleteRule l rule =
   modify $ \s ->
-    s { rules = Index.delete (Labelled l rule) (rules s),
+    s { rules = RuleIndex.delete l rule (rules s),
         queue = deleteLabel l (queue s) }
 
 data Reduction f v = Simplify (Rule f v) | Reorient (Rule f v) deriving Show
@@ -212,7 +215,7 @@ instance (PrettyTerm f, Pretty v) => Pretty (Reduction f v) where
 
 interreduce :: (Monad m, PrettyTerm f, Ord f, Sized f, Ord v, Numbered v, Pretty v) => Rule f v -> StateT (KBC f v) m ()
 interreduce new = do
-  rules <- gets (Index.elems . rules)
+  rules <- gets (RuleIndex.elems . rules)
   let reductions = catMaybes (map (moveLabel . fmap (reduce new)) rules)
   sequence_ [ traceM (Reduce red new) | red <- map peel reductions ]
   sequence_ [ simplifyRule l rule | Labelled l (Simplify rule) <- reductions ]
@@ -234,15 +237,15 @@ simplifyRule l rule = do
   modify $ \s ->
     s{
       rules =
-         Index.insert (Labelled l rule { rhs = norm (rhs rule) })
-           (Index.delete (Labelled l rule) (rules s)) }
+         RuleIndex.insert l rule { rhs = norm (rhs rule) }
+           (RuleIndex.delete l rule (rules s)) }
 
 addCriticalPairs :: (Monad m, PrettyTerm f, Ord f, Sized f, Ord v, Numbered v, Pretty v) => Label -> Rule f v -> StateT (KBC f v) m ()
 addCriticalPairs l new = do
   rules <- gets rules
   queueCPs l $
     [ Labelled l' cp
-    | Labelled l' old <- Index.elems rules,
+    | Labelled l' old <- RuleIndex.elems rules,
       cp <- usort (criticalPairs new old ++ criticalPairs old new) ]
 
 criticalPairs :: (Ord f, Ord v, Numbered v) => Rule f v -> Rule f v -> [Equation f v]
