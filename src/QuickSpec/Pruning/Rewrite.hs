@@ -36,16 +36,22 @@ nested strat (Fun f xs) = map (Fun f) (combine xs (map strat xs))
 ordered :: (Sized f, Ord f, Ord v) => Strategy f v -> Strategy f v
 ordered strat t = [u | u <- strat t, u `simplerThan` t]
 
-tryRule :: (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) => Rule f v -> Strategy f v
+tryRule :: (Ord f, Ord v, Numbered v) => Rule f v -> Strategy f v
 tryRule rule t = do
   sub <- maybeToList (match (lhs rule) t)
   let rule' = substf (evalSubst sub) rule
   return (rhs rule')
 
-tryRules :: (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) => RuleIndex f v -> Strategy f v
+tryRules :: (Ord f, Ord v, Numbered v) => RuleIndex f v -> Strategy f v
 tryRules rules t = map (rhs . peel) (RuleIndex.lookup t rules)
 
-tryEquations :: (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) => EquationIndex f v -> Strategy f v
+tryEquations :: (Ord f, Ord v, Numbered v) => EquationIndex f v -> Strategy f v
 tryEquations eqns t = map (eqRhs . peel) (EquationIndex.lookup t eqns)
   where
     eqRhs (_ :==: r) = r
+
+insertWithSubsumptionCheck ::
+  (Ord f, Ord v, Numbered v) => Label -> Equation f v -> EquationIndex f v -> EquationIndex f v
+insertWithSubsumptionCheck label (l :==: r) idx
+  | r `elem` anywhere (tryEquations idx) l = idx
+  | otherwise = EquationIndex.insert label (l :==: r) idx

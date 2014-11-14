@@ -109,7 +109,7 @@ pause eqn = do
 pauseEquation :: (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Pretty v, Numbered v) => Equation f v -> StateT (KBC f v) m ()
 pauseEquation eqn = do
   traceM (NewEquation eqn)
-  modify (\s -> s { equations = EquationIndex.insert noLabel (canonicalise eqn) (equations s) })
+  modify (\s -> s { equations = insertWithSubsumptionCheck noLabel eqn (equations s) })
 
 normaliser ::
   (Monad m, PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) =>

@@ -77,7 +77,7 @@ findRepHarder axioms t = do
     Just u -> return (Just u)
     Nothing -> do
       predecessors t >>= mapM_ addAxiomsFor
-      liftKBC complete
+      liftKBC $ while complete KBC.unpause
       findRep axioms t
 
 predecessors :: Monad m => PruningTerm -> StateT Completion m [PruningTerm]
@@ -101,7 +101,8 @@ addAxiomsFor t = do
 generaliseRules :: Monad m => StateT KBC m ()
 generaliseRules = do
   rules <- gets (map peel . RuleIndex.elems . KBC.rules)
-  let rules' = catMaybes (map (unskolemise . unorient >=> orient) rules)
+  let p (Rule.Rule l r) = size l <= 5
+      rules' = filter p (catMaybes (map (unskolemise . unorient >=> orient) rules))
   mapM_ (KBC.traceM . KBC.Generalise) rules'
   mapM_ (KBC.newEquation . unorient) rules'
 
