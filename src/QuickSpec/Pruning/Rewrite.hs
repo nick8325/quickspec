@@ -51,7 +51,7 @@ tryEquations eqns t = map (eqRhs . peel) (EquationIndex.lookup t eqns)
     eqRhs (_ :==: r) = r
 
 insertWithSubsumptionCheck ::
-  (Ord f, Ord v, Numbered v) => Label -> Equation f v -> EquationIndex f v -> EquationIndex f v
+  (Ord f, Ord v, Numbered v) => Label -> Equation f v -> EquationIndex f v -> Maybe (EquationIndex f v)
 insertWithSubsumptionCheck label (l :==: r) idx
-  | r `elem` anywhere (tryEquations idx) l = idx
-  | otherwise = EquationIndex.insert label (l :==: r) idx
+  | r `elem` anywhere (tryEquations idx) l = Nothing
+  | otherwise = Just (EquationIndex.insert label (l :==: r) idx)
