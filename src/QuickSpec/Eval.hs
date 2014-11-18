@@ -272,6 +272,7 @@ consider sig makeEvent x = do
     Just u | Measure u < Measure t ->
       -- lift (lift (axiom ([] :=>: t :=: u)))
       return ()
+    Just u -> error (prettyShow t ++ " -> " ++ prettyShow u)
     _ -> do
       ts <- getTestSet x
       res <-

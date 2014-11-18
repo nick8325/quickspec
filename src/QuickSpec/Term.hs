@@ -84,14 +84,15 @@ measureFunction f arity = (twiddle arity, f)
 -- if t `simplerThan` u then Measure (schema t) < Measure (schema u).
 orientTerms :: (Sized f, Ord f, Ord v) => Tm f v -> Tm f v -> Maybe Ordering
 orientTerms t u =
-  case compareTerms t u of
+  case compareTerms (toSchema t) (toSchema u) of
     Just (t', u', LT) -> do { guard (check t u t' u'); return LT }
     Just (t', u', GT) -> do { guard (check u t u' t'); return GT }
-    Nothing           -> return EQ
+    Nothing           -> return (compare (Measure t) (Measure u))
   where
     check t u t' u' =
       sort (vars t') `isSubsequenceOf` sort (vars u') &&
       sort (vars t)  `isSubsequenceOf` sort (vars u)
+    toSchema = mapTerm schematise id
 
 simplerThan :: (Sized f, Ord f, Ord v) => Tm f v -> Tm f v -> Bool
 t `simplerThan` u = orientTerms t u == Just LT
