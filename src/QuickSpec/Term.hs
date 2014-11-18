@@ -40,12 +40,7 @@ instance (Sized f, Ord f, Ord v) => Eq (Measure f v) where
   t == u = compare t u == EQ
 instance (Sized f, Ord f, Ord v) => Ord (Measure f v) where
   compare (Measure t) (Measure u) =
-    compareSchema t u `orElse` comparing rest t u
-    where
-      -- Order instances of the same schema by generality
-      -- Look at funs t too to deal with Skolem constants
-      rest t = (-length (usort (vars t)), vars t,
-                -length (usort (funs t)), funs t)
+    compareSchema t u `orElse` compareRest t u
 
 compareSchema :: (Sized f, Ord f) => Tm f v -> Tm f v -> Ordering
 compareSchema t u =
@@ -54,6 +49,14 @@ compareSchema t u =
     Just (_, _, ord) -> ord
   where
     toSchema = mapTerm schematise (const ())
+
+compareRest :: (Sized f, Ord f, Ord v) => Tm f v -> Tm f v -> Ordering
+compareRest = comparing rest
+  where
+    -- Order instances of the same schema by generality
+    -- Look at funs t too to deal with Skolem constants
+    rest t = (-length (usort (vars t)), vars t,
+              -length (usort (funs t)), funs t)
 
 -- Take two terms and find the first place where they differ.
 compareTerms :: (Sized f, Ord f, Ord v) => Tm f v -> Tm f v -> Maybe (Tm f v, Tm f v, Ordering)
@@ -87,7 +90,7 @@ orientTerms t u =
   case compareTerms (toSchema t) (toSchema u) of
     Just (t', u', LT) -> do { guard (check t u t' u'); return LT }
     Just (t', u', GT) -> do { guard (check u t u' t'); return GT }
-    Nothing           -> return (compare (Measure t) (Measure u))
+    Nothing           -> return (compareRest t u)
   where
     check t u t' u' =
       sort (vars t') `isSubsequenceOf` sort (vars u') &&
