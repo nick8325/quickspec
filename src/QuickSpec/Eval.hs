@@ -186,11 +186,12 @@ createRules sig = do
           liftIO $ print (text "Schema" <+> pretty s <+> text "timed out")
         Untestable -> return ()
         EqualTo t -> do
-          considerRenamings t t
-          considerRenamings t ms
+          considerRenamings isCanonical t t
+          considerRenamings (const True) t ms
         Representative -> do
+          generate (ConsiderTerm (From ms (instantiate ms)))
           when (size ms <= maxCommutativeSize_ sig) $
-            considerRenamings ms ms
+            considerRenamings (const True) ms ms
 
   rule $ do
     Term (From s t) k <- event
@@ -218,7 +219,9 @@ createRules sig = do
 
   rule $ do
     ConsiderTerm t@(From _ t') <- event
-    execute (consider sig (Term t) t)
+    execute $ do
+      newTerm t'
+      consider sig (Term t) t
 
   rule $ do
     Schema s _ <- event
@@ -255,13 +258,25 @@ createRules sig = do
     execute $
       found sig prop
 
-  -- rule $ event >>= execute . liftIO . prettyPrint
+  rule $ event >>= execute . liftIO . prettyPrint
 
-considerRenamings :: Schema -> Schema -> M ()
-considerRenamings s s' = do
-  sequence_ [ generate (ConsiderTerm (From s t)) | t <- ts ]
+considerRenamings :: (Term -> Bool) -> Schema -> Schema -> M ()
+considerRenamings p s s' = do
+  sequence_ [ generate (ConsiderTerm (From s t)) | t <- ts, p t ]
   where
     ts = sortBy (comparing Measure) (allUnifications (instantiate s'))
+
+isCanonical :: Term -> Bool
+isCanonical t = and [ ascending [] (ofType ty) | ty <- tys ]
+  where
+    tys = usort (map typ vs)
+    vs  = vars t
+    ofType ty = [ x | x <- vs, typ x == ty ]
+    ascending vs [] = True
+    ascending vs (x:xs)
+      | x `elem` vs = ascending vs xs
+      | or [ x < y | y <- vs ] = False
+      | otherwise = ascending (x:vs) xs
 
 class (Eq a, Typed a) => Considerable a where
   generalise :: a -> Term
@@ -272,7 +287,6 @@ class (Eq a, Typed a) => Considerable a where
 consider :: Considerable a => Signature -> (KindOf a -> Event) -> a -> M ()
 consider sig makeEvent x = do
   let t = generalise x
-  newTerm t
   res   <- lift (lift (rep Easy t))
   terms <- lift (gets terms)
   case res of
@@ -280,8 +294,8 @@ consider sig makeEvent x = do
     Just u | u `Set.member` terms -> return ()
     _ -> do
       case res of
-        Just u -> newTerm u
-        Nothing -> return ()
+        Just u -> liftIO (putStrLn ("Ignoring reduction " ++ prettyShow t ++ " -> " ++ prettyShow u))
+        _ -> return ()
       ts <- getTestSet x
       res <-
         liftIO . testTimeout_ sig $
@@ -292,7 +306,7 @@ consider sig makeEvent x = do
             res <- lift (lift (rep Hard t))
             case res of
               Just u | Measure u < Measure t && u `Set.member` terms ->
-                return ()
+                lift (lift (axiom ([] :=>: t :=: u)))
               _ ->
                 generate (makeEvent (EqualTo y))
           Just (New ts) -> return $ do

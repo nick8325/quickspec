@@ -1,6 +1,8 @@
 High-priority
 -------------
 
+Introduce a "have seen" predicate which we define to be true on representative terms (this predicate is added to the rewrite system - or possibly not as we know it will never participate in critical pairs). This means that we can leave out terms as we like without affecting completeness too much (rule becomes: throw away a term t if seen(t) = true).
+
 Look more into Moa's idea that any permutative law can be expressed as a permutative law over a single function (e.g. f x y = f y x)
 
 Make sure that pruningTerm t < pruningTerm u <==> t < u!
