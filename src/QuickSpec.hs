@@ -18,7 +18,7 @@ module QuickSpec(
   module Data.Constraint) where
 
 import QuickSpec.Base
-import QuickSpec.Eval
+import QuickSpec.Eval hiding (terms)
 import QuickSpec.Memo
 import QuickSpec.Parse
 import QuickSpec.Pretty

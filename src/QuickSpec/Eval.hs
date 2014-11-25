@@ -2,7 +2,7 @@
 module QuickSpec.Eval where
 
 #include "errors.h"
-import QuickSpec.Base hiding (unify)
+import QuickSpec.Base hiding (unify, terms)
 import qualified QuickSpec.Base as Base
 import QuickSpec.Utils
 import QuickSpec.Type
@@ -34,10 +34,11 @@ import QuickSpec.Test
 import Test.QuickCheck.Random
 import Data.Monoid hiding ((<>))
 
-type M = RulesT Event (StateT S (PrunerT Completion IO))
+type M = RulesT Event (StateT S (PrunerT SimplePruner IO))
 
 data S = S {
   schemas       :: Schemas,
+  terms         :: Set Term,
   schemaTestSet :: TestSet Schema,
   termTestSet   :: Map Schema (TestSet TermFrom),
   freshTestSet  :: TestSet TermFrom,
@@ -79,6 +80,7 @@ type Schemas = Map Int (Map (Poly Type) [Poly Schema])
 initialState :: Signature -> [(QCGen, Int)] -> S
 initialState sig seeds =
   S { schemas       = Map.empty,
+      terms         = Set.empty,
       schemaTestSet = emptyTestSet (makeTester specialise e seeds sig),
       termTestSet   = Map.empty,
       freshTestSet  = emptyTestSet (makeTester specialise e seeds sig),
@@ -88,6 +90,9 @@ initialState sig seeds =
       allTypes      = bigTypeUniverse sig }
   where
     e = table (env sig)
+
+newTerm :: Term -> M ()
+newTerm t = lift (modify (\s -> s { terms = Set.insert t (terms s) }))
 
 schemasOfSize :: Int -> Signature -> M [Schema]
 schemasOfSize n sig = do
@@ -189,13 +194,14 @@ createRules sig = do
 
   rule $ do
     Term (From s t) k <- event
-    execute $
+    execute $ do
+      newTerm t
       case k of
         TimedOut ->
           liftIO $ print (text "Term" <+> pretty t <+> text "timed out")
         Untestable ->
           ERROR ("Untestable instance " ++ prettyShow t ++ " of testable schema " ++ prettyShow s)
-        EqualTo (From _ u) -> do
+        EqualTo (From _ u) ->
           generate (Found ([] :=>: t :=: u))
         Representative -> return ()
 
@@ -267,13 +273,15 @@ class (Eq a, Typed a) => Considerable a where
 consider :: Considerable a => Signature -> (KindOf a -> Event) -> a -> M ()
 consider sig makeEvent x = do
   let t = generalise x
-  res <- lift (lift (rep Easy t))
+  res   <- lift (lift (rep Easy t))
+  terms <- lift (gets terms)
   case res of
-    Just u | Measure u < Measure t ->
-      -- lift (lift (axiom ([] :=>: t :=: u)))
-      return ()
-    Just u -> error (prettyShow t ++ " -> " ++ prettyShow u)
+    Just u | Measure u >= Measure t -> error (prettyShow t ++ " -> " ++ prettyShow u)
+    Just u | u `Set.member` terms -> return ()
     _ -> do
+      case res of
+        Just u -> newTerm u
+        Nothing -> return ()
       ts <- getTestSet x
       res <-
         liftIO . testTimeout_ sig $
@@ -283,7 +291,7 @@ consider sig makeEvent x = do
           Just (Old y) -> return $ do
             res <- lift (lift (rep Hard t))
             case res of
-              Just u | Measure u < Measure t ->
+              Just u | Measure u < Measure t && u `Set.member` terms ->
                 return ()
               _ ->
                 generate (makeEvent (EqualTo y))
