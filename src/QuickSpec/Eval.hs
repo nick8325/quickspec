@@ -195,7 +195,6 @@ createRules sig = do
   rule $ do
     Term (From s t) k <- event
     execute $ do
-      newTerm t
       case k of
         TimedOut ->
           liftIO $ print (text "Term" <+> pretty t <+> text "timed out")
@@ -273,6 +272,7 @@ class (Eq a, Typed a) => Considerable a where
 consider :: Considerable a => Signature -> (KindOf a -> Event) -> a -> M ()
 consider sig makeEvent x = do
   let t = generalise x
+  newTerm t
   res   <- lift (lift (rep Easy t))
   terms <- lift (gets terms)
   case res of
