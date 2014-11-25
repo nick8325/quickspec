@@ -34,7 +34,7 @@ import QuickSpec.Test
 import Test.QuickCheck.Random
 import Data.Monoid hiding ((<>))
 
-type M = RulesT Event (StateT S (PrunerT SimplePruner IO))
+type M = RulesT Event (StateT S (PrunerT Completion IO))
 
 data S = S {
   schemas       :: Schemas,
