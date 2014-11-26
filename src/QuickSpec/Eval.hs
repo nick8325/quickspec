@@ -55,6 +55,8 @@ data Event =
   | Type           (Poly Type)
   | UntestableType (Poly Type)
   | Found          Prop
+  | InstantiateSchema Schema
+  | FinishedSize   Int
   deriving (Eq, Ord)
 
 instance Pretty Event where
@@ -65,6 +67,8 @@ instance Pretty Event where
   pretty (Type ty) = text "type" <+> pretty ty
   pretty (UntestableType ty) = text "untestable type" <+> pretty ty
   pretty (Found prop) = text "found" <+> pretty prop
+  pretty (FinishedSize n) = text "finished size" <+> pretty n
+  pretty (InstantiateSchema s) = text "instantiate schema" <+> pretty s
 
 data KindOf a = Untestable | TimedOut | Representative | EqualTo a
   deriving (Eq, Ord)
@@ -146,6 +150,7 @@ exploreSize sig n = do
   ss <- fmap (sortBy (comparing Measure)) (schemasOfSize n sig)
   liftIO $ putStrLn ("Size " ++ show n ++ ", " ++ show (length ss) ++ " schemas to consider:")
   mapM_ (generate . ConsiderSchema . poly) ss
+  generate (FinishedSize n)
   liftIO $ putStrLn ""
 
 summarise :: M ()
@@ -186,12 +191,24 @@ createRules sig = do
           liftIO $ print (text "Schema" <+> pretty s <+> text "timed out")
         Untestable -> return ()
         EqualTo t -> do
-          considerRenamings isCanonical t t
-          considerRenamings (const True) t ms
+          generate (InstantiateSchema t)
+          considerRenamings isCanonical t ms
         Representative -> do
           generate (ConsiderTerm (From ms (instantiate ms)))
           when (size ms <= maxCommutativeSize_ sig) $
-            considerRenamings (const True) ms ms
+            generate (InstantiateSchema ms)
+
+  rule $ do
+    InstantiateSchema s <- event
+    execute $
+      considerRenamings isCanonical s s
+
+  rule $ do
+    FinishedSize n <- event
+    InstantiateSchema s <- event
+    require (size s == n)
+    execute $
+      considerRenamings (const True) s s
 
   rule $ do
     Term (From s t) k <- event
