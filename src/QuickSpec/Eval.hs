@@ -258,7 +258,7 @@ createRules sig = do
     execute $
       found sig prop
 
-  rule $ event >>= execute . liftIO . prettyPrint
+  -- rule $ event >>= execute . liftIO . prettyPrint
 
 considerRenamings :: (Term -> Bool) -> Schema -> Schema -> M ()
 considerRenamings p s s' = do

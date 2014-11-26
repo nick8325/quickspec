@@ -48,7 +48,7 @@ traceM Unpausing = traceIf True "Found rules to unpause"
 traceM (Generalise rule) = traceIf True ("Generalised ground rule " ++ prettyShow rule)
 traceM (NewGroundEquation eqn) = traceIf True ("Instantiated equation " ++ prettyShow eqn)
 traceIf :: Monad m => Bool -> String -> m ()
-traceIf True s = Debug.Trace.traceM s
+--traceIf True s = Debug.Trace.traceM s
 traceIf _ s = return ()
 
 data KBC f v =
