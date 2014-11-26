@@ -291,7 +291,7 @@ consider sig makeEvent x = do
   terms <- lift (gets terms)
   case res of
     Just u | Measure u >= Measure t -> error (prettyShow t ++ " -> " ++ prettyShow u)
-    Just u | u `Set.member` terms -> return ()
+    Just u {- | u `Set.member` terms -} -> return ()
     _ -> do
       case res of
         Just u -> liftIO (putStrLn ("Ignoring reduction " ++ prettyShow t ++ " -> " ++ prettyShow u))
@@ -305,7 +305,7 @@ consider sig makeEvent x = do
           Just (Old y) -> return $ do
             res <- lift (lift (rep Hard t))
             case res of
-              Just u | Measure u < Measure t && u `Set.member` terms ->
+              Just u | Measure u < Measure t {- && u `Set.member` terms -} ->
                 lift (lift (axiom ([] :=>: t :=: u)))
               _ ->
                 generate (makeEvent (EqualTo y))
