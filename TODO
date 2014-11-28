@@ -1,6 +1,18 @@
 High-priority
 -------------
 
+Make reducing-to-existing-term stuff more robust: whenever a term
+simplifies to a term which we haven't generated, generate that term,
+but only once we've come to the end of the current size.
+
+Think about why we want to prefer equations with different schemas on
+both sides. 1: simplification rules are nicer than random shuffling
+about of stuff. 2: If we eliminate one equation because it reduces to
+another, certain proofs may become harder. E.g. if the equation
+reduces because of commutativity and we eliminate it, some proofs will
+require commutativity that didn't before. Maybe then eliminating
+schemas by simplifying using unorientable rules is something to avoid.
+
 Introduce a "have seen" predicate which we define to be true on representative terms (this predicate is added to the rewrite system - or possibly not as we know it will never participate in critical pairs). This means that we can leave out terms as we like without affecting completeness too much (rule becomes: throw away a term t if seen(t) = true).
 
 Look more into Moa's idea that any permutative law can be expressed as a permutative law over a single function (e.g. f x y = f y x)
