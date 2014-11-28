@@ -6,7 +6,7 @@ import QuickSpec.Term
 import QuickSpec.Utils
 import Data.Ord
 import Control.Monad
-import QuickSpec.Pruning.Rule
+import Data.Rewriting.Rule hiding (isVariantOf)
 import QuickSpec.Pruning.Constraints
 import Data.Maybe
 import Data.Monoid
@@ -31,11 +31,12 @@ order (l :==: r)
   | otherwise = r :==: l
 
 unorient :: Rule f v -> Equation f v
-unorient (Rule _ l r) = l :==: r
+unorient (Rule l r) = l :==: r
 
-orient :: (Sized f, Ord f, Ord v, Numbered v) => Equation f v -> [Rule f v]
-orient (l :==: r) =
-  catMaybes $ [rule l r] ++ [rule r l | not (l `isVariantOf` r) ]
+orient :: (Sized f, Ord f, Ord v, Numbered v) => Equation f v -> [Constrained (Rule f v)]
+orient (l :==: r) = rule l r ++ concat [rule r l | not (l `isVariantOf` r)]
+  where
+    rule l r = add (Constraint Less r l) (unconstrained (Rule l r))
 
 bothSides :: (Tm f v -> Tm f v) -> Equation f v -> Equation f v
 bothSides f (t :==: u) = f t :==: f u

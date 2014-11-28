@@ -10,7 +10,7 @@ import Data.Maybe
 import Data.Set(Set)
 import QuickSpec.Pruning.Queue
 import Control.Monad
-import QuickSpec.Pruning.Rule
+import Data.Rewriting.Rule
 import Debug.Trace
 
 type Strategy f v = Tm f v -> [Tm f v]
@@ -35,15 +35,15 @@ nested strat (Fun f xs) = map (Fun f) (combine xs (map strat xs))
 ordered :: (Sized f, Ord f, Ord v) => Strategy f v -> Strategy f v
 ordered strat t = [u | u <- strat t, u `simplerThan` t]
 
-tryRule :: (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) => Constraints f v -> Rule f v -> Strategy f v
-tryRule conds rule t = do
-  sub <- maybeToList (match (lhs rule) t)
-  let rule' = substf (evalSubst sub) rule
-  guard (ruleAllowed conds rule')
-  return (rhs rule')
+tryRule :: (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) => Context f v -> Constrained (Rule f v) -> Strategy f v
+tryRule ctx rule t = do
+  sub <- maybeToList (match (lhs (constrained rule)) t)
+  rule' <- split (substf (evalSubst sub) rule)
+  guard (implies ctx (context rule'))
+  return (rhs (constrained rule'))
 
-tryRules :: (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) => Constraints f v -> Index (Labelled (Rule f v)) -> Strategy f v
-tryRules conds rules t = do
-  rule <- map peel (Index.lookup t rules)
-  guard (ruleAllowed conds rule)
-  return (rhs rule)
+tryRules :: (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) => Context f v -> Index (Labelled (Constrained (Rule f v))) -> Strategy f v
+tryRules ctx rules t = do
+  rule <- map peel (Index.lookup t rules) >>= split
+  guard (implies ctx (context rule))
+  return (rhs (constrained rule))

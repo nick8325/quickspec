@@ -29,8 +29,11 @@ isSortedBy f xs = isSorted (map f xs)
 usort :: Ord a => [a] -> [a]
 usort = usortBy compare
 
-usortBy :: (a -> a -> Ordering) ->[a] -> [a]
+usortBy :: (a -> a -> Ordering) -> [a] -> [a]
 usortBy f = map head . groupBy (\x y -> f x y == EQ) . sortBy f
+
+usortBy' :: Ord b => (a -> b) -> [a] -> [a]
+usortBy' f = map snd . usortBy (comparing fst) . map (\x -> (f x, x))
 
 orElse :: Ordering -> Ordering -> Ordering
 EQ `orElse` x = x

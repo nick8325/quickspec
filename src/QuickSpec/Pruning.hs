@@ -20,6 +20,7 @@ import Data.Rewriting.Substitution.Type
 import Data.Maybe
 import Control.Monad
 import Control.Applicative
+import Data.Ord
 
 class Pruner s where
   emptyPruner   :: Signature -> s
