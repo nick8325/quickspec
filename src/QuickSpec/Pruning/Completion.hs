@@ -67,13 +67,15 @@ findRep axioms t =
 
 findRepHarder :: Monad m => [PropOf PruningTerm] -> PruningTerm -> StateT Completion m (Maybe PruningTerm)
 findRepHarder axioms t = do
+  predecessors t >>= mapM_ addAxiomsFor
   u <- findRep axioms t
   case u of
-    Just u -> return (Just u)
-    Nothing -> do
-      predecessors t >>= mapM_ addAxiomsFor
-      liftKBC $ while KBC.complete generaliseRules
-      findRep axioms t
+    Nothing -> return Nothing
+    Just u -> do
+      v <- findRepHarder axioms u
+      case v of
+        Nothing -> return (Just u)
+        Just v -> return (Just v)
 
 predecessors :: Monad m => PruningTerm -> StateT Completion m [PruningTerm]
 --predecessors t = do

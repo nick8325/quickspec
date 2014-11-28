@@ -308,11 +308,8 @@ consider sig makeEvent x = do
   terms <- lift (gets terms)
   case res of
     Just u | Measure u >= Measure t -> error (prettyShow t ++ " -> " ++ prettyShow u)
-    Just u {- | u `Set.member` terms -} -> return ()
+    Just u | (u `Set.member` terms || size u < size t) -> return ()
     _ -> do
-      case res of
-        Just u -> liftIO (putStrLn ("Ignoring reduction " ++ prettyShow t ++ " -> " ++ prettyShow u))
-        _ -> return ()
       ts <- getTestSet x
       res <-
         liftIO . testTimeout_ sig $
@@ -322,9 +319,13 @@ consider sig makeEvent x = do
           Just (Old y) -> return $ do
             res <- lift (lift (rep Hard t))
             case res of
-              Just u | Measure u < Measure t {- && u `Set.member` terms -} ->
+              Just u | Measure u < Measure t && (u `Set.member` terms || size u < size t) ->
                 lift (lift (axiom ([] :=>: t :=: u)))
-              _ ->
+              _ -> do
+                case res of
+                  Just u ->
+                    liftIO (putStrLn ("Ignoring reduction " ++ prettyShow t ++ " -> " ++ prettyShow u))
+                  _ -> return ()
                 generate (makeEvent (EqualTo y))
           Just (New ts) -> return $ do
             putTestSet x ts
