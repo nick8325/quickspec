@@ -32,6 +32,9 @@ usort = usortBy compare
 usortBy :: (a -> a -> Ordering) -> [a] -> [a]
 usortBy f = map head . groupBy (\x y -> f x y == EQ) . sortBy f
 
+sortBy' :: Ord b => (a -> b) -> [a] -> [a]
+sortBy' f = map snd . sortBy (comparing fst) . map (\x -> (f x, x))
+
 usortBy' :: Ord b => (a -> b) -> [a] -> [a]
 usortBy' f = map snd . usortBy (comparing fst) . map (\x -> (f x, x))
 

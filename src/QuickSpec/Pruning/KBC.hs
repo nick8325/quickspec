@@ -1,6 +1,6 @@
 -- Knuth-Bendix completion, up to an adjustable size limit.
 
-{-# LANGUAGE CPP, TypeFamilies #-}
+{-# LANGUAGE CPP, TypeFamilies, FlexibleContexts #-}
 module QuickSpec.Pruning.KBC where
 
 #include "errors.h"
@@ -13,7 +13,7 @@ import qualified QuickSpec.Pruning.Index as Index
 import QuickSpec.Pruning.Index(Index)
 import QuickSpec.Pruning.Equation
 import QuickSpec.Pruning.Rewrite
-import Data.Rewriting.Rule hiding (rename, isInstanceOf)
+import Data.Rewriting.Rule hiding (rename, isInstanceOf, vars)
 import qualified Data.Set as Set
 import Data.Set(Set)
 import Control.Monad
@@ -26,11 +26,13 @@ import Data.List
 
 import qualified Debug.Trace
 
-data Event f v = NewRule (Constrained (Rule f v)) | NewCPs [CP f v] | CaseSplit (Constrained (Equation f v)) [Constrained (Equation f v)] | Pause (Constrained (Equation f v)) | Reduce (Reduction f v) (Constrained (Rule f v)) | Complete | Unpausing
+data Event f v = NewRule (Constrained (Rule f v)) | NewCPs [CP f v] | Consider (Constrained (Equation f v)) | CaseSplit (Constrained (Equation f v)) [Constrained (Equation f v)] | ConsiderCaseSplit (Constrained (Equation f v)) (Context f v) | Pause (Constrained (Equation f v)) | Reduce (Reduction f v) (Constrained (Rule f v)) | Complete | Unpausing
 traceM :: (Monad m, PrettyTerm f, Pretty v) => Event f v -> m ()
 traceM (NewRule rule) = traceIf True (hang (text "New rule") 2 (pretty rule))
 traceM (NewCPs cps) = traceIf True (hang (text "New critical pairs") 2 (pretty cps))
+traceM (Consider eq) = traceIf True (hang (text "Considering") 2 (pretty eq))
 traceM (CaseSplit eqn eqns) = traceIf True (sep [text "Case split on", nest 2 (pretty eqn), text "giving", nest 2 (pretty eqns)])
+traceM (ConsiderCaseSplit ctx ctx') = traceIf True (sep [text "Considering case split on", nest 2 (pretty ctx'), text "in", nest 2 (pretty ctx)])
 traceM (Pause eqn) = traceIf True (hang (text "Pausing equation") 2 (pretty eqn))
 traceM (Reduce red rule) = traceIf True (sep [pretty red, nest 2 (text "using"), nest 2 (pretty rule)])
 traceM Complete = traceIf True (text "Finished completion")
@@ -176,6 +178,7 @@ consider ::
   (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
   Label -> Label -> Constrained (Equation f v) -> StateT (KBC f v) m ()
 consider l1 l2 eq = do
+  traceM (Consider eq)
   rules <- gets rules
   case joinEquation rules eq of
     GaveUp (Constrained ctx eq) ->
@@ -211,7 +214,7 @@ bestCaseSplit ::
   (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) =>
   Index (Labelled (Constrained (Rule f v))) -> Constrained (Equation f v) -> Maybe [Constrained (Equation f v)]
 bestCaseSplit rules eq =
-  listToMaybe (sortBy (comparing goodness) (caseSplit rules eq))
+  listToMaybe (sortBy' goodness (caseSplit rules eq))
   where
     goodness eqs@(Constrained ctx (l :==: r):_) =
       (length eqs, l' `max` r', l', r')
@@ -226,9 +229,10 @@ caseSplit ::
 caseSplit rules (Constrained ctx eq@(l :==: r)) = usort $ do
   t <- subterms l ++ subterms r
   Constrained ctx' _ <- map peel (Index.lookup t rules)
-  Debug.Trace.traceM ("Considering case split on " ++ prettyShow ctx' ++ " in " ++ prettyShow ctx)
+  traceM (ConsiderCaseSplit (Constrained ctx eq) ctx')
   let pos = split (Constrained (contextUnion ctx ctx') eq)
       neg = addNegation ctx' (Constrained ctx eq)
+  Debug.Trace.traceShowM (length pos)
   guard (pos /= [])
   return (usort (map canonicalise (pos ++ neg)) >>= split)
 
@@ -287,9 +291,17 @@ addCriticalPairs l new = do
     | Labelled l' old <- Index.elems rules,
       cp <- usort (criticalPairs new old ++ criticalPairs old new) ]
 
+canonicaliseBoth :: (Symbolic a, Ord (VariableOf a), Numbered (VariableOf a)) => (a, a) -> (a, a)
+canonicaliseBoth (x, y) = (x', substf (Var . increase) y')
+  where
+    x' = canonicalise x
+    y' = canonicalise y
+    n  = maximum (0:map (succ . number) (vars x'))
+    increase v = withNumber (n+number v) v
+
 criticalPairs :: (Sized f, Ord f, Ord v, Numbered v) => Constrained (Rule f v) -> Constrained (Rule f v) -> [Constrained (Equation f v)]
 criticalPairs r1 r2 = do
-  let (Constrained ctx1 r1', Constrained ctx2 r2') = canonicalise (r1, r2)
+  let (Constrained ctx1 r1', Constrained ctx2 r2') = canonicaliseBoth (r1, r2)
   cp <- CP.cps [r1'] [r2']
   let sub = CP.subst cp
       f (Left x)  = x
