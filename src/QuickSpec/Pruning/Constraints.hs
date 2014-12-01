@@ -19,17 +19,24 @@ import Control.Monad
 import Data.Ord
 import Data.Monoid hiding ((<>))
 import Control.Monad.Trans.State.Strict
-{-
+import Debug.Trace
+
 import QuickSpec.Pruning
 import Data.Rewriting.Rule(Rule(Rule))
-instance Sized [a] where funSize _ = 1
-instance Pretty a => PrettyTerm [a] where termStyle _ = Infix 5
-t, u :: Tm String PruningVariable
-t = Fun "+" [Var 0, Var 1]
-u = Fun "+" [Var 1, Var 0]
-r0 = unconstrained (Rule t u)
-r = add (Constraint Less u t) r0
--}
+data F = F String | Ty deriving (Eq, Ord, Show)
+instance Pretty F where
+  pretty (F x) = text x
+  pretty Ty    = text "@"
+instance PrettyTerm F
+instance Sized F where
+  funSize (F _) = 1
+  funSize Ty    = 0
+t, u :: Tm F PruningVariable
+t = Fun (F "sx") []
+u = Fun Ty [t]
+r1 = add (Less u t) (unconstrained (Rule t u))
+r2 = add (Less t u) (unconstrained (Rule u t))
+
 data Constrained a =
   Constrained {
     context     :: ContextOf a,
@@ -64,8 +71,8 @@ data Context f v =
   Context {
     literals :: Set (Literal f v),
     -- Nothing: constraint must be split
-    -- Just (ps, p): p is the encoding of the constraints and ps == assert p noProps
-    formula    :: Maybe (PropSet, Prop) }
+    -- Just ps: ps is the encoding of the constraints
+    formula    :: Maybe PropSet }
   deriving Show
 
 instance (PrettyTerm f, Pretty v) => Pretty (Context f v) where
@@ -81,16 +88,37 @@ instance (Sized f, Ord f, Ord v) => Symbolic (Context f v) where
   type VariableOf (Context f v) = v
   termsDL (Context ls _) = msum (map termsDL (Set.toList ls))
   substf sub (Context ls _) = Context (Set.map (substf sub) ls) Nothing
-  
+
+contextUnion :: (Ord f, Ord v) => Context f v -> Context f v -> Context f v
+contextUnion (Context ls _) (Context ls' _) = Context (Set.union ls ls') Nothing
+
 type LiteralOf a = Literal (ConstantOf a) (VariableOf a)
 data Literal f v =
     SizeIs Rel (Size v)
   | StructLess (Tm f v) (Tm f v)
   deriving (Eq, Ord, Show)
+data Rel = REQ | RNE | RLT | RGE deriving (Eq, Ord, Show)
+
+instance Pretty Rel where
+  pretty REQ = text "="
+  pretty RNE = text "/="
+  pretty RLT = text "<"
+  pretty RGE = text ">="
+
+evalRel :: Rel -> Expr -> Expr -> Prop
+evalRel REQ = (:==)
+evalRel RNE = (:/=)
+evalRel RLT = (:<)
+evalRel RGE = (:>=)
+
+negateRel :: Rel -> Rel
+negateRel REQ = RNE
+negateRel RNE = REQ
+negateRel RLT = RGE
+negateRel RGE = RLT
 
 instance (PrettyTerm f, Pretty v) => Pretty (Literal f v) where
-  pretty (SizeIs Equal s) = pretty s <+> text "= 0"
-  pretty (SizeIs Less s)  = pretty s <+> text "< 0"
+  pretty (SizeIs rel s) = pretty s <+> pretty rel <+> text "0"
   pretty (StructLess t u) = pretty t <+> text "<#" <+> pretty u
 
 instance (Sized f, Ord v) => Symbolic (Literal f v) where
@@ -104,22 +132,39 @@ instance (Sized f, Ord v) => Symbolic (Literal f v) where
   substf sub (StructLess t u) = StructLess (substf sub t) (substf sub u)
 
 type ConstraintOf a = Constraint (ConstantOf a) (VariableOf a)
-data Constraint f v = Constraint Rel (Tm f v) (Tm f v) | Literal (Literal f v) deriving Show
-data Rel = Less | Equal deriving (Eq, Ord, Show)
+data Constraint f v =
+    Less (Tm f v) (Tm f v)
+  | Equal (Tm f v) (Tm f v)
+  | Literal (Literal f v) deriving Show
 
 instance (Sized f, Ord v) => Symbolic (Constraint f v) where
   type ConstantOf (Constraint f v) = f
   type VariableOf (Constraint f v) = v
-  termsDL (Constraint _ t u) = return t `mplus` return u
+  termsDL (Less t u)  = return t `mplus` return u
+  termsDL (Equal t u) = return t `mplus` return u
   termsDL (Literal l) = termsDL l
-  substf sub (Constraint rel t u) = Constraint rel (substf sub t) (substf sub u)
+  substf sub (Less t u)  = Less  (substf sub t) (substf sub u)
+  substf sub (Equal t u) = Equal (substf sub t) (substf sub u)
   substf sub (Literal l) = Literal (substf sub l)
 
 unconstrained :: a -> Constrained a
-unconstrained x = Constrained (Context Set.empty (Just (noProps, PTrue))) x
+unconstrained x = Constrained emptyContext x
+
+emptyContext :: Context f v
+emptyContext = Context Set.empty (Just noProps)
 
 add :: (Symbolic a, Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Numbered (VariableOf a)) => ConstraintOf a -> Constrained a -> [Constrained a]
 add c x = runM x (addConstraint c x)
+
+addNegation :: (Symbolic a, Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Numbered (VariableOf a)) => ContextOf a -> Constrained a -> [Constrained a]
+addNegation (Context ls _) x = concatMap (flip addNegatedLiteral x) (Set.toList ls)
+
+addNegatedLiteral :: (Symbolic a, Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Numbered (VariableOf a)) => LiteralOf a -> Constrained a -> [Constrained a]
+addNegatedLiteral (SizeIs op s) x = add (Literal (SizeIs (negateRel op) s)) x
+addNegatedLiteral (StructLess t u) x =
+  concat [
+    add (Literal (StructLess u t)) x,
+    add (Equal t u) x]
 
 split :: (Symbolic a, Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Numbered (VariableOf a)) => Constrained a -> [Constrained a]
 split x = runM x (splitConstraint x)
@@ -147,13 +192,13 @@ addLiterals :: (Symbolic a, Sized (ConstantOf a), Ord (ConstantOf a), Ord (Varia
 addLiterals ls x = addConstraints (map Literal ls) x
 
 addConstraint :: (Symbolic a, Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Numbered (VariableOf a)) => ConstraintOf a -> Constrained a -> M (Constrained a)
-addConstraint (Constraint Equal t u) x = do
+addConstraint (Equal t u) x = do
   Just sub <- return (unify t u)
   splitConstraint (substf (evalSubst sub) x)
-addConstraint (Constraint Less t u) x =
+addConstraint (Less t u) x =
   msum [
-    addLiteral (SizeIs Less sz) x,
-    addLiterals [SizeIs Equal sz, StructLess t u] x]
+    addLiteral (SizeIs RLT sz) x,
+    addLiterals [SizeIs REQ sz, StructLess t u] x]
   where
     sz = termSize t `minus` termSize u
 addConstraint (Literal l) x = addLiteral l x
@@ -163,9 +208,9 @@ addConstraintWith c (Constrained ctx x) y = do
   Constrained ctx' (x', y') <- addConstraint c (Constrained ctx (x, y))
   return (Constrained ctx' x', y')
 
-tautological :: (Sized f, Ord f, Ord v) => Literal f v -> Bool
-tautological (SizeIs Equal sz) | Map.null (coeffs sz) && constant sz == 0 = True
-tautological (SizeIs Less sz) | all (<= 0) (Map.elems (coeffs sz)) && constant sz < 0 = True
+tautological :: (Sized f, Ord f, Ord v, Numbered v) => Literal f v -> Bool
+tautological (SizeIs op sz)
+  | isNothing (checkSat (assert (Not (evalRel op (encodeSize sz) (K 0)) :&& sizeAxioms sz) noProps)) = True
 tautological (StructLess t u) | t `simplerThan` u = True
 tautological (StructLess (Fun f xs) (Fun g ys))
   | measureFunction f (length xs) < measureFunction g (length ys) = True
@@ -175,11 +220,11 @@ addLiteral :: (Symbolic a, Sized (ConstantOf a), Ord (ConstantOf a), Ord (Variab
 addLiteral l x | tautological l = return x
 addLiteral l x | l `Set.member` literals (context x) = return x
 addLiteral l@SizeIs{} c = addBaseLiteral l c
-addLiteral (StructLess (Fun f _) (Fun g _)) _ | f /= g = __ -- should be caught by tautological
+addLiteral l@(StructLess (Fun f _) (Fun g _)) c | f /= g = mzero
 addLiteral (StructLess (Fun _ xs) (Fun _ ys)) c =
   argsLess xs ys c
 addLiteral l@(StructLess t u) c =
-  case filter (`Set.notMember` ls) tc of
+  case filter (\l -> l `Set.notMember` ls && not (tautological l)) tc of
     [] -> addLess t u c
     (l':_) ->
       addLiterals [l', l] c
@@ -199,41 +244,44 @@ addLess t (Var x) _ | x `elem` vars t = mzero
 addLess (Var x) t c | x `elem` vars t = return c
 addLess t@(Fun f [_]) u@(Var x) c | funSize f == 0 = do
   y <- newName x
-  addConstraints [Constraint Equal (Fun f [Var y]) u, Literal (StructLess t u)] c
+  addConstraints [Equal (Fun f [Var y]) u, Literal (StructLess t u)] c
 addLess t@(Var x) u@(Fun f ts) c
   | not (null [ () | StructLess (Fun g _) (Var y) <- Set.toList (literals (context c)), f == g, x == y ]) = do
     us <- sequence [ newName x | _ <- ts ]
-    addConstraints [Constraint Equal (Var x) (Fun f (map Var us)), Literal (StructLess t u)] c
+    addConstraints [Equal (Var x) (Fun f (map Var us)), Literal (StructLess t u)] c
 addLess t@(Fun f ts) u@(Var x) c
   | not (null [ () | StructLess (Var y) (Fun g _) <- Set.toList (literals (context c)), f == g, x == y ]) = do
     us <- sequence [ newName x | _ <- ts ]
-    addConstraints [Constraint Equal (Fun f (map Var us)) (Var x), Literal (StructLess t u)] c
+    addConstraints [Equal (Fun f (map Var us)) (Var x), Literal (StructLess t u)] c
 addLess t u c = addBaseLiteral (StructLess t u) c
 
 addLiteralToContext :: (Sized f, Ord f, Ord v, Numbered v) => Literal f v -> Context f v -> Context f v
 addLiteralToContext l (Context ls form) =
-  Context (Set.insert l ls) (fmap f form)
-  where
-    f (ps, p) = (assert q ps, p :&& q)
-    q = encodeLiteral l
+  Context (Set.insert l ls) (fmap (assert (encodeLiteral l)) form)
 
 argsLess :: (Symbolic a, Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Numbered (VariableOf a)) => [TmOf a] -> [TmOf a] -> Constrained a -> M (Constrained a)
 argsLess [] [] _ = mzero
 argsLess (x:xs) (y:ys) c =
   msum [
-    addConstraint (Constraint Less x y) c,
-    do { (c', (xs', ys')) <- addConstraintWith (Constraint Equal x y) c (xs, ys); argsLess xs' ys' c' } ]
+    addConstraint (Less x y) c,
+    do { (c', (xs', ys')) <- addConstraintWith (Equal x y) c (xs, ys); argsLess xs' ys' c' } ]
 
 splitError :: String
 splitError = "must call split after substituting into a constraint"
 
-satisfiable :: Constrained a -> Bool
-satisfiable (Constrained (Context _ (Just (ctx, _))) _) = isJust (checkSat ctx)
+satisfiable :: (Sized (ConstantOf a), Numbered (VariableOf a)) => Constrained a -> Bool
+satisfiable (Constrained (Context ls (Just ctx)) _) =
+  trace "check" $
+  let form = foldr (:&&) PTrue [ encodeLiteral l | l <- reverse (Set.toList ls) ] in
+  traceShow form $
+  traceShow (assert form noProps) $
+  traceShow (isJust (checkSat (assert form noProps))) $
+  traceShow ctx $
+  traceShowId (isJust (checkSat ctx))
 satisfiable (Constrained (Context _ Nothing) _) = ERROR splitError
 
 encodeLiteral :: (Sized f, Numbered v) => Literal f v -> Prop
-encodeLiteral (SizeIs Less sz)  = encodeSize sz :<  K 0 :&& sizeAxioms sz
-encodeLiteral (SizeIs Equal sz) = encodeSize sz :== K 0 :&& sizeAxioms sz
+encodeLiteral (SizeIs op sz)  = evalRel op (encodeSize sz) (K 0) :&& sizeAxioms sz
 encodeLiteral (StructLess (Var x) (Var y)) = structVar x :< structVar y
 encodeLiteral StructLess{} = PTrue
 
@@ -241,14 +289,19 @@ splitConstraint :: (Symbolic a, Sized (ConstantOf a), Ord (ConstantOf a), Ord (V
 splitConstraint c@(Constrained (Context _ (Just _)) _) = return c
 splitConstraint (Constrained (Context ls Nothing) x) = addLiterals (Set.toList ls) (unconstrained x)
 
-implies :: Context f v -> Context f v -> Bool
-implies (Context _ Just{}) (Context _ (Just (_, PTrue))) = True
-implies (Context _ (Just (ctx, _))) (Context _ (Just (_, goal))) =
-  isNothing (checkSat (assert (Not goal) ctx))
-implies _ _ = ERROR splitError
+implies :: (Sized f, Numbered v, Ord f, Ord v) => Context f v -> Context f v -> Bool
+implies ctx@(Context _ (Just ps)) (Context ls _) =
+  all implies1 (Set.toList ls)
+  where
+    implies1 (SizeIs op sz) = unsat (sizeAxioms sz :&& Not (evalRel op (encodeSize sz) (K 0)))
+    implies1 l | tautological l = True
+    implies1 l =
+      null (addNegatedLiteral l (Constrained ctx (Fun __ [])))
+    unsat p = isNothing (checkSat (assert p ps))
+implies (Context _ Nothing) _ = ERROR splitError
 
 minSize :: (Sized f, Numbered v, Ord v) => Tm f v -> Context f v -> Integer
-minSize t (Context _ (Just (ctx, _))) =
+minSize t (Context _ (Just ctx)) =
   loop (sizeIn (fromMaybe __ (checkSat prob)))
   where
     p    = encodeSize sz :== resultVar :&& sizeAxioms sz

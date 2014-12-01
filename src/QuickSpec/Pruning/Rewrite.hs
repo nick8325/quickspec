@@ -46,4 +46,5 @@ tryRules :: (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) => Conte
 tryRules ctx rules t = do
   rule <- map peel (Index.lookup t rules) >>= split
   guard (implies ctx (context rule))
+  traceM (prettyShow rule ++ " in context " ++ prettyShow ctx)
   return (rhs (constrained rule))

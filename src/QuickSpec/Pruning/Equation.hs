@@ -36,7 +36,7 @@ unorient (Rule l r) = l :==: r
 orient :: (Sized f, Ord f, Ord v, Numbered v) => Equation f v -> [Constrained (Rule f v)]
 orient (l :==: r) = rule l r ++ concat [rule r l | not (l `isVariantOf` r)]
   where
-    rule l r = add (Constraint Less r l) (unconstrained (Rule l r))
+    rule l r = add (Less r l) (unconstrained (Rule l r))
 
 bothSides :: (Tm f v -> Tm f v) -> Equation f v -> Equation f v
 bothSides f (t :==: u) = f t :==: f u
