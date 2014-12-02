@@ -159,7 +159,7 @@ maxValue p t = fmap negate (minValue p (negate t))
 
 reduce :: Problem -> Maybe Problem
 reduce p = do
-  --guard (all (consistent p) (Set.toList (pos p)))
+  guard (all (consistent p) (Set.toList (pos p)))
   case step p of
     Nothing -> Just p
     Just p' -> reduce p'
@@ -221,3 +221,10 @@ main =
     bench "prob0" (whnf solve prob0),
     bench "prob1" (whnf solve prob1),
     bench "prob2" (whnf solve prob2)]
+
+-- {-# NOINLINE go #-}
+-- go :: (a -> b) -> a -> c -> IO ()
+-- go f x _ = f x `seq` return ()
+
+-- main =
+--   forM_ [1..10000] (go solve prob0)
