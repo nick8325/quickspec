@@ -53,17 +53,15 @@ eval m t =
 data Problem =
   Problem {
     pos    :: Set Term,
-    solved :: [(Var, [Term], [Term])],
-    fresh  :: Int }
+    solved :: [(Var, [Term], [Term])] }
   deriving (Eq, Ord, Show)
 
 instance Monoid Problem where
-  mempty = Problem Set.empty [] 0
+  mempty = Problem Set.empty []
   x `mappend` y =
     Problem {
       pos    = pos x `Set.union` pos y,
-      solved = solved x ++ solved y,
-      fresh  = fresh x `max` fresh y }
+      solved = solved x ++ solved y }
 
 problemVars :: Problem -> Set Var
 problemVars p =
@@ -73,7 +71,7 @@ problemVars p =
 
 infix 4 ===, <==, >==
 (===), (<==), (>==) :: Term -> Term -> Problem
-t <== u = Problem (Set.singleton (u - t)) [] 0
+t <== u = Problem (Set.singleton (u - t)) []
 t >== u = u <== t
 t === u = mconcat [t <== u, t >== u]
 
