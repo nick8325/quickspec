@@ -59,6 +59,17 @@ data Problem =
     pvars  :: Set Var }
   deriving (Eq, Ord, Show)
 
+problem :: [Term] -> Problem
+problem ts = foldr addTerm (Problem Set.empty Map.empty Map.empty (Set.fromList vs)) ts
+  where
+    vs = concatMap (Map.keys . vars) ts
+
+infix 4 ===, <==, >==
+(===), (<==), (>==) :: Term -> Term -> [Term]
+t <== u = [u - t]
+t >== u = u <== t
+t === u = (t <== u) ++ (t >== u)
+
 addTerm :: Term -> Problem -> Problem
 addTerm _ Unsolvable = Unsolvable
 addTerm t p
@@ -77,62 +88,13 @@ addTerm t p =
     _ ->
       p { pos = Set.insert t (Set.filter (not . implies p t) (pos p)) }
 
-infix 4 ===, <==, >==
-(===), (<==), (>==) :: Term -> Term -> [Term]
-t <== u = [u - t]
-t >== u = u <== t
-t === u = (t <== u) ++ (t >== u)
+prune :: Problem -> Problem
+prune p =
+  p { pos = Set.filter (not . redundant p) (pos p) }
 
-x = var (Var 0)
-y = var (Var 1)
-z = var (Var 2)
-w = var (Var 3)
-
-problem :: [Term] -> Problem
-problem ts = foldr addTerm (Problem Set.empty Map.empty Map.empty (Set.fromList vs)) ts
-  where
-    vs = concatMap (Map.keys . vars) ts
-
-prob0 =
-  problem $
-  concat [
-    x >== 1,
-    y >== 1,
-    z >== 1,
-    w >== 1,
-    (-1) ^* x + 1 ^* y <== -1,
-    x + y - w + 1 <== -1,
-    x - z - w - 1 <== -1,
-    x + y - z + w + 2 >== 0,
-    y - z + w + 1 >== 0 ]
-
-prob1 = foldr addTerm prob0 (x - y <== -1)
-prob2 = foldr addTerm prob0 (x - y >== 1)
-
-foldDelete :: Ord a => (a -> b -> Maybe b) -> b -> Set a -> (b, Set a)
-foldDelete op e s = Set.foldr' op' (e, s) s
-  where
-    op' x (y, s) =
-      case op x y of
-        Nothing -> (y, s)
-        Just y' -> (y', Set.delete x s)
-
-focus :: Var -> Problem -> ([Term], [Term], Problem)
-focus x p = (ls', us', p' { pos = pos' })
-  where
-    p' = p {
-      lower = Map.delete x (lower p),
-      upper = Map.delete x (upper p),
-      pvars = Set.delete x (pvars p) }
-    ((ls', us'), pos') = foldDelete op (ls, us) (pos p')
-    (ls, us) = (bound (lower p), bound (upper p))
-    bound s = maybeToList (fmap constTerm (Map.lookup x s))
-    op t (ls, us) = do
-      a <- Map.lookup x (vars t)
-      let b = negate (recip a) ^* t { vars = Map.delete x (vars t) }
-      if a > 0
-        then return (b:ls, us)
-        else return (ls, b:us)
+redundant p t =
+  trivial p t ||
+  or [ implies p u t | u <- Set.toList (pos p), t /= u ]
 
 implies :: Problem -> Term -> Term -> Bool
 -- a1x1+...+anxn + b >= 0 ==> c1x1+...+cnxn + d >= 0
@@ -162,39 +124,10 @@ minValue p t = do
       | a > 0 = fmap (a *) (Map.lookup x (lower p))
       | otherwise = fmap (a *) (Map.lookup x (upper p))
 
-solve :: Problem -> Maybe (Map Var Rational)
-solve Unsolvable = Nothing
-solve p =
-  case step p of
-    Stop -> Just Map.empty
-    Eliminate x ls us p' -> do
-      m <- solve p'
-      let a = between (try maximum (map (eval m) ls),
-                       try minimum (map (eval m) us))
-      return (Map.insert x a m)
-  where
-    between (x, y) = fromMaybe 0 (x `mplus` y)
-    try f [] = Nothing
-    try f xs = Just (f xs)
-
 data Step = Stop | Eliminate Var [Term] [Term] Problem
 
-step :: Problem -> Step
-step p =
-  case eliminateOne p of
-    [] -> Stop
-    (x:_) -> x
-
-prune :: Problem -> Problem
-prune p =
-  p { pos = Set.filter (not . redundant p) (pos p) }
-
-redundant p t =
-  trivial p t ||
-  or [ implies p u t | u <- Set.toList (pos p), t /= u ]
-
-eliminateOne :: Problem -> [Step]
-eliminateOne p =
+eliminations :: Problem -> [Step]
+eliminations p =
   map snd .
   sortBy (comparing fst) $
     [ eliminate x p | x <- Set.toList (pvars p) ]
@@ -206,6 +139,67 @@ eliminate x p =
   where
     (ls, us, p') = focus x p
     ts = filter (not . trivial p) [ t - u | t <- us, u <- ls ]
+
+focus :: Var -> Problem -> ([Term], [Term], Problem)
+focus x p = (ls', us', p' { pos = pos' })
+  where
+    p' = p {
+      lower = Map.delete x (lower p),
+      upper = Map.delete x (upper p),
+      pvars = Set.delete x (pvars p) }
+    ((ls', us'), pos') = foldDelete op (ls, us) (pos p')
+    (ls, us) = (bound (lower p), bound (upper p))
+    bound s = maybeToList (fmap constTerm (Map.lookup x s))
+    op t (ls, us) = do
+      a <- Map.lookup x (vars t)
+      let b = negate (recip a) ^* t { vars = Map.delete x (vars t) }
+      if a > 0
+        then return (b:ls, us)
+        else return (ls, b:us)
+
+foldDelete :: Ord a => (a -> b -> Maybe b) -> b -> Set a -> (b, Set a)
+foldDelete op e s = Set.foldr' op' (e, s) s
+  where
+    op' x (y, s) =
+      case op x y of
+        Nothing -> (y, s)
+        Just y' -> (y', Set.delete x s)
+
+solve :: Problem -> Maybe (Map Var Rational)
+solve Unsolvable = Nothing
+solve p =
+  case eliminations p of
+    [] -> Just Map.empty
+    (Eliminate x ls us p':_) -> do
+      m <- solve p'
+      let a = between (try maximum (map (eval m) ls),
+                       try minimum (map (eval m) us))
+      return (Map.insert x a m)
+  where
+    between (x, y) = fromMaybe 0 (x `mplus` y)
+    try f [] = Nothing
+    try f xs = Just (f xs)
+
+x = var (Var 0)
+y = var (Var 1)
+z = var (Var 2)
+w = var (Var 3)
+
+prob0 =
+  problem $
+  concat [
+    x >== 1,
+    y >== 1,
+    z >== 1,
+    w >== 1,
+    (-1) ^* x + 1 ^* y <== -1,
+    x + y - w + 1 <== -1,
+    x - z - w - 1 <== -1,
+    x + y - z + w + 2 >== 0,
+    y - z + w + 1 >== 0 ]
+
+prob1 = foldr addTerm prob0 (x - y <== -1)
+prob2 = foldr addTerm prob0 (x - y >== 1)
 
 main =
   defaultMain [
