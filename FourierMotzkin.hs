@@ -59,25 +59,24 @@ data Problem =
   deriving (Eq, Ord, Show)
 
 addTerm :: Term -> Problem -> Problem
+addTerm t p
+  | t `Set.member` pos p = p
+  | redundant p t = p
 addTerm t p =
   case Map.toList (vars t) of
     [(x, a)]
       | a > 0 ->
-        p { lower = Map.insertWith max x y (lower p) }
+        prune p { lower = Map.insertWith max x y (lower p) }
       | a < 0 ->
-        p { upper = Map.insertWith min x y (upper p) }
+        prune p { upper = Map.insertWith min x y (upper p) }
       where
         y = negate (constant t) / a
-    _ -> p { pos = Set.insert t (pos p) }
-
-instance Monoid Problem where
-  mempty = Problem Set.empty Map.empty Map.empty []
-  x `mappend` y =
-    Problem {
-      pos    = pos x `Set.union` pos y,
-      lower  = Map.unionWith max (lower x) (lower y),
-      upper  = Map.unionWith min (upper x) (upper y),
-      solved = solved x ++ solved y }
+    _ ->
+      -- Can assume that p is not a member of pos p (clause above).
+      -- Since two terms that imply each other must be identical
+      -- (see note for implies function), this means there is no
+      -- risk of circularity here.
+      p { pos = Set.insert t (Set.filter (not . implies p t) (pos p)) }
 
 problemVars :: Problem -> Set Var
 problemVars p =
@@ -87,18 +86,22 @@ problemVars p =
     toSet = Set.fromAscList . Map.keys
 
 infix 4 ===, <==, >==
-(===), (<==), (>==) :: Term -> Term -> Problem
-t <== u = addTerm (u - t) mempty
+(===), (<==), (>==) :: Term -> Term -> [Term]
+t <== u = [u - t]
 t >== u = u <== t
-t === u = mconcat [t <== u, t >== u]
+t === u = (t <== u) ++ (t >== u)
 
 x = var (Var 0)
 y = var (Var 1)
 z = var (Var 2)
 w = var (Var 3)
 
+problem :: [Term] -> Problem
+problem = foldr addTerm (Problem Set.empty Map.empty Map.empty [])
+
 prob0 =
-  mconcat [
+  problem $
+  concat [
     x >== 1,
     y >== 1,
     z >== 1,
@@ -109,8 +112,8 @@ prob0 =
     x + y - z + w + 2 >== 0,
     y - z + w + 1 >== 0 ]
 
-prob1 = prob0 `mappend` (x - y <== -1)
-prob2 = prob0 `mappend` (x - y >== 1)
+prob1 = foldr addTerm prob0 (x - y <== -1)
+prob2 = foldr addTerm prob0 (x - y >== 1)
 
 data View = Lower Var Term | Upper Var Term
 
@@ -139,6 +142,13 @@ implies :: Problem -> Term -> Term -> Bool
 -- <=>
 -- (c1-a1)x1+...+(cn-an)x2 + d - b >= 0
 implies p t u = trivial p (u - t)
+-- Note: if t implies u and u implies t then t is syntactically equal to u:
+-- If t implies u then:
+--    minValue (u - t) >= 0
+-- => maxValue (t - u) <= 0
+-- => minValue (t - u) <= 0
+-- If u also implies t than minValue (t - u) >= 0
+-- so minValue (t - u) = maxValue (t - u) = 0 so t - u = 0.
 
 trivial :: Problem -> Term -> Bool
 trivial p t =
@@ -195,15 +205,14 @@ step p = listToMaybe (steps p)
 
 steps :: Problem -> [Problem]
 steps p =
-  [ p  { pos = Set.delete t (pos p) } | t <- redundant p ] ++
   eliminateOne p
 
-redundant :: Problem -> [Term]
-redundant p =
-  sortBy (comparing size)
-    [ u
-    | t <- Set.toList (pos p), u <- Set.toList (pos p), t /= u,
-      implies p t u ]
+prune :: Problem -> Problem
+prune p =
+  p { pos = Set.filter (not . redundant p) (pos p) }
+
+redundant p t =
+  or [ implies p u t | u <- Set.toList (pos p), t /= u ]
 
 eliminateOne :: Problem -> [Problem]
 eliminateOne p =
