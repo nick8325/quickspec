@@ -16,7 +16,6 @@ data Term =
     vars :: Map Var Rational }
   deriving (Eq, Ord, Show)
 
---data Var = Var String | New Int deriving (Eq, Ord, Show)
 newtype Var = Var Int deriving (Eq, Ord, Show)
 
 instance Num Term where
