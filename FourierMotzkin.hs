@@ -20,7 +20,7 @@ data Term =
 newtype Var = Var Int deriving (Eq, Ord, Show)
 
 instance Num Term where
-  fromInteger n = Term (fromInteger n) Map.empty
+  fromInteger n = constTerm (fromInteger n)
   x + y =
     Term {
       constant = constant x + constant y,
@@ -29,6 +29,9 @@ instance Num Term where
     Term {
       constant = negate (constant x),
       vars = fmap negate (vars x) }
+
+constTerm :: Rational -> Term
+constTerm a = Term a Map.empty
 
 (^*) :: Rational -> Term -> Term
 0 ^* _ = 0
@@ -55,6 +58,7 @@ data Problem =
     pos    :: Set Term,
     lower  :: Map Var Rational,
     upper  :: Map Var Rational,
+    pvars  :: Set Var,
     solved :: [(Var, [Term], [Term])] }
   deriving (Eq, Ord, Show)
 
@@ -74,13 +78,6 @@ addTerm t p =
     _ ->
       p { pos = Set.insert t (Set.filter (not . implies p t) (pos p)) }
 
-problemVars :: Problem -> Set Var
-problemVars p =
-  Set.unions [ toSet (vars t) | t <- Set.toList (pos p) ] `Set.union`
-  toSet (lower p) `Set.union` toSet (upper p)
-  where
-    toSet = Set.fromAscList . Map.keys
-
 infix 4 ===, <==, >==
 (===), (<==), (>==) :: Term -> Term -> [Term]
 t <== u = [u - t]
@@ -93,7 +90,9 @@ z = var (Var 2)
 w = var (Var 3)
 
 problem :: [Term] -> Problem
-problem = foldr addTerm (Problem Set.empty Map.empty Map.empty [])
+problem ts = foldr addTerm (Problem Set.empty Map.empty Map.empty (Set.fromList vs) []) ts
+  where
+    vs = concatMap (Map.keys . vars) ts
 
 prob0 =
   problem $
@@ -111,27 +110,30 @@ prob0 =
 prob1 = foldr addTerm prob0 (x - y <== -1)
 prob2 = foldr addTerm prob0 (x - y >== 1)
 
-data View = Lower Var Term | Upper Var Term
-
-view :: Var -> Term -> Maybe View
-view x t =
-  case Map.lookup x (vars t) of
-    Nothing -> Nothing
-    Just a | a > 0 -> Just (Lower x (negate (recip a) ^* remove x t))
-    Just a | a < 0 -> Just (Upper x (negate (recip a) ^* remove x t))
+foldDelete :: Ord a => (a -> b -> Maybe b) -> b -> Set a -> (b, Set a)
+foldDelete op e s = Set.foldr' op' (e, s) s
   where
-    remove x t = t { vars = Map.delete x (vars t) }
+    op' x (y, s) =
+      case op x y of
+        Nothing -> (y, s)
+        Just y' -> (y', Set.delete x s)
 
-focus :: Var -> Problem -> ([View], Problem)
-focus x p = foldr op (bs, p { lower = Map.delete x (lower p), upper = Map.delete x (upper p) }) (Set.toList (pos p))
+focus :: Var -> Problem -> ([Term], [Term], Problem)
+focus x p = (ls', us', p' { pos = pos' })
   where
-    op t (vs, p) =
-      case view x t of
-        Nothing -> (vs, p)
-        Just v -> (v:vs, p { pos = Set.delete t (pos p) })
-    bs =
-      [ Lower x (Term a Map.empty) | Just a <- [Map.lookup x (lower p)] ] ++
-      [ Upper x (Term a Map.empty) | Just a <- [Map.lookup x (upper p)] ]
+    p' = p {
+      lower = Map.delete x (lower p),
+      upper = Map.delete x (upper p),
+      pvars = Set.delete x (pvars p) }
+    ((ls', us'), pos') = foldDelete op (ls, us) (pos p')
+    (ls, us) = (bound (lower p), bound (upper p))
+    bound s = maybeToList (fmap constTerm (Map.lookup x s))
+    op t (ls, us) = do
+      a <- Map.lookup x (vars t)
+      let b = negate (recip a) ^* t { vars = Map.delete x (vars t) }
+      if a > 0
+        then return (b:ls, us)
+        else return (ls, b:us)
 
 implies :: Problem -> Term -> Term -> Bool
 -- a1x1+...+anxn + b >= 0 ==> c1x1+...+cnxn + d >= 0
@@ -197,11 +199,7 @@ solve :: Problem -> Maybe (Map Var Rational)
 solve p = fmap solution (reduce p)
 
 step :: Problem -> Maybe Problem
-step p = listToMaybe (steps p)
-
-steps :: Problem -> [Problem]
-steps p =
-  eliminateOne p
+step p = listToMaybe (eliminateOne p)
 
 prune :: Problem -> Problem
 prune p =
@@ -215,16 +213,14 @@ eliminateOne :: Problem -> [Problem]
 eliminateOne p =
   map snd .
   sortBy (comparing fst) $
-    [ eliminate x p | x <- Set.toList (problemVars p) ]
+    [ eliminate x p | x <- Set.toList (pvars p) ]
 
 eliminate :: Var -> Problem -> (Int, Problem)
 eliminate x p =
   (length ts - length ls - length us,
    foldr addTerm p' { solved = (x, ls, us):solved p' } ts)
   where
-    (vs, p') = focus x p
-    ls = [ t | Lower _ t <- vs ]
-    us = [ t | Upper _ t <- vs ]
+    (ls, us, p') = focus x p
     ts = filter (not . trivial p) [ t - u | t <- us, u <- ls ]
 
 main =
