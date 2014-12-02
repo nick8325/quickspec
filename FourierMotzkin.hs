@@ -43,9 +43,6 @@ x ^* y =
 var :: Var -> Term
 var x = Term 0 (Map.singleton x 1)
 
-size :: Term -> Rational
-size t = constant t + sum (Map.elems (vars t))
-
 eval :: Map Var Rational -> Term -> Rational
 eval m t =
   constant t +
@@ -54,6 +51,7 @@ eval m t =
     err = error "eval: variable not bound"
 
 data Problem =
+  Unsolvable |
   Problem {
     pos    :: Set Term,
     lower  :: Map Var Rational,
@@ -63,11 +61,13 @@ data Problem =
   deriving (Eq, Ord, Show)
 
 addTerm :: Term -> Problem -> Problem
+addTerm _ Unsolvable = Unsolvable
 addTerm t p
   | t `Set.member` pos p = p
   | redundant p t = p
 addTerm t p =
   case Map.toList (vars t) of
+    [] | constant t < 0 -> Unsolvable
     [(x, a)]
       | a > 0 ->
         prune p { lower = Map.insertWith max x y (lower p) }
@@ -154,13 +154,7 @@ trivial p t =
     Just a | a >= 0 -> True
     _ -> False
 
-consistent :: Problem -> Term -> Bool
-consistent p t =
-  case maxValue p t of
-    Just a | a < 0 -> False
-    _ -> True
-
-minValue, maxValue :: Problem -> Term -> Maybe Rational
+minValue :: Problem -> Term -> Maybe Rational
 minValue p t = do
   as <- fmap sum (mapM varValue (Map.toList (vars t)))
   return (as + constant t)
@@ -169,13 +163,10 @@ minValue p t = do
       | a > 0 = fmap (a *) (Map.lookup x (lower p))
       | otherwise = fmap (a *) (Map.lookup x (upper p))
 
-maxValue p t = fmap negate (minValue p (negate t))
-
-reduce :: Problem -> Maybe Problem
+reduce :: Problem -> Problem
 reduce p = do
-  guard (all (consistent p) (Set.toList (pos p)))
   case step p of
-    Nothing -> Just p
+    Nothing -> p
     Just p' -> reduce p'
 
 solution :: Problem -> Map Var Rational
@@ -188,17 +179,18 @@ solution p
       where
         a = between (try maximum (map (eval m) los),
                      try minimum (map (eval m) his))
-    between (Just x, Just y) | x > y = error "between: inconsistent bounds"
-    between (Nothing, Nothing) = 0
-    between (Nothing, Just x)  = x
-    between (Just x,  _)       = x
+    between (x, y) = fromMaybe 0 (x `mplus` y)
     try f [] = Nothing
     try f xs = Just (f xs)
 
 solve :: Problem -> Maybe (Map Var Rational)
-solve p = fmap solution (reduce p)
+solve p =
+  case reduce p of
+    Unsolvable -> Nothing
+    p -> Just (solution p)
 
 step :: Problem -> Maybe Problem
+step Unsolvable = Nothing
 step p = listToMaybe (eliminateOne p)
 
 prune :: Problem -> Problem
