@@ -10,13 +10,26 @@ import Data.Ord
 import Control.Monad
 import Criterion.Main
 
+newtype Var = Var Int deriving (Eq, Ord, Show)
+
 data Term =
   Term {
     constant :: Rational,
+    -- Invariant: no coefficient is zero
     vars :: Map Var Rational }
   deriving (Eq, Ord, Show)
 
-newtype Var = Var Int deriving (Eq, Ord, Show)
+constTerm :: Rational -> Term
+constTerm a = Term a Map.empty
+
+var :: Var -> Term
+var x = Term 0 (Map.singleton x 1)
+
+mapTerm :: (Rational -> Rational) -> Term -> Term
+mapTerm f x =
+  Term {
+    constant = f (constant x),
+    vars = fmap f (vars x) }
 
 instance Num Term where
   fromInteger n = constTerm (fromInteger n)
@@ -24,23 +37,11 @@ instance Num Term where
     Term {
       constant = constant x + constant y,
       vars = Map.filter (/= 0) (Map.unionWith (+) (vars x) (vars y)) }
-  negate x =
-    Term {
-      constant = negate (constant x),
-      vars = fmap negate (vars x) }
-
-constTerm :: Rational -> Term
-constTerm a = Term a Map.empty
+  negate = mapTerm negate
 
 (^*) :: Rational -> Term -> Term
-0 ^* _ = 0
-x ^* y =
-  Term {
-    constant = x * constant y,
-    vars = fmap (x*) (vars y) }
-
-var :: Var -> Term
-var x = Term 0 (Map.singleton x 1)
+0 ^* y = constTerm 0
+x ^* y = mapTerm (x*) y
 
 eval :: Map Var Rational -> Term -> Rational
 eval m t =
@@ -55,8 +56,7 @@ data Problem =
     pos    :: Set Term,
     lower  :: Map Var Rational,
     upper  :: Map Var Rational,
-    pvars  :: Set Var,
-    solved :: [(Var, [Term], [Term])] }
+    pvars  :: Set Var }
   deriving (Eq, Ord, Show)
 
 addTerm :: Term -> Problem -> Problem
@@ -89,7 +89,7 @@ z = var (Var 2)
 w = var (Var 3)
 
 problem :: [Term] -> Problem
-problem ts = foldr addTerm (Problem Set.empty Map.empty Map.empty (Set.fromList vs) []) ts
+problem ts = foldr addTerm (Problem Set.empty Map.empty Map.empty (Set.fromList vs)) ts
   where
     vs = concatMap (Map.keys . vars) ts
 
@@ -162,35 +162,28 @@ minValue p t = do
       | a > 0 = fmap (a *) (Map.lookup x (lower p))
       | otherwise = fmap (a *) (Map.lookup x (upper p))
 
-reduce :: Problem -> Problem
-reduce p = do
+solve :: Problem -> Maybe (Map Var Rational)
+solve Unsolvable = Nothing
+solve p =
   case step p of
-    Nothing -> p
-    Just p' -> reduce p'
-
-solution :: Problem -> Map Var Rational
-solution p
-  | not (Set.null (pos p)) = error "problem not solved yet"
-  | otherwise = foldl' op Map.empty (solved p)
+    Stop -> Just Map.empty
+    Eliminate x ls us p' -> do
+      m <- solve p'
+      let a = between (try maximum (map (eval m) ls),
+                       try minimum (map (eval m) us))
+      return (Map.insert x a m)
   where
-    op m (x, los, his) =
-      Map.insert x a m
-      where
-        a = between (try maximum (map (eval m) los),
-                     try minimum (map (eval m) his))
     between (x, y) = fromMaybe 0 (x `mplus` y)
     try f [] = Nothing
     try f xs = Just (f xs)
 
-solve :: Problem -> Maybe (Map Var Rational)
-solve p =
-  case reduce p of
-    Unsolvable -> Nothing
-    p -> Just (solution p)
+data Step = Stop | Eliminate Var [Term] [Term] Problem
 
-step :: Problem -> Maybe Problem
-step Unsolvable = Nothing
-step p = listToMaybe (eliminateOne p)
+step :: Problem -> Step
+step p =
+  case eliminateOne p of
+    [] -> Stop
+    (x:_) -> x
 
 prune :: Problem -> Problem
 prune p =
@@ -200,16 +193,16 @@ redundant p t =
   trivial p t ||
   or [ implies p u t | u <- Set.toList (pos p), t /= u ]
 
-eliminateOne :: Problem -> [Problem]
+eliminateOne :: Problem -> [Step]
 eliminateOne p =
   map snd .
   sortBy (comparing fst) $
     [ eliminate x p | x <- Set.toList (pvars p) ]
 
-eliminate :: Var -> Problem -> (Int, Problem)
+eliminate :: Var -> Problem -> (Int, Step)
 eliminate x p =
   (length ts - length ls - length us,
-   foldr addTerm p' { solved = (x, ls, us):solved p' } ts)
+   Eliminate x ls us (foldr addTerm p' ts))
   where
     (ls, us, p') = focus x p
     ts = filter (not . trivial p) [ t - u | t <- us, u <- ls ]
