@@ -72,10 +72,6 @@ addTerm t p =
       where
         y = negate (constant t) / a
     _ ->
-      -- Can assume that p is not a member of pos p (clause above).
-      -- Since two terms that imply each other must be identical
-      -- (see note for implies function), this means there is no
-      -- risk of circularity here.
       p { pos = Set.insert t (Set.filter (not . implies p t) (pos p)) }
 
 problemVars :: Problem -> Set Var
