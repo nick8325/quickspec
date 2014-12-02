@@ -138,7 +138,7 @@ eliminate x p =
    Eliminate x ls us (foldr addTerm p' ts))
   where
     (ls, us, p') = focus x p
-    ts = filter (not . trivial p) [ t - u | t <- us, u <- ls ]
+    ts = [ t - u | t <- us, u <- ls ]
 
 focus :: Var -> Problem -> ([Term], [Term], Problem)
 focus x p = (ls', us', p' { pos = pos' })
