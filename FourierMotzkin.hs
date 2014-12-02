@@ -124,7 +124,7 @@ minValue p t = do
       | a > 0 = fmap (a *) (Map.lookup x (lower p))
       | otherwise = fmap (a *) (Map.lookup x (upper p))
 
-data Step = Stop | Eliminate Var [Term] [Term] Problem
+data Step = Stop | Eliminate Var [Term] [Term] Problem deriving Show
 
 eliminations :: Problem -> [Step]
 eliminations p =
@@ -158,7 +158,7 @@ focus x p = (ls', us', p' { pos = pos' })
         else return (ls, b:us)
 
 foldDelete :: Ord a => (a -> b -> Maybe b) -> b -> Set a -> (b, Set a)
-foldDelete op e s = Set.foldr' op' (e, s) s
+foldDelete op e s = Set.foldr op' (e, s) s
   where
     op' x (y, s) =
       case op x y of
