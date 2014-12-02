@@ -212,17 +212,18 @@ prune p =
   p { pos = Set.filter (not . redundant p) (pos p) }
 
 redundant p t =
+  trivial p t ||
   or [ implies p u t | u <- Set.toList (pos p), t /= u ]
 
 eliminateOne :: Problem -> [Problem]
 eliminateOne p =
   map snd .
-  sortBy (comparing (length . fst)) $
+  sortBy (comparing fst) $
     [ eliminate x p | x <- Set.toList (problemVars p) ]
 
-eliminate :: Var -> Problem -> ([Term], Problem)
+eliminate :: Var -> Problem -> (Int, Problem)
 eliminate x p =
-  (ts, 
+  (length ts - length ls - length us,
    foldr addTerm p' { solved = (x, ls, us):solved p' } ts)
   where
     (vs, p') = focus x p
