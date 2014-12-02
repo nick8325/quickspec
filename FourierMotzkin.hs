@@ -225,4 +225,4 @@ main =
 -- go f x _ = f x `seq` return ()
 
 -- main =
---   forM_ [1..10000] (go solve prob0)
+--   forM_ [1..100000] (go solve prob0)
