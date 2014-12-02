@@ -134,7 +134,8 @@ eliminations p =
 
 eliminate :: Var -> Problem -> (Int, Step)
 eliminate x p =
-  (length ts - length ls - length us,
+   -- Number of terms added by the elimination
+  (length ls * length us - length ls - length us,
    Eliminate x ls us (foldr addTerm p' ts))
   where
     (ls, us, p') = focus x p
