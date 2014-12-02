@@ -53,25 +53,42 @@ eval m t =
 data Problem =
   Problem {
     pos    :: Set Term,
+    lower  :: Map Var Rational,
+    upper  :: Map Var Rational,
     solved :: [(Var, [Term], [Term])] }
   deriving (Eq, Ord, Show)
 
+addTerm :: Term -> Problem -> Problem
+addTerm t p =
+  case Map.toList (vars t) of
+    [(x, a)]
+      | a > 0 ->
+        p { lower = Map.insertWith max x y (lower p) }
+      | a < 0 ->
+        p { upper = Map.insertWith min x y (upper p) }
+      where
+        y = negate (constant t) / a
+    _ -> p { pos = Set.insert t (pos p) }
+
 instance Monoid Problem where
-  mempty = Problem Set.empty []
+  mempty = Problem Set.empty Map.empty Map.empty []
   x `mappend` y =
     Problem {
       pos    = pos x `Set.union` pos y,
+      lower  = Map.unionWith max (lower x) (lower y),
+      upper  = Map.unionWith min (upper x) (upper y),
       solved = solved x ++ solved y }
 
 problemVars :: Problem -> Set Var
 problemVars p =
-  Set.unions [ toMap (vars t) | t <- Set.toList (pos p) ]
+  Set.unions [ toSet (vars t) | t <- Set.toList (pos p) ] `Set.union`
+  toSet (lower p) `Set.union` toSet (upper p)
   where
-    toMap = Set.fromAscList . Map.keys
+    toSet = Set.fromAscList . Map.keys
 
 infix 4 ===, <==, >==
 (===), (<==), (>==) :: Term -> Term -> Problem
-t <== u = Problem (Set.singleton (u - t)) []
+t <== u = addTerm (u - t) mempty
 t >== u = u <== t
 t === u = mconcat [t <== u, t >== u]
 
@@ -102,29 +119,20 @@ view x t =
   case Map.lookup x (vars t) of
     Nothing -> Nothing
     Just a | a > 0 -> Just (Lower x (negate (recip a) ^* remove x t))
-    Just a | a < 0 -> Just (Upper x (recip a ^* remove x t))
+    Just a | a < 0 -> Just (Upper x (negate (recip a) ^* remove x t))
   where
     remove x t = t { vars = Map.delete x (vars t) }
 
 focus :: Var -> Problem -> ([View], Problem)
-focus x p = foldr op ([], p) (Set.toList (pos p))
+focus x p = foldr op (bs, p { lower = Map.delete x (lower p), upper = Map.delete x (upper p) }) (Set.toList (pos p))
   where
     op t (vs, p) =
       case view x t of
         Nothing -> (vs, p)
         Just v -> (v:vs, p { pos = Set.delete t (pos p) })
-
-bounds :: Var -> Problem -> (Maybe Rational, Maybe Rational)
-bounds x p = (try maximum [constant t | Lower _ t <- vs, Map.null (vars t)],
-              try minimum [constant t | Upper _ t <- vs, Map.null (vars t)])
-  where
-    (vs, _) = focus x p
-    try f [] = Nothing
-    try f xs = Just (f xs)
-
-lowerBound, upperBound :: Var -> Problem -> Maybe Rational
-lowerBound x p = fst (bounds x p)
-upperBound x p = snd (bounds x p)
+    bs =
+      [ Lower x (Term a Map.empty) | Just a <- [Map.lookup x (lower p)] ] ++
+      [ Upper x (Term a Map.empty) | Just a <- [Map.lookup x (upper p)] ]
 
 implies :: Problem -> Term -> Term -> Bool
 -- a1x1+...+anxn + b >= 0 ==> c1x1+...+cnxn + d >= 0
@@ -150,8 +158,8 @@ minValue p t = do
   return (as + constant t)
   where
     varValue (x, a)
-      | a > 0 = fmap (a *) (lowerBound x p)
-      | otherwise = fmap (a *) (upperBound x p)
+      | a > 0 = fmap (a *) (Map.lookup x (lower p))
+      | otherwise = fmap (a *) (Map.lookup x (upper p))
 
 maxValue p t = fmap negate (minValue p (negate t))
 
@@ -195,24 +203,23 @@ redundant p =
   sortBy (comparing size)
     [ u
     | t <- Set.toList (pos p), u <- Set.toList (pos p), t /= u,
-      implies p { pos = Set.delete u (pos p) } t u ]
+      implies p t u ]
 
 eliminateOne :: Problem -> [Problem]
 eliminateOne p =
   map snd .
-  sortBy (comparing (Set.size . fst)) $
+  sortBy (comparing (length . fst)) $
     [ eliminate x p | x <- Set.toList (problemVars p) ]
 
-eliminate :: Var -> Problem -> (Set Term, Problem)
+eliminate :: Var -> Problem -> ([Term], Problem)
 eliminate x p =
   (ts, 
-   p' { solved = (x, ls, us):solved p',
-        pos = Set.union ts (pos p') })
+   foldr addTerm p' { solved = (x, ls, us):solved p' } ts)
   where
     (vs, p') = focus x p
     ls = [ t | Lower _ t <- vs ]
     us = [ t | Upper _ t <- vs ]
-    ts = Set.fromList (filter (not . trivial p) [ t - u | t <- us, u <- ls ])
+    ts = filter (not . trivial p) [ t - u | t <- us, u <- ls ]
 
 main =
   defaultMain [
