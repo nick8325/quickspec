@@ -72,9 +72,6 @@ t === u = (t <== u) ++ (t >== u)
 
 addTerm :: Term -> Problem -> Problem
 addTerm _ Unsolvable = Unsolvable
-addTerm t p
-  | t `Set.member` pos p = p
-  | redundant p t = p
 addTerm t p =
   case Map.toList (vars t) of
     [] | constant t < 0 -> Unsolvable
@@ -85,8 +82,10 @@ addTerm t p =
         prune p { upper = Map.insertWith min x y (upper p) }
       where
         y = negate (constant t) / a
-    _ ->
-      p { pos = Set.insert t (Set.filter (not . implies p t) (pos p)) }
+    _ | t `Set.member` pos p -> p
+      | redundant p t -> p
+      | otherwise ->
+        p { pos = Set.insert t (Set.filter (not . implies p t) (pos p)) }
 
 prune :: Problem -> Problem
 prune p =
