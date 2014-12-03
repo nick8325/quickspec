@@ -11,7 +11,7 @@ import Data.Ord
 import Control.Monad
 import Criterion.Main
 
-newtype Var = Var Int deriving (Eq, Ord, Show, Enum)
+newtype Var = Var Char deriving (Eq, Ord, Show, Enum)
 
 data Term =
   Term {
@@ -207,10 +207,10 @@ trace p =
     (s@(Eliminate _ _ _ p'):_) ->
       s:trace p'
 
-x = var (Var 0)
-y = var (Var 1)
-z = var (Var 2)
-w = var (Var 3)
+x = var (Var 'x')
+y = var (Var 'y')
+z = var (Var 'z')
+w = var (Var 'w')
 
 cs =
   concat [
