@@ -112,7 +112,7 @@ prune p =
 
 redundant p t =
   trivial p t ||
-  or [ implies p u t | u <- Set.toList (pos p), t /= u ]
+  or [ implies p u t && (t < u || not (implies p t u)) | u <- Set.toList (pos p), t /= u ]
 
 implies :: Problem -> Term -> Term -> Bool
 -- a1x1+...+anxn + b >= 0 ==> c1x1+...+cnxn + d >= 0
@@ -222,6 +222,15 @@ prob0 =
 prob1 = problem ((x - y <== -1) ++ cs)
 prob2 = problem ((x - y >== 1) ++ cs)
 prob3 = problem ((x - y === 1) ++ cs)
+
+prob4 =
+  addTerms cs' $
+  addTerms cs $
+  addVars cs $
+  empty
+  where
+    cs = concat [x + y >== 0, x + 2^*y >== 0]
+    cs' = y === 0
 
 main =
  defaultMain [
