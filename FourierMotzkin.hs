@@ -11,14 +11,26 @@ import Data.Ord
 import Control.Monad
 import Criterion.Main
 
-newtype Var = Var Char deriving (Eq, Ord, Show, Enum)
+newtype Var = Var Char deriving (Eq, Ord, Enum)
+instance Show Var where show (Var x) = [x]
 
 data Term =
   Term {
     constant :: Rational,
     -- Invariant: no coefficient is zero
     vars :: Map Var Rational }
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord)
+instance Show Term where
+  show (Term a vs)
+    | Map.null vs = showRat a
+    | a == 0 = showVars vs
+    | otherwise = showRat a ++ " + " ++ showVars vs
+    where
+      showVars vs = intercalate " + " [ showRat a ++ show x | (x, a) <- Map.toList vs ]
+showRat :: Rational -> String
+showRat a
+  | denominator a == 1 = show (numerator a)
+  | otherwise = "(" ++ show a ++ ")"
 
 constTerm :: Rational -> Term
 constTerm a = Term a Map.empty
@@ -58,7 +70,17 @@ data Problem =
     lower  :: Map Var Rational,
     upper  :: Map Var Rational,
     pvars  :: Set Var }
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord)
+
+instance Show Problem where
+  show Unsolvable = "Unsolvable"
+  show p =
+    "[" ++ intercalate ", " xs ++ "]"
+    where
+      xs =
+        [show t ++ " >= 0" | t <- Set.toList (pos p)] ++
+        [show x ++ " >= " ++ showRat a | (x, a) <- Map.toList (lower p)] ++
+        [show x ++ " <= " ++ showRat a | (x, a) <- Map.toList (upper p)]
 
 empty :: Problem
 empty = Problem Set.empty Map.empty Map.empty Set.empty
