@@ -79,11 +79,11 @@ instance Show a => Show (Problem a) where
         [show x ++ " >= " ++ showRat a | (x, a) <- Map.toList (lower p)] ++
         [show x ++ " <= " ++ showRat a | (x, a) <- Map.toList (upper p)]
 
+problem :: Ord a => [Term a] -> Problem a
+problem ts = addTerms ts empty
+
 empty :: Problem a
 empty = Problem Set.empty Map.empty Map.empty Set.empty
-
-problem :: Ord a => [Term a] -> Problem a
-problem ts = addTerms ts (addVars ts empty)
 
 infix 4 ===, <==, >==
 (===), (<==), (>==) :: Ord a => Term a -> Term a -> [Term a]
@@ -91,15 +91,16 @@ t <== u = [u - t]
 t >== u = u <== t
 t === u = (t <== u) ++ (t >== u)
 
-addVars :: Ord a => [Term a] -> Problem a -> Problem a
-addVars ts p =
-  p { pvars = Set.union (Set.fromList vs) (pvars p) }
-  where
-    vs = concatMap (Map.keys . vars) ts
-
 addTerms :: Ord a => [Term a] -> Problem a -> Problem a
 addTerms _ Unsolvable = Unsolvable
-addTerms ts p = foldr addTerm (addBounds bs p) us
+addTerms ts p =
+  addDerivedTerms ts p { pvars = Set.union vs (pvars p) }
+  where
+    vs = Set.unions (map (Set.fromAscList . Map.keys . vars) ts)
+
+addDerivedTerms :: Ord a => [Term a] -> Problem a -> Problem a
+addDerivedTerms _ Unsolvable = Unsolvable
+addDerivedTerms ts p = foldr addTerm (addBounds bs p) us
   where
     (bs, us) = partition ((== 1) . Map.size . vars) ts
 
@@ -170,11 +171,11 @@ eliminate x p =
    -- otherwise generate ls >= rs
    case nontrivial ls && nontrivial us && any (== 0) ts of
      False ->
-       Eliminate x ls us (addTerms ts p')
+       Eliminate x ls us (addDerivedTerms ts p')
      True ->
        let (c:_) = sortBy (comparing (Map.size . vars)) (intersect ls us)
            ts = [ t - c | t <- us ] ++ [ c - u | u <- ls ] in
-       Eliminate x [c] [c] (addTerms ts p'))
+       Eliminate x [c] [c] (addDerivedTerms ts p'))
   where
     (ls, us, p') = focus x p
     ts = [ t - u | t <- us, u <- ls ]
@@ -264,7 +265,6 @@ prob3 = problem cs3
 prob4 =
   addTerms cs' $
   addTerms cs $
-  addVars cs $
   empty
   where
     cs = concat [x + y >== 0, x + 2^*y >== 0]
