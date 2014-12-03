@@ -174,12 +174,21 @@ eliminations p =
 
 eliminate :: Var -> Problem -> (Int, Step)
 eliminate x p =
-   -- Number of terms added by the elimination
+  -- Number of terms added by the elimination
   (length ls * length us - length ls - length us,
-   Eliminate x ls us (addTerms ts p'))
+   case nontrivial ls && nontrivial us && any (== 0) ts of
+     False ->
+       Eliminate x ls us (addTerms ts p')
+     True ->
+       -- If we have c >= x >= c, eliminate x by doing ls >= c, c >= rs
+       let (c:_) = sortBy (comparing (Map.size . vars)) (intersect ls us)
+           ts = [ t - c | t <- us ] ++ [ c - u | u <- ls ] in
+       Eliminate x [c] [c] (addTerms ts p'))
   where
     (ls, us, p') = focus x p
     ts = [ t - u | t <- us, u <- ls ]
+    nontrivial (_:_:_) = True
+    nontrivial _ = False
 
 focus :: Var -> Problem -> ([Term], [Term], Problem)
 focus x p = (ls', us', p' { pos = pos' })
