@@ -209,25 +209,26 @@ foldDelete op e s = Set.foldr op' (e, s) s
 
 solve :: Ord a => Problem a -> Maybe (Map a Rational)
 solve Unsolvable = Nothing
-solve p | Set.null (pos p) = Just (Map.fromList xs)
-  where
-    xs =
-      [ (x, solveBounds (l, u))
-      | x <- Set.toList (pvars p),
-        let l = Map.lookup x (lower p),
-        let u = Map.lookup x (upper p) ]
+solve p | Set.null (pos p) =
+  fmap Map.fromList $
+    forM (Set.toList (pvars p)) $ \x -> do
+      let l = Map.lookup x (lower p)
+          u = Map.lookup x (upper p)
+      a <- solveBounds (l, u)
+      return (x, a)
 solve p = do
   m <- solve p'
-  let a = solveBounds (try maximum (map (eval m) ls),
-                       try minimum (map (eval m) us))
+  let Just a = solveBounds (try maximum (map (eval m) ls),
+                            try minimum (map (eval m) us))
   return (Map.insert x a m)
   where
     Eliminate x ls us p':_ = eliminations p
     try f [] = Nothing
     try f xs = Just (f xs)
 
-solveBounds :: (Maybe Rational, Maybe Rational) -> Rational
-solveBounds (x, y) = fromMaybe 0 (x `mplus` y)
+solveBounds :: (Maybe Rational, Maybe Rational) -> Maybe Rational
+solveBounds (Just x, Just y) | x > y = Nothing
+solveBounds (x, y) = Just (fromMaybe 0 (x `mplus` y))
 
 -- Debugging function
 trace :: Ord a => Problem a -> [Step a]
