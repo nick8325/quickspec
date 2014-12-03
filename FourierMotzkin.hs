@@ -249,11 +249,12 @@ prob5 =
 
 main =
  defaultMain [
-   bench "prob0"  (whnf solve prob0),
-   bench "prob1"  (whnf solve prob1),
-   bench "prob2"  (whnf solve prob2),
-   bench "prob3"  (whnf solve prob3),
-   bench "prob0'" (whnf (solve . problem) cs)]
+   bench "prob0" (whnf solve prob0),
+   bench "prob0 (full)" (whnf (solve . problem) cs),
+   bench "prob1" (whnf solve prob1),
+   bench "prob2" (whnf solve prob2),
+   bench "prob3" (whnf solve prob3),
+   bench "prob5" (whnf solve prob5)]
 
 -- {-# NOINLINE go #-}
 -- go :: (a -> b) -> a -> c -> IO ()
