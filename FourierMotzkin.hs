@@ -279,6 +279,14 @@ cs5 =
 
 prob5 = problem cs5
 
+-- Should be unsatisfiable
+prob6 =
+  problem . concat $ [
+    -1 + x - y - z >== 0,
+    y >== 1,
+    z >== 1,
+    x <== 2 ]
+
 main =
  defaultMain [
    bench "prob0" (whnf solve prob0),
