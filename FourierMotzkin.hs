@@ -250,7 +250,7 @@ y = var (Var 'y')
 z = var (Var 'z')
 w = var (Var 'w')
 
-cs =
+cs0 =
   concat [
     x >== 1,
     y >== 1,
@@ -261,13 +261,14 @@ cs =
     x - z - w - 1 <== -1,
     x + y - z + w + 2 >== 0,
     y - z + w + 1 >== 0 ]
+cs1 = cs0 ++ (x - y <== -1)
+cs2 = cs0 ++ (x - y >== 1)
+cs3 = cs0 ++ (x - y === 1)
 
-prob0 =
-  problem cs
-
-prob1 = problem ((x - y <== -1) ++ cs)
-prob2 = problem ((x - y >== 1) ++ cs)
-prob3 = problem ((x - y === 1) ++ cs)
+prob0 = problem cs0
+prob1 = problem cs1
+prob2 = problem cs2
+prob3 = problem cs3
 
 prob4 =
   addTerms cs' $
@@ -278,21 +279,27 @@ prob4 =
     cs = concat [x + y >== 0, x + 2^*y >== 0]
     cs' = y === 0
 
-prob5 =
-  problem . concat $ [
+cs5 =
+  concat $ [
     x - 3^*y + 2^*z + w === -4,
     2^*x - 6^*y + z + 4^*w === 1,
     -1^*x + 2^*y + 3^*z + 4^*w === 12,
     -1^*y + z + w === 0 ]
 
+prob5 = problem cs5
+
 main =
  defaultMain [
    bench "prob0" (whnf solve prob0),
-   bench "prob0 (full)" (whnf (solve . problem) cs),
    bench "prob1" (whnf solve prob1),
    bench "prob2" (whnf solve prob2),
    bench "prob3" (whnf solve prob3),
-   bench "prob5" (whnf solve prob5)]
+   bench "prob5" (whnf solve prob5),
+   bench "cs0" (whnf (solve . problem) cs0),
+   bench "cs1" (whnf (solve . problem) cs1),
+   bench "cs2" (whnf (solve . problem) cs2),
+   bench "cs3" (whnf (solve . problem) cs3),
+   bench "cs5" (whnf (solve . problem) cs5)]
 
 -- {-# NOINLINE go #-}
 -- go :: (a -> b) -> a -> c -> IO ()
