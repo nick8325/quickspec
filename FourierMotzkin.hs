@@ -185,8 +185,7 @@ y = var (Var 1)
 z = var (Var 2)
 w = var (Var 3)
 
-prob0 =
-  problem $
+cs =
   concat [
     x >== 1,
     y >== 1,
@@ -198,18 +197,24 @@ prob0 =
     x + y - z + w + 2 >== 0,
     y - z + w + 1 >== 0 ]
 
-prob1 = foldr addTerm prob0 (x - y <== -1)
-prob2 = foldr addTerm prob0 (x - y >== 1)
+prob0 =
+  problem cs
+
+prob1 = problem ((x - y <== -1) ++ cs)
+prob2 = problem ((x - y >== 1) ++ cs)
+prob3 = problem ((x - y === 1) ++ cs)
 
 main =
-  defaultMain [
-    bench "prob0" (whnf solve prob0),
-    bench "prob1" (whnf solve prob1),
-    bench "prob2" (whnf solve prob2)]
+ defaultMain [
+   bench "prob0"  (whnf solve prob0),
+   bench "prob1"  (whnf solve prob1),
+   bench "prob2"  (whnf solve prob2),
+   bench "prob3"  (whnf solve prob3),
+   bench "prob0'" (whnf (solve . problem) cs)]
 
 -- {-# NOINLINE go #-}
 -- go :: (a -> b) -> a -> c -> IO ()
 -- go f x _ = f x `seq` return ()
 
 -- main =
---   forM_ [1..100000] (go solve prob0)
+--   forM_ [1..100000] (go (solve . problem) cs)
