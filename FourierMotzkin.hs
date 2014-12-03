@@ -1,3 +1,4 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 import Data.Ratio
 import Data.Map.Strict(Map)
 import qualified Data.Map.Strict as Map
@@ -10,7 +11,7 @@ import Data.Ord
 import Control.Monad
 import Criterion.Main
 
-newtype Var = Var Int deriving (Eq, Ord, Show)
+newtype Var = Var Int deriving (Eq, Ord, Show, Enum)
 
 data Term =
   Term {
@@ -60,7 +61,7 @@ data Problem =
   deriving (Eq, Ord, Show)
 
 problem :: [Term] -> Problem
-problem ts = foldr addTerm (Problem Set.empty Map.empty Map.empty (Set.fromList vs)) ts
+problem ts = addTerms ts (Problem Set.empty Map.empty Map.empty (Set.fromList vs))
   where
     vs = concatMap (Map.keys . vars) ts
 
@@ -70,22 +71,30 @@ t <== u = [u - t]
 t >== u = u <== t
 t === u = (t <== u) ++ (t >== u)
 
+addTerms :: [Term] -> Problem -> Problem
+addTerms _ Unsolvable = Unsolvable
+addTerms ts p = foldr addTerm (addBounds bs p) us
+  where
+    (bs, us) = partition ((== 1) . Map.size . vars) ts
+
 addTerm :: Term -> Problem -> Problem
-addTerm _ Unsolvable = Unsolvable
-addTerm t p =
-  case Map.toList (vars t) of
-    [] | constant t < 0 -> Unsolvable
-    [(x, a)]
-      | a > 0 ->
-        prune p { lower = Map.insertWith max x y (lower p) }
-      | a < 0 ->
-        prune p { upper = Map.insertWith min x y (upper p) }
-      where
-        y = negate (constant t) / a
-    _ | t `Set.member` pos p -> p
-      | redundant p t -> p
-      | otherwise ->
-        p { pos = Set.insert t (Set.filter (not . implies p t) (pos p)) }
+addTerm t p
+  | Map.null (vars t) =
+    if constant t < 0 then Unsolvable else p
+  | t `Set.member` pos p || redundant p t = p
+  | otherwise =
+    p { pos = Set.insert t (Set.filter (not . implies p t) (pos p)) }
+
+addBounds :: [Term] -> Problem -> Problem
+addBounds [] p = p
+addBounds bs p =
+  prune p { lower = Map.unionWith max (lower p) (toBounds ls),
+            upper = Map.unionWith min (upper p) (toBounds us) }
+  where
+    bs' = [ (Map.findMin (vars t), constant t) | t <- bs ]
+    (ls, us) = partition ((> 0) . snd . fst) bs'
+    toBounds = Map.fromList . map toBound
+    toBound ((x, a), b) = (x, negate b / a)
 
 prune :: Problem -> Problem
 prune p =
@@ -135,7 +144,7 @@ eliminate :: Var -> Problem -> (Int, Step)
 eliminate x p =
    -- Number of terms added by the elimination
   (length ls * length us - length ls - length us,
-   Eliminate x ls us (foldr addTerm p' ts))
+   Eliminate x ls us (addTerms ts p'))
   where
     (ls, us, p') = focus x p
     ts = [ t - u | t <- us, u <- ls ]
