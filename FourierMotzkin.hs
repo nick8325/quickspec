@@ -199,6 +199,14 @@ solve p =
     try f [] = Nothing
     try f xs = Just (f xs)
 
+-- Debugging function
+trace :: Problem -> [Step]
+trace p =
+  case eliminations p of
+    [] -> []
+    (s@(Eliminate _ _ _ p'):_) ->
+      s:trace p'
+
 x = var (Var 0)
 y = var (Var 1)
 z = var (Var 2)
