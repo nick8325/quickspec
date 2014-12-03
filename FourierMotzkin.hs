@@ -60,16 +60,23 @@ data Problem =
     pvars  :: Set Var }
   deriving (Eq, Ord, Show)
 
+empty :: Problem
+empty = Problem Set.empty Map.empty Map.empty Set.empty
+
 problem :: [Term] -> Problem
-problem ts = addTerms ts (Problem Set.empty Map.empty Map.empty (Set.fromList vs))
-  where
-    vs = concatMap (Map.keys . vars) ts
+problem ts = addTerms ts (addVars ts empty)
 
 infix 4 ===, <==, >==
 (===), (<==), (>==) :: Term -> Term -> [Term]
 t <== u = [u - t]
 t >== u = u <== t
 t === u = (t <== u) ++ (t >== u)
+
+addVars :: [Term] -> Problem -> Problem
+addVars ts p =
+  p { pvars = Set.union (Set.fromList vs) (pvars p) }
+  where
+    vs = concatMap (Map.keys . vars) ts
 
 addTerms :: [Term] -> Problem -> Problem
 addTerms _ Unsolvable = Unsolvable
