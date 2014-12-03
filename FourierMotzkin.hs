@@ -23,7 +23,7 @@ instance Show a => Show (Term a) where
     | a == 0 = showVars vs
     | otherwise = showRat a ++ " + " ++ showVars vs
     where
-      showVars vs = intercalate " + " [ showRat a ++ show x | (x, a) <- Map.toList vs ]
+      showVars vs = intercalate " + " [ showRat a ++ "*" ++ show x | (x, a) <- Map.toList vs ]
 showRat :: Rational -> String
 showRat a
   | denominator a == 1 = show (numerator a)
