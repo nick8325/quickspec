@@ -1,4 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+module QuickSpec.Pruning.FourierMotzkin where
+
 import Data.Ratio
 import Data.Map.Strict(Map)
 import qualified Data.Map.Strict as Map
@@ -9,7 +11,6 @@ import Data.Maybe
 import Data.List
 import Data.Ord
 import Control.Monad
-import Criterion.Main
 
 data Term a =
   Term {
@@ -237,73 +238,3 @@ trace p | Set.null (pos p) = []
 trace p = s:trace p'
   where
     s@(Eliminate _ _ _ p'):_ = eliminations p
-
-x = var 'x'
-y = var 'y'
-z = var 'z'
-w = var 'w'
-
-cs0 =
-  concat [
-    x >== 1,
-    y >== 1,
-    z >== 1,
-    w >== 1,
-    (-1) ^* x + 1 ^* y <== -1,
-    x + y - w + 1 <== -1,
-    x - z - w - 1 <== -1,
-    x + y - z + w + 2 >== 0,
-    y - z + w + 1 >== 0 ]
-cs1 = cs0 ++ (x - y <== -1)
-cs2 = cs0 ++ (x - y >== 1)
-cs3 = cs0 ++ (x - y === 1)
-
-prob0 = problem cs0
-prob1 = problem cs1
-prob2 = problem cs2
-prob3 = problem cs3
-
-prob4 =
-  addTerms cs' $
-  addTerms cs $
-  empty
-  where
-    cs = concat [x + y >== 0, x + 2^*y >== 0]
-    cs' = y === 0
-
-cs5 =
-  concat $ [
-    x - 3^*y + 2^*z + w === -4,
-    2^*x - 6^*y + z + 4^*w === 1,
-    -1^*x + 2^*y + 3^*z + 4^*w === 12,
-    -1^*y + z + w === 0 ]
-
-prob5 = problem cs5
-
--- Should be unsatisfiable
-prob6 =
-  problem . concat $ [
-    -1 + x - y - z >== 0,
-    y >== 1,
-    z >== 1,
-    x <== 2 ]
-
-main =
- defaultMain [
-   bench "prob0" (whnf solve prob0),
-   bench "prob1" (whnf solve prob1),
-   bench "prob2" (whnf solve prob2),
-   bench "prob3" (whnf solve prob3),
-   bench "prob5" (whnf solve prob5),
-   bench "cs0" (whnf (solve . problem) cs0),
-   bench "cs1" (whnf (solve . problem) cs1),
-   bench "cs2" (whnf (solve . problem) cs2),
-   bench "cs3" (whnf (solve . problem) cs3),
-   bench "cs5" (whnf (solve . problem) cs5)]
-
--- {-# NOINLINE go #-}
--- go :: (a -> b) -> a -> c -> IO ()
--- go f x _ = f x `seq` return ()
-
--- main =
---   forM_ [1..100000] (go (solve . problem) cs)
