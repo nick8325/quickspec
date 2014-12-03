@@ -141,13 +141,6 @@ implies :: Problem -> Term -> Term -> Bool
 -- <=>
 -- (c1-a1)x1+...+(cn-an)x2 + d - b >= 0
 implies p t u = trivial p (u - t)
--- Note: if t implies u and u implies t then t is syntactically equal to u:
--- If t implies u then:
---    minValue (u - t) >= 0
--- => maxValue (t - u) <= 0
--- => minValue (t - u) <= 0
--- If u also implies t than minValue (t - u) >= 0
--- so minValue (t - u) = maxValue (t - u) = 0 so t - u = 0.
 
 trivial :: Problem -> Term -> Bool
 trivial p t =
