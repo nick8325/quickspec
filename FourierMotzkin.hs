@@ -232,6 +232,13 @@ prob4 =
     cs = concat [x + y >== 0, x + 2^*y >== 0]
     cs' = y === 0
 
+prob5 =
+  problem . concat $ [
+    x - 3^*y + 2^*z + w === -4,
+    2^*x - 6^*y + z + 4^*w === 1,
+    -1^*x + 2^*y + 3^*z + 4^*w === 12,
+    -1^*y + z + w === 0 ]
+
 main =
  defaultMain [
    bench "prob0"  (whnf solve prob0),
