@@ -88,13 +88,16 @@ addTerm t p
 addBounds :: [Term] -> Problem -> Problem
 addBounds [] p = p
 addBounds bs p =
-  prune p { lower = Map.unionWith max (lower p) (toBounds ls),
-            upper = Map.unionWith min (upper p) (toBounds us) }
+  prune p { lower = Map.unionWith max (lower p) lower',
+            upper = Map.unionWith min (upper p) upper' }
   where
-    bs' = [ (Map.findMin (vars t), constant t) | t <- bs ]
-    (ls, us) = partition ((> 0) . snd . fst) bs'
-    toBounds = Map.fromList . map toBound
-    toBound ((x, a), b) = (x, negate b / a)
+    (lower', upper') = foldr op (Map.empty, Map.empty) bs
+    op t (l, u)
+      | a > 0 = (Map.insertWith max x b l, u)
+      | a < 0 = (l, Map.insertWith min x b u)
+      where
+        (x, a) = Map.findMin (vars t)
+        b = negate (constant t) / a
 
 prune :: Problem -> Problem
 prune p =
