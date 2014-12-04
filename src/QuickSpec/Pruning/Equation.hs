@@ -34,7 +34,12 @@ unorient :: Rule f v -> Equation f v
 unorient (Rule l r) = l :==: r
 
 orient :: (Sized f, Ord f, Ord v, Numbered v) => Equation f v -> [Constrained (Rule f v)]
-orient (l :==: r) = rule l r ++ concat [rule r l | not (l `isVariantOf` r)]
+orient (l :==: r) =
+  case orientTerms l r of
+    Just LT -> [unconstrained (Rule r l)]
+    Just GT -> [unconstrained (Rule l r)]
+    Just EQ -> []
+    Nothing -> rule l r ++ concat [rule r l | not (l `isVariantOf` r)]
   where
     rule l r = add (Less r l) (unconstrained (Rule l r))
 
