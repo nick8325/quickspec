@@ -4,6 +4,7 @@ import QuickSpec.Pruning
 import qualified QuickSpec.Pruning.KBC as KBC
 import QuickSpec.Pruning.Equation
 import QuickSpec.Pruning.Constraints
+import QuickSpec.Base
 import QuickSpec.Prop
 import QuickSpec.Term
 import QuickSpec.Signature
@@ -38,9 +39,12 @@ localKBC m = do
 newAxiom :: Monad m => PropOf PruningTerm -> StateT Completion m ()
 newAxiom ([] :=>: (t :=: u)) = do
   liftKBC $ do
-    KBC.newEquation (unconstrained (t :==: u))
-    res <- KBC.complete
-    when res KBC.unpause
+    norm <- KBC.normaliser
+    unless (norm emptyContext t == norm emptyContext u) $ do
+      --Debug.Trace.traceM ("add " ++ prettyShow (t :==: u))
+      KBC.newEquation (unconstrained (t :==: u))
+      res <- KBC.complete
+      when res KBC.unpause
 
 findRep :: Monad m => [PropOf PruningTerm] -> PruningTerm -> StateT Completion m (Maybe PruningTerm)
 findRep axioms t =

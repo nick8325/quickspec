@@ -1,6 +1,8 @@
 High-priority
 -------------
 
+Look into constraining rewrite rules so that the constraint is l >= r instead of l > r? This would mean that irrelevant variable laws like f x -> f a would become unconditional. Might reduce amount of case splitting too.
+
 Simplify size expressions a bit more (e.g.: take out common factors, make sure that constant is always >= 0 by flipping sign)
 Re-add disjunctions to constraint language (but use splitting for unification)
 

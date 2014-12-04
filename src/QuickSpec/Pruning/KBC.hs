@@ -132,7 +132,7 @@ unpause ::
 unpause = do
   paused  <- gets paused
   rules   <- gets rules
-  let resumable eq = not (null (caseSplit rules eq))
+  let resumable eq = not (null (concatMap (caseSplit rules) (split eq)))
       (resumed, paused') = Set.partition resumable paused
   when (not (Set.null resumed)) $ do
     traceM (Unpausing :: Event Constant Variable)
@@ -153,18 +153,22 @@ increaseSize n = do
 newEquation ::
   (PrettyTerm f, Pretty v, Monad m, Sized f, Ord f, Ord v, Numbered v) =>
   Constrained (Equation f v) -> StateT (KBC f v) m ()
-newEquation eqn = queueCPs noLabel [unlabelled eqn]
+newEquation eqn = queueCPs noLabel (map unlabelled (split eqn))
 
 queueCPs ::
   (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
   Label -> [Labelled (Constrained (Equation f v))] -> StateT (KBC f v) m ()
 queueCPs l eqns = do
   norm <- normaliser
+  n    <- gets maxSize
   let cps = catMaybes (map (moveLabel . fmap (toCP norm)) eqns)
-  enqueueM l cps
+      p (Labelled _ (CP m _)) = m <= fromIntegral n
+      (cps1, cps2) = partition p cps
+  enqueueM l cps1
+  sequence_ [ pause eq | Labelled _ (CP _ eq) <- cps2 ]
 
 toCP ::
-  (Sized f, Ord f, Ord v, Numbered v) =>
+  (Sized f, Ord f, Ord v, Numbered v, PrettyTerm f, Pretty v) =>
   (Context f v -> Tm f v -> Tm f v) ->
   Constrained (Equation f v) -> Maybe (CP f v)
 toCP norm (Constrained ctx (l :==: r)) = do
@@ -299,7 +303,7 @@ canonicaliseBoth (x, y) = (x', substf (Var . increase) y')
     n  = maximum (0:map (succ . number) (vars x'))
     increase v = withNumber (n+number v) v
 
-criticalPairs :: (Sized f, Ord f, Ord v, Numbered v) => Constrained (Rule f v) -> Constrained (Rule f v) -> [Constrained (Equation f v)]
+criticalPairs :: (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) => Constrained (Rule f v) -> Constrained (Rule f v) -> [Constrained (Equation f v)]
 criticalPairs r1 r2 = do
   let (Constrained ctx1 r1', Constrained ctx2 r2') = canonicaliseBoth (r1, r2)
   cp <- CP.cps [r1'] [r2']
