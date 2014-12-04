@@ -6,7 +6,8 @@ import QuickSpec.Term
 import QuickSpec.Utils
 import Data.Ord
 import Control.Monad
-import Data.Rewriting.Rule
+import Data.Rewriting.Rule hiding (isVariantOf)
+import QuickSpec.Pruning.Constraints
 import Data.Maybe
 import Data.Monoid
 import Data.Set(Set)
@@ -32,12 +33,15 @@ order (l :==: r)
 unorient :: Rule f v -> Equation f v
 unorient (Rule l r) = l :==: r
 
-orient :: (Sized f, Ord f, Ord v, Numbered v) => Equation f v -> Maybe (Rule f v)
+orient :: (Sized f, Ord f, Ord v, Numbered v) => Equation f v -> [Constrained (Rule f v)]
 orient (l :==: r) =
   case orientTerms l r of
-    Just GT -> Just (Rule l r)
-    Just LT -> Just (Rule r l)
-    _       -> Nothing
+    Just GT -> [unconstrained (Rule l r)]
+    Just LT -> [unconstrained (Rule r l)]
+    Just EQ -> []
+    Nothing -> rule l r ++ concat [rule r l | not (l `isVariantOf` r)]
+  where
+    rule l r = add (Less r l) (unconstrained (Rule l r))
 
 bothSides :: (Tm f v -> Tm f v) -> Equation f v -> Equation f v
 bothSides f (t :==: u) = f t :==: f u

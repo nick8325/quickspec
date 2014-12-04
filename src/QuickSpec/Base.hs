@@ -34,6 +34,7 @@ import qualified Data.Rewriting.CriticalPair as CP
 import QuickSpec.Utils
 import Data.List
 import Data.Rewriting.Rule hiding (varsDL, funsDL, vars, funs)
+import Data.Rewriting.Rule(Rule(..))
 
 -- Renamings of functionality from term-rewriting.
 type Tm = T.Term
@@ -78,11 +79,17 @@ instance Symbolic (Tm f v) where
   substf sub = foldTerm sub Fun
   term = id
 
+instance Symbolic (Rule f v) where
+  type ConstantOf (Rule f v) = f
+  type VariableOf (Rule f v) = v
+  termsDL (Rule l r) = return l `mplus` return r
+  substf sub (Rule l r) = Rule (substf sub l) (substf sub r)
+
 instance (ConstantOf a ~ ConstantOf b,
           VariableOf a ~ VariableOf b,
           Symbolic a, Symbolic b) => Symbolic (a, b) where
   type ConstantOf (a, b) = ConstantOf a
-  type VariableOf (a, b) = VariableOf b
+  type VariableOf (a, b) = VariableOf a
   termsDL (x, y) = termsDL x `mplus` termsDL y
   substf sub (x, y) = (substf sub x, substf sub y)
 
@@ -151,6 +158,10 @@ instance (PrettyTerm f, Pretty v) => Pretty (Tm f v) where
   prettyPrec p (Fun f xs) =
     prettyStyle (termStyle f) p (pretty f) xs
 
+instance (PrettyTerm f, Pretty v) => Pretty (Rule f v) where
+  pretty (Rule l r) =
+    hang (pretty l <+> text "->") 2 (pretty r)
+
 prettyStyle Curried p d [] = d
 prettyStyle Curried p d xs =
   prettyParen (p > 10) $
@@ -201,13 +212,3 @@ prettyStyle style p d xs =
       case style of
         Infixr pOp -> (0, pOp)
         Infix  pOp -> (1, pOp)
-
-instance Symbolic (Rule f v) where
-  type ConstantOf (Rule f v) = f
-  type VariableOf (Rule f v) = v
-  termsDL (Rule lhs rhs) = return lhs `mplus` return rhs
-  substf sub (Rule lhs rhs) = Rule (substf sub lhs) (substf sub rhs)
-
-instance (PrettyTerm f, Pretty v) => Pretty (Rule f v) where
-  pretty (Rule lhs rhs) =
-    sep [pretty lhs <+> text "->", nest 2 (pretty rhs)]

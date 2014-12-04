@@ -2,11 +2,10 @@ module QuickSpec.Pruning.Rewrite where
 
 import QuickSpec.Base
 import QuickSpec.Term
-import qualified QuickSpec.Pruning.RuleIndex as RuleIndex
-import QuickSpec.Pruning.RuleIndex(RuleIndex)
-import qualified QuickSpec.Pruning.EquationIndex as EquationIndex
-import QuickSpec.Pruning.EquationIndex(EquationIndex)
 import QuickSpec.Pruning.Equation
+import QuickSpec.Pruning.Constraints
+import qualified QuickSpec.Pruning.Index as Index
+import QuickSpec.Pruning.Index(Index)
 import Data.Maybe
 import Data.Set(Set)
 import QuickSpec.Pruning.Queue
@@ -20,7 +19,7 @@ normaliseWith :: Strategy f v -> Tm f v -> Tm f v
 normaliseWith strat t =
   case strat t of
     [] -> t
-    (r:_) -> normaliseWith strat r
+    (u:_) -> normaliseWith strat u
 
 anywhere :: Strategy f v -> Strategy f v
 anywhere strat t = strat t ++ nested (anywhere strat) t
@@ -36,22 +35,16 @@ nested strat (Fun f xs) = map (Fun f) (combine xs (map strat xs))
 ordered :: (Sized f, Ord f, Ord v) => Strategy f v -> Strategy f v
 ordered strat t = [u | u <- strat t, u `simplerThan` t]
 
-tryRule :: (Ord f, Ord v, Numbered v) => Rule f v -> Strategy f v
-tryRule rule t = do
-  sub <- maybeToList (match (lhs rule) t)
-  let rule' = substf (evalSubst sub) rule
-  return (rhs rule')
+tryRule :: (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) => Context f v -> Constrained (Rule f v) -> Strategy f v
+tryRule ctx rule t = do
+  sub <- maybeToList (match (lhs (constrained rule)) t)
+  rule' <- split (substf (evalSubst sub) rule)
+  guard (implies ctx (context rule'))
+  return (rhs (constrained rule'))
 
-tryRules :: (Ord f, Ord v, Numbered v) => RuleIndex f v -> Strategy f v
-tryRules rules t = map (rhs . peel) (RuleIndex.lookup t rules)
-
-tryEquations :: (Ord f, Ord v, Numbered v) => EquationIndex f v -> Strategy f v
-tryEquations eqns t = map (eqRhs . peel) (EquationIndex.lookup t eqns)
-  where
-    eqRhs (_ :==: r) = r
-
-insertWithSubsumptionCheck ::
-  (Ord f, Ord v, Numbered v) => Label -> Equation f v -> EquationIndex f v -> Maybe (EquationIndex f v)
-insertWithSubsumptionCheck label (l :==: r) idx
-  | r `elem` anywhere (tryEquations idx) l = Nothing
-  | otherwise = Just (EquationIndex.insert label (l :==: r) idx)
+tryRules :: (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) => Context f v -> Index (Labelled (Constrained (Rule f v))) -> Strategy f v
+tryRules ctx rules t = do
+  rule <- map peel (Index.lookup t rules) >>= split
+  guard (lhs (constrained rule) == t && implies ctx (context rule))
+  --traceM (prettyShow rule ++ " in context " ++ prettyShow ctx)
+  return (rhs (constrained rule))
