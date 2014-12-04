@@ -13,7 +13,7 @@ newtype SimplePruner = S [PropOf PruningTerm]
 instance Pruner SimplePruner where
   emptyPruner _ = S []
   untypedAxiom  = simpleUnify
-  untypedRep _  = simpleRep
+  untypedRep    = simpleRep
 
 modifyS f = modify (\(S x) -> S (f x))
 

@@ -24,16 +24,14 @@ import Data.Ord
 
 class Pruner s where
   emptyPruner   :: Signature -> s
-  untypedRep    :: Monad m => Strength -> [PropOf PruningTerm] -> PruningTerm -> StateT s m (Maybe PruningTerm)
+  untypedRep    :: Monad m => [PropOf PruningTerm] -> PruningTerm -> StateT s m (Maybe PruningTerm)
   untypedAxiom  :: Monad m => PropOf PruningTerm -> StateT s m ()
   pruningReport :: s -> String
   pruningReport _ = ""
 
-data Strength = Easy | Hard
-
 instance Pruner [PropOf PruningTerm] where
   emptyPruner _     = []
-  untypedRep _ _ _  = return Nothing
+  untypedRep _ _    = return Nothing
   untypedAxiom prop = modify (prop:)
 
 newtype PrunerT s m a =
@@ -151,11 +149,11 @@ constrain :: [Type] -> Term -> [Map TyVar Type]
 constrain univ t =
   usort [ toMap sub | u <- univ, Just sub <- [match (typ t) u] ]
 
-rep :: (Pruner s, Monad m) => Strength -> Term -> PrunerT s m (Maybe Term)
-rep strength t = liftM (liftM fromPruningTerm) $ do
+rep :: (Pruner s, Monad m) => Term -> PrunerT s m (Maybe Term)
+rep t = liftM (liftM fromPruningTerm) $ do
   let u = toGoalTerm t
   sequence_ [ PrunerT (generate fun) | fun <- usort (funs u) ]
-  liftPruner (untypedRep strength [] u)
+  liftPruner (untypedRep [] u)
 
 type PruningTerm = Tm PruningConstant PruningVariable
 

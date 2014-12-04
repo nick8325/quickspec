@@ -304,12 +304,16 @@ class (Eq a, Typed a) => Considerable a where
 consider :: Considerable a => Signature -> (KindOf a -> Event) -> a -> M ()
 consider sig makeEvent x = do
   let t = generalise x
-  res   <- lift (lift (rep Easy t))
+  res   <- lift (lift (rep t))
   terms <- lift (gets terms)
   case res of
     Just u | Measure u >= Measure t -> error (prettyShow t ++ " -> " ++ prettyShow u)
     Just u | (u `Set.member` terms || size u < size t) -> return ()
     _ -> do
+      case res of
+        Just u ->
+          liftIO (putStrLn ("Ignoring reduction " ++ prettyShow t ++ " -> " ++ prettyShow u))
+        _ -> return ()
       ts <- getTestSet x
       res <-
         liftIO . testTimeout_ sig $
@@ -317,16 +321,7 @@ consider sig makeEvent x = do
           Nothing -> return $ do
             generate (makeEvent Untestable)
           Just (Old y) -> return $ do
-            res <- lift (lift (rep Hard t))
-            case res of
-              Just u | Measure u < Measure t && (u `Set.member` terms || size u < size t) ->
-                lift (lift (axiom ([] :=>: t :=: u)))
-              _ -> do
-                case res of
-                  Just u ->
-                    liftIO (putStrLn ("Ignoring reduction " ++ prettyShow t ++ " -> " ++ prettyShow u))
-                  _ -> return ()
-                generate (makeEvent (EqualTo y))
+            generate (makeEvent (EqualTo y))
           Just (New ts) -> return $ do
             putTestSet x ts
             generate (makeEvent Representative)

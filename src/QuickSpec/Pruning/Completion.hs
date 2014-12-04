@@ -71,6 +71,6 @@ findRep axioms t =
 
 instance Pruner Completion where
   emptyPruner sig = initialState (maxTermSize_ sig)
-  untypedRep _    = findRep
+  untypedRep      = findRep
   untypedAxiom    = newAxiom
   pruningReport   = KBC.report . kbc
