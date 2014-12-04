@@ -159,7 +159,7 @@ addNegatedLiteral (SizeIs RLT s) x = add (Literal (SizeIs RGE s)) x
 addNegatedLiteral (SizeIs REQ s) x =
   concat [
     add (Literal (SizeIs RLT s)) x,
-    add (Literal (SizeIs RGE (s `plus` constSize 1))) x]
+    add (Literal (SizeIs RGE (s `plus` constSize (-1)))) x]
 addNegatedLiteral (StructLess t u) x =
   concat [
     add (Literal (StructLess u t)) x,
@@ -301,7 +301,9 @@ implies ctx (Context ls _) =
     implies1 l | tautological l = True
     implies1 l =
       null (addNegatedLiteral l (Constrained ctx (Fun __ [])))
-    unsat p = isNothing (solve (problem (p ++ encodeContext ctx)))
+    unsat p = isNothing (solve' (problem (p ++ encodeContext ctx)))
+    --solve' p = traceShow p (traceShowId (solve p))
+    solve' = solve
 
 minSize :: (Sized f, Numbered v, Ord v) => Tm f v -> Context f v -> Integer
 minSize t ctx =
