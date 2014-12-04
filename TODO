@@ -1,6 +1,9 @@
 High-priority
 -------------
 
+Simplify size expressions a bit more (e.g.: take out common factors, make sure that constant is always >= 0 by flipping sign)
+Re-add disjunctions to constraint language (but use splitting for unification)
+
 Make sure that pruningTerm t < pruningTerm u <==> t < u!
 Possible fix: add type axioms for Skolem constants.
 
