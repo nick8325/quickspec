@@ -214,7 +214,7 @@ bestCaseSplit ::
   (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) =>
   Index (Labelled (Constrained (Rule f v))) -> Constrained (Equation f v) -> Maybe [Constrained (Equation f v)]
 bestCaseSplit rules eq =
-  listToMaybe (sortBy' goodness (caseSplit rules eq))
+  listToMaybe (sortBy' goodness (filter p (caseSplit rules eq)))
   where
     goodness eqs@(Constrained ctx (l :==: r):_) =
       (length eqs, l' `max` r', l', r')
@@ -222,6 +222,7 @@ bestCaseSplit rules eq =
         norm = normaliseWith (anywhere (tryRules ctx rules))
         l' = Measure (norm l)
         r' = Measure (norm r)
+    p eqs = eq `notElem` eqs
 
 caseSplit ::
   (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) =>
@@ -232,7 +233,6 @@ caseSplit rules (Constrained ctx eq@(l :==: r)) = usort $ do
   traceM (ConsiderCaseSplit (Constrained ctx eq) ctx')
   let pos = split (Constrained (contextUnion ctx ctx') eq)
       neg = addNegation ctx' (Constrained ctx eq)
-  Debug.Trace.traceShowM (length pos)
   guard (pos /= [])
   return (usort (map canonicalise (pos ++ neg)) >>= split)
 

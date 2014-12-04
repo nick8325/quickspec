@@ -12,8 +12,8 @@ import qualified Data.Map.Strict as Map
 import Data.Map.Strict(Map)
 import Data.List
 import Data.Maybe
-import Data.Integer.SAT hiding (Var)
-import qualified Data.Integer.SAT as SAT
+import QuickSpec.Pruning.FourierMotzkin hiding (Term(..), trace)
+import qualified QuickSpec.Pruning.FourierMotzkin as FM
 import qualified Data.DList as DList
 import Control.Monad
 import Data.Ord
@@ -36,6 +36,8 @@ t = Fun (F "sx") []
 u = Fun Ty [t]
 r1 = add (Less u t) (unconstrained (Rule t u))
 r2 = add (Less t u) (unconstrained (Rule u t))
+
+type T = FM.Term Int
 
 data Constrained a =
   Constrained {
@@ -97,25 +99,17 @@ data Literal f v =
     SizeIs Rel (Size v)
   | StructLess (Tm f v) (Tm f v)
   deriving (Eq, Ord, Show)
-data Rel = REQ | RNE | RLT | RGE deriving (Eq, Ord, Show)
+data Rel = REQ | RLT | RGE deriving (Eq, Ord, Show)
 
 instance Pretty Rel where
   pretty REQ = text "="
-  pretty RNE = text "/="
   pretty RLT = text "<"
   pretty RGE = text ">="
 
-evalRel :: Rel -> Expr -> Expr -> Prop
-evalRel REQ = (:==)
-evalRel RNE = (:/=)
-evalRel RLT = (:<)
-evalRel RGE = (:>=)
-
-negateRel :: Rel -> Rel
-negateRel REQ = RNE
-negateRel RNE = REQ
-negateRel RLT = RGE
-negateRel RGE = RLT
+evalRel :: Rel -> T -> T -> [T]
+evalRel REQ t u = t === u
+evalRel RLT t u = t + 1 <== u
+evalRel RGE t u = t >== u
 
 instance (PrettyTerm f, Pretty v) => Pretty (Literal f v) where
   pretty (SizeIs rel s) = pretty s <+> pretty rel <+> text "0"
@@ -160,7 +154,12 @@ addNegation :: (Symbolic a, Sized (ConstantOf a), Ord (ConstantOf a), Ord (Varia
 addNegation (Context ls _) x = concatMap (flip addNegatedLiteral x) (Set.toList ls)
 
 addNegatedLiteral :: (Symbolic a, Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Numbered (VariableOf a)) => LiteralOf a -> Constrained a -> [Constrained a]
-addNegatedLiteral (SizeIs op s) x = add (Literal (SizeIs (negateRel op) s)) x
+addNegatedLiteral (SizeIs RGE s) x = add (Literal (SizeIs RLT s)) x
+addNegatedLiteral (SizeIs RLT s) x = add (Literal (SizeIs RGE s)) x
+addNegatedLiteral (SizeIs REQ s) x =
+  concat [
+    add (Literal (SizeIs RLT s)) x,
+    add (Literal (SizeIs RGE (s `plus` constSize 1))) x]
 addNegatedLiteral (StructLess t u) x =
   concat [
     add (Literal (StructLess u t)) x,
@@ -209,8 +208,13 @@ addConstraintWith c (Constrained ctx x) y = do
   return (Constrained ctx' x', y')
 
 tautological :: (Sized f, Ord f, Ord v, Numbered v) => Literal f v -> Bool
-tautological (SizeIs op sz)
-  | isNothing (checkSat (assert (sizeAxioms sz :&& Not (evalRel op (encodeSize sz) (K 0))) noProps)) = True
+tautological (SizeIs RLT sz)
+  | isNothing (solve (problem (sizeAxioms sz ++ evalRel RGE (encodeSize sz) 0))) = True
+tautological (SizeIs RGE sz)
+  | isNothing (solve (problem (sizeAxioms sz ++ evalRel RLT (encodeSize sz) 0))) = True
+tautological (SizeIs REQ sz)
+  | isNothing (solve (problem (sizeAxioms sz ++ evalRel RLT (encodeSize sz) 0))) &&
+    isNothing (solve (problem (sizeAxioms sz ++ evalRel RGE (encodeSize sz) 1))) = True
 tautological (StructLess t u) | t `simplerThan` u = True
 tautological (StructLess (Fun f xs) (Fun g ys))
   | measureFunction f (length xs) < measureFunction g (length ys) = True
@@ -221,6 +225,7 @@ addLiteral l x | tautological l = return x
 addLiteral l x | l `Set.member` literals (context x) = return x
 addLiteral l@SizeIs{} c = addBaseLiteral l c
 addLiteral l@(StructLess (Fun f _) (Fun g _)) c | f /= g = mzero
+addLiteral (StructLess t (Var x)) c | x `elem` vars t = mzero
 addLiteral (StructLess (Fun _ xs) (Fun _ ys)) c =
   argsLess xs ys c
 addLiteral l@(StructLess t u) c =
@@ -268,22 +273,17 @@ argsLess (x:xs) (y:ys) c =
 
 satisfiable :: (Sized (ConstantOf a), Numbered (VariableOf a), Ord (VariableOf a)) => Constrained a -> Bool
 satisfiable (Constrained ctx _) =
-  traceShow (encodeContext ctx) $
-  traceShowId (isJust (checkSat (assert (encodeContext ctx) noProps)))
+  isJust (solve (problem (encodeContext ctx)))
 
-encodeContext :: (Ord v, Sized f, Numbered v) => Context f v -> Prop
+encodeContext :: (Ord v, Sized f, Numbered v) => Context f v -> [T]
 encodeContext (Context ls False) =
-  foldr (:&&) PTrue ps
-  where
-    ps =
-      [ sizeVar x :> K 0 | x <- usort (vars (Set.toList ls)) ] ++
-      map encodeLiteral (Set.toList ls)
+  concat [ sizeVar x >== 1 | x <- usort (vars (Set.toList ls)) ] ++
+  concatMap encodeLiteral (Set.toList ls)
 encodeContext (Context _ True) = ERROR "must call split after substituting into a constraint"
 
-encodeLiteral :: (Sized f, Numbered v) => Literal f v -> Prop
-encodeLiteral (SizeIs op sz)  = evalRel op (encodeSize sz) (K 0)
-encodeLiteral (StructLess (Var x) (Var y)) = structVar x :< structVar y
-encodeLiteral StructLess{} = PTrue
+encodeLiteral :: (Sized f, Numbered v) => Literal f v -> [T]
+encodeLiteral (SizeIs op sz)  = evalRel op (encodeSize sz) 0
+encodeLiteral StructLess{} = []
 
 splitConstraint :: (Symbolic a, Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Numbered (VariableOf a)) => Constrained a -> M (Constrained a)
 splitConstraint c@(Constrained (Context _ False) _) = return c
@@ -293,26 +293,31 @@ implies :: (Sized f, Numbered v, Ord f, Ord v) => Context f v -> Context f v -> 
 implies ctx (Context ls _) =
   all implies1 (Set.toList ls)
   where
-    implies1 (SizeIs op sz) = unsat (sizeAxioms sz :&& Not (evalRel op (encodeSize sz) (K 0)))
+    implies1 (SizeIs REQ sz) =
+      unsat (sizeAxioms sz ++ evalRel RGE (encodeSize sz) 1) &&
+      unsat (sizeAxioms sz ++ evalRel RLT (encodeSize sz) 0)
+    implies1 (SizeIs RGE sz) = unsat (sizeAxioms sz ++ evalRel RLT (encodeSize sz) 0)
+    implies1 (SizeIs RLT sz) = unsat (sizeAxioms sz ++ evalRel RGE (encodeSize sz) 0)
     implies1 l | tautological l = True
     implies1 l =
       null (addNegatedLiteral l (Constrained ctx (Fun __ [])))
-    unsat p = traceShow p $ traceShow (encodeContext ctx) $ traceShowId (isNothing (checkSat (assert p ps)))
-    ps = assert (encodeContext ctx) noProps
+    unsat p = isNothing (solve (problem (p ++ encodeContext ctx)))
 
 minSize :: (Sized f, Numbered v, Ord v) => Tm f v -> Context f v -> Integer
 minSize t ctx =
-  loop (sizeIn (fromMaybe __ (checkSat prob)))
+  loop (sizeIn (fromMaybe __ (solve prob)))
   where
-    p    = sizeAxioms sz :&& encodeSize sz :== resultVar
+    p    = sizeAxioms sz ++ (encodeSize sz === resultVar)
     sz   = termSize t
-    prob = assert (encodeContext ctx :&& p) noProps
-    sizeIn m = fromMaybe __ (lookup resultNum m)
+    prob = problem (encodeContext ctx ++ p)
+    sizeIn m = ceiling (Map.findWithDefault __ resultNum m)
     loop n | n < 0 = __
     loop n =
-      case checkSat (assert (resultVar :< K n) prob) of
+      case solve' (addTerms (resultVar <== fromIntegral (n-1)) prob) of
         Nothing -> n
         Just m -> loop (sizeIn m)
+    --solve' p = traceShow p (traceShowId (solve p))
+    solve' p = solve p
 
 -- Symbolic sizes of terms.
 data Size a =
@@ -341,14 +346,14 @@ substSize f (Size c x) =
 evalSize :: (a -> Integer) -> Size a -> Integer
 evalSize f (Size c x) = x + sum [ k * f v | (v, k) <- Map.toList c ]
 
-encodeSize :: Numbered v => Size v -> Expr
+encodeSize :: Numbered v => Size v -> T
 encodeSize (Size c x) =
-  foldr (:+) (K x)
-    [k :* sizeVar v | (v, k) <- Map.toList c]
+  foldr (+) (fromIntegral x)
+    [fromIntegral k ^* sizeVar v | (v, k) <- Map.toList c]
 
-sizeAxioms :: Numbered v => Size v -> Prop
+sizeAxioms :: Numbered v => Size v -> [T]
 sizeAxioms (Size c _) =
-  foldr (:&&) PTrue [ sizeVar v :> K 0 | v <- Map.keys c ]
+  concat [ sizeVar v >== 1 | v <- Map.keys c ]
 
 termSize :: (Sized f, Ord v) => Tm f v -> Size v
 termSize = foldTerm var fun
@@ -370,15 +375,14 @@ minus :: Ord a => Size a -> Size a -> Size a
 s `minus` s' = s `plus` times (-1) s'
 
 -- Variable assignments for Presburger problem.
-sizeVar, structVar :: Numbered v => v -> Expr
-sizeVar x = SAT.Var (toName (sizeNum x))
-structVar x = SAT.Var (toName (number x*3+2))
+sizeVar :: Numbered v => v -> T
+sizeVar x = var (sizeNum x)
 
 sizeNum :: Numbered v => v -> Int
-sizeNum x = number x*3+1
+sizeNum x = number x*2+1
 
 resultNum :: Int
 resultNum = 0
 
-resultVar :: Expr
-resultVar = SAT.Var (toName resultNum)
+resultVar :: T
+resultVar = var resultNum
