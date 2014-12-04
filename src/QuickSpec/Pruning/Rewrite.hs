@@ -19,7 +19,7 @@ normaliseWith :: Strategy f v -> Tm f v -> Tm f v
 normaliseWith strat t =
   case strat t of
     [] -> t
-    (r:_) -> normaliseWith strat r
+    (u:_) -> normaliseWith strat u
 
 anywhere :: Strategy f v -> Strategy f v
 anywhere strat t = strat t ++ nested (anywhere strat) t
