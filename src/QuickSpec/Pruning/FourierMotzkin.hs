@@ -106,6 +106,7 @@ addDerivedTerms ts p = foldr addTerm (addBounds bs p) us
     (bs, us) = partition ((== 1) . Map.size . vars) ts
 
 addTerm :: Ord a => Term a -> Problem a -> Problem a
+addTerm _ Unsolvable = Unsolvable
 addTerm t p
   | Map.null (vars t) =
     if constant t < 0 then Unsolvable else p
