@@ -45,6 +45,6 @@ tryRule ctx rule t = do
 tryRules :: (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) => Context f v -> Index (Labelled (Constrained (Rule f v))) -> Strategy f v
 tryRules ctx rules t = do
   rule <- map peel (Index.lookup t rules) >>= split
-  guard (implies ctx (context rule))
+  guard (lhs (constrained rule) == t && implies ctx (context rule))
   --traceM (prettyShow rule ++ " in context " ++ prettyShow ctx)
   return (rhs (constrained rule))
