@@ -17,8 +17,6 @@ import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Class
 import Control.Monad
 import qualified Data.Set as Set
-import qualified QuickSpec.Pruning.RuleIndex as RuleIndex
-import qualified QuickSpec.Pruning.EquationIndex as EquationIndex
 import qualified Data.Rewriting.Rule as Rule
 import Data.Maybe
 
