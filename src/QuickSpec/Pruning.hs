@@ -183,10 +183,6 @@ instance Sized PruningConstant where
   funSize (TermConstant c _ _) = funSize c
   funSize (SkolemVariable _) = 1
   funSize (HasType _) = 0
-  schematise (SkolemVariable x) = SkolemVariable (Variable 0 ty)
-    where
-      ty = typeOf (undefined :: A)
-  schematise x = x
 
 newtype PruningVariable = PruningVariable Int deriving (Eq, Ord, Num, Enum, Show, Numbered)
 

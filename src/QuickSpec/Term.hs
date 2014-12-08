@@ -28,35 +28,29 @@ type Schema = TermOf Hole
 
 class Sized a where
   funSize :: a -> Int
-  -- Map all Skolem constants to the same constant.
-  schematise :: a -> a
-  schematise = id
 
--- Term ordering.
+-- Term ordering - size, skeleton, generality.
 -- Satisfies the property:
--- if Measure (schema t) < Measure (schema u) then Measure t < Measure u.
-newtype Measure f v = Measure (Tm f v)
-instance (Sized f, Ord f, Ord v) => Eq (Measure f v) where
+-- if measure (schema t) < measure (schema u) then t < u.
+type Measure f v = (Int, Int, MeasureFuns f (), Int, [v])
+measure :: (Sized f, Ord f, Ord v) => Tm f v -> Measure f v
+measure t = (size t, -length (vars t),
+             MeasureFuns (rename (const ()) t), -length (usort (vars t)), vars t)
+
+newtype MeasureFuns f v = MeasureFuns (Tm f v)
+instance (Sized f, Ord f, Ord v) => Eq (MeasureFuns f v) where
   t == u = compare t u == EQ
-instance (Sized f, Ord f, Ord v) => Ord (Measure f v) where
-  compare (Measure t) (Measure u) =
-    compareSchema t u `orElse` compareRest t u
+instance (Sized f, Ord f, Ord v) => Ord (MeasureFuns f v) where
+  compare (MeasureFuns t) (MeasureFuns u) = compareFuns t u
 
-compareSchema :: (Sized f, Ord f) => Tm f v -> Tm f v -> Ordering
-compareSchema t u =
-  case compareTerms (toSchema t) (toSchema u) of
-    Nothing -> EQ
-    Just (_, _, ord) -> ord
-  where
-    toSchema = mapTerm schematise (const ())
-
-compareRest :: (Sized f, Ord f, Ord v) => Tm f v -> Tm f v -> Ordering
-compareRest = comparing rest
-  where
-    -- Order instances of the same schema by generality
-    -- Look at funs t too to deal with Skolem constants
-    rest t = (-length (usort (vars t)), vars t,
-              -length (usort (funs t)), funs t)
+compareFuns :: (Sized f, Ord f, Ord v) => Tm f v -> Tm f v -> Ordering
+compareFuns (Var x) (Var y) = compare x y
+compareFuns Var{} Fun{} = LT
+compareFuns Fun{} Var{} = GT
+compareFuns (Fun f ts) (Fun g us) =
+  compare (measureFunction f (length ts))
+          (measureFunction g (length us)) `orElse`
+  compare (map MeasureFuns ts) (map MeasureFuns us)
 
 -- Take two terms and find the first place where they differ.
 compareTerms :: (Sized f, Ord f, Ord v) => Tm f v -> Tm f v -> Maybe (Tm f v, Tm f v, Ordering)
@@ -83,19 +77,16 @@ measureFunction f arity = (twiddle arity, f)
     twiddle n = n
 
 -- Reduction ordering (i.e., a partial order closed under substitution).
--- Has the property:
--- if t `simplerThan` u then Measure (schema t) < Measure (schema u).
 orientTerms :: (Sized f, Ord f, Ord v) => Tm f v -> Tm f v -> Maybe Ordering
 orientTerms t u =
-  case compareTerms (toSchema t) (toSchema u) of
+  case compareTerms t u of
     Just (t', u', LT) -> do { guard (check t u t' u'); return LT }
     Just (t', u', GT) -> do { guard (check u t u' t'); return GT }
-    Nothing           -> return (compareRest t u)
+    _                 -> Nothing
   where
     check t u t' u' =
       sort (vars t') `isSubsequenceOf` sort (vars u') &&
       sort (vars t)  `isSubsequenceOf` sort (vars u)
-    toSchema = mapTerm schematise id
 
 simplerThan :: (Sized f, Ord f, Ord v) => Tm f v -> Tm f v -> Bool
 t `simplerThan` u = orientTerms t u == Just LT

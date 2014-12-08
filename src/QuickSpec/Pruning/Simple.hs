@@ -19,7 +19,7 @@ modifyS f = modify (\(S x) -> S (f x))
 
 simpleAreEqual :: Monad m => PropOf PruningTerm -> StateT SimplePruner m (Maybe PruningTerm)
 simpleAreEqual (lhs :=>: t :=: u)
-  | Measure (fromPruningTerm t) <= Measure (fromPruningTerm u) = do
+  | measure (fromPruningTerm t) <= measure (fromPruningTerm u) = do
     S eqs <- get
     return (simplifies (map unitProp lhs ++ eqs) u)
   | otherwise =
@@ -41,7 +41,7 @@ simpleUnify prop = modifyS (prop:)
 alwaysSimplerThan :: Term -> Term -> Bool
 t `alwaysSimplerThan` u =
   size t <= size u &&
-  Measure (schema t) < Measure (schema u) &&
+  measure (schema t) < measure (schema u) &&
   and [ sizeOk v | v <- vars t, v `elem` vars u ]
   where
     sizeOk v = occ v t <= occ v u
@@ -66,5 +66,5 @@ simplifies1 :: PruningTerm -> PruningTerm -> PruningTerm -> Maybe PruningTerm
 simplifies1 t u v = do
   s <- match t v
   let w = subst s u
-  guard (Measure (fromPruningTerm w) < Measure (fromPruningTerm v))
+  guard (measure (fromPruningTerm w) < measure (fromPruningTerm v))
   return w

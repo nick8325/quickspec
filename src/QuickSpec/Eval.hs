@@ -147,7 +147,7 @@ quickSpecLoop sig = do
 
 exploreSize sig n = do
   lift $ modify (\s -> s { schemas = Map.insert n Map.empty (schemas s) })
-  ss <- fmap (sortBy (comparing Measure)) (schemasOfSize n sig)
+  ss <- fmap (sortBy (comparing measure)) (schemasOfSize n sig)
   liftIO $ putStrLn ("Size " ++ show n ++ ", " ++ show (length ss) ++ " schemas to consider:")
   mapM_ (generate . ConsiderSchema . poly) ss
   generate (FinishedSize n)
@@ -237,8 +237,9 @@ createRules sig = do
   rule $ do
     ConsiderTerm t@(From _ t') <- event
     execute $ do
-      newTerm t'
       consider sig (Term t) t
+      u <- fmap (fromMaybe t') (lift (lift (rep t')))
+      newTerm u
 
   rule $ do
     Schema s _ <- event
@@ -281,7 +282,7 @@ considerRenamings :: (Term -> Bool) -> Schema -> Schema -> M ()
 considerRenamings p s s' = do
   sequence_ [ generate (ConsiderTerm (From s t)) | t <- ts, p t ]
   where
-    ts = sortBy (comparing Measure) (allUnifications (instantiate s'))
+    ts = sortBy (comparing measure) (allUnifications (instantiate s'))
 
 isCanonical :: Term -> Bool
 isCanonical t = and [ ascending [] (ofType ty) | ty <- tys ]
@@ -307,8 +308,8 @@ consider sig makeEvent x = do
   res   <- lift (lift (rep t))
   terms <- lift (gets terms)
   case res of
-    Just u | Measure u >= Measure t -> error (prettyShow t ++ " -> " ++ prettyShow u)
-    Just u | (u `Set.member` terms || size u < size t) -> return ()
+    Just u | u `Set.member` terms -> return ()
+    Nothing | t `Set.member` terms -> return ()
     _ -> do
       case res of
         Just u ->
@@ -366,6 +367,12 @@ found sig prop = do
       liftIO $ putStrLn (prettyShow (prettyRename sig prop))
 
   lift (lift (axiom prop))
+  terms <- fmap Set.toList (lift (gets terms))
+  let rep' t = do
+        u <- rep t
+        return (fromMaybe t u)
+  terms' <- mapM (lift . lift . rep') terms
+  lift $ modify (\s -> s { terms = Set.fromList terms' })
 
 pruner :: ExtraPruner -> [PropOf PruningTerm] -> PropOf PruningTerm -> IO Bool
 pruner (SPASS timeout) = E.spassUnify timeout

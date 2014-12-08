@@ -27,7 +27,7 @@ instance (PrettyTerm f, Pretty v) => Pretty (Equation f v) where
 
 order :: (Sized f, Ord f, Ord v) => Equation f v -> Equation f v
 order (l :==: r)
-  | Measure l >= Measure r = l :==: r
+  | measure l >= measure r = l :==: r
   | otherwise = r :==: l
 
 unorient :: Rule f v -> Equation f v

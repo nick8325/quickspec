@@ -69,7 +69,7 @@ data CP f v =
 instance (Sized f, Ord f, Ord v) => Ord (CP f v) where
   compare =
     comparing $ \(CP size (Constrained ctx (l :==: r))) ->
-      (Measure l, Measure r, size, Set.size (literals ctx), literals ctx)
+      (measure l, measure r, size, Set.size (literals ctx), literals ctx)
 
 instance (PrettyTerm f, Pretty v) => Pretty (CP f v) where
   pretty = pretty . cpEquation
@@ -237,8 +237,8 @@ bestCaseSplit rules eq =
       (length eqs, l' `max` r', l', r')
       where
         norm = normaliseWith (anywhere (tryRules ctx rules))
-        l' = Measure (norm l)
-        r' = Measure (norm r)
+        l' = measure (norm l)
+        r' = measure (norm r)
     p (_, eqs) = eq `notElem` eqs
 
 caseSplit ::
