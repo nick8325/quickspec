@@ -3,36 +3,34 @@ module QuickSpec.Eval where
 
 #include "errors.h"
 import QuickSpec.Base hiding (unify, terms)
-import qualified QuickSpec.Base as Base
-import QuickSpec.Utils
-import QuickSpec.Type
-import QuickSpec.Term
-import QuickSpec.Signature
-import QuickSpec.Prop
+
+import Control.Monad
+import Control.Monad.IO.Class
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.State.Strict
+import Data.List hiding (insert)
+import qualified Data.Map as Map
 import Data.Map(Map)
 import Data.Maybe
-import qualified Data.Map as Map
+import Data.MemoCombinators.Class
+import Data.Monoid hiding ((<>))
+import Data.Ord
 import qualified Data.Set as Set
 import Data.Set(Set)
-import Control.Monad
+import QuickSpec.Memo()
+import QuickSpec.Prop
 import QuickSpec.Pruning hiding (createRules, instances)
-import QuickSpec.Pruning.Simple hiding (S)
 import QuickSpec.Pruning.Completion hiding (initialState)
 import qualified QuickSpec.Pruning.E as E
 import qualified QuickSpec.Pruning.Z3 as Z3
-import Data.List hiding (insert)
-import Data.Ord
-import Control.Monad.Trans.State.Strict
-import Control.Monad.Trans.Class
-import Data.MemoCombinators.Class
-import QuickSpec.TestSet
 import QuickSpec.Rules
-import Control.Monad.IO.Class
-import QuickSpec.Memo()
-import Control.Applicative
+import QuickSpec.Signature
+import QuickSpec.Term
 import QuickSpec.Test
+import QuickSpec.TestSet
+import QuickSpec.Type
+import QuickSpec.Utils
 import Test.QuickCheck.Random
-import Data.Monoid hiding ((<>))
 
 type M = RulesT Event (StateT S (PrunerT Completion IO))
 

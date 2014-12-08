@@ -3,23 +3,18 @@ module QuickSpec.Pruning.Constraints where
 
 #include "errors.h"
 import QuickSpec.Base
+import qualified QuickSpec.Pruning.FourierMotzkin as FM
+import QuickSpec.Pruning.FourierMotzkin hiding (Term(..), trace)
 import QuickSpec.Term
 import QuickSpec.Utils
-import qualified Data.Rewriting.Substitution.Type as Subst
-import qualified Data.Set as Set
-import Data.Set(Set)
+import Control.Monad
+import Control.Monad.Trans.State.Strict
 import qualified Data.Map.Strict as Map
 import Data.Map.Strict(Map)
-import Data.List
 import Data.Maybe
-import QuickSpec.Pruning.FourierMotzkin hiding (Term(..), trace)
-import qualified QuickSpec.Pruning.FourierMotzkin as FM
-import qualified Data.DList as DList
-import Control.Monad
 import Data.Ord
-import Data.Monoid hiding ((<>))
-import Control.Monad.Trans.State.Strict
-import Debug.Trace
+import qualified Data.Set as Set
+import Data.Set(Set)
 
 import QuickSpec.Pruning
 import Data.Rewriting.Rule(Rule(Rule))

@@ -1,24 +1,14 @@
 module QuickSpec.Pruning.Completion where
 
-import QuickSpec.Base
-import QuickSpec.Type
-import QuickSpec.Utils
-import QuickSpec.Pruning
-import qualified QuickSpec.Pruning.KBC as KBC
-import QuickSpec.Pruning.Equation
-import QuickSpec.Pruning.Queue
-import QuickSpec.Pruning.Rewrite
-import QuickSpec.Pruning.Constraints
-import QuickSpec.Base
 import QuickSpec.Prop
-import QuickSpec.Term
+import QuickSpec.Pruning
+import QuickSpec.Pruning.Constraints
+import QuickSpec.Pruning.Equation
+import qualified QuickSpec.Pruning.KBC as KBC
 import QuickSpec.Signature
-import Control.Monad.Trans.State.Strict
-import Control.Monad.Trans.Class
 import Control.Monad
-import qualified Data.Set as Set
-import qualified Data.Rewriting.Rule as Rule
-import Data.Maybe
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.State.Strict
 
 newtype Completion =
   Completion {

@@ -3,22 +3,19 @@
 module QuickSpec.Term where
 
 #include "errors.h"
-import QuickSpec.Utils
+import Control.Applicative
+import Control.Monad
+import Control.Monad.Trans.State.Strict
+import Data.Functor.Identity
+import Data.List
+import qualified Data.Map as Map
+import Data.Ord
+import qualified Data.Rewriting.Substitution.Type as T
 import QuickSpec.Base
 import QuickSpec.Type
+import QuickSpec.Utils
 import Test.QuickCheck
 import Test.QuickCheck.Gen
-import Control.Monad.Trans.State.Strict
-import Data.Ord
-import qualified Data.Map as Map
-import Data.Functor.Identity
-import Control.Applicative
-import Data.Traversable(traverse)
-import qualified Data.Rewriting.Substitution.Type as T
-import Data.List
-import Control.Monad
-import Data.Maybe
-import qualified Data.DList as DList
 
 -- Terms and schemas.
 -- A schema is like a term but has holes instead of variables.

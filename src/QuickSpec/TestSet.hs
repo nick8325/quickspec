@@ -1,12 +1,11 @@
 {-# LANGUAGE FunctionalDependencies #-}
 module QuickSpec.TestSet where
 
-import QuickSpec.Base
-import QuickSpec.Type
+import Control.Monad
+import Data.Constraint
 import qualified Data.Map as Map
 import Data.Map(Map)
-import Data.Constraint
-import Control.Monad
+import QuickSpec.Type
 
 data TestSet t =
   TestSet {

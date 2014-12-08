@@ -2,17 +2,16 @@
 module QuickSpec.Parse where
 
 #include "errors.h"
-import Text.ParserCombinators.ReadP
-import Data.Char
-import QuickSpec.Signature
-import QuickSpec.Type
-import QuickSpec.Term
-import QuickSpec.Base hiding (char)
-import QuickSpec.Utils
-import QuickSpec.Prop
-import Control.Monad
 import Control.Applicative
+import Control.Monad
+import Data.Char
 import qualified Data.Map as Map
+import QuickSpec.Base hiding (char)
+import QuickSpec.Prop
+import QuickSpec.Term
+import QuickSpec.Type
+import QuickSpec.Utils
+import Text.ParserCombinators.ReadP
 
 class Parse a where
   parse :: [Constant] -> ReadP a

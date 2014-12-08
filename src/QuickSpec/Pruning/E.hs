@@ -6,27 +6,18 @@ eUnify _ _ _ = return False
 spassUnify _ _ _ = return False
 #else
 import QuickSpec.Base
-import QuickSpec.Term
-import QuickSpec.Type
-import QuickSpec.Utils
 import QuickSpec.Prop
 import QuickSpec.Pruning
-import System.IO
-import System.IO.Unsafe
-import Control.Monad.Trans.State.Strict
-import Data.Map(Map)
-import qualified Data.Map as Map
+import QuickSpec.Term
+import QuickSpec.Utils
 import qualified Data.ByteString.Char8 as BS
+import Data.Char
+import qualified Data.Map as Map
+import Data.Map(Map)
 import qualified Jukebox.Form as Jukebox
 import qualified Jukebox.Name as Jukebox
 import qualified Jukebox.Provers.E as Jukebox
 import qualified Jukebox.Provers.SPASS as Jukebox
-import qualified Jukebox.Toolbox as Jukebox
-import qualified Jukebox.Monotonox.ToFOF as Jukebox
-import qualified Jukebox.Clausify as Jukebox
-import qualified Jukebox.TPTP.Print as Jukebox
-import qualified Text.PrettyPrint.HughesPJ as Jukebox
-import Data.Char
 
 eUnify, spassUnify :: Int -> [PropOf PruningTerm] -> PropOf PruningTerm -> IO Bool
 eUnify timeout = foUnify (Jukebox.runE (Jukebox.EFlags "eprover" (Just timeout) Nothing)) (Left Jukebox.Unsatisfiable)

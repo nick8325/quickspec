@@ -3,17 +3,16 @@
 module QuickSpec.Pruning.Index where
 
 import QuickSpec.Base hiding (empty)
-import qualified Data.Map as Map
-import Data.Map(Map)
-import qualified Data.Set as Set
-import Data.Set(Set)
-import qualified Data.Rewriting.Substitution.Type as Subst
-import qualified Data.Rewriting.Substitution.Ops as Subst
-import qualified Data.DList as DList
-import Data.DList(DList)
-import Data.Maybe
 import Control.Applicative
 import Control.Monad
+import qualified Data.DList as DList
+import Data.DList(DList)
+import qualified Data.Map as Map
+import Data.Map(Map)
+import qualified Data.Rewriting.Substitution.Ops as Subst
+import qualified Data.Rewriting.Substitution.Type as Subst
+import qualified Data.Set as Set
+import Data.Set(Set)
 
 data Index a =
   Index {

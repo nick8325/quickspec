@@ -2,19 +2,17 @@
 module QuickSpec.Test where
 
 #include "errors.h"
+import Data.Constraint
+import Data.Maybe
 import QuickSpec.Base
-import QuickSpec.Term
-import QuickSpec.Type
 import QuickSpec.Signature
+import QuickSpec.Term
 import QuickSpec.TestSet
+import QuickSpec.Type
+import System.Random
 import Test.QuickCheck
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Random
-import System.Random
-import Data.Constraint
-import Data.Maybe
-import Data.Ord
-import Control.Applicative
 
 defaultTypes :: Typed a => Type -> a -> a
 defaultTypes ty = typeSubst (const ty)

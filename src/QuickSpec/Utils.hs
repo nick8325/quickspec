@@ -3,12 +3,12 @@
 module QuickSpec.Utils where
 
 import Control.Arrow((&&&))
-import Data.List(groupBy, sortBy)
-import Data.Ord(comparing)
-import System.IO
 import Control.Exception
 import Control.Spoon
+import Data.List(groupBy, sortBy)
 import Data.Monoid
+import Data.Ord(comparing)
+import System.IO
 
 repeatM :: Monad m => m a -> m [a]
 repeatM = sequence . repeat

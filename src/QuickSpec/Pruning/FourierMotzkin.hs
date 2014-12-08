@@ -1,16 +1,15 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module QuickSpec.Pruning.FourierMotzkin where
 
-import Data.Ratio
-import Data.Map.Strict(Map)
-import qualified Data.Map.Strict as Map
-import Data.Set(Set)
-import qualified Data.Set as Set
-import Data.Monoid
-import Data.Maybe
-import Data.List
-import Data.Ord
 import Control.Monad
+import Data.List
+import qualified Data.Map.Strict as Map
+import Data.Map.Strict(Map)
+import Data.Maybe
+import Data.Ord
+import Data.Ratio
+import qualified Data.Set as Set
+import Data.Set(Set)
 
 data Term a =
   Term {

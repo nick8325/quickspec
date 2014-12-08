@@ -20,26 +20,17 @@ module QuickSpec.Type(
   mapValue, forValue, ofValue, withValue, pairValues, unwrapFunctor) where
 
 #include "errors.h"
-
-import QuickSpec.Base
-import QuickSpec.Utils
-import Data.Typeable(Typeable)
+import Control.Applicative
+import Control.Monad
+import Data.DList(DList)
+import Data.Maybe
 import qualified Data.Typeable as Ty
+import Data.Typeable(Typeable)
 import qualified Data.Typeable.Internal as Ty
 import GHC.Exts(Any)
-import Unsafe.Coerce
-import Control.Applicative
-import Data.Maybe
-import qualified Data.DList as DList
-import Data.DList(DList)
-import Data.Functor.Identity
-import Data.Traversable(traverse)
-import qualified Data.Map as Map
-import qualified Data.Rewriting.Substitution.Type as T
-import Data.List
-import Control.Monad
-import Control.Monad.Trans.Writer
+import QuickSpec.Base
 import Test.QuickCheck
+import Unsafe.Coerce
 
 -- A (possibly polymorphic) type.
 type Type = Tm TyCon TyVar

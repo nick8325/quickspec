@@ -14,27 +14,22 @@ module QuickSpec.Base(
   PrettyTerm(..), TermStyle(..), prettyStyle) where
 
 #include "errors.h"
-
-import Data.Rewriting.Term hiding (Term, fold, map, fromString, parse, parseIO, parseFun, parseVar, parseWST, vars, funs, varsDL, funsDL)
-import Data.Rewriting.Term.Ops(subterms)
-import qualified Data.Rewriting.Term as T
-import Data.Rewriting.Substitution hiding (apply, fromString, parse, parseIO)
-import qualified Data.Rewriting.Substitution as T
-import qualified Data.Rewriting.Substitution.Type as T
-import Control.Applicative
-import Data.Traversable(sequenceA)
-import qualified Data.Map as Map
-import Data.Map(Map)
-import QuickSpec.Pretty
-import Text.PrettyPrint.HughesPJ hiding (empty)
+import Control.Monad
 import qualified Data.DList as DList
 import Data.DList(DList)
-import Control.Monad
-import qualified Data.Rewriting.CriticalPair as CP
-import QuickSpec.Utils
 import Data.List
+import qualified Data.Map as Map
+import qualified Data.Rewriting.CriticalPair as CP
 import Data.Rewriting.Rule hiding (varsDL, funsDL, vars, funs)
-import Data.Rewriting.Rule(Rule(..))
+import qualified Data.Rewriting.Substitution as T
+import Data.Rewriting.Substitution hiding (apply, fromString, parse, parseIO)
+import qualified Data.Rewriting.Substitution.Type as T
+import qualified Data.Rewriting.Term as T
+import Data.Rewriting.Term hiding (Term, fold, map, fromString, parse, parseIO, parseFun, parseVar, parseWST, vars, funs, varsDL, funsDL)
+import Data.Rewriting.Term.Ops(subterms)
+import QuickSpec.Pretty
+import QuickSpec.Utils
+import Text.PrettyPrint.HughesPJ hiding (empty)
 
 -- Renamings of functionality from term-rewriting.
 type Tm = T.Term

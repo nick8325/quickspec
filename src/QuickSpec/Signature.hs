@@ -4,28 +4,26 @@
 module QuickSpec.Signature where
 
 #include "errors.h"
-import Prelude hiding (sequence)
+import Control.Applicative
+import Control.Monad hiding (sequence)
+import Control.Monad.Trans.State.Strict
+import Data.Char hiding (ord)
 import Data.Constraint
-import QuickSpec.Base
-import QuickSpec.Utils
-import QuickSpec.Term
-import QuickSpec.Type
-import QuickSpec.Prop
 import Data.Functor.Identity
-import Data.Monoid
-import Test.QuickCheck hiding (subterms)
+import Data.List
 import qualified Data.Map as Map
+import Data.Maybe
+import Data.Monoid
 import qualified Data.Set as Set
 import Data.Set(Set)
-import Data.Char hiding (ord)
-import Data.Maybe
-import Data.List
-import Control.Applicative
-import Control.Monad.Trans.State.Strict
 import Data.Traversable hiding (mapM)
-import Debug.Trace
-import Control.Monad hiding (sequence)
+import Prelude hiding (sequence)
+import QuickSpec.Base
+import QuickSpec.Prop
+import QuickSpec.Term
+import QuickSpec.Type
 import System.Timeout
+import Test.QuickCheck hiding (subterms)
 
 newtype Instance = Instance (Value Instance1) deriving Show
 newtype Instance1 a = Instance1 (Value (Instance2 a))

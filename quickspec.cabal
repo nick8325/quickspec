@@ -84,7 +84,19 @@ library
     QuickSpec.Type
     QuickSpec.Utils
 
-  Build-depends: base < 5, containers, transformers, QuickCheck >= 2.7, spoon >= 0.2, term-rewriting >= 0.1.2, constraints, dlist, pretty, data-memocombinators, random, bytestring
+  Build-depends: QuickCheck >= 2.7
+               , base < 5
+               , bytestring
+               , constraints
+               , containers
+               , data-memocombinators
+               , dlist
+               , pqueue >= 1.2.1
+               , pretty
+               , random
+               , spoon >= 0.2
+               , term-rewriting >= 0.1.2
+               , transformers
 
   if flag(jukebox)
     Build-depends: jukebox >= 0.1.2

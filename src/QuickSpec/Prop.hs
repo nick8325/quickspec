@@ -2,18 +2,13 @@
 module QuickSpec.Prop where
 
 #include "errors.h"
+import Control.Monad
+import qualified Data.DList as DList
+import Data.Ord
 import QuickSpec.Base
 import QuickSpec.Term
 import QuickSpec.Type
 import QuickSpec.Utils
-import Control.Applicative
-import Data.Traversable
-import Control.Monad.Trans.State.Strict
-import qualified Data.Set as Set
-import qualified Data.Map as Map
-import Data.Ord
-import Control.Monad
-import qualified Data.DList as DList
 
 type Prop = PropOf Term
 data PropOf a =

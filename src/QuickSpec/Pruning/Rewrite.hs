@@ -1,17 +1,14 @@
 module QuickSpec.Pruning.Rewrite where
 
 import QuickSpec.Base
-import QuickSpec.Term
-import QuickSpec.Pruning.Equation
 import QuickSpec.Pruning.Constraints
 import qualified QuickSpec.Pruning.Index as Index
 import QuickSpec.Pruning.Index(Index)
-import Data.Maybe
-import Data.Set(Set)
 import QuickSpec.Pruning.Queue
+import QuickSpec.Term
 import Control.Monad
+import Data.Maybe
 import Data.Rewriting.Rule
-import Debug.Trace
 
 type Strategy f v = Tm f v -> [Tm f v]
 

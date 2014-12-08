@@ -3,12 +3,11 @@
 module QuickSpec.Pruning.Queue where
 
 import QuickSpec.Base
+import Data.Ord
 import qualified Data.PQueue.Min as Queue
 import Data.PQueue.Min(MinQueue)
 import qualified Data.Set as Set
 import Data.Set(Set)
-import Data.Ord
-import Data.Maybe
 
 data Queue a =
   Queue {

@@ -2,16 +2,10 @@
 module QuickSpec.Pruning.Equation where
 
 import QuickSpec.Base
+import QuickSpec.Pruning.Constraints
 import QuickSpec.Term
-import QuickSpec.Utils
-import Data.Ord
 import Control.Monad
 import Data.Rewriting.Rule hiding (isVariantOf)
-import QuickSpec.Pruning.Constraints
-import Data.Maybe
-import Data.Monoid
-import Data.Set(Set)
-import qualified Data.Set as Set
 
 data Equation f v = Tm f v :==: Tm f v deriving (Eq, Ord, Show)
 type EquationOf a = Equation (ConstantOf a) (VariableOf a)

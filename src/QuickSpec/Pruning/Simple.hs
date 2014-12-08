@@ -1,12 +1,11 @@
 module QuickSpec.Pruning.Simple where
 
 import QuickSpec.Base
-import QuickSpec.Term
 import QuickSpec.Prop
 import QuickSpec.Pruning
+import QuickSpec.Term
 import Control.Monad
 import Control.Monad.Trans.State.Strict
-import Data.Maybe
 
 newtype SimplePruner = S [PropOf PruningTerm]
 

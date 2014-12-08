@@ -4,13 +4,11 @@ module QuickSpec.Pruning.Z3 where
 #ifdef NO_Z3
 z3Unify _ _ _ = return False
 #else
-import QuickSpec.Pruning
-import QuickSpec.Prop
-import QuickSpec.Utils
-import QuickSpec.Term
 import QuickSpec.Base
+import QuickSpec.Prop
+import QuickSpec.Pruning
+import QuickSpec.Utils
 import Z3.Monad hiding (Symbol, Context, reset)
-import Z3.Opts
 
 z3Unify :: Int -> [PropOf PruningTerm] -> PropOf PruningTerm -> IO Bool
 z3Unify timeout axioms goal =

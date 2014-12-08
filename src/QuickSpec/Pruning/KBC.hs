@@ -7,25 +7,23 @@ module QuickSpec.Pruning.KBC where
 
 #include "errors.h"
 import QuickSpec.Base
-import QuickSpec.Term
-import QuickSpec.Utils
-import QuickSpec.Pruning
-import QuickSpec.Pruning.Queue hiding (queue)
-import qualified QuickSpec.Pruning.Index as Index
-import QuickSpec.Pruning.Index(Index)
 import QuickSpec.Pruning.Constraints
 import QuickSpec.Pruning.Equation
+import qualified QuickSpec.Pruning.Index as Index
+import QuickSpec.Pruning.Index(Index)
+import QuickSpec.Pruning.Queue hiding (queue)
 import QuickSpec.Pruning.Rewrite
+import QuickSpec.Term
+import QuickSpec.Utils
+import Control.Monad
+import Control.Monad.Trans.State.Strict
+import Data.List
+import Data.Maybe
+import Data.Ord
+import qualified Data.Rewriting.CriticalPair as CP
 import Data.Rewriting.Rule(Rule(..))
 import qualified Data.Set as Set
 import Data.Set(Set)
-import Control.Monad
-import Control.Monad.Trans.State.Strict
-import qualified Data.Rewriting.CriticalPair as CP
-import Data.Ord
-import Data.Maybe
-import Data.List
-
 import qualified Debug.Trace
 
 data Event f v =
