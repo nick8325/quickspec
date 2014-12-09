@@ -76,6 +76,14 @@ library
     QuickSpec.Pruning.E
     QuickSpec.Pruning.Z3
     QuickSpec.Pruning.Simple
+    QuickSpec.Pruning.Constraints
+    QuickSpec.Pruning.Equation
+    QuickSpec.Pruning.Index
+    QuickSpec.Pruning.Rewrite
+    QuickSpec.Pruning.KBC
+    QuickSpec.Pruning.Queue
+    QuickSpec.Pruning.FourierMotzkin
+    QuickSpec.Pruning.Completion
     QuickSpec.Rules
     QuickSpec.Signature
     QuickSpec.Term
