@@ -1,6 +1,7 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, CPP #-}
 module QuickSpec.Pruning.FourierMotzkin where
 
+#include "errors.h"
 import Control.Monad
 import Data.List
 import qualified Data.Map.Strict as Map
@@ -48,6 +49,9 @@ instance Ord a => Num (Term a) where
       constant = constant x + constant y,
       vars = Map.filter (/= 0) (Map.unionWith (+) (vars x) (vars y)) }
   negate = mapTerm negate
+  (*) = __
+  abs = __
+  signum = __
 
 (^*) :: Rational -> Term a -> Term a
 0 ^* y = constTerm 0
