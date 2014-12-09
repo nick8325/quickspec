@@ -83,26 +83,6 @@ boundTrue :: (Ord a, Num a) => Bound a -> Bool
 boundTrue (Closed x) = x >= 0
 boundTrue (Open x) = x > 0
 
-newtype MaybeBound a = MB { runMB :: Maybe (Bound a) } deriving Functor
-
-instance Applicative MaybeBound where
-  pure = return
-  (<*>) = liftM2 ($)
-
-instance Monad MaybeBound where
-  return = MB . return . return
-  x >>= f = join' (fmap (runMB . f) x)
-    where
-      join' (MB x) = MB (fmap join (join (fmap swap x)))
-      swap (Closed x) = fmap Closed x
-      swap (Open x)   = fmap Open   x
-
-liftMaybe :: Maybe a -> MaybeBound a
-liftMaybe = MB . fmap return
-
-liftBound :: Bound a -> MaybeBound a
-liftBound = MB . return
-
 data Problem a =
   Unsolvable |
   Problem {
@@ -198,21 +178,21 @@ implies p t u = trivial p (b t u (bound u - bound t))
 
 trivial :: Ord a => Problem a -> Bound (Term a) -> Bool
 trivial p t =
-  case minValue p t of
-    Just a | boundTrue a -> True
-    _ -> False
+  case minValue p (bound t) of
+   Just a -> check a t
+   _ -> False
+  where
+    check (Closed x) Open{} = x > 0
+    check x _ = bound x >= 0
 
-minValue :: Ord a => Problem a -> Bound (Term a) -> Maybe (Bound Rational)
-minValue p bt = runMB $ do
-  t <- liftBound bt
+minValue :: Ord a => Problem a -> Term a -> Maybe (Bound Rational)
+minValue p t = do
   as <- mapM varValue (Map.toList (vars t))
-  return (constant t + sum as)
+  return (fmap (constant t +) (fmap sum (sequence as)))
   where
     varValue (x, a) =
-      fmap (a*) (MB (Map.lookup x (boundsFor a)))
-    boundsFor a
-      | a > 0     = lower p
-      | otherwise = upper p
+      fmap (fmap (a*))
+        (Map.lookup x (if a > 0 then lower p else upper p))
 
 data Step a = Stop | Eliminate a [Bound (Term a)] [Bound (Term a)] (Problem a) deriving Show
 
@@ -235,7 +215,10 @@ eliminate x p =
        case sortBy (comparing (Map.size . vars . bound)) (intersect ls us) of
         Closed c:_ ->
           let ts = [fmap (subtract c) t | t <- us] ++ [fmap (c -) u | u <- ls] in
-          Eliminate x [Closed c] [Closed c] (addDerivedTerms ts p'))
+          Eliminate x [Closed c] [Closed c] (addDerivedTerms ts p')
+        _ ->
+          -- c > x > c or similar
+          Eliminate x ls us Unsolvable)
   where
     (ls, us, p') = focus x p
     ts = [ liftM2 (-) t u | t <- us, u <- ls ]
@@ -253,11 +236,12 @@ focus x p = (ls', us', p' { pos = pos' })
     (ls, us) = (boundFor (lower p), boundFor (upper p))
     boundFor s = maybeToList (fmap (fmap constTerm) (Map.lookup x s))
     op t (ls, us) = do
-      a <- Map.lookup x (vars (bound t))
-      let f t = negate (recip a) ^* t { vars = Map.delete x (vars t) }
+      let vs = vars (bound t)
+      a <- Map.lookup x vs
+      let b = negate (recip a) ^* (bound t) { vars = Map.delete x vs }
       if a > 0
-        then return (fmap f t:ls, us)
-        else return (ls, fmap f t:us)
+        then return (t { bound = b }:ls, us)
+        else return (ls, t { bound = b }:us)
 
 foldDelete :: Ord a => (a -> b -> Maybe b) -> b -> Set a -> (b, Set a)
 foldDelete op e s = Set.foldr op' (e, s) s
@@ -287,13 +271,22 @@ solve p = do
     try f xs = Just (f xs)
 
 solveBounds :: (Maybe (Bound Rational), Maybe (Bound Rational)) -> Maybe Rational
-solveBounds (Just x@Closed{}, Just y@Closed{}) | bound x > bound y = Nothing
-solveBounds (Just x, Just y) | bound x > bound y = Nothing
-solveBounds (Just (Closed x), _) = Just x
-solveBounds (Just (Open x), _) = Just (fromInteger (floor (x+1)))
-solveBounds (_, Just (Closed y)) = Just y
-solveBounds (_, Just (Open y)) = Just (fromInteger (ceiling (y-1)))
-solveBounds (Nothing, Nothing) = Just 0
+solveBounds (Just x, Just y)
+  | empty x y = Nothing
+    -- Try to give an integer solution if possible.
+  | boundTrue (fmap (subtract a) y) = Just a
+  | otherwise = Just ((bound x+bound y)/2)
+  where
+    empty (Closed x) (Closed y) = x > y
+    empty x y = bound x >= bound y
+    a = fromInteger (floor (bound x+1))
+solveBounds (x, y) =
+  fmap solveBound x `mplus`
+  fmap (negate . solveBound . fmap negate) y `mplus`
+  return 0
+  where
+    solveBound (Closed x) = x
+    solveBound (Open x) = fromInteger (floor (x+1))
 
 -- Debugging function
 trace :: Ord a => Problem a -> [Step a]
