@@ -1,8 +1,10 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, CPP #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, DeriveFunctor, CPP #-}
 module QuickSpec.Pruning.FourierMotzkin where
 
 #include "errors.h"
+import Control.Applicative hiding (empty)
 import Control.Monad
+import Criterion.Main
 import Data.List
 import qualified Data.Map.Strict as Map
 import Data.Map.Strict(Map)
@@ -64,12 +66,34 @@ eval m t =
   where
     err = error "eval: variable not bound"
 
+data Bound a =
+  Closed { bound :: a }
+  | Open { bound :: a }
+  deriving (Eq, Ord, Functor)
+
+instance Applicative Bound where
+  pure = return
+  (<*>) = liftM2 ($)
+
+instance Monad Bound where
+  return = Closed
+  Closed x >>= f = f x
+  Open   x >>= f = Open (bound (f x))
+
+instance Show a => Show (Bound a) where
+  show (Closed x) = show x ++ " >= 0"
+  show (Open x) = show x ++ " > 0"
+
+boundTrue :: (Ord a, Num a) => Bound a -> Bool
+boundTrue (Closed x) = x >= 0
+boundTrue (Open x) = x > 0
+
 data Problem a =
   Unsolvable |
   Problem {
-    pos    :: Set (Term a),
-    lower  :: Map a Rational,
-    upper  :: Map a Rational,
+    pos    :: Set (Bound (Term a)),
+    lower  :: Map a (Bound Rational),
+    upper  :: Map a (Bound Rational),
     pvars  :: Set a }
   deriving (Eq, Ord)
 
@@ -79,57 +103,66 @@ instance Show a => Show (Problem a) where
     "[" ++ intercalate ", " xs ++ "]"
     where
       xs =
-        [show t ++ " >= 0" | t <- Set.toList (pos p)] ++
-        [show x ++ " >= " ++ showRat a | (x, a) <- Map.toList (lower p)] ++
-        [show x ++ " <= " ++ showRat a | (x, a) <- Map.toList (upper p)]
+        [show t | t <- Set.toList (pos p)] ++
+        [show x ++ " >= " ++ showRat a | (x, Closed a) <- Map.toList (lower p)] ++
+        [show x ++ " > "  ++ showRat a | (x, Open a)   <- Map.toList (lower p)] ++
+        [show x ++ " <= " ++ showRat a | (x, Closed a) <- Map.toList (upper p)] ++
+        [show x ++ " < "  ++ showRat a | (x, Open a)   <- Map.toList (upper p)]
 
-problem :: Ord a => [Term a] -> Problem a
+problem :: Ord a => [Bound (Term a)] -> Problem a
 problem ts = addTerms ts empty
 
 empty :: Problem a
 empty = Problem Set.empty Map.empty Map.empty Set.empty
 
-infix 4 ===, <==, >==
-(===), (<==), (>==) :: Ord a => Term a -> Term a -> [Term a]
-t <== u = [u - t]
+infix 4 ===, <==, >==, </=, >/=
+(===), (<==), (>==), (</=), (>/=) :: Ord a => Term a -> Term a -> [Bound (Term a)]
+t <== u = [Closed (u - t)]
 t >== u = u <== t
+t </= u = [Open (u - t)]
+t >/= u = u </= t
 t === u = (t <== u) ++ (t >== u)
 
-addTerms :: Ord a => [Term a] -> Problem a -> Problem a
+addTerms :: Ord a => [Bound (Term a)] -> Problem a -> Problem a
 addTerms _ Unsolvable = Unsolvable
 addTerms ts p =
   addDerivedTerms ts p { pvars = Set.union vs (pvars p) }
   where
-    vs = Set.unions (map (Set.fromAscList . Map.keys . vars) ts)
+    vs = Set.unions (map (Set.fromAscList . Map.keys . vars . bound) ts)
 
-addDerivedTerms :: Ord a => [Term a] -> Problem a -> Problem a
+addDerivedTerms :: Ord a => [Bound (Term a)] -> Problem a -> Problem a
 addDerivedTerms _ Unsolvable = Unsolvable
 addDerivedTerms ts p = foldr addTerm (addBounds bs p) us
   where
-    (bs, us) = partition ((== 1) . Map.size . vars) ts
+    (bs, us) = partition ((== 1) . Map.size . vars . bound) ts
 
-addTerm :: Ord a => Term a -> Problem a -> Problem a
+addTerm :: Ord a => Bound (Term a) -> Problem a -> Problem a
 addTerm _ Unsolvable = Unsolvable
 addTerm t p
-  | Map.null (vars t) =
-    if constant t < 0 then Unsolvable else p
+  | Map.null (vars (bound t)) =
+    if boundTrue (fmap constant t) then p else Unsolvable
   | t `Set.member` pos p || redundant p t = p
   | otherwise =
     p { pos = Set.insert t (Set.filter (not . implies p t) (pos p)) }
 
-addBounds :: Ord a => [Term a] -> Problem a -> Problem a
+addBounds :: Ord a => [Bound (Term a)] -> Problem a -> Problem a
 addBounds [] p = p
 addBounds bs p =
-  prune p { lower = Map.unionWith max (lower p) lower',
-            upper = Map.unionWith min (upper p) upper' }
+  prune p { lower = Map.unionWith bmax (lower p) lower',
+            upper = Map.unionWith bmin (upper p) upper' }
   where
     (lower', upper') = foldr op (Map.empty, Map.empty) bs
     op t (l, u)
-      | a > 0 = (Map.insertWith max x b l, u)
-      | a < 0 = (l, Map.insertWith min x b u)
+      | a > 0 = (Map.insertWith bmax x b l, u)
+      | a < 0 = (l, Map.insertWith bmin x b u)
       where
-        (x, a) = Map.findMin (vars t)
-        b = negate (constant t) / a
+        (x, a) = Map.findMin (vars (bound t))
+        b = fmap (\t -> negate (constant t) / a) t
+    bmax x y
+      | bound x > bound y = x
+      | bound y > bound x = y
+      | otherwise = liftM2 const x y
+    bmin x y = fmap negate (bmax (fmap negate x) (fmap negate y))
 
 prune :: Ord a => Problem a -> Problem a
 prune p =
@@ -139,28 +172,34 @@ redundant p t =
   trivial p t ||
   or [ implies p u t && (t < u || not (implies p t u)) | u <- Set.toList (pos p), t /= u ]
 
-implies :: Ord a => Problem a -> Term a -> Term a -> Bool
+implies :: Ord a => Problem a -> Bound (Term a) -> Bound (Term a) -> Bool
 -- a1x1+...+anxn + b >= 0 ==> c1x1+...+cnxn + d >= 0
 -- <=>
 -- (c1-a1)x1+...+(cn-an)x2 + d - b >= 0
-implies p t u = trivial p (u - t)
-
-trivial :: Ord a => Problem a -> Term a -> Bool
-trivial p t =
-  case minValue p t of
-    Just a | a >= 0 -> True
-    _ -> False
-
-minValue :: Ord a => Problem a -> Term a -> Maybe Rational
-minValue p t = do
-  as <- fmap sum (mapM varValue (Map.toList (vars t)))
-  return (as + constant t)
+implies p t u = trivial p (b t u (bound u - bound t))
   where
-    varValue (x, a)
-      | a > 0 = fmap (a *) (Map.lookup x (lower p))
-      | otherwise = fmap (a *) (Map.lookup x (upper p))
+    b Closed{} Open{} = Open
+    b _        _      = Closed
 
-data Step a = Stop | Eliminate a [Term a] [Term a] (Problem a) deriving Show
+trivial :: Ord a => Problem a -> Bound (Term a) -> Bool
+trivial p t =
+  case minValue p (bound t) of
+   Just a -> check a t
+   _ -> False
+  where
+    check (Closed x) Open{} = x > 0
+    check x _ = bound x >= 0
+
+minValue :: Ord a => Problem a -> Term a -> Maybe (Bound Rational)
+minValue p t = do
+  as <- mapM varValue (Map.toList (vars t))
+  return (fmap (constant t +) (fmap sum (sequence as)))
+  where
+    varValue (x, a) =
+      fmap (fmap (a*))
+        (Map.lookup x (if a > 0 then lower p else upper p))
+
+data Step a = Stop | Eliminate a [Bound (Term a)] [Bound (Term a)] (Problem a) deriving Show
 
 eliminations :: Ord a => Problem a -> [Step a]
 eliminations p =
@@ -174,20 +213,24 @@ eliminate x p =
   (length ls * length us - length ls - length us,
    -- If we have c >= x >= c, eliminate x by doing ls >= c, c >= rs,
    -- otherwise generate ls >= rs
-   case nontrivial ls && nontrivial us && any (== 0) ts of
+   case nontrivial ls && nontrivial us && any ((== 0) . bound) ts of
      False ->
        Eliminate x ls us (addDerivedTerms ts p')
      True ->
-       let (c:_) = sortBy (comparing (Map.size . vars)) (intersect ls us)
-           ts = [ t - c | t <- us ] ++ [ c - u | u <- ls ] in
-       Eliminate x [c] [c] (addDerivedTerms ts p'))
+       case sortBy (comparing (Map.size . vars . bound)) (intersect ls us) of
+        Closed c:_ ->
+          let ts = [fmap (subtract c) t | t <- us] ++ [fmap (c -) u | u <- ls] in
+          Eliminate x [Closed c] [Closed c] (addDerivedTerms ts p')
+        _ ->
+          -- c > x > c or similar
+          Eliminate x ls us Unsolvable)
   where
     (ls, us, p') = focus x p
-    ts = [ t - u | t <- us, u <- ls ]
+    ts = [ liftM2 (-) t u | t <- us, u <- ls ]
     nontrivial (_:_:_) = True
     nontrivial _ = False
 
-focus :: Ord a => a -> Problem a -> ([Term a], [Term a], Problem a)
+focus :: Ord a => a -> Problem a -> ([Bound (Term a)], [Bound (Term a)], Problem a)
 focus x p = (ls', us', p' { pos = pos' })
   where
     p' = p {
@@ -195,14 +238,15 @@ focus x p = (ls', us', p' { pos = pos' })
       upper = Map.delete x (upper p),
       pvars = Set.delete x (pvars p) }
     ((ls', us'), pos') = foldDelete op (ls, us) (pos p')
-    (ls, us) = (bound (lower p), bound (upper p))
-    bound s = maybeToList (fmap constTerm (Map.lookup x s))
+    (ls, us) = (boundFor (lower p), boundFor (upper p))
+    boundFor s = maybeToList (fmap (fmap constTerm) (Map.lookup x s))
     op t (ls, us) = do
-      a <- Map.lookup x (vars t)
-      let b = negate (recip a) ^* t { vars = Map.delete x (vars t) }
+      let vs = vars (bound t)
+      a <- Map.lookup x vs
+      let b = negate (recip a) ^* (bound t) { vars = Map.delete x vs }
       if a > 0
-        then return (b:ls, us)
-        else return (ls, b:us)
+        then return (t { bound = b }:ls, us)
+        else return (ls, t { bound = b }:us)
 
 foldDelete :: Ord a => (a -> b -> Maybe b) -> b -> Set a -> (b, Set a)
 foldDelete op e s = Set.foldr op' (e, s) s
@@ -223,17 +267,31 @@ solve p | Set.null (pos p) =
       return (x, a)
 solve p = do
   m <- solve p'
-  let Just a = solveBounds (try maximum (map (eval m) ls),
-                            try minimum (map (eval m) us))
+  let Just a = solveBounds (try maximum (map (fmap (eval m)) ls),
+                            try minimum (map (fmap (eval m)) us))
   return (Map.insert x a m)
   where
     Eliminate x ls us p':_ = eliminations p
     try f [] = Nothing
     try f xs = Just (f xs)
 
-solveBounds :: (Maybe Rational, Maybe Rational) -> Maybe Rational
-solveBounds (Just x, Just y) | x > y = Nothing
-solveBounds (x, y) = Just (fromMaybe 0 (x `mplus` y))
+solveBounds :: (Maybe (Bound Rational), Maybe (Bound Rational)) -> Maybe Rational
+solveBounds (Just x, Just y)
+  | empty x y = Nothing
+    -- Try to give an integer solution if possible.
+  | boundTrue (fmap (subtract a) y) = Just a
+  | otherwise = Just ((bound x+bound y)/2)
+  where
+    empty (Closed x) (Closed y) = x > y
+    empty x y = bound x >= bound y
+    a = fromInteger (floor (bound x+1))
+solveBounds (x, y) =
+  fmap solveBound x `mplus`
+  fmap (negate . solveBound . fmap negate) y `mplus`
+  return 0
+  where
+    solveBound (Closed x) = x
+    solveBound (Open x) = fromInteger (floor (x+1))
 
 -- Debugging function
 trace :: Ord a => Problem a -> [Step a]
