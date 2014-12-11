@@ -4,7 +4,6 @@ module QuickSpec.Pruning.FourierMotzkin where
 #include "errors.h"
 import Control.Applicative hiding (empty)
 import Control.Monad
-import Criterion.Main
 import Data.List
 import qualified Data.Map.Strict as Map
 import Data.Map.Strict(Map)
@@ -115,13 +114,12 @@ problem ts = addTerms ts empty
 empty :: Problem a
 empty = Problem Set.empty Map.empty Map.empty Set.empty
 
-infix 4 ===, <==, >==, </=, >/=
-(===), (<==), (>==), (</=), (>/=) :: Ord a => Term a -> Term a -> [Bound (Term a)]
-t <== u = [Closed (u - t)]
+infix 4 <==, >==, </=, >/=
+(<==), (>==), (</=), (>/=) :: Ord a => Term a -> Term a -> Bound (Term a)
+t <== u = Closed (u - t)
 t >== u = u <== t
-t </= u = [Open (u - t)]
+t </= u = Open (u - t)
 t >/= u = u </= t
-t === u = (t <== u) ++ (t >== u)
 
 addTerms :: Ord a => [Bound (Term a)] -> Problem a -> Problem a
 addTerms _ Unsolvable = Unsolvable
