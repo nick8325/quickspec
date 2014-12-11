@@ -117,6 +117,10 @@ t >== u = u <== t
 t </= u = Open (u - t)
 t >/= u = u </= t
 
+negateBound :: Ord a => Bound (Term a) -> Bound (Term a)
+negateBound (Closed t) = Open (-t)
+negateBound (Open t) = Closed (-t)
+
 addTerms :: Ord a => [Bound (Term a)] -> Problem a -> Problem a
 addTerms _ Unsolvable = Unsolvable
 addTerms ts p =
