@@ -12,24 +12,26 @@ import Data.Ord
 import Data.Ratio
 import qualified Data.Set as Set
 import Data.Set(Set)
+import QuickSpec.Base hiding (vars, mapTerm)
 
 data Term a =
   Term {
     constant :: Rational,
     -- Invariant: no coefficient is zero
     vars :: Map a Rational }
-  deriving (Eq, Ord)
-instance Show a => Show (Term a) where
-  show (Term a vs)
-    | Map.null vs = showRat a
-    | a == 0 = showVars vs
-    | otherwise = showRat a ++ " + " ++ showVars vs
+  deriving (Eq, Ord, Show)
+instance Pretty a => Pretty (Term a) where
+  pretty (Term a vs)
+    | Map.null vs = pretty a
+    | a == 0 = prettyVars vs
+    | otherwise = pretty a <+> text "+" <+> prettyVars vs
     where
-      showVars vs = intercalate " + " [ showRat a ++ "*" ++ show x | (x, a) <- Map.toList vs ]
-showRat :: Rational -> String
-showRat a
-  | denominator a == 1 = show (numerator a)
-  | otherwise = "(" ++ show a ++ ")"
+      prettyVars vs = sep (punctuate (text "+") [ pretty a <> text "*" <> pretty x | (x, a) <- Map.toList vs ])
+
+instance (Eq a, Integral a, Pretty a) => Pretty (Ratio a) where
+  pretty a
+    | denominator a == 1 = pretty (numerator a)
+    | otherwise = text "(" <+> pretty a <+> text ")"
 
 constTerm :: Rational -> Term a
 constTerm a = Term a Map.empty
@@ -68,7 +70,7 @@ eval m t =
 data Bound a =
   Closed { bound :: a }
   | Open { bound :: a }
-  deriving (Eq, Ord, Functor)
+  deriving (Eq, Ord, Functor, Show)
 
 instance Applicative Bound where
   pure = return
@@ -79,9 +81,9 @@ instance Monad Bound where
   Closed x >>= f = f x
   Open   x >>= f = Open (bound (f x))
 
-instance Show a => Show (Bound a) where
-  show (Closed x) = show x ++ " >= 0"
-  show (Open x) = show x ++ " > 0"
+instance Pretty a => Pretty (Bound a) where
+  pretty (Closed x) = pretty x <+> text ">= 0"
+  pretty (Open x) = pretty x <+> text "> 0"
 
 boundTrue :: (Ord a, Num a) => Bound a -> Bool
 boundTrue (Closed x) = x >= 0
@@ -94,19 +96,19 @@ data Problem a =
     lower  :: Map a (Bound Rational),
     upper  :: Map a (Bound Rational),
     pvars  :: Set a }
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Show)
 
-instance Show a => Show (Problem a) where
-  show Unsolvable = "Unsolvable"
-  show p =
-    "[" ++ intercalate ", " xs ++ "]"
+instance Pretty a => Pretty (Problem a) where
+  pretty Unsolvable = text "Unsolvable"
+  pretty p =
+    brackets (sep (punctuate (text ",") xs))
     where
       xs =
-        [show t | t <- Set.toList (pos p)] ++
-        [show x ++ " >= " ++ showRat a | (x, Closed a) <- Map.toList (lower p)] ++
-        [show x ++ " > "  ++ showRat a | (x, Open a)   <- Map.toList (lower p)] ++
-        [show x ++ " <= " ++ showRat a | (x, Closed a) <- Map.toList (upper p)] ++
-        [show x ++ " < "  ++ showRat a | (x, Open a)   <- Map.toList (upper p)]
+        [pretty t | t <- Set.toList (pos p)] ++
+        [pretty x <+> text ">=" <+> pretty a | (x, Closed a) <- Map.toList (lower p)] ++
+        [pretty x <+> text ">"  <+> pretty a | (x, Open a)   <- Map.toList (lower p)] ++
+        [pretty x <+> text "<=" <+> pretty a | (x, Closed a) <- Map.toList (upper p)] ++
+        [pretty x <+> text "<"  <+> pretty a | (x, Open a)   <- Map.toList (upper p)]
 
 problem :: Ord a => [Bound (Term a)] -> Problem a
 problem ts = addTerms ts empty
@@ -198,6 +200,13 @@ minValue p t = do
         (Map.lookup x (if a > 0 then lower p else upper p))
 
 data Step a = Stop | Eliminate a [Bound (Term a)] [Bound (Term a)] (Problem a) deriving Show
+
+instance Pretty a => Pretty (Step a) where
+  pretty Stop = text "Stop"
+  pretty (Eliminate x ls us p) =
+    hang e 2 (pretty p)
+    where
+      e = text "Eliminate" <+> pretty x <+> text "between" <+> pretty ls <+> text "and" <+> pretty us <+> text "giving"
 
 eliminations :: Ord a => Problem a -> [Step a]
 eliminations p =
