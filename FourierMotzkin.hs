@@ -110,13 +110,12 @@ problem ts = addTerms ts empty
 empty :: Problem a
 empty = Problem Set.empty Map.empty Map.empty Set.empty
 
-infix 4 ===, <==, >==, </=, >/=
-(===), (<==), (>==), (</=), (>/=) :: Ord a => Term a -> Term a -> [Bound (Term a)]
-t <== u = [Closed (u - t)]
+infix 4 <==, >==, </=, >/=
+(<==), (>==), (</=), (>/=) :: Ord a => Term a -> Term a -> Bound (Term a)
+t <== u = Closed (u - t)
 t >== u = u <== t
-t </= u = [Open (u - t)]
+t </= u = Open (u - t)
 t >/= u = u </= t
-t === u = (t <== u) ++ (t >== u)
 
 addTerms :: Ord a => [Bound (Term a)] -> Problem a -> Problem a
 addTerms _ Unsolvable = Unsolvable
@@ -301,20 +300,19 @@ y = var 'y'
 z = var 'z'
 w = var 'w'
 
-cs0 =
-  concat [
-    x >== 1,
-    y >== 1,
-    z >== 1,
-    w >== 1,
-    (-1) ^* x + 1 ^* y <== -1,
-    x + y - w + 1 <== -1,
-    x - z - w - 1 <== -1,
-    x + y - z + w + 2 >== 0,
-    y - z + w + 1 >== 0 ]
-cs1 = cs0 ++ (x - y <== -1)
-cs2 = cs0 ++ (x - y >== 1)
-cs3 = cs0 ++ (x - y === 1)
+cs0 = [
+  x >== 1,
+  y >== 1,
+  z >== 1,
+  w >== 1,
+  (-1) ^* x + 1 ^* y <== -1,
+  x + y - w + 1 <== -1,
+  x - z - w - 1 <== -1,
+  x + y - z + w + 2 >== 0,
+  y - z + w + 1 >== 0 ]
+cs1 = cs0 ++ [x - y <== -1]
+cs2 = cs0 ++ [x - y >== 1]
+cs3 = cs0 ++ [x - y <== 1, x - y >== 1]
 
 prob0 = problem cs0
 prob1 = problem cs1
@@ -326,28 +324,31 @@ prob4 =
   addTerms cs $
   empty
   where
-    cs = concat [x + y >== 0, x + 2^*y >== 0]
-    cs' = y === 0
+    cs = [x + y >== 0, x + 2^*y >== 0]
+    cs' = [y >== 0, y <== 0]
 
 cs5 =
-  concat $ [
+  concat [
     x - 3^*y + 2^*z + w === -4,
     2^*x - 6^*y + z + 4^*w === 1,
     -1^*x + 2^*y + 3^*z + 4^*w === 12,
     -1^*y + z + w === 0 ]
+  where
+    infix 4 ===
+    x === y = [x >== y, x <== y]
 
 prob5 = problem cs5
 
 -- Should be unsatisfiable
 prob6 =
-  problem . concat $ [
+  problem [
     -1 + x - y - z >== 0,
     y >== 1,
     z >== 1,
     x <== 2 ]
 
 prob7 =
-  problem . concat $ [
+  problem [
     1 <== x + y,
     2 <== 0 ]
 
