@@ -410,36 +410,22 @@ impliesLiteral form (HeadGreater (Var x) f) =
     _ -> False
 impliesLiteral _ _ = ERROR "must call split before using a context"
 
-{-
-implies :: (Sized f, Numbered v, Ord f, Ord v) => Context f v -> Context f v -> Bool
-implies ctx (Context ls _) =
-  all implies1 (Set.toList ls)
-  where
-    implies1 (SizeIs REQ sz) =
-      unsat (sizeAxioms sz ++ evalRel RGE (encodeSize sz) 1) &&
-      unsat (sizeAxioms sz ++ evalRel RLT (encodeSize sz) 0)
-    implies1 (SizeIs RGE sz) = unsat (sizeAxioms sz ++ evalRel RLT (encodeSize sz) 0)
-    implies1 (SizeIs RLT sz) = unsat (sizeAxioms sz ++ evalRel RGE (encodeSize sz) 0)
-    implies1 l | tautological l = True
-    implies1 l =
-      null (addNegatedLiteral l (Constrained ctx (Fun __ [])))
-    unsat p = isNothing (solve' (problem (p ++ encodeContext ctx)))
-    --solve' p = traceShow p (traceShowId (solve p))
-    solve' = solve
+minSize :: (Sized f, Numbered v, Ord f, Ord v) => Solved f v -> Tm f v -> Integer
+minSize (Solved fs) t = minimum [ minSize1 f t | f <- Set.toList fs ]
 
-minSize :: (Sized f, Numbered v, Ord v) => Tm f v -> Context f v -> Integer
-minSize t ctx =
-  loop (sizeIn (fromMaybe __ (solve prob)))
+minSize1 :: (Sized f, Numbered v, Ord f, Ord v) => Solved1 f v -> Tm f v -> Integer
+minSize1 form t = minProbSize (addTerms ts (prob form)) (termSize t)
   where
-    p    = sizeAxioms sz ++ (encodeSize sz === resultVar)
-    sz   = termSize t
-    prob = problem (encodeContext ctx ++ p)
-    sizeIn m = ceiling (Map.findWithDefault __ resultNum m)
-    loop n | n < 0 = __
-    loop n =
-      case solve' (addTerms (resultVar <== fromIntegral (n-1)) prob) of
+    ts = [ var x >== 1 | x <- usort (vars t) ]
+
+minProbSize :: Ord v => Problem v -> FM.Term v -> Integer
+minProbSize prob t =
+  loop (eval (fromMaybe __ (FM.solve prob)) t)
+  where
+    loop x | x < 0 = __
+    loop x =
+      case FM.solve (addTerms [t <== fromIntegral (n-1)] prob) of
         Nothing -> n
-        Just m -> loop (sizeIn m)
-    --solve' p = traceShow p (traceShowId (solve p))
-    solve' p = solve p
--}
+        Just m -> loop (eval m t)
+      where
+        n = ceiling x
