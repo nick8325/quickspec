@@ -38,6 +38,7 @@ t, u :: Tm F PruningVariable
 r1 = Constrained (toContext (literal (Less u t))) (Rule t u)
 r2 = Constrained (toContext (literal (Less t u))) (Rule u t)
 -}
+-- Constrained things.
 data Constrained a =
   Constrained {
     context     :: ContextOf a,
