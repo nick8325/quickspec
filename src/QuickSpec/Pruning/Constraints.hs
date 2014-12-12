@@ -4,7 +4,7 @@ module QuickSpec.Pruning.Constraints where
 #include "errors.h"
 import QuickSpec.Base
 import qualified QuickSpec.Pruning.FourierMotzkin as FM
-import QuickSpec.Pruning.FourierMotzkin hiding (Term(..), trace, Stop, solve)
+import QuickSpec.Pruning.FourierMotzkin hiding (Term(..), trace, Stop, solve, implies)
 import QuickSpec.Term
 import QuickSpec.Utils
 import Control.Monad
@@ -44,7 +44,7 @@ data Constrained a =
     constrained :: a }
 
 instance (PrettyTerm (ConstantOf a), Pretty (VariableOf a), Pretty a) => Pretty (Constrained a) where
-  pretty (Constrained (Context { formula = Disj [Conj []] }) x) = pretty x
+  pretty (Constrained (Context { formula = FTrue }) x) = pretty x
   pretty (Constrained ctx x) =
     hang (pretty x) 2 (text "when" <+> pretty ctx)
 
@@ -86,69 +86,76 @@ instance (Sized f, Ord f, Ord v) => Symbolic (Context f v) where
   substf sub ctx = toContext (substf sub (formula ctx))
 
 type FormulaOf a = Formula (ConstantOf a) (VariableOf a)
-type ClauseOf a  = Clause  (ConstantOf a) (VariableOf a)
-newtype Formula f v = Disj { disjuncts :: [Clause f v] }  deriving (Eq, Ord, Show)
-newtype Clause f v  = Conj { conjuncts :: [Literal f v] } deriving (Eq, Ord, Show)
+data Formula f v =
+  -- After calling split, formulas are in the following form:
+  -- * No occurrences of Equal.
+  -- * HeadIs and Less can only be applied to variables.
+  -- * No tautological or impossible literals.
+    FTrue
+  | FFalse
+  | Formula f v :&: Formula f v
+  | Formula f v :|: Formula f v
+  | Size (Bound (FM.Term v))
+  | HeadIs Sense (Tm f v) (Arity f)
+  | Less (Tm f v) (Tm f v)
+    -- Equal t u p q represents (t = u & p) | q.
+    -- The smart constructors disj and conj lift
+    -- Equal to the top level.
+  | Equal (Tm f v) (Tm f v) (Formula f v) (Formula f v)
+  deriving (Eq, Ord, Show)
+
+data Sense = Lesser | Greater deriving (Eq, Ord, Show)
+instance Pretty Sense where
+  pretty Lesser = text "<"
+  pretty Greater = text ">"
+
+negateSense :: Sense -> Sense
+negateSense Lesser = Greater
+negateSense Greater = Lesser
+
+evalSense :: Ord a => Sense -> a -> a -> Bool
+evalSense Lesser = (<)
+evalSense Greater = (>)
 
 instance (PrettyTerm f, Pretty v) => Pretty (Formula f v) where
-  pretty (Disj []) = text "false"
-  pretty (Disj [x]) = pretty x
-  pretty (Disj ls) =
-    fsep (punctuate (text " |") (map pretty ls))
-
-instance (PrettyTerm f, Pretty v) => Pretty (Clause f v) where
-  pretty (Conj []) = text "true"
-  pretty (Conj [x]) = pretty x
-  pretty (Conj ls) =
-    fsep (punctuate (text " &") (map pretty ls))
+  prettyPrec _ FTrue = text "true"
+  prettyPrec _ FFalse = text "false"
+  prettyPrec p (x :&: y) =
+    prettyParen (p > 10)
+      (hang (prettyPrec 11 x <+> text "&") 2 (prettyPrec 11 y))
+  prettyPrec p (x :|: y) =
+    prettyParen (p > 10)
+      (hang (prettyPrec 11 x <+> text "|") 2 (prettyPrec 11 y))
+  prettyPrec p (Size t) = pretty t
+  prettyPrec p (HeadIs sense t x) = text "hd(" <> pretty t <> text ")" <+> pretty sense <+> pretty x
+  prettyPrec p (Less t u) = pretty t <+> text "<" <+> pretty u
+  prettyPrec p (Equal t u x y) =
+    prettyParen (p > 10) $
+    hang
+      (parens
+        (pretty t <+> text "=" <+> pretty u <+> text "&" <+> prettyPrec 11 x) <+> text "|") 2
+      (prettyPrec 11 y)
 
 instance (Sized f, Ord v) => Symbolic (Formula f v) where
   type ConstantOf (Formula f v) = f
   type VariableOf (Formula f v) = v
-  termsDL (Disj fs) = msum (map termsDL fs)
-  substf sub (Disj fs) = Disj (map (substf sub) fs)
-
-instance (Sized f, Ord v) => Symbolic (Clause f v) where
-  type ConstantOf (Clause f v) = f
-  type VariableOf (Clause f v) = v
-  termsDL (Conj fs) = msum (map termsDL fs)
-  substf sub (Conj fs) = Conj (map (substf sub) fs)
-
-type LiteralOf a = Literal (ConstantOf a) (VariableOf a)
-data Literal f v =
-  -- After calling split, literals are in the following form:
-  -- * No occurrences of Equal.
-  -- * HeadLess, HeadGreater and Less can only be applied to variables.
-  -- * No tautological or impossible literals.
-    Size (Bound (FM.Term v))
-  | HeadLess (Tm f v) (Arity f)
-  | HeadGreater (Tm f v) (Arity f)
-  | Less (Tm f v) (Tm f v)
-  | Equal (Tm f v) (Tm f v)
-  deriving (Eq, Ord, Show)
-
-instance (PrettyTerm f, Pretty v) => Pretty (Literal f v) where
-  pretty (Size t) = pretty t
-  pretty (HeadLess t x) = text "hd(" <> pretty t <> text ") <" <+> pretty x
-  pretty (HeadGreater t x) = text "hd(" <> pretty t <> text ") >" <+> pretty x
-  pretty (Less t u) = pretty t <+> text "<" <+> pretty u
-  pretty (Equal t u) = pretty t <+> text "=" <+> pretty u
-
-instance (Sized f, Ord v) => Symbolic (Literal f v) where
-  type ConstantOf (Literal f v) = f
-  type VariableOf (Literal f v) = v
-
+  termsDL FTrue = mzero
+  termsDL FFalse = mzero
+  termsDL (p :&: q) = termsDL p `mplus` termsDL q
+  termsDL (p :|: q) = termsDL p `mplus` termsDL q
   termsDL (Size t) = msum (map (return . Var) (Map.keys (FM.vars (bound t))))
-  termsDL (HeadLess t _) = termsDL t
-  termsDL (HeadGreater t _) = termsDL t
-  termsDL (Less t u) = termsDL t `mplus` termsDL u
-  termsDL (Equal t u) = termsDL t `mplus` termsDL u
+  termsDL (HeadIs _ t _) = return t
+  termsDL (Less t u) = return t `mplus` return u
+  termsDL (Equal t u p q) = return t `mplus` return u `mplus` termsDL p `mplus` termsDL q
 
+  substf sub FTrue = FTrue
+  substf sub FFalse = FFalse
+  substf sub (p :&: q) = substf sub p &&& substf sub q
+  substf sub (p :|: q) = substf sub p ||| substf sub q
   substf sub (Size t) = Size t { bound = substFM sub (bound t) }
-  substf sub (HeadLess t f) = HeadLess (substf sub t) f
-  substf sub (HeadGreater t f) = HeadGreater (substf sub t) f
+  substf sub (HeadIs sense t f) = HeadIs sense (substf sub t) f
   substf sub (Less t u) = Less (substf sub t) (substf sub u)
-  substf sub (Equal t u) = Equal (substf sub t) (substf sub u)
+  substf sub (Equal t u p q) = Equal (substf sub t) (substf sub u) (substf sub p) (substf sub q)
 
 substFM :: (Sized f, Ord v') => (v -> Tm f v') -> FM.Term v -> FM.Term v'
 substFM f t =
@@ -170,85 +177,55 @@ solveSize :: Ord v => Bound (FM.Term v) -> Maybe (Map v Rational)
 solveSize s =
   FM.solve (problem (s:sizeAxioms s))
 
-literal :: Literal f v -> Formula f v
-literal l = literals [l]
+(|||), (&&&) :: Formula f v -> Formula f v -> Formula f v
+FTrue ||| _ = FTrue
+_ ||| FTrue = FTrue
+FFalse ||| p = p
+p ||| FFalse = p
+Equal t u p q ||| r = Equal t u p (q ||| r)
+r ||| Equal t u p q = Equal t u p (q ||| r)
+p ||| q = p :|: q
 
-literals :: [Literal f v] -> Formula f v
-literals ls = Disj [Conj ls]
+FTrue &&& p = p
+p &&& FTrue = p
+FFalse &&& p = FFalse
+p &&& FFalse = FFalse
+Equal t u p q &&& r = Equal t u (p &&& r) (q &&& r)
+r &&& Equal t u p q = Equal t u (p &&& r) (q &&& r)
+p &&& q = p :&: q
 
-disj, conj :: [Formula f v] -> Formula f v
-disj fs = Disj (concatMap disjuncts fs)
-conj [] = Disj [Conj []]
-conj (Disj cs:fs) =
-  Disj [ Conj (ls ++ ls') | Conj ls <- cs, Conj ls' <- disjuncts (conj fs) ]
-
-true, false :: Formula f v
-true = conj []
-false = disj []
-
-neg :: (Sized f, Numbered v, Ord f, Ord v) => Formula f v -> Formula f v
-neg (Disj cs) = conj (map negClause cs)
-  where
-    negClause (Conj ls) = disj (runM (mapM negLiteral) ls)
-    negLiteral (Size s) = return $ literal (Size (negateBound s))
-    negLiteral (Less t u) = return $ disj (map literal [Equal t u, Less u t])
-    negLiteral (HeadLess (Var x) f) = do
-      t <- specialise x f
-      return . disj . map literal $ [HeadGreater (Var x) f, Equal (Var x) t]
-    negLiteral (HeadGreater (Var x) f) = do
-      t <- specialise x f
-      return . disj . map literal $ [HeadLess (Var x) f, Equal (Var x) t]
-    negLiteral _ = ERROR "must call split before using a context"
+neg :: (Sized f, Numbered v, Ord f, Ord v) => Formula f v -> M (Formula f v)
+neg FTrue = return FFalse
+neg FFalse = return FTrue
+neg (p :&: q) = liftM2 (&&&) (neg p) (neg q)
+neg (p :|: q) = liftM2 (|||) (neg p) (neg q)
+neg (Size s) = return (Size (negateBound s))
+neg (Less t u) = return (Equal t u FTrue (Less u t))
+neg (HeadIs sense (Var x) f) = do
+  t <- specialise x f
+  return (Equal (Var x) t FTrue (HeadIs (negateSense sense) (Var x) f))
+neg _ = ERROR "must call split before using a context"
 
 bool :: Bool -> Formula f v
-bool True = true
-bool False = false
-
-simplify :: (Sized f, Ord f, Ord v, Numbered v) => Context f v -> Context f v
-simplify ctx = toContext (simplifyFormula (formula ctx))
-  where
-    simplifyFormula (Disj cs) = Disj (prune [] cs)
-    prune xs [] = reverse xs
-    prune xs (y:ys)
-      | any (redundant y) (xs ++ ys) = prune xs ys
-      | otherwise = prune (y:xs) ys
-    redundant c _ | isNothing (solve1 c) = True
-    redundant (Conj ls) c =
-      case solve1 c of
-        Nothing -> False
-        Just s -> all (impliesLiteral s) ls
+bool True = FTrue
+bool False = FFalse
 
 split :: (Symbolic a, Ord a, Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Numbered (VariableOf a)) => Constrained a -> (Constrained a, [Constrained a])
 split (Constrained ctx x) = (Constrained (toContext ctx') x, collect (concatMap (split' . f) xs))
   where
-    (ctx', xs) = splitFormula (formula ctx)
+    (ctx', xs) = splitFormula (runM simplify (formula ctx))
     f (sub, ctx') = substf (evalSubst sub) (Constrained (toContext ctx') x)
     collect = map coll . partitionBy constrained
     coll [x] = x
     coll xs@(Constrained _ x:_) = Constrained ctx x
       where
-        ctx = toContext (disj (map (formula . context) xs))
+        ctx = toContext (foldr (|||) FFalse (map (formula . context) xs))
 
 split' :: (Symbolic a, Ord a, Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Numbered (VariableOf a)) => Constrained a -> [Constrained a]
 split' x
   | satisfiable (solved (context y)) = y:xs
   | otherwise = xs
   where (y, xs) = split x
-
-type Split f v = (Formula f v, [(Subst f v, Formula f v)])
-
-splitFormula :: (Sized f, Ord f, Ord v, Numbered v) => Formula f v -> Split f v
-splitFormula (Disj cs) = (disj (map fst xs), concatMap snd xs)
-  where xs = map splitClause cs
-
-splitClause :: (Sized f, Ord f, Ord v, Numbered v) => Clause f v -> Split f v
-splitClause (Conj ls) =
-  case runM simplifyLiterals ls of
-    Stop -> (literals ls, [])
-    Substitute sub -> (false, [(sub, literals ls)])
-    Simplify ctx -> splitFormula ctx
-
-data Result f v = Substitute (Subst f v) | Simplify (Formula f v) | Stop
 
 type M = State Int
 
@@ -263,71 +240,59 @@ newName x = do
   put $! n+1
   return (withNumber n x)
 
-simplifyLiterals :: (Sized f, Ord f, Ord v, Numbered v) => [Literal f v] -> M (Result f v)
-simplifyLiterals [] = return Stop
-simplifyLiterals (Equal t u:ls) | t == u = fmap f (simplifyLiterals ls)
+splitFormula :: (Sized f, Ord f, Ord v, Numbered v) => Formula f v -> (Formula f v, [(Subst f v, Formula f v)])
+splitFormula (Equal t u p q) = (q', (sub, p):xs)
   where
-    f Stop = Simplify (literals ls)
-    f res  = res
-simplifyLiterals (Equal t u:ls) =
-  return $
-  case unify t u of
-    Nothing -> Simplify false
-    Just sub -> Substitute sub
-simplifyLiterals (l:ls) =
-  liftM2 op (simplifyLiteral l) (simplifyLiterals ls)
-  where
-    op Nothing    (Simplify ctx)  = Simplify (conj [literal l, ctx])
-    op (Just ctx) (Simplify ctx') = Simplify (conj [ctx, ctx'])
-    op (Just ctx) Stop            = Simplify (conj [ctx, literals ls])
-    op _          res             = res
+    Just sub = unify t u
+    (q', xs) = splitFormula q
+splitFormula p = (p, [])
 
-simplifyLiteral :: (Sized f, Ord f, Ord v, Numbered v) => Literal f v -> M (Maybe (Formula f v))
-simplifyLiteral (Size s)
-  | isNothing (solveSize s) = return (Just false)
-  | isNothing (solveSize (negateBound s)) = return (Just true)
-simplifyLiteral (HeadLess (Fun f ts) g) =
-  return (Just (bool (f :/: length ts < g)))
-simplifyLiteral (HeadGreater (Fun f ts) g) =
-  return (Just (bool (f :/: length ts > g)))
-simplifyLiteral (HeadGreater _ (f :/: 1)) | funSize f == 0 =
-  return (Just false)
-simplifyLiteral (Less t u) | t == u = return (Just false)
-simplifyLiteral (Less t (Var x)) | x `elem` vars t = return (Just false)
-simplifyLiteral (Less (Var x) t) | x `elem` vars t = return (Just true)
-simplifyLiteral (Less t u) | isFun t || isFun u = do
+simplify :: (Sized f, Ord f, Ord v, Numbered v) => Formula f v -> M (Formula f v)
+simplify FTrue = return FTrue
+simplify FFalse = return FFalse
+simplify (p :&: q) = liftM2 (&&&) (simplify p) (simplify q)
+simplify (p :|: q) = liftM2 (|||) (simplify p) (simplify q)
+simplify (Equal t u p q) | t == u = simplify (p ||| q)
+simplify (Equal t u p q) =
+  case unify t u of
+    Nothing -> simplify q
+    Just{} -> fmap (Equal t u p) (simplify q)
+simplify (Size s)
+  | isNothing (solveSize s) = return FFalse
+  | isNothing (solveSize (negateBound s)) = return FTrue
+simplify (HeadIs sense (Fun f ts) g) =
+  return (bool (evalSense sense (f :/: length ts) g))
+simplify (HeadIs Greater _ (f :/: 1)) | funSize f == 0 =
+  return FFalse
+simplify (Less t u) | t == u = return FFalse
+simplify (Less t (Var x)) | x `elem` vars t = return FFalse
+simplify (Less (Var x) t) | x `elem` vars t = return FTrue
+simplify (Less t u) | isFun t || isFun u = do
   rest <- structLess t u
-  return . Just $
-    conj [
-      literal (Size (sz <== 0)),
-      disj [
-        literal (Size (sz </= 0)),
-        rest]]
+  simplify (Size (sz <== 0) &&& (Size (sz </= 0) ||| rest))
   where
     sz = termSize t - termSize u
-simplifyLiteral l = return Nothing
+simplify p = return p
 
 structLess :: (Sized f, Ord f, Ord v, Numbered v) => Tm f v -> Tm f v -> M (Formula f v)
 structLess (Fun f ts) (Fun g us) =
   return $
   case compare (f :/: length ts) (g :/: length us) of
-    LT -> true
-    GT -> false
+    LT -> FTrue
+    GT -> FFalse
     EQ -> argsLess ts us
 structLess (Var x) (Fun f ts) = do
   u <- specialise x (f :/: length ts)
   rest <- structLess u (Fun f ts)
   return $
-    disj [
-      literal (HeadLess (Var x) (f :/: length ts)),
-      conj [literal (Equal (Var x) u), rest]]
+    Equal (Var x) u rest $
+      HeadIs Lesser (Var x) (f :/: length ts)
 structLess (Fun f ts) (Var x) = do
   u <- specialise x (f :/: length ts)
   rest <- structLess (Fun f ts) u
   return $
-    disj [
-      literal (HeadGreater (Var x) (f :/: length ts)),
-      conj [literal (Equal (Var x) u), rest]]
+    Equal (Var x) u rest $
+      HeadIs Greater (Var x) (f :/: length ts)
 
 specialise :: (Sized f, Ord f, Ord v, Numbered v) => v -> Arity f -> M (Tm f v)
 specialise x (f :/: n) = do
@@ -335,11 +300,9 @@ specialise x (f :/: n) = do
   return (Fun f (map Var ns))
 
 argsLess :: (Sized f, Ord f, Ord v) => [Tm f v] -> [Tm f v] -> Formula f v
-argsLess [] [] = false
+argsLess [] [] = FFalse
 argsLess (t:ts) (u:us) =
-  disj [
-    literal (Less t u),
-    conj [literal (Equal t u), argsLess ts us]]
+  Equal t u (argsLess ts us) (Less t u)
 
 type SolvedOf a = Solved (ConstantOf a) (VariableOf a)
 newtype Solved f v =
@@ -382,21 +345,28 @@ instance (PrettyTerm f, Pretty v) => Pretty (Solved1 f v) where
       pretty (headGreater x),
       pretty (less x) ]
 
-solve :: (Sized f, Ord f, Ord v) => Formula f v -> Solved f v
-solve (Disj cs) =
-  Solved (Set.fromList (catMaybes (map solve1 cs)))
+flatten :: Formula f v -> [[Formula f v]]
+flatten FTrue = [[]]
+flatten FFalse = []
+flatten (p :&: q) = liftM2 (++) (flatten p) (flatten q)
+flatten (p :|: q) = flatten p ++ flatten q
+flatten t = [[t]]
 
-solve1 :: (Sized f, Ord f, Ord v) => Clause f v -> Maybe (Solved1 f v)
-solve1 (Conj []) = Just unconditionalSolved1
-solve1 (Conj ls)
+solve :: (Sized f, Ord f, Ord v) => Formula f v -> Solved f v
+solve f =
+  Solved (Set.fromList (catMaybes (map solve1 (flatten f))))
+
+solve1 :: (Sized f, Ord f, Ord v) => [Formula f v] -> Maybe (Solved1 f v)
+solve1 [] = Just unconditionalSolved1
+solve1 ls
   | not (null equal) = ERROR "must call split before using a context"
   | isNothing (FM.solve prob) = Nothing
   | or [ Set.member x s | (x, s) <- Map.toList less' ] = Nothing
   | otherwise = Just (Solved1 prob headLess' headGreater' less')
   where
     size = [s | Size s <- ls]
-    headLess = [(unVar x, f) | HeadLess x f <- ls]
-    headGreater = [(unVar x, f) | HeadGreater x f <- ls]
+    headLess = [(unVar x, f) | HeadIs Lesser x f <- ls]
+    headGreater = [(unVar x, f) | HeadIs Greater x f <- ls]
     headLess' = Map.fromListWith min headLess
     headGreater' = Map.fromListWith max headGreater
     less = [(unVar t, unVar u) | Less t u <- ls]
@@ -428,31 +398,29 @@ close1 bs x = aux [x] Set.empty
 satisfiable :: (Ord f, Ord v) => Solved f v -> Bool
 satisfiable (Solved cs) = not (Set.null cs)
 
-implies :: (Sized f, Numbered v, Ord f, Ord v) => Solved f v -> Context f v -> Bool
-implies form ctx = any (impliesClause form) cs
-  where
-    (Disj cs, _) = splitFormula (formula ctx)
+implies :: (Sized f, Numbered v, Ord f, Ord v) => Solved f v -> Formula f v -> Bool
+implies _ FTrue = True
+implies _ FFalse = False
+implies s (p :&: q) = implies s p && implies s q
+implies s (p :|: q) = implies s p || implies s q
+implies (Solved s) l = or [ implies1 f l | f <- Set.toList s ]
 
-impliesClause :: (Sized f, Numbered v, Ord f, Ord v) => Solved f v -> Clause f v -> Bool
-impliesClause (Solved fs) (Conj ls) =
-  and [ or [ impliesLiteral f l | f <- Set.toList fs ] | l <- ls ]
-
-impliesLiteral :: (Sized f, Numbered v, Ord f, Ord v) => Solved1 f v -> Literal f v -> Bool
-impliesLiteral form (Size s) =
+implies1 :: (Sized f, Numbered v, Ord f, Ord v) => Solved1 f v -> Formula f v -> Bool
+implies1 form (Size s) =
   isNothing (FM.solve (addTerms ts (prob form)))
   where
     ts = negateBound s:sizeAxioms s
-impliesLiteral form (Less (Var x) (Var y)) =
+implies1 form (Less (Var x) (Var y)) =
   y `Set.member` Map.findWithDefault Set.empty x (less form)
-impliesLiteral form (HeadLess (Var x) f) =
+implies1 form (HeadIs Lesser (Var x) f) =
   case Map.lookup x (headLess form) of
     Just g | g < f -> True
     _ -> False
-impliesLiteral form (HeadGreater (Var x) f) =
+implies1 form (HeadIs Greater (Var x) f) =
   case Map.lookup x (headGreater form) of
     Just g | g > f -> True
     _ -> False
-impliesLiteral _ _ = ERROR "must call split before using a context"
+implies1 _ _ = ERROR "must call split before using a context"
 
 minSize :: (Sized f, Numbered v, Ord f, Ord v) => Solved f v -> Tm f v -> Integer
 minSize (Solved fs) t = minimum [ minSize1 f t | f <- Set.toList fs ]
