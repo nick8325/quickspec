@@ -4,7 +4,7 @@ module QuickSpec.Pruning.Constraints where
 #include "errors.h"
 import QuickSpec.Base
 import qualified QuickSpec.Pruning.FourierMotzkin as FM
-import QuickSpec.Pruning.FourierMotzkin hiding (Term(..), trace, Stop)
+import QuickSpec.Pruning.FourierMotzkin hiding (Term(..), trace, Stop, solve)
 import QuickSpec.Term
 import QuickSpec.Utils
 import Control.Monad
@@ -67,7 +67,7 @@ data Context f v =
     solved  :: Solved f v }
   deriving Show
 
-toContext :: (Ord f, Ord v) => Formula f v -> Context f v
+toContext :: (Sized f, Ord f, Ord v) => Formula f v -> Context f v
 toContext x = Context x (solve x)
 
 instance (Eq f, Eq v) => Eq (Context f v) where
@@ -113,17 +113,29 @@ instance (Sized f, Ord v) => Symbolic (Clause f v) where
 
 type LiteralOf a = Literal (ConstantOf a) (VariableOf a)
 data Literal f v =
+  -- After calling split, literals are in the following form:
+  -- * No occurrences of Equal.
+  -- * HeadLess, HeadGreater and Less can only be applied to variables.
+  -- * No tautological or impossible literals.
     Size (Bound (FM.Term v))
-  | HeadLess (Tm f v) f Int
-  | HeadGreater (Tm f v) f Int
+  | HeadLess (Tm f v) (Arity f)
+  | HeadGreater (Tm f v) (Arity f)
   | Less (Tm f v) (Tm f v)
   | Equal (Tm f v) (Tm f v)
   deriving (Eq, Ord, Show)
 
+data Arity f = f :/: Int deriving (Eq, Show)
+
+instance Ord f => Ord (Arity f) where
+  compare = comparing (\(f :/: n) -> measureFunction f n)
+
+instance Pretty f => Pretty (Arity f) where
+  pretty (f :/: n) = pretty f <> text "/" <> pretty n
+
 instance (PrettyTerm f, Pretty v) => Pretty (Literal f v) where
   pretty (Size t) = pretty t
-  pretty (HeadLess t x n) = text "hd(" <> pretty t <> text ") <" <+> pretty x <> text "/" <> pretty n
-  pretty (HeadGreater t x n) = text "hd(" <> pretty t <> text ") >" <+> pretty x <> text "/" <> pretty n
+  pretty (HeadLess t x) = text "hd(" <> pretty t <> text ") <" <+> pretty x
+  pretty (HeadGreater t x) = text "hd(" <> pretty t <> text ") >" <+> pretty x
   pretty (Less t u) = pretty t <+> text "<" <+> pretty u
   pretty (Equal t u) = pretty t <+> text "=" <+> pretty u
 
@@ -132,14 +144,14 @@ instance (Sized f, Ord v) => Symbolic (Literal f v) where
   type VariableOf (Literal f v) = v
 
   termsDL (Size t) = msum (map (return . Var) (Map.keys (FM.vars (bound t))))
-  termsDL (HeadLess t _ _) = termsDL t
-  termsDL (HeadGreater t _ _) = termsDL t
+  termsDL (HeadLess t _) = termsDL t
+  termsDL (HeadGreater t _) = termsDL t
   termsDL (Less t u) = termsDL t `mplus` termsDL u
   termsDL (Equal t u) = termsDL t `mplus` termsDL u
 
   substf sub (Size t) = Size t { bound = substFM sub (bound t) }
-  substf sub (HeadLess t f n) = HeadLess (substf sub t) f n
-  substf sub (HeadGreater t f n) = HeadGreater (substf sub t) f n
+  substf sub (HeadLess t f) = HeadLess (substf sub t) f
+  substf sub (HeadGreater t f) = HeadGreater (substf sub t) f
   substf sub (Less t u) = Less (substf sub t) (substf sub u)
   substf sub (Equal t u) = Equal (substf sub t) (substf sub u)
 
@@ -237,11 +249,11 @@ simplifyLiteral :: (Sized f, Ord f, Ord v, Numbered v) => Literal f v -> M (Mayb
 simplifyLiteral (Size s)
   | isNothing (solveSize s) = return (Just false)
   | isNothing (solveSize (negateBound s)) = return (Just true)
-simplifyLiteral (HeadLess (Fun f ts) g n) =
+simplifyLiteral (HeadLess (Fun f ts) (g :/: n)) =
   return (Just (bool (measureFunction f (length ts) < measureFunction g n)))
-simplifyLiteral (HeadGreater (Fun f ts) g n) =
+simplifyLiteral (HeadGreater (Fun f ts) (g :/: n)) =
   return (Just (bool (measureFunction f (length ts) > measureFunction g n)))
-simplifyLiteral (HeadGreater _ f 1) | funSize f == 0 =
+simplifyLiteral (HeadGreater _ (f :/: 1)) | funSize f == 0 =
   return (Just false)
 simplifyLiteral (Less t u) | t == u = return (Just false)
 simplifyLiteral (Less t (Var x)) | x `elem` vars t = return (Just false)
@@ -271,7 +283,7 @@ structLess (Var x) (Fun f ts) = do
       us = map Var ns
   return $
     disj [
-      literal (HeadLess (Var x) f (length ts)),
+      literal (HeadLess (Var x) (f :/: length ts)),
       conj [literal (Equal (Var x) u), argsLess ts us]]
 structLess (Fun f ts) (Var x) = do
   ns <- replicateM (length ts) (newName x)
@@ -279,7 +291,7 @@ structLess (Fun f ts) (Var x) = do
       us = map Var ns
   return $
     disj [
-      literal (HeadGreater (Var x) f (length ts)),
+      literal (HeadGreater (Var x) (f :/: length ts)),
       conj [literal (Equal (Var x) u), argsLess us ts]]
 
 argsLess :: (Sized f, Ord f, Ord v) => [Tm f v] -> [Tm f v] -> Formula f v
@@ -290,14 +302,87 @@ argsLess (t:ts) (u:us) =
     conj [literal (Equal t u), argsLess ts us]]
 
 type SolvedOf a = Solved (ConstantOf a) (VariableOf a)
-data Solved f v = Solved
-  deriving Show
+newtype Solved f v =
+  Solved {
+    clauses :: Set (Solved1 f v) }
+  deriving (Eq, Ord, Show)
+data Solved1 f v =
+  -- We complete the set of constraints as follows:
+  -- * Less is transitively closed.
+  -- * If Less x y, then size x <= size y.
+  -- * If HeadGreater x f and Less x y and HeadLess y f,
+  --   then size x < size y (size x = size y implies f < f).
+  --   When x = y this becomes: if HeadGreater x f and HeadLess x f,
+  --   then size x < size x, i.e. false.
+  -- Once completed, the constraints are satisfiable iff:
+  -- 1. The size constrains are satisfiable.
+  -- 2. There is no literal Less x x.
+  Solved1 {
+    -- Size constraints.
+    prob        :: Problem v,
+    -- HeadLess and HeadGreater constraints for variables.
+    headLess    :: Map v (Arity f),
+    headGreater :: Map v (Arity f),
+    -- Less x y constraints. Transitively closed.
+    less        :: Map v (Set v) }
+  deriving (Eq, Ord, Show)
 
-solve :: (Ord f, Ord v) => Formula f v -> Solved f v
-solve _ = Solved
+instance (PrettyTerm f, Pretty v) => Pretty (Solved f v) where
+  pretty (Solved cs) =
+    case Set.toList cs of
+      [] -> text "false"
+      [c] -> pretty c
+      cs -> fsep (punctuate (text " |") (map pretty cs))
+
+instance (PrettyTerm f, Pretty v) => Pretty (Solved1 f v) where
+  pretty x =
+    pretty [
+      pretty (prob x),
+      pretty (headLess x),
+      pretty (headGreater x),
+      pretty (less x) ]
+
+solve :: (Sized f, Ord f, Ord v) => Formula f v -> Solved f v
+solve (Disj cs) =
+  Solved (Set.fromList (catMaybes (map solve1 cs)))
+
+solve1 :: (Sized f, Ord f, Ord v) => Clause f v -> Maybe (Solved1 f v)
+solve1 (Conj ls)
+  | not (null equal) = ERROR "must call split before using a context"
+  | isNothing (FM.solve prob) = Nothing
+  | or [ Set.member x s | (x, s) <- Map.toList less' ] = Nothing
+  | otherwise = Just (Solved1 prob headLess' headGreater' less')
+  where
+    size = [s | Size s <- ls]
+    headLess = [(unVar x, f) | HeadLess x f <- ls]
+    headGreater = [(unVar x, f) | HeadGreater x f <- ls]
+    headLess' = Map.fromListWith min headLess
+    headGreater' = Map.fromListWith max headGreater
+    less = [(unVar t, unVar u) | Less t u <- ls]
+    less' = close less
+    equal = [() | Equal{} <- ls]
+    unVar (Var x) = x
+    unVar _ = ERROR "must call split before using a context"
+    prob = FM.problem (size ++ axioms ++ lessProb ++ headProb)
+    axioms = [var x >== 1 | x <- usort (vars ls)]
+    lessProb = [var x <== var y | (x, y) <- less]
+    headProb = [var x </= var y | (x, f) <- Map.toList headGreater', (y, g) <- Map.toList headLess', f >= g]
+
+close :: Ord a => [(a, a)] -> Map a (Set a)
+close bs = Map.fromList [(x, close1 bs x) | x <- usort (map fst bs)]
+
+close1 :: Ord a => [(a, a)] -> a -> Set a
+close1 bs x = aux [x] Set.empty
+  where
+    aux [] s = s
+    aux (x:xs) s
+      | x `Set.member` s = aux xs s
+      | otherwise = aux (ys ++ xs) (Set.union (Set.fromList ys) s)
+      where
+        ys = [y | (x', y) <- bs, x == x']
 
 satisfiable :: (Ord f, Ord v) => Solved f v -> Bool
-satisfiable _ = True
+satisfiable (Solved cs) = not (Set.null cs)
 
 {-
 implies :: (Sized f, Numbered v, Ord f, Ord v) => Context f v -> Context f v -> Bool

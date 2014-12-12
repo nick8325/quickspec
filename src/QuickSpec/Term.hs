@@ -65,7 +65,7 @@ compareTerms t u =
     here EQ = Nothing
     here ord = Just (t, u, ord)
 
-measureFunction :: (Sized f, Ord f) => f -> Int -> (Int, f)
+measureFunction :: Ord f => f -> Int -> (Int, f)
 measureFunction f arity = (twiddle arity, f)
   where
     -- This tweak is taken from Prover9
