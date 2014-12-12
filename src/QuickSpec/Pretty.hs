@@ -34,7 +34,7 @@ instance (Pretty a, Pretty b, Pretty c, Pretty d) => Pretty (a, b, c, d) where
 
 instance Pretty a => Pretty (Maybe a) where
   prettyPrec p (Just x) =
-    prettyParen (p > 11) $
+    prettyParen (p > 10) $
       hang (text "Just") 2 (prettyPrec 11 x)
   prettyPrec _ Nothing = text "Nothing"
 
