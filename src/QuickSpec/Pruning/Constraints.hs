@@ -41,7 +41,7 @@ data Constrained a =
     constrained :: a }
 
 instance (PrettyTerm (ConstantOf a), Pretty (VariableOf a), Pretty a) => Pretty (Constrained a) where
-  pretty (Constrained (Disj [Conj []]) x) = pretty x
+  pretty (Constrained (Context { formula = Disj [Conj []] }) x) = pretty x
   pretty (Constrained ctx x) =
     hang (pretty x) 2 (text "when" <+> pretty ctx)
 
@@ -61,11 +61,32 @@ instance (Sized (ConstantOf a), Ord (VariableOf a), Symbolic a) => Symbolic (Con
     Constrained (substf sub ctx) (substf sub x)
 
 type ContextOf a = Context (ConstantOf a) (VariableOf a)
+data Context f v =
+  Context {
+    formula :: Formula f v }
+  deriving Show
+
+toContext :: Formula f v -> Context f v
+toContext = Context
+
+instance (Eq f, Eq v) => Eq (Context f v) where
+  x == y = formula x == formula y
+instance (Ord f, Ord v) => Ord (Context f v) where
+  compare = comparing formula
+instance (PrettyTerm f, Pretty v) => Pretty (Context f v) where
+  pretty = pretty . formula
+instance (Sized f, Ord v) => Symbolic (Context f v) where
+  type ConstantOf (Context f v) = f
+  type VariableOf (Context f v) = v
+  termsDL ctx = termsDL (formula ctx)
+  substf sub ctx = toContext (substf sub (formula ctx))
+
+type FormulaOf a = Formula (ConstantOf a) (VariableOf a)
 type ClauseOf a  = Clause  (ConstantOf a) (VariableOf a)
-newtype Context f v = Disj { disjuncts :: [Clause f v] }  deriving (Eq, Ord, Show)
+newtype Formula f v = Disj { disjuncts :: [Clause f v] }  deriving (Eq, Ord, Show)
 newtype Clause f v  = Conj { conjuncts :: [Literal f v] } deriving (Eq, Ord, Show)
 
-instance (PrettyTerm f, Pretty v) => Pretty (Context f v) where
+instance (PrettyTerm f, Pretty v) => Pretty (Formula f v) where
   pretty (Disj []) = text "false"
   pretty (Disj [x]) = pretty x
   pretty (Disj ls) =
@@ -77,9 +98,9 @@ instance (PrettyTerm f, Pretty v) => Pretty (Clause f v) where
   pretty (Conj ls) =
     fsep (punctuate (text " &") (map pretty ls))
 
-instance (Sized f, Ord v) => Symbolic (Context f v) where
-  type ConstantOf (Context f v) = f
-  type VariableOf (Context f v) = v
+instance (Sized f, Ord v) => Symbolic (Formula f v) where
+  type ConstantOf (Formula f v) = f
+  type VariableOf (Formula f v) = v
   termsDL (Disj fs) = msum (map termsDL fs)
   substf sub (Disj fs) = Disj (map (substf sub) fs)
 
@@ -135,42 +156,39 @@ solveSize :: Ord v => Bound (FM.Term v) -> Maybe (Map v Rational)
 solveSize s =
   solve (problem (s:[ var x >== 1 | x <- Map.keys (FM.vars (bound s)) ]))
 
-literal :: Literal f v -> Context f v
+literal :: Literal f v -> Formula f v
 literal l = literals [l]
 
-literals :: [Literal f v] -> Context f v
+literals :: [Literal f v] -> Formula f v
 literals ls = Disj [Conj ls]
 
-disj, conj :: [Context f v] -> Context f v
+disj, conj :: [Formula f v] -> Formula f v
 disj fs = Disj (concatMap disjuncts fs)
 conj [] = Disj [Conj []]
 conj (Disj cs:fs) =
   Disj [ Conj (ls ++ ls') | Conj ls <- cs, Conj ls' <- disjuncts (conj fs) ]
 
-true, false :: Context f v
+true, false :: Formula f v
 true = conj []
 false = disj []
 
-bool :: Bool -> Context f v
+bool :: Bool -> Formula f v
 bool True = true
 bool False = false
 
-split :: (Symbolic a, Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Numbered (VariableOf a)) => Constrained a -> [Constrained a]
-split x =
-  case simplify x of
-    (Constrained (Disj []) _, xs) -> xs
-    (y, xs) -> y:xs
-
-simplify :: (Symbolic a, Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Numbered (VariableOf a)) => Constrained a -> (Constrained a, [Constrained a])
-simplify (Constrained ctx x) = (Constrained ctx' x, concatMap (split . f) xs)
+split :: (Symbolic a, Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Numbered (VariableOf a)) => Constrained a -> (Constrained a, [Constrained a])
+split (Constrained ctx x) = (Constrained (Context ctx') x, concatMap (split' . f) xs)
   where
-    (ctx', xs) = splitContext ctx
-    f (sub, ctx') = substf (evalSubst sub) (Constrained ctx' x)
+    (ctx', xs) = splitFormula (formula ctx)
+    f (sub, ctx') = substf (evalSubst sub) (Constrained (toContext ctx') x)
 
-type Split f v = (Context f v, [(Subst f v, Context f v)])
+split' :: (Symbolic a, Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Numbered (VariableOf a)) => Constrained a -> [Constrained a]
+split' x = y:xs where (y, xs) = split x
 
-splitContext :: (Sized f, Ord f, Ord v, Numbered v) => Context f v -> Split f v
-splitContext (Disj cs) = (disj (map fst xs), concatMap snd xs)
+type Split f v = (Formula f v, [(Subst f v, Formula f v)])
+
+splitFormula :: (Sized f, Ord f, Ord v, Numbered v) => Formula f v -> Split f v
+splitFormula (Disj cs) = (disj (map fst xs), concatMap snd xs)
   where xs = map splitClause cs
 
 splitClause :: (Sized f, Ord f, Ord v, Numbered v) => Clause f v -> Split f v
@@ -178,9 +196,9 @@ splitClause (Conj ls) =
   case runM simplifyLiterals ls of
     Stop -> (literals ls, [])
     Substitute sub -> (false, [(sub, literals ls)])
-    Simplify ctx -> splitContext ctx
+    Simplify ctx -> splitFormula ctx
 
-data Result f v = Substitute (Subst f v) | Simplify (Context f v) | Stop
+data Result f v = Substitute (Subst f v) | Simplify (Formula f v) | Stop
 
 type M = State Int
 
@@ -211,7 +229,7 @@ simplifyLiterals (l:ls) =
     op (Just ctx) Stop            = Simplify (conj [ctx, literals ls])
     op _          res             = res
 
-simplifyLiteral :: (Sized f, Ord f, Ord v, Numbered v) => Literal f v -> M (Maybe (Context f v))
+simplifyLiteral :: (Sized f, Ord f, Ord v, Numbered v) => Literal f v -> M (Maybe (Formula f v))
 simplifyLiteral (Size s)
   | isNothing (solveSize s) = return (Just false)
   | isNothing (solveSize (negateBound s)) = return (Just true)
@@ -236,7 +254,7 @@ simplifyLiteral (Less t u) | isFun t || isFun u = do
     sz = termSize t - termSize u
 simplifyLiteral l = return Nothing
 
-structLess :: (Sized f, Ord f, Ord v, Numbered v) => Tm f v -> Tm f v -> M (Context f v)
+structLess :: (Sized f, Ord f, Ord v, Numbered v) => Tm f v -> Tm f v -> M (Formula f v)
 structLess (Fun f ts) (Fun g us) =
   return $
   case compare (measureFunction f (length ts)) (measureFunction g (length us)) of
@@ -260,7 +278,7 @@ structLess (Fun f ts) (Var x) = do
       literal (HeadGreater (Var x) f (length ts)),
       conj [literal (Equal (Var x) u), argsLess us ts]]
 
-argsLess :: (Sized f, Ord f, Ord v) => [Tm f v] -> [Tm f v] -> Context f v
+argsLess :: (Sized f, Ord f, Ord v) => [Tm f v] -> [Tm f v] -> Formula f v
 argsLess [] [] = false
 argsLess (t:ts) (u:us) =
   disj [
