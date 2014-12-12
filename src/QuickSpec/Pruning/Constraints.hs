@@ -384,6 +384,32 @@ close1 bs x = aux [x] Set.empty
 satisfiable :: (Ord f, Ord v) => Solved f v -> Bool
 satisfiable (Solved cs) = not (Set.null cs)
 
+implies :: (Sized f, Numbered v, Ord f, Ord v) => Solved f v -> Context f v -> Bool
+implies form ctx = any (impliesClause form) cs
+  where
+    (Disj cs, _) = splitFormula (formula ctx)
+
+impliesClause :: (Sized f, Numbered v, Ord f, Ord v) => Solved f v -> Clause f v -> Bool
+impliesClause (Solved fs) (Conj ls) =
+  and [ or [ impliesLiteral f l | f <- Set.toList fs ] | l <- ls ]
+
+impliesLiteral :: (Sized f, Numbered v, Ord f, Ord v) => Solved1 f v -> Literal f v -> Bool
+impliesLiteral form (Size s) =
+  isNothing (FM.solve (addTerms ts (prob form)))
+  where
+    ts = negateBound s:[ var x >== 1 | x <- Map.keys (FM.vars (bound s)) ]
+impliesLiteral form (Less (Var x) (Var y)) =
+  y `Set.member` Map.findWithDefault Set.empty x (less form)
+impliesLiteral form (HeadLess (Var x) f) =
+  case Map.lookup x (headLess form) of
+    Just g | g < f -> True
+    _ -> False
+impliesLiteral form (HeadGreater (Var x) f) =
+  case Map.lookup x (headGreater form) of
+    Just g | g > f -> True
+    _ -> False
+impliesLiteral _ _ = ERROR "must call split before using a context"
+
 {-
 implies :: (Sized f, Numbered v, Ord f, Ord v) => Context f v -> Context f v -> Bool
 implies ctx (Context ls _) =
