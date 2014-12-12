@@ -211,15 +211,12 @@ bool True = FTrue
 bool False = FFalse
 
 split :: (Symbolic a, Ord a, Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Numbered (VariableOf a)) => Constrained a -> (Constrained a, [Constrained a])
-split (Constrained ctx x) = (Constrained (toContext ctx') x, collect (concatMap (split' . f) xs))
+split (Constrained ctx x) = (make form, concatMap split' zs)
   where
-    (ctx', xs) = splitFormula (runM simplify (formula ctx))
-    f (sub, ctx') = substf (evalSubst sub) (Constrained (toContext ctx') x)
-    collect = map coll . partitionBy constrained
-    coll [x] = x
-    coll xs@(Constrained _ x:_) = Constrained ctx x
-      where
-        ctx = toContext (foldr (|||) FFalse (map (formula . context) xs))
+    make ctx = Constrained (toContext ctx) x
+    (form, xs) = splitFormula (runM simplify (formula ctx))
+    ys = collate (foldr (|||) FFalse) xs
+    zs = [ substf (evalSubst sub) (make form) | (sub, form) <- ys ]
 
 split' :: (Symbolic a, Ord a, Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Numbered (VariableOf a)) => Constrained a -> [Constrained a]
 split' x

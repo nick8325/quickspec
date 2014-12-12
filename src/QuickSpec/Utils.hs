@@ -20,6 +20,11 @@ partitionBy value =
   sortBy (comparing snd) .
   map (id &&& value)
 
+collate :: Ord a => ([b] -> c) -> [(a, b)] -> [(a, c)]
+collate f = map g . partitionBy fst
+  where
+    g xs = (fst (head xs), f (map snd xs))
+
 isSorted :: Ord a => [a] -> Bool
 isSorted xs = and (zipWith (<=) xs (tail xs))
 

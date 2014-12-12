@@ -30,6 +30,7 @@ import Data.Rewriting.Term.Ops(subterms)
 import QuickSpec.Pretty
 import QuickSpec.Utils
 import Text.PrettyPrint.HughesPJ hiding (empty)
+import Data.Ord
 
 -- Renamings of functionality from term-rewriting.
 type Tm = T.Term
@@ -45,6 +46,11 @@ evalSubst s = subst s . Var
 
 subst :: Ord v => Subst f v -> Tm f v -> Tm f v
 subst = T.apply
+
+instance (Eq f, Eq v, Eq v') => Eq (GSubst v f v') where
+  x == y = T.toMap x == T.toMap y
+instance (Ord f, Ord v, Ord v') => Ord (GSubst v f v') where
+  compare = comparing T.toMap
 
 -- Generalisation of term functionality to things that contain terms.
 class Symbolic a where
