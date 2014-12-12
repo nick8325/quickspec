@@ -45,8 +45,7 @@ compareFuns (Var x) (Var y) = compare x y
 compareFuns Var{} Fun{} = LT
 compareFuns Fun{} Var{} = GT
 compareFuns (Fun f ts) (Fun g us) =
-  compare (measureFunction f (length ts))
-          (measureFunction g (length us)) `orElse`
+  compare (f :/: length ts) (g :/: length us) `orElse`
   compare (map MeasureFuns ts) (map MeasureFuns us)
 
 -- Take two terms and find the first place where they differ.
@@ -58,20 +57,24 @@ compareTerms t u =
     (Var{}, Fun{}) -> here LT
     (Fun{}, Var{}) -> here GT
     (Fun f xs, Fun g ys) ->
-      here (compare (measureFunction f (length xs))
-                    (measureFunction g (length ys))) `mplus`
+      here (compare (f :/: length xs) (g :/: length ys)) `mplus`
       msum (zipWith compareTerms xs ys)
   where
     here EQ = Nothing
     here ord = Just (t, u, ord)
 
-measureFunction :: Ord f => f -> Int -> (Int, f)
-measureFunction f arity = (twiddle arity, f)
-  where
-    -- This tweak is taken from Prover9
-    twiddle 2 = 1
-    twiddle 1 = 2
-    twiddle n = n
+data Arity f = f :/: Int deriving (Eq, Show)
+
+instance Ord f => Ord (Arity f) where
+  compare = comparing (\(f :/: n) -> (twiddle n, f))
+    where
+      -- This tweak is taken from Prover9
+      twiddle 2 = 1
+      twiddle 1 = 2
+      twiddle n = n
+
+instance Pretty f => Pretty (Arity f) where
+  pretty (f :/: n) = pretty f <> text "/" <> pretty n
 
 -- Reduction ordering (i.e., a partial order closed under substitution).
 orientTerms :: (Sized f, Ord f, Ord v) => Tm f v -> Tm f v -> Maybe Ordering

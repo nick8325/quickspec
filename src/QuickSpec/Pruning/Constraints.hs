@@ -127,14 +127,6 @@ data Literal f v =
   | Equal (Tm f v) (Tm f v)
   deriving (Eq, Ord, Show)
 
-data Arity f = f :/: Int deriving (Eq, Show)
-
-instance Ord f => Ord (Arity f) where
-  compare = comparing (\(f :/: n) -> measureFunction f n)
-
-instance Pretty f => Pretty (Arity f) where
-  pretty (f :/: n) = pretty f <> text "/" <> pretty n
-
 instance (PrettyTerm f, Pretty v) => Pretty (Literal f v) where
   pretty (Size t) = pretty t
   pretty (HeadLess t x) = text "hd(" <> pretty t <> text ") <" <+> pretty x
@@ -289,10 +281,10 @@ simplifyLiteral :: (Sized f, Ord f, Ord v, Numbered v) => Literal f v -> M (Mayb
 simplifyLiteral (Size s)
   | isNothing (solveSize s) = return (Just false)
   | isNothing (solveSize (negateBound s)) = return (Just true)
-simplifyLiteral (HeadLess (Fun f ts) (g :/: n)) =
-  return (Just (bool (measureFunction f (length ts) < measureFunction g n)))
-simplifyLiteral (HeadGreater (Fun f ts) (g :/: n)) =
-  return (Just (bool (measureFunction f (length ts) > measureFunction g n)))
+simplifyLiteral (HeadLess (Fun f ts) g) =
+  return (Just (bool (f :/: length ts < g)))
+simplifyLiteral (HeadGreater (Fun f ts) g) =
+  return (Just (bool (f :/: length ts > g)))
 simplifyLiteral (HeadGreater _ (f :/: 1)) | funSize f == 0 =
   return (Just false)
 simplifyLiteral (Less t u) | t == u = return (Just false)
@@ -313,7 +305,7 @@ simplifyLiteral l = return Nothing
 structLess :: (Sized f, Ord f, Ord v, Numbered v) => Tm f v -> Tm f v -> M (Formula f v)
 structLess (Fun f ts) (Fun g us) =
   return $
-  case compare (measureFunction f (length ts)) (measureFunction g (length us)) of
+  case compare (f :/: length ts) (g :/: length us) of
     LT -> true
     GT -> false
     EQ -> argsLess ts us

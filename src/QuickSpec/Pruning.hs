@@ -173,7 +173,7 @@ instance Ord PruningConstant where
   compare = comparing f
     where
       f (SkolemVariable x)    = Left x
-      f (TermConstant x ty n) = Right (Left (measureFunction x n, ty))
+      f (TermConstant x ty n) = Right (Left (x :/: n, ty))
       f (HasType ty)          = Right (Right ty)
 
 -- Hopefully we have the property:
