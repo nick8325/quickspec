@@ -382,6 +382,7 @@ solve (Disj cs) =
   Solved (Set.fromList (catMaybes (map solve1 cs)))
 
 solve1 :: (Sized f, Ord f, Ord v) => Clause f v -> Maybe (Solved1 f v)
+solve1 (Conj []) = Just unconditionalSolved1
 solve1 (Conj ls)
   | not (null equal) = ERROR "must call split before using a context"
   | isNothing (FM.solve prob) = Nothing
@@ -401,6 +402,10 @@ solve1 (Conj ls)
     prob = FM.problem (size ++ termAxioms ls ++ lessProb ++ headProb)
     lessProb = [var x <== var y | (x, y) <- less]
     headProb = [var x </= var y | (x, f) <- Map.toList headGreater', (y, g) <- Map.toList headLess', f >= g]
+
+-- XXX check if this helps with performance
+unconditionalSolved1 :: Solved1 f v
+unconditionalSolved1 = Solved1 FM.empty Map.empty Map.empty Map.empty
 
 close :: Ord a => [(a, a)] -> Map a (Set a)
 close bs = Map.fromList [(x, close1 bs x) | x <- usort (map fst bs)]
