@@ -116,7 +116,7 @@ data Formula f v =
   | HeadIs Sense (Tm f v) (Arity f)
   | Less (Tm f v) (Tm f v)
     -- Equal t u p q represents (t = u & p) | q.
-    -- The smart constructors disj and conj lift
+    -- The smart constructors (|||) and (&&&) lift
     -- Equal to the top level.
   | Equal (Tm f v) (Tm f v) (Formula f v) (Formula f v)
   deriving (Eq, Ord, Show)
