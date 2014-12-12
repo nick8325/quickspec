@@ -240,7 +240,10 @@ newName x = do
 
 simplifyLiterals :: (Sized f, Ord f, Ord v, Numbered v) => [Literal f v] -> M (Result f v)
 simplifyLiterals [] = return Stop
-simplifyLiterals (Equal t u:ls) | t == u = simplifyLiterals ls
+simplifyLiterals (Equal t u:ls) | t == u = fmap f (simplifyLiterals ls)
+  where
+    f Stop = Simplify (literals ls)
+    f res  = res
 simplifyLiterals (Equal t u:ls) =
   return $
   case unify t u of
