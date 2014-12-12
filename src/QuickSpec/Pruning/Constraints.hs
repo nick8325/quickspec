@@ -218,13 +218,18 @@ simplify ctx = toContext (simplifyFormula (formula ctx))
         Nothing -> False
         Just s -> all (impliesLiteral s) ls
 
-split :: (Symbolic a, Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Numbered (VariableOf a)) => Constrained a -> (Constrained a, [Constrained a])
-split (Constrained ctx x) = (Constrained (toContext ctx') x, concatMap (split' . f) xs)
+split :: (Symbolic a, Ord a, Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Numbered (VariableOf a)) => Constrained a -> (Constrained a, [Constrained a])
+split (Constrained ctx x) = (Constrained (toContext ctx') x, collect (concatMap (split' . f) xs))
   where
     (ctx', xs) = splitFormula (formula ctx)
     f (sub, ctx') = substf (evalSubst sub) (Constrained (toContext ctx') x)
+    collect = map coll . partitionBy constrained
+    coll [x] = x
+    coll xs@(Constrained _ x:_) = Constrained ctx x
+      where
+        ctx = toContext (disj (map (formula . context) xs))
 
-split' :: (Symbolic a, Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Numbered (VariableOf a)) => Constrained a -> [Constrained a]
+split' :: (Symbolic a, Ord a, Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Numbered (VariableOf a)) => Constrained a -> [Constrained a]
 split' x
   | satisfiable (solved (context y)) = y:xs
   | otherwise = xs
