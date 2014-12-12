@@ -49,7 +49,7 @@ deriving instance (Eq a, Eq (ConstantOf a), Eq (VariableOf a)) => Eq (Constraine
 deriving instance (Ord a, Ord (ConstantOf a), Ord (VariableOf a)) => Ord (Constrained a)
 deriving instance (Show a, Show (VariableOf a), Show (ConstantOf a)) => Show (Constrained a)
 
-instance (Sized (ConstantOf a), Ord (VariableOf a), Symbolic a) => Symbolic (Constrained a) where
+instance (Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Symbolic a) => Symbolic (Constrained a) where
   type ConstantOf (Constrained a) = ConstantOf a
   type VariableOf (Constrained a) = VariableOf a
 
@@ -63,11 +63,12 @@ instance (Sized (ConstantOf a), Ord (VariableOf a), Symbolic a) => Symbolic (Con
 type ContextOf a = Context (ConstantOf a) (VariableOf a)
 data Context f v =
   Context {
-    formula :: Formula f v }
+    formula :: Formula f v,
+    solved  :: Solved f v }
   deriving Show
 
-toContext :: Formula f v -> Context f v
-toContext = Context
+toContext :: (Ord f, Ord v) => Formula f v -> Context f v
+toContext x = Context x (solve x)
 
 instance (Eq f, Eq v) => Eq (Context f v) where
   x == y = formula x == formula y
@@ -75,7 +76,7 @@ instance (Ord f, Ord v) => Ord (Context f v) where
   compare = comparing formula
 instance (PrettyTerm f, Pretty v) => Pretty (Context f v) where
   pretty = pretty . formula
-instance (Sized f, Ord v) => Symbolic (Context f v) where
+instance (Sized f, Ord f, Ord v) => Symbolic (Context f v) where
   type ConstantOf (Context f v) = f
   type VariableOf (Context f v) = v
   termsDL ctx = termsDL (formula ctx)
@@ -154,7 +155,7 @@ termSize = foldTerm FM.var fun
 
 solveSize :: Ord v => Bound (FM.Term v) -> Maybe (Map v Rational)
 solveSize s =
-  solve (problem (s:[ var x >== 1 | x <- Map.keys (FM.vars (bound s)) ]))
+  FM.solve (problem (s:[ var x >== 1 | x <- Map.keys (FM.vars (bound s)) ]))
 
 literal :: Literal f v -> Formula f v
 literal l = literals [l]
@@ -177,13 +178,16 @@ bool True = true
 bool False = false
 
 split :: (Symbolic a, Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Numbered (VariableOf a)) => Constrained a -> (Constrained a, [Constrained a])
-split (Constrained ctx x) = (Constrained (Context ctx') x, concatMap (split' . f) xs)
+split (Constrained ctx x) = (Constrained (toContext ctx') x, concatMap (split' . f) xs)
   where
     (ctx', xs) = splitFormula (formula ctx)
     f (sub, ctx') = substf (evalSubst sub) (Constrained (toContext ctx') x)
 
 split' :: (Symbolic a, Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Numbered (VariableOf a)) => Constrained a -> [Constrained a]
-split' x = y:xs where (y, xs) = split x
+split' x
+  | satisfiable (solved (context y)) = y:xs
+  | otherwise = xs
+  where (y, xs) = split x
 
 type Split f v = (Formula f v, [(Subst f v, Formula f v)])
 
@@ -284,6 +288,16 @@ argsLess (t:ts) (u:us) =
   disj [
     literal (Less t u),
     conj [literal (Equal t u), argsLess ts us]]
+
+type SolvedOf a = Solved (ConstantOf a) (VariableOf a)
+data Solved f v = Solved
+  deriving Show
+
+solve :: (Ord f, Ord v) => Formula f v -> Solved f v
+solve _ = Solved
+
+satisfiable :: (Ord f, Ord v) => Solved f v -> Bool
+satisfiable _ = True
 
 {-
 implies :: (Sized f, Numbered v, Ord f, Ord v) => Context f v -> Context f v -> Bool
