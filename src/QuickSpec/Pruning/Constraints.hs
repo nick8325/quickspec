@@ -63,6 +63,22 @@ instance (Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Symbolic
   substf sub (Constrained ctx x) =
     Constrained (substf sub ctx) (substf sub x)
 
+split :: (Symbolic a, Ord a, Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Numbered (VariableOf a)) => Constrained a -> [Constrained a]
+split (Constrained ctx x) =
+  case runM simplify (formula ctx) of
+    Equal t u p q ->
+      let Just sub = unify t u in
+      make q:split (substf (evalSubst sub) (make p))
+    p -> [make p]
+  where
+    make ctx = Constrained (toContext ctx) x
+
+neg :: (Symbolic a, Sized (ConstantOf a), Numbered (VariableOf a), Ord (ConstantOf a), Ord (VariableOf a)) => Constrained a -> Constrained a
+neg = runM $ \x -> do
+  f <- negFormula (formula (context x))
+  return x { context = toContext f }
+
+-- Contexts (sets of constraints).
 type ContextOf a = Context (ConstantOf a) (VariableOf a)
 data Context f v =
   Context {
@@ -85,6 +101,7 @@ instance (Sized f, Ord f, Ord v) => Symbolic (Context f v) where
   termsDL ctx = termsDL (formula ctx)
   substf sub ctx = toContext (substf sub (formula ctx))
 
+-- Formulas.
 type FormulaOf a = Formula (ConstantOf a) (VariableOf a)
 data Formula f v =
   -- After calling split, formulas are in the following form:
@@ -108,14 +125,6 @@ data Sense = Lesser | Greater deriving (Eq, Ord, Show)
 instance Pretty Sense where
   pretty Lesser = text "<"
   pretty Greater = text ">"
-
-negateSense :: Sense -> Sense
-negateSense Lesser = Greater
-negateSense Greater = Lesser
-
-evalSense :: Ord a => Sense -> a -> a -> Bool
-evalSense Lesser = (<)
-evalSense Greater = (>)
 
 instance (PrettyTerm f, Pretty v) => Pretty (Formula f v) where
   prettyPrec _ FTrue = text "true"
@@ -153,14 +162,13 @@ instance (Sized f, Ord v) => Symbolic (Formula f v) where
   substf sub (p :&: q) = substf sub p &&& substf sub q
   substf sub (p :|: q) = substf sub p ||| substf sub q
   substf sub (Size t) = Size t { bound = substFM sub (bound t) }
+    where
+      substFM f t =
+        constTerm (FM.constant t) +
+        sum [k ^* termSize (f v) | (v, k) <- Map.toList (FM.vars t)]
   substf sub (HeadIs sense t f) = HeadIs sense (substf sub t) f
   substf sub (Less t u) = Less (substf sub t) (substf sub u)
   substf sub (Equal t u p q) = Equal (substf sub t) (substf sub u) (substf sub p) (substf sub q)
-
-substFM :: (Sized f, Ord v') => (v -> Tm f v') -> FM.Term v -> FM.Term v'
-substFM f t =
-  constTerm (FM.constant t) +
-  sum [k ^* termSize (f v) | (v, k) <- Map.toList (FM.vars t)]
 
 termSize :: (Sized f, Ord v) => Tm f v -> FM.Term v
 termSize = foldTerm FM.var fun
@@ -172,10 +180,6 @@ sizeAxioms s = [ var x >== 1 | x <- Map.keys (FM.vars (bound s)) ]
 
 termAxioms :: (Symbolic a, Ord (VariableOf a)) => a -> [Bound (FM.Term (VariableOf a))]
 termAxioms t = [ var x >== 1 | x <- usort (vars t) ]
-
-solveSize :: Ord v => Bound (FM.Term v) -> Maybe (Map v Rational)
-solveSize s =
-  FM.solve (problem (s:sizeAxioms s))
 
 (|||), (&&&) :: Formula f v -> Formula f v -> Formula f v
 FTrue ||| _ = FTrue
@@ -194,36 +198,6 @@ Equal t u p q &&& r = Equal t u (p &&& r) (q &&& r)
 r &&& Equal t u p q = Equal t u (p &&& r) (q &&& r)
 p &&& q = p :&: q
 
-neg :: (Sized f, Numbered v, Ord f, Ord v) => Formula f v -> M (Formula f v)
-neg FTrue = return FFalse
-neg FFalse = return FTrue
-neg (p :&: q) = liftM2 (&&&) (neg p) (neg q)
-neg (p :|: q) = liftM2 (|||) (neg p) (neg q)
-neg (Size s) = return (Size (negateBound s))
-neg (Less t u) = return (Equal t u FTrue (Less u t))
-neg (HeadIs sense (Var x) f) = do
-  t <- specialise x f
-  return (Equal (Var x) t FTrue (HeadIs (negateSense sense) (Var x) f))
-neg _ = ERROR "must call split before using a context"
-
-bool :: Bool -> Formula f v
-bool True = FTrue
-bool False = FFalse
-
-split :: (Symbolic a, Ord a, Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Numbered (VariableOf a)) => Constrained a -> (Constrained a, [Constrained a])
-split (Constrained ctx x) = (make form, concatMap split' zs)
-  where
-    make ctx = Constrained (toContext ctx) x
-    (form, xs) = splitFormula (runM simplify (formula ctx))
-    ys = collate (foldr (|||) FFalse) xs
-    zs = [ substf (evalSubst sub) (make form) | (sub, form) <- ys ]
-
-split' :: (Symbolic a, Ord a, Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Numbered (VariableOf a)) => Constrained a -> [Constrained a]
-split' x
-  | satisfiable (solved (context y)) = y:xs
-  | otherwise = xs
-  where (y, xs) = split x
-
 type M = State Int
 
 runM :: (Symbolic a, Numbered (VariableOf a)) => (a -> M b) -> a -> b
@@ -237,13 +211,6 @@ newName x = do
   put $! n+1
   return (withNumber n x)
 
-splitFormula :: (Sized f, Ord f, Ord v, Numbered v) => Formula f v -> (Formula f v, [(Subst f v, Formula f v)])
-splitFormula (Equal t u p q) = (q', (sub, p):xs)
-  where
-    Just sub = unify t u
-    (q', xs) = splitFormula q
-splitFormula p = (p, [])
-
 simplify :: (Sized f, Ord f, Ord v, Numbered v) => Formula f v -> M (Formula f v)
 simplify FTrue = return FTrue
 simplify FFalse = return FFalse
@@ -255,10 +222,16 @@ simplify (Equal t u p q) =
     Nothing -> simplify q
     Just{} -> fmap (Equal t u p) (simplify q)
 simplify (Size s)
-  | isNothing (solveSize s) = return FFalse
-  | isNothing (solveSize (negateBound s)) = return FTrue
-simplify (HeadIs sense (Fun f ts) g) =
-  return (bool (evalSense sense (f :/: length ts) g))
+  | isNothing (solve s) = return FFalse
+  | isNothing (solve (negateBound s)) = return FTrue
+  where
+    solve s = FM.solve (problem (s:sizeAxioms s))
+simplify (HeadIs sense (Fun f ts) g)
+  | test sense (f :/: length ts) g = return FTrue
+  | otherwise = return FFalse
+  where
+    test Lesser = (<)
+    test Greater = (>)
 simplify (HeadIs Greater _ (f :/: 1)) | funSize f == 0 =
   return FFalse
 simplify (Less t u) | t == u = return FFalse
@@ -277,7 +250,10 @@ structLess (Fun f ts) (Fun g us) =
   case compare (f :/: length ts) (g :/: length us) of
     LT -> FTrue
     GT -> FFalse
-    EQ -> argsLess ts us
+    EQ -> loop ts us
+  where
+    loop [] [] = FFalse
+    loop (t:ts) (u:us) = Equal t u (loop ts us) (Less t u)
 structLess (Var x) (Fun f ts) = do
   u <- specialise x (f :/: length ts)
   rest <- structLess u (Fun f ts)
@@ -296,11 +272,22 @@ specialise x (f :/: n) = do
   ns <- replicateM n (newName x)
   return (Fun f (map Var ns))
 
-argsLess :: (Sized f, Ord f, Ord v) => [Tm f v] -> [Tm f v] -> Formula f v
-argsLess [] [] = FFalse
-argsLess (t:ts) (u:us) =
-  Equal t u (argsLess ts us) (Less t u)
+negFormula :: (Sized f, Numbered v, Ord f, Ord v) => Formula f v -> M (Formula f v)
+negFormula FTrue = return FFalse
+negFormula FFalse = return FTrue
+negFormula (p :&: q) = liftM2 (|||) (negFormula p) (negFormula q)
+negFormula (p :|: q) = liftM2 (&&&) (negFormula p) (negFormula q)
+negFormula (Size s) = return (Size (negateBound s))
+negFormula (Less t u) = return (Equal t u FTrue (Less u t))
+negFormula (HeadIs sense (Var x) f) = do
+  t <- specialise x f
+  return (Equal (Var x) t FTrue (HeadIs (negFormulaateSense sense) (Var x) f))
+  where
+    negFormulaateSense Lesser = Greater
+    negFormulaateSense Greater = Lesser
+negFormula _ = ERROR "must call split before using a context"
 
+-- Solved formulas.
 type SolvedOf a = Solved (ConstantOf a) (VariableOf a)
 newtype Solved f v =
   Solved {
@@ -420,13 +407,14 @@ implies1 form (HeadIs Greater (Var x) f) =
 implies1 _ _ = ERROR "must call split before using a context"
 
 minSize :: (Sized f, Numbered v, Ord f, Ord v) => Solved f v -> Tm f v -> Integer
-minSize (Solved fs) t = minimum [ minSize1 f t | f <- Set.toList fs ]
+minSize (Solved fs) t =
+  minimum [ minimise (addTerms ax (prob f)) sz | f <- Set.toList fs ]
+  where
+    sz = termSize t
+    ax = termAxioms t
 
-minSize1 :: (Sized f, Numbered v, Ord f, Ord v) => Solved1 f v -> Tm f v -> Integer
-minSize1 form t = minProbSize (addTerms (termAxioms t) (prob form)) (termSize t)
-
-minProbSize :: Ord v => Problem v -> FM.Term v -> Integer
-minProbSize prob t =
+minimise :: Ord v => Problem v -> FM.Term v -> Integer
+minimise prob t =
   loop (eval (fromMaybe __ (FM.solve prob)) t)
   where
     loop x | x < 0 = __
