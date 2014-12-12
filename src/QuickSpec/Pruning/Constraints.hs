@@ -194,9 +194,37 @@ true, false :: Formula f v
 true = conj []
 false = disj []
 
+neg :: (Sized f, Numbered v, Ord f, Ord v) => Formula f v -> Formula f v
+neg (Disj cs) = conj (map negClause cs)
+  where
+    negClause (Conj ls) = disj (runM (mapM negLiteral) ls)
+    negLiteral (Size s) = return $ literal (Size (negateBound s))
+    negLiteral (Less t u) = return $ disj (map literal [Equal t u, Less u t])
+    negLiteral (HeadLess (Var x) f) = do
+      t <- specialise x f
+      return . disj . map literal $ [HeadGreater (Var x) f, Equal (Var x) t]
+    negLiteral (HeadGreater (Var x) f) = do
+      t <- specialise x f
+      return . disj . map literal $ [HeadLess (Var x) f, Equal (Var x) t]
+    negLiteral _ = ERROR "must call split before using a context"
+
 bool :: Bool -> Formula f v
 bool True = true
 bool False = false
+
+simplify :: (Sized f, Ord f, Ord v, Numbered v) => Context f v -> Context f v
+simplify ctx = toContext (simplifyFormula (formula ctx))
+  where
+    simplifyFormula (Disj cs) = Disj (prune [] cs)
+    prune xs [] = reverse xs
+    prune xs (y:ys)
+      | any (redundant y) (xs ++ ys) = prune xs ys
+      | otherwise = prune (y:xs) ys
+    redundant c _ | isNothing (solve1 c) = True
+    redundant (Conj ls) c =
+      case solve1 c of
+        Nothing -> False
+        Just s -> all (impliesLiteral s) ls
 
 split :: (Symbolic a, Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Numbered (VariableOf a)) => Constrained a -> (Constrained a, [Constrained a])
 split (Constrained ctx x) = (Constrained (toContext ctx') x, concatMap (split' . f) xs)
@@ -290,21 +318,24 @@ structLess (Fun f ts) (Fun g us) =
     GT -> false
     EQ -> argsLess ts us
 structLess (Var x) (Fun f ts) = do
-  ns <- replicateM (length ts) (newName x)
-  let u = Fun f us
-      us = map Var ns
+  u <- specialise x (f :/: length ts)
+  rest <- structLess u (Fun f ts)
   return $
     disj [
       literal (HeadLess (Var x) (f :/: length ts)),
-      conj [literal (Equal (Var x) u), argsLess ts us]]
+      conj [literal (Equal (Var x) u), rest]]
 structLess (Fun f ts) (Var x) = do
-  ns <- replicateM (length ts) (newName x)
-  let u = Fun f us
-      us = map Var ns
+  u <- specialise x (f :/: length ts)
+  rest <- structLess (Fun f ts) u
   return $
     disj [
       literal (HeadGreater (Var x) (f :/: length ts)),
-      conj [literal (Equal (Var x) u), argsLess us ts]]
+      conj [literal (Equal (Var x) u), rest]]
+
+specialise :: (Sized f, Ord f, Ord v, Numbered v) => v -> Arity f -> M (Tm f v)
+specialise x (f :/: n) = do
+  ns <- replicateM n (newName x)
+  return (Fun f (map Var ns))
 
 argsLess :: (Sized f, Ord f, Ord v) => [Tm f v] -> [Tm f v] -> Formula f v
 argsLess [] [] = false
