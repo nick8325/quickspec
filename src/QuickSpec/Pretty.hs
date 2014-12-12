@@ -16,6 +16,7 @@ class Pretty a where
   prettyList :: [a] -> Doc
   prettyList = brackets . fsep . punctuate comma . map pretty
 
+instance Pretty Doc where pretty = id
 instance Pretty Int where pretty = int
 instance Pretty Integer where pretty = integer
 instance Pretty () where pretty = text . show

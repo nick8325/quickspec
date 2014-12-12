@@ -16,25 +16,28 @@ import Data.Ord
 import qualified Data.Set as Set
 import Data.Set(Set)
 import qualified Data.Rewriting.Substitution.Type as Subst
-
+{-
 import QuickSpec.Pruning
 import Data.Rewriting.Rule(Rule(Rule))
 data F = F String | Ty deriving (Eq, Ord, Show)
 instance Pretty F where
   pretty (F x) = text x
   pretty Ty    = text "@"
-instance PrettyTerm F
+instance PrettyTerm F where termStyle _ = Infix 5
 instance Sized F where
   funSize (F _) = 1
   funSize Ty    = 0
 t, u :: Tm F PruningVariable
-t = Fun (F "sx") []
-u = Fun Ty [t]
-r1 = add (Less u t) (unconstrained (Rule t u))
-r2 = add (Less t u) (unconstrained (Rule u t))
-
-type T = FM.Term Int
-
+-- t = Fun (F "sx") []
+-- u = Fun Ty [t]
+--t = Fun (F "+") [Var 0, Var 1]
+--u = Fun (F "+") [Var 1, Var 0]
+(t, u) = (f (Var 0) (Var 1), f (Var 1) (Var 0))
+  where
+    f x y = Fun (F "*") [x, Fun (F "+") [y, Fun (F "+") [y, y]]]
+r1 = Constrained (toContext (literal (Less u t))) (Rule t u)
+r2 = Constrained (toContext (literal (Less t u))) (Rule u t)
+-}
 data Constrained a =
   Constrained {
     context     :: ContextOf a,
@@ -165,9 +168,15 @@ termSize = foldTerm FM.var fun
   where
     fun f ss = fromIntegral (funSize f) + sum ss
 
+sizeAxioms :: Ord v => Bound (FM.Term v) -> [Bound (FM.Term v)]
+sizeAxioms s = [ var x >== 1 | x <- Map.keys (FM.vars (bound s)) ]
+
+termAxioms :: (Symbolic a, Ord (VariableOf a)) => a -> [Bound (FM.Term (VariableOf a))]
+termAxioms t = [ var x >== 1 | x <- usort (vars t) ]
+
 solveSize :: Ord v => Bound (FM.Term v) -> Maybe (Map v Rational)
 solveSize s =
-  FM.solve (problem (s:[ var x >== 1 | x <- Map.keys (FM.vars (bound s)) ]))
+  FM.solve (problem (s:sizeAxioms s))
 
 literal :: Literal f v -> Formula f v
 literal l = literals [l]
@@ -363,8 +372,7 @@ solve1 (Conj ls)
     equal = [() | Equal{} <- ls]
     unVar (Var x) = x
     unVar _ = ERROR "must call split before using a context"
-    prob = FM.problem (size ++ axioms ++ lessProb ++ headProb)
-    axioms = [var x >== 1 | x <- usort (vars ls)]
+    prob = FM.problem (size ++ termAxioms ls ++ lessProb ++ headProb)
     lessProb = [var x <== var y | (x, y) <- less]
     headProb = [var x </= var y | (x, f) <- Map.toList headGreater', (y, g) <- Map.toList headLess', f >= g]
 
@@ -397,7 +405,7 @@ impliesLiteral :: (Sized f, Numbered v, Ord f, Ord v) => Solved1 f v -> Literal 
 impliesLiteral form (Size s) =
   isNothing (FM.solve (addTerms ts (prob form)))
   where
-    ts = negateBound s:[ var x >== 1 | x <- Map.keys (FM.vars (bound s)) ]
+    ts = negateBound s:sizeAxioms s
 impliesLiteral form (Less (Var x) (Var y)) =
   y `Set.member` Map.findWithDefault Set.empty x (less form)
 impliesLiteral form (HeadLess (Var x) f) =
@@ -414,9 +422,7 @@ minSize :: (Sized f, Numbered v, Ord f, Ord v) => Solved f v -> Tm f v -> Intege
 minSize (Solved fs) t = minimum [ minSize1 f t | f <- Set.toList fs ]
 
 minSize1 :: (Sized f, Numbered v, Ord f, Ord v) => Solved1 f v -> Tm f v -> Integer
-minSize1 form t = minProbSize (addTerms ts (prob form)) (termSize t)
-  where
-    ts = [ var x >== 1 | x <- usort (vars t) ]
+minSize1 form t = minProbSize (addTerms (termAxioms t) (prob form)) (termSize t)
 
 minProbSize :: Ord v => Problem v -> FM.Term v -> Integer
 minProbSize prob t =
