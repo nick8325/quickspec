@@ -309,10 +309,6 @@ consider sig makeEvent x = do
     Just u | u `Set.member` terms -> return ()
     Nothing | t `Set.member` terms -> return ()
     _ -> do
-      case res of
-        Just u ->
-          liftIO (putStrLn ("Ignoring reduction " ++ prettyShow t ++ " -> " ++ prettyShow u))
-        _ -> return ()
       ts <- getTestSet x
       res <-
         liftIO . testTimeout_ sig $
