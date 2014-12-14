@@ -30,8 +30,7 @@ data Event f v =
     NewRule (Constrained (Rule f v))
   | NewCPs [CP f v]
   | Consider (Constrained (Equation f v))
-  | CaseSplit (Constrained (Equation f v)) (Context f v) [Constrained (Equation f v)]
-  | ConsiderCaseSplit (Constrained (Equation f v)) (Context f v)
+  | CaseSplit (Context f v) (Formula f v) (Rule f v)
   | Pause (Constrained (Equation f v))
   | Reduce (Reduction f v) (Constrained (Rule f v))
   | Complete
@@ -39,11 +38,10 @@ data Event f v =
 
 traceM :: (Monad m, PrettyTerm f, Pretty v) => Event f v -> m ()
 traceM (NewRule rule) = traceIf True (hang (text "New rule") 2 (pretty rule))
-traceM (NewCPs cps) = traceIf False (hang (text "New critical pairs") 2 (pretty cps))
-traceM (Consider eq) = traceIf False (hang (text "Considering") 2 (pretty eq))
-traceM (CaseSplit eqn ctx eqns) = traceIf False (sep [text "Case split on", nest 2 (pretty ctx), text "in", nest 2 (pretty eqn), text "giving", nest 2 (pretty eqns)])
-traceM (ConsiderCaseSplit ctx ctx') = traceIf False (sep [text "Considering case split on", nest 2 (pretty ctx'), text "in", nest 2 (pretty ctx)])
-traceM (Pause eqn) = traceIf False (hang (text "Pausing equation") 2 (pretty eqn))
+traceM (NewCPs cps) = traceIf True (hang (text "New critical pairs") 2 (pretty cps))
+traceM (Consider eq) = traceIf True (hang (text "Considering") 2 (pretty eq))
+traceM (CaseSplit ctx form rule) = traceIf True (sep [text "Splitting on", nest 2 (pretty form), text "in", nest 2 (pretty ctx), text "to apply", nest 2 (pretty rule)])
+traceM (Pause eqn) = traceIf True (hang (text "Pausing equation") 2 (pretty eqn))
 traceM (Reduce red rule) = traceIf True (sep [pretty red, nest 2 (text "using"), nest 2 (pretty rule)])
 traceM Complete = traceIf True (text "Finished completion")
 traceM Unpausing = traceIf True (text "Found rules to unpause")
@@ -67,7 +65,7 @@ data CP f v =
 instance (Sized f, Ord f, Ord v) => Ord (CP f v) where
   compare =
     comparing $ \(CP size (Constrained ctx (l :==: r))) ->
-      (measure l, measure r, size, Set.size (literals ctx), literals ctx)
+      (measure l, measure r, size)
 
 instance (PrettyTerm f, Pretty v) => Pretty (CP f v) where
   pretty = pretty . cpEquation
@@ -143,7 +141,7 @@ unpause ::
 unpause = do
   paused    <- gets paused
   rules   <- gets rules
-  let resumable eq = not (null (concatMap (caseSplit rules) (split eq)))
+  let resumable (Constrained ctx eq) = isJust (caseSplit rules ctx eq)
       (resumed, paused') = Set.partition resumable paused
   when (not (Set.null resumed)) $ do
     traceM (Unpausing :: Event Constant Variable)
@@ -175,6 +173,7 @@ queueCPs l eqns = do
   let cps = catMaybes (map (moveLabel . fmap (toCP norm)) eqns)
       p (Labelled _ (CP m _)) = m <= fromIntegral n
       (cps1, cps2) = partition p cps
+  traceM (NewCPs (map peel cps1))
   enqueueM l cps1
   sequence_ [ pause eq | Labelled _ (CP _ eq) <- cps2 ]
 
@@ -183,73 +182,91 @@ toCP ::
   (Context f v -> Tm f v -> Tm f v) ->
   Constrained (Equation f v) -> Maybe (CP f v)
 toCP norm (Constrained ctx (l :==: r)) = do
+  guard (l /= r)
   let l' = norm ctx l
       r' = norm ctx r
       eqn' = order (l' :==: r')
   guard (l' /= r')
-  return (CP (minSize l' ctx `max` minSize r' ctx) (canonicalise (Constrained ctx eqn')))
+  return (CP (minSize (solved ctx) l' `max` minSize (solved ctx) r') (canonicalise (Constrained ctx eqn')))
 
 consider ::
   (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
   Label -> Label -> Constrained (Equation f v) -> StateT (KBC f v) m ()
-consider l1 l2 eq = do
-  traceM (Consider eq)
-  rules <- gets rules
-  case joinEquation rules eq of
-    GaveUp (Constrained ctx eq) ->
-      forM_ (orient eq >>= split . canonicalise) $ \rule -> do
-        traceM (NewRule rule)
-        l <- addRule rule
-        interreduce rule
-        addCriticalPairs l rule
-    ReducedTo ctx eqs -> do
-      unless (null eqs) $
-        traceM (CaseSplit eq ctx eqs)
-      queueCPs l1 (map (Labelled l2) eqs)
+consider l1 l2 eq@(Constrained ctx (t :==: u))
+  | t == u = return ()
+  | otherwise = do
+      traceM (Consider eq)
+      norm  <- normaliser
+      rules <- gets rules
+      let t' = norm ctx t
+          u' = norm ctx u
+      case bestCases norm rules ctx (t' :==: u') of
+        Nothing -> do
+          forM_ (orient (t' :==: u') >>= split) $ \rule -> do
+            traceM (NewRule rule)
+            l <- addRule rule
+            interreduce rule
+            addCriticalPairs l rule
+        Just form -> do
+          let ctx1     = toContext (formula ctx &&& form)
+              ctx2     = toContext (formula ctx &&& runM negFormula form)
+              (_:eqs1) = split (Constrained ctx1 (t' :==: u'))
+              eqs2     = split (Constrained ctx2 (t' :==: u'))
+          queueCPs l1 (map (Labelled l2) (eqs1 ++ eqs2))
 
-data JoinResult f v = GaveUp (Constrained (Equation f v)) | ReducedTo (Context f v) [Constrained (Equation f v)]
-
-joinEquation ::
-  (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) =>
-  Index (Labelled (Constrained (Rule f v))) -> Constrained (Equation f v) -> JoinResult f v
-joinEquation rules (Constrained ctx eq@(l :==: r))
-  | l == r = ReducedTo emptyContext []
-  | l' == r' = ReducedTo emptyContext []
-  | otherwise =
-    case bestCaseSplit rules (Constrained ctx eq') of
-      Nothing -> GaveUp (Constrained ctx eq')
-      Just (ctx, eqs) -> ReducedTo ctx eqs
+bestCases ::
+  (PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
+  (Context f v -> Tm f v -> Tm f v) ->
+  Index (Labelled (Constrained (Rule f v))) ->
+  Context f v -> Equation f v -> Maybe (Formula f v)
+bestCases norm rules ctx (t :==: u) =
+  findCases norm rules ctx (t :==: u) >>= shrink
     where
-      norm = normaliseWith (anywhere (tryRules ctx rules))
-      l' = norm l
-      r' = norm r
-      eq' = l' :==: r'
+      shrink form = msum (map try (shrinkFormula form)) `mplus` return form
+      try form = do
+        let form' = mainSplit (form &&& formula ctx)
+            ctx' = toContext form'
+        guard (norm ctx' t == norm ctx' u)
+        shrink form
 
-bestCaseSplit ::
-  (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) =>
-  Index (Labelled (Constrained (Rule f v))) -> Constrained (Equation f v) -> Maybe (Context f v, [Constrained (Equation f v)])
-bestCaseSplit rules eq =
-  listToMaybe (sortBy' goodness (filter p (caseSplit rules eq)))
+findCases ::
+  (PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
+  (Context f v -> Tm f v -> Tm f v) ->
+  Index (Labelled (Constrained (Rule f v))) ->
+  Context f v -> Equation f v -> Maybe (Formula f v)
+findCases norm rules ctx (t :==: u)
+  | t' == u' = Just FTrue
+  | otherwise = do
+      (form, ctx') <- caseSplit rules ctx (t' :==: u')
+      fmap (form &&&) (findCases norm rules ctx' (t' :==: u'))
   where
-    goodness (_, eqs@(Constrained ctx (l :==: r):_)) =
-      (length eqs, l' `max` r', l', r')
-      where
-        norm = normaliseWith (anywhere (tryRules ctx rules))
-        l' = measure (norm l)
-        r' = measure (norm r)
-    p (_, eqs) = eq `notElem` eqs
+    t' = norm ctx t
+    u' = norm ctx u
 
 caseSplit ::
   (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) =>
-  Index (Labelled (Constrained (Rule f v))) -> Constrained (Equation f v) -> [(Context f v, [Constrained (Equation f v)])]
-caseSplit rules (Constrained ctx eq@(l :==: r)) = usort $ do
-  t <- subterms l ++ subterms r
-  Constrained ctx' _ <- map peel (Index.lookup t rules)
-  traceM (ConsiderCaseSplit (Constrained ctx eq) ctx')
-  let pos = split (Constrained (contextUnion ctx ctx') eq)
-      neg = addNegation ctx' (Constrained ctx eq)
-  guard (pos /= [])
-  return (ctx', usort (map canonicalise (pos ++ neg)) >>= split)
+  Index (Labelled (Constrained (Rule f v))) ->
+  Context f v -> Equation f v -> Maybe (Formula f v, Context f v)
+caseSplit rules ctx (t :==: u) =
+  listToMaybe $ do
+    v <- subterms t ++ subterms u
+    rule <- map peel (Index.lookup v rules)
+    let form = formula (context rule)
+        ctx' = toContext (mainSplit (form &&& formula ctx))
+    guard (satisfiable (solved ctx'))
+    traceM (CaseSplit ctx form (constrained rule))
+    return (form, ctx')
+
+shrinkFormula :: Formula f v -> [Formula f v]
+shrinkFormula (p :&: q) =
+  [p, q] ++
+  [p &&& q' | q' <- shrinkFormula q] ++
+  [p' &&& q | p' <- shrinkFormula p]
+shrinkFormula (p :|: q) =
+  [p ||| q' | q' <- shrinkFormula q] ++
+  [p' ||| q | p' <- shrinkFormula p]
+shrinkFormula FTrue = []
+shrinkFormula _ = [FTrue]
 
 addRule :: (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) => Constrained (Rule f v) -> StateT (KBC f v) m Label
 addRule rule = do
@@ -275,7 +292,7 @@ interreduce new = do
   let reductions = catMaybes (map (moveLabel . fmap (reduce new)) rules)
   sequence_ [ traceM (Reduce red new) | red <- map peel reductions ]
   sequence_ [ simplifyRule l rule | Labelled l (Simplify rule) <- reductions ]
-  sequence_ [ newEquation (unconstrained (unorient (constrained rule))) | Reorient rule <- map peel reductions ]
+  sequence_ [ newEquation (Constrained (toContext FTrue) (unorient (constrained rule))) | Reorient rule <- map peel reductions ]
   sequence_ [ deleteRule l rule | Labelled l (Reorient rule) <- reductions ]
 
 reduce :: (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) => Constrained (Rule f v) -> Constrained (Rule f v) -> Maybe (Reduction f v)
@@ -324,8 +341,8 @@ criticalPairs r1 r2 = do
       left = rename f (CP.left cp)
       right = rename f (CP.right cp)
       ctx =
-        contextUnion
-          (substf (rename f . evalSubst sub . Left) ctx1)
-          (substf (rename f . evalSubst sub . Right) ctx2)
+        toContext $
+          substf (rename f . evalSubst sub . Left) (formula ctx1) &&&
+          substf (rename f . evalSubst sub . Right) (formula ctx2)
 
   split (Constrained ctx (left :==: right))

@@ -30,12 +30,12 @@ unorient (Rule l r) = l :==: r
 orient :: (Sized f, Ord f, Ord v, Numbered v) => Equation f v -> [Constrained (Rule f v)]
 orient (l :==: r) =
   case orientTerms l r of
-    Just GT -> [unconstrained (Rule l r)]
-    Just LT -> [unconstrained (Rule r l)]
+    Just GT -> [Constrained (toContext FTrue) (Rule l r)]
+    Just LT -> [Constrained (toContext FTrue) (Rule r l)]
     Just EQ -> []
     Nothing -> rule l r ++ concat [rule r l | not (l `isVariantOf` r)]
   where
-    rule l r = add (Less r l) (unconstrained (Rule l r))
+    rule l r = [Constrained (toContext (Less r l)) (Rule l r)]
 
 bothSides :: (Tm f v -> Tm f v) -> Equation f v -> Equation f v
 bothSides f (t :==: u) = f t :==: f u

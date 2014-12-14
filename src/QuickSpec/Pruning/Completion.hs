@@ -37,8 +37,8 @@ newAxiom :: Monad m => PropOf PruningTerm -> StateT Completion m ()
 newAxiom ([] :=>: (t :=: u)) = do
   liftKBC $ do
     norm <- KBC.normaliser
-    unless (norm emptyContext t == norm emptyContext u) $ do
-      KBC.newEquation (unconstrained (t :==: u))
+    unless (norm (toContext FTrue) t == norm (toContext FTrue) u) $ do
+      KBC.newEquation (Constrained (toContext FTrue) (t :==: u))
       while KBC.complete KBC.unpause
 
 while :: Monad m => m Bool -> m () -> m ()
@@ -51,10 +51,10 @@ while cond m = do
 findRep :: Monad m => [PropOf PruningTerm] -> PruningTerm -> StateT Completion m (Maybe PruningTerm)
 findRep axioms t =
   localKBC $ do
-    sequence_ [ KBC.newEquation (unconstrained (t :==: u)) | [] :=>: t :=: u <- axioms ]
+    sequence_ [ KBC.newEquation (Constrained (toContext FTrue) (t :==: u)) | [] :=>: t :=: u <- axioms ]
     KBC.complete
     norm <- KBC.normaliser
-    let u = norm emptyContext t
+    let u = norm (toContext FTrue) t
     if t == u then return Nothing else return (Just u)
 
 instance Pruner Completion where

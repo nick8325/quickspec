@@ -9,10 +9,11 @@ import QuickSpec.Term
 import Control.Monad
 import Data.Maybe
 import Data.Rewriting.Rule
+import Debug.Trace
 
 type Strategy f v = Tm f v -> [Tm f v]
 
-normaliseWith :: Strategy f v -> Tm f v -> Tm f v
+normaliseWith :: (PrettyTerm f, Pretty v) => Strategy f v -> Tm f v -> Tm f v
 normaliseWith strat t =
   case strat t of
     [] -> t
@@ -35,14 +36,13 @@ ordered strat t = [u | u <- strat t, u `simplerThan` t]
 tryRule :: (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) => Context f v -> Constrained (Rule f v) -> Strategy f v
 tryRule ctx rule t = do
   sub <- maybeToList (match (lhs (constrained rule)) t)
-  rule' <- split (substf (evalSubst sub) rule)
-  guard (implies ctx (context rule'))
+  let rule' = substf (evalSubst sub) rule
+  guard (implies (solved ctx) (mainSplit (formula (context rule'))))
   return (rhs (constrained rule'))
 
 tryRules :: (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) => Context f v -> Index (Labelled (Constrained (Rule f v))) -> Strategy f v
 tryRules ctx rules t = do
-  rule <- map peel (Index.lookup t rules) >>= split
-  let rule' = rule { context = contextUnion ctx (context rule) }
-  guard (lhs (constrained rule) == t && not (null (split rule')) && implies ctx (context rule))
+  rule <- map peel (Index.lookup t rules)
+  guard (implies (solved ctx) (mainSplit (formula (context rule))))
   --traceM (prettyShow rule ++ " in context " ++ prettyShow ctx)
   return (rhs (constrained rule))
