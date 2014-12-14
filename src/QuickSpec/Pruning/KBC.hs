@@ -31,6 +31,7 @@ data Event f v =
   | NewCPs [CP f v]
   | Consider (Constrained (Equation f v))
   | CaseSplit (Context f v) (Formula f v) (Rule f v)
+  | ConditionalJoin (Constrained (Equation f v)) (Formula f v)
   | Pause (Constrained (Equation f v))
   | Reduce (Reduction f v) (Constrained (Rule f v))
   | Complete
@@ -38,13 +39,14 @@ data Event f v =
 
 traceM :: (Monad m, PrettyTerm f, Pretty v) => Event f v -> m ()
 traceM (NewRule rule) = traceIf True (hang (text "New rule") 2 (pretty rule))
-traceM (NewCPs cps) = traceIf True (hang (text "New critical pairs") 2 (pretty cps))
-traceM (Consider eq) = traceIf True (hang (text "Considering") 2 (pretty eq))
-traceM (CaseSplit ctx form rule) = traceIf True (sep [text "Splitting on", nest 2 (pretty form), text "in", nest 2 (pretty ctx), text "to apply", nest 2 (pretty rule)])
-traceM (Pause eqn) = traceIf True (hang (text "Pausing equation") 2 (pretty eqn))
-traceM (Reduce red rule) = traceIf True (sep [pretty red, nest 2 (text "using"), nest 2 (pretty rule)])
-traceM Complete = traceIf True (text "Finished completion")
-traceM Unpausing = traceIf True (text "Found rules to unpause")
+traceM (NewCPs cps) = traceIf False (hang (text "New critical pairs") 2 (pretty cps))
+traceM (Consider eq) = traceIf False (hang (text "Considering") 2 (pretty eq))
+traceM (CaseSplit ctx form rule) = traceIf False (sep [text "Splitting on", nest 2 (pretty form), text "in", nest 2 (pretty ctx), text "to apply", nest 2 (pretty rule)])
+traceM (ConditionalJoin eq form) = traceIf True (sep [text "Joined", nest 2 (pretty eq), text "under condition", nest 2 (pretty form)])
+traceM (Pause eqn) = traceIf False (hang (text "Pausing equation") 2 (pretty eqn))
+traceM (Reduce red rule) = traceIf False (sep [pretty red, nest 2 (text "using"), nest 2 (pretty rule)])
+traceM Complete = traceIf False (text "Finished completion")
+traceM Unpausing = traceIf False (text "Found rules to unpause")
 traceIf :: Monad m => Bool -> Doc -> m ()
 traceIf True x = Debug.Trace.traceM (show x)
 traceIf _ s = return ()
@@ -207,11 +209,15 @@ consider l1 l2 eq@(Constrained ctx (t :==: u))
             l <- addRule rule
             interreduce rule
             addCriticalPairs l rule
+        Just FTrue ->
+          let (_:eqs) = split (Constrained ctx (t' :==: u'))
+          in queueCPs l1 (map (Labelled l2) eqs)
         Just form -> do
-          let ctx1     = toContext (formula ctx &&& form)
-              ctx2     = toContext (formula ctx &&& runM negFormula form)
+          let ctx1     = toContext (formula ctx &&& runM simplify form)
+              ctx2     = toContext (formula ctx &&& runM simplify (runM negFormula form))
               (_:eqs1) = split (Constrained ctx1 (t' :==: u'))
               eqs2     = split (Constrained ctx2 (t' :==: u'))
+          traceM (ConditionalJoin (Constrained ctx (t' :==: u')) form)
           queueCPs l1 (map (Labelled l2) (eqs1 ++ eqs2))
 
 bestCases ::
@@ -265,6 +271,8 @@ shrinkFormula (p :&: q) =
 shrinkFormula (p :|: q) =
   [p ||| q' | q' <- shrinkFormula q] ++
   [p' ||| q | p' <- shrinkFormula p]
+shrinkFormula (Less (Fun _ ts) u) =
+  FTrue:[Less t u | t <- ts]
 shrinkFormula FTrue = []
 shrinkFormula _ = [FTrue]
 

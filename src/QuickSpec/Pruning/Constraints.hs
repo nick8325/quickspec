@@ -4,7 +4,7 @@ module QuickSpec.Pruning.Constraints where
 #include "errors.h"
 import QuickSpec.Base
 import qualified QuickSpec.Pruning.FourierMotzkin as FM
-import QuickSpec.Pruning.FourierMotzkin hiding (Term(..), trace, Stop, solve, implies)
+import QuickSpec.Pruning.FourierMotzkin hiding (Term(..), trace, Stop, solve, implies, Unsolvable)
 import QuickSpec.Term
 import QuickSpec.Utils
 import Control.Monad
@@ -72,20 +72,31 @@ split (Constrained ctx x) =
   case runM simplify (formula ctx) of
     Equal t u p q ->
       let Just sub = unify t u in
-        split (make q) ++ split (substf (evalSubst sub) (make (prune p)))
+      split (make q) ++ split (substf (evalSubst sub) (make (prune p)))
+    p :|: q ->
+      split (make p) ++ split (make q)
     p -> [make p | satisfiable (solved (toContext p))]
   where
     make ctx = Constrained (toContext ctx) x
     prune (Equal t u p q) = Equal t u (prune p) (prune q)
+    prune (p :|: q) = prune p ||| prune q
     prune p
       | satisfiable (solved (toContext p)) = p
       | otherwise = FFalse
 
 mainSplit :: (Sized f, Numbered v, Ord f, Ord v) => Formula f v -> Formula f v
 mainSplit p =
+  case mainSplits p of
+    [] -> FFalse
+    (q:_) -> q
+
+mainSplits :: (Sized f, Numbered v, Ord f, Ord v) => Formula f v -> [Formula f v]
+mainSplits p =
   case runM simplify p of
-    Equal t u p q -> mainSplit q
-    p -> p
+    Equal t u p q -> mainSplits q
+    p :|: q -> mainSplits p ++ mainSplits q
+    p | satisfiable (solve p) -> [p]
+      | otherwise -> []
 
 neg :: (Symbolic a, Sized (ConstantOf a), Numbered (VariableOf a), Ord (ConstantOf a), Ord (VariableOf a)) => Constrained a -> Constrained a
 neg = runM $ \x -> do
@@ -152,16 +163,10 @@ instance (PrettyTerm f, Pretty v) => Pretty (Formula f v) where
   prettyPrec p (Size t) = pretty t
   prettyPrec p (HeadIs sense t x) = text "hd(" <> pretty t <> text ")" <+> pretty sense <+> pretty x
   prettyPrec p (Less t u) = pretty t <+> text "<" <+> pretty u
- -- prettyPrec p (Equal t u PTrue PFalse) =
-  --   pretty t <+> text "=" <+> pretty u
-  -- prettyPrec p (Equal t u x y) =
-  --   prettyPrec p ((Equal t u &&& x) ||| y)
+  prettyPrec p (Equal t u FTrue FFalse) =
+    pretty t <+> text "=" <+> pretty u
   prettyPrec p (Equal t u x y) =
-    prettyParen (p > 10) $
-    hang
-      (parens
-        (pretty t <+> text "=" <+> pretty u <+> text "&" <+> prettyPrec 11 x) <+> text "|") 2
-      (prettyPrec 11 y)
+    prettyPrec p ((Equal t u FTrue FFalse :&: x) :|: y)
 
 instance (Sized f, Ord v) => Symbolic (Formula f v) where
   type ConstantOf (Formula f v) = f
@@ -214,6 +219,8 @@ FFalse &&& p = FFalse
 p &&& FFalse = FFalse
 Equal t u p q &&& r = Equal t u (p &&& r) (q &&& r)
 r &&& Equal t u p q = Equal t u (p &&& r) (q &&& r)
+p &&& (q :|: r) = (p &&& q) ||| (p &&& r)
+(p :|: q) &&& r = (p &&& r) ||| (q &&& r)
 p &&& q = p :&: q
 
 type M = State Int
@@ -238,7 +245,11 @@ simplify (Equal t u p q) | t == u = simplify (p ||| q)
 simplify (Equal t u p q) =
   case unify t u of
     Nothing -> simplify q
-    Just{} -> liftM2 (Equal t u) (simplify p) (simplify q)
+    Just{} -> liftM2 (equal t u) (simplify p) (simplify q)
+  where
+    equal t u FFalse q = q
+    equal t u _ FTrue = FTrue
+    equal t u p q = Equal t u p q
 simplify (Size s)
   | isNothing (solve s) = return FFalse
   | isNothing (solve (negateBound s)) = return FTrue
@@ -307,11 +318,7 @@ negFormula _ = ERROR "must call split before using a context"
 
 -- Solved formulas.
 type SolvedOf a = Solved (ConstantOf a) (VariableOf a)
-newtype Solved f v =
-  Solved {
-    clauses :: Set (Solved1 f v) }
-  deriving (Eq, Ord, Show)
-data Solved1 f v =
+data Solved f v =
   -- We complete the set of constraints as follows:
   -- * Less is transitively closed.
   -- * If Less x y, then size x <= size y.
@@ -322,7 +329,9 @@ data Solved1 f v =
   -- Once completed, the constraints are satisfiable iff:
   -- 1. The size constrains are satisfiable.
   -- 2. There is no literal Less x x.
-  Solved1 {
+  Unsolvable |
+  Tautological |
+  Solved {
     -- Size constraints.
     prob        :: Problem v,
     -- HeadLess and HeadGreater constraints for variables.
@@ -333,13 +342,8 @@ data Solved1 f v =
   deriving (Eq, Ord, Show)
 
 instance (PrettyTerm f, Pretty v) => Pretty (Solved f v) where
-  pretty (Solved cs) =
-    case Set.toList cs of
-      [] -> text "false"
-      [c] -> pretty c
-      cs -> fsep (punctuate (text " |") (map pretty cs))
-
-instance (PrettyTerm f, Pretty v) => Pretty (Solved1 f v) where
+  pretty Unsolvable = text "false"
+  pretty Tautological = text "true"
   pretty x =
     pretty [
       pretty (prob x),
@@ -347,24 +351,22 @@ instance (PrettyTerm f, Pretty v) => Pretty (Solved1 f v) where
       pretty (headGreater x),
       pretty (less x) ]
 
-flatten :: Formula f v -> [[Formula f v]]
-flatten FTrue = [[]]
-flatten FFalse = []
-flatten (p :&: q) = liftM2 (++) (flatten p) (flatten q)
-flatten (p :|: q) = flatten p ++ flatten q
-flatten t = [[t]]
-
 solve :: (Sized f, Ord f, Ord v) => Formula f v -> Solved f v
-solve f =
-  Solved (Set.fromList (catMaybes (map solve1 (flatten f))))
+solve = solve1 . filter (/= FTrue) . literals
+  where
+    literals (p :&: q) = literals p ++ literals q
+    literals (p :|: q) = ERROR "must call split before using a context"
+    literals (Equal _ _ _ _) = ERROR "must call split before using a context"
+    literals p = [p]
 
-solve1 :: (Sized f, Ord f, Ord v) => [Formula f v] -> Maybe (Solved1 f v)
-solve1 [] = Just unconditionalSolved1
+solve1 :: (Sized f, Ord f, Ord v) => [Formula f v] -> Solved f v
+solve1 [] = Tautological
 solve1 ls
   | not (null equal) = ERROR "must call split before using a context"
-  | isNothing (FM.solve prob) = Nothing
-  | or [ Set.member x s | (x, s) <- Map.toList less' ] = Nothing
-  | otherwise = Just (Solved1 prob headLess' headGreater' less')
+  | FFalse `elem` ls = Unsolvable
+  | isNothing (FM.solve prob) = Unsolvable
+  | or [ Set.member x s | (x, s) <- Map.toList less' ] = Unsolvable
+  | otherwise = Solved prob headLess' headGreater' less'
   where
     size = [s | Size s <- ls]
     headLess = [(unVar x, f) | HeadIs Lesser x f <- ls]
@@ -380,10 +382,6 @@ solve1 ls
     lessProb = [var x <== var y | (x, y) <- less]
     headProb = [var x </= var y | (x, f) <- Map.toList headGreater', (y, g) <- Map.toList headLess', f >= g]
 
--- XXX check if this helps with performance
-unconditionalSolved1 :: Solved1 f v
-unconditionalSolved1 = Solved1 FM.empty Map.empty Map.empty Map.empty
-
 close :: Ord a => [(a, a)] -> Map a (Set a)
 close bs = Map.fromList [(x, close1 bs x) | x <- usort (map fst bs)]
 
@@ -398,36 +396,37 @@ close1 bs x = aux (successors x) Set.empty
     successors x = [y | (x', y) <- bs, x == x']
 
 satisfiable :: (Ord f, Ord v) => Solved f v -> Bool
-satisfiable (Solved cs) = not (Set.null cs)
+satisfiable Unsolvable = False
+satisfiable _ = True
 
 implies :: (Sized f, Numbered v, Ord f, Ord v) => Solved f v -> Formula f v -> Bool
-implies (Solved s) _ | Set.null s = __
+implies Unsolvable _ = __
 implies _ FTrue = True
+implies Tautological _ = False
 implies _ FFalse = False
-implies (Solved s) p = and [ implies1 f p | f <- Set.toList s ]
-
-implies1 :: (Sized f, Numbered v, Ord f, Ord v) => Solved1 f v -> Formula f v -> Bool
-implies1 form (p :&: q) = implies1 form p && implies1 form q
-implies1 form (p :|: q) = implies1 form p || implies1 form q
-implies1 form (Equal _ _ _ p) = implies1 form p
-implies1 form (Size s) =
+implies form (p :&: q) = implies form p && implies form q
+implies form (p :|: q) = implies form p || implies form q
+implies form (Equal _ _ _ p) = implies form p
+implies form (Size s) =
   isNothing (FM.solve (addTerms ts (prob form)))
   where
     ts = negateBound s:sizeAxioms s
-implies1 form (Less (Var x) (Var y)) =
-  y `Set.member` Map.findWithDefault Set.empty x (less form)
-implies1 form (HeadIs Lesser (Var x) f) =
+implies form (Less (Var x) (Var y)) =
+  y `Set.member` Map.findWithDefault Set.empty x (less form) ||
+  implies form (Size (var x - var y </= 0))
+implies form (HeadIs Lesser (Var x) f) =
   case Map.lookup x (headLess form) of
     Just g | g <= f -> True
     _ -> False
-implies1 form (HeadIs Greater (Var x) f) =
+implies form (HeadIs Greater (Var x) f) =
   case Map.lookup x (headGreater form) of
     Just g | g >= f -> True
     _ -> False
 
 minSize :: (Pretty v, Sized f, Numbered v, Ord f, Ord v) => Solved f v -> Tm f v -> Integer
-minSize (Solved fs) t =
-  minimum [ minimise (addTerms ax (prob f)) sz | f <- Set.toList fs ]
+minSize Unsolvable _ = __
+minSize Tautological t = fromIntegral (size t)
+minSize s t = minimise (addTerms ax (prob s)) sz
   where
     sz = termSize t
     ax = termAxioms t
