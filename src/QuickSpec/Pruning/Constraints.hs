@@ -254,7 +254,8 @@ simplify (Size s)
   | isNothing (solve s) = return FFalse
   | isNothing (solve (negateBound s)) = return FTrue
   where
-    solve s = FM.solve (problem (s:sizeAxioms s))
+    solve s = FM.solve (addTerms [s] p)
+    p = problem (sizeAxioms s)
 simplify (HeadIs sense (Fun f ts) g)
   | test sense (f :/: length ts) g = return FTrue
   | otherwise = return FFalse
@@ -412,8 +413,7 @@ implies form (Size s) =
   where
     ts = negateBound s:sizeAxioms s
 implies form (Less (Var x) (Var y)) =
-  y `Set.member` Map.findWithDefault Set.empty x (less form) ||
-  implies form (Size (var x - var y </= 0))
+  y `Set.member` Map.findWithDefault Set.empty x (less form)
 implies form (HeadIs Lesser (Var x) f) =
   case Map.lookup x (headLess form) of
     Just g | g <= f -> True
