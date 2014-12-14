@@ -265,8 +265,8 @@ solve p | Set.null (pos p) =
       return (x, a)
 solve p = do
   m <- solve p'
-  let Just a = solveBounds (try maximum (map (fmap (eval m)) ls),
-                            try minimum (map (fmap (eval m)) us))
+  a <- solveBounds (try maximum (map (fmap (eval m)) ls),
+                    try minimum (map (fmap (eval m)) us))
   return (Map.insert x a m)
   where
     Eliminate x ls us p':_ = eliminations p
@@ -355,6 +355,19 @@ prob7 =
   problem [
     1 <== x + y,
     2 <== 0 ]
+
+-- Unsatisfiable.
+prob8 =
+  problem [
+    -1 - x + y - z >== 0,
+    -w + x >== 0,
+    1 + x - y + z >== 0,
+    1 + w + x - y >/= 0,
+    x >== 1,
+    y >== 1,
+    z >== 1,
+    w >== 1,
+    8 - w - x - y - z >== 0]
 
 main =
  defaultMain [
