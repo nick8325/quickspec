@@ -146,7 +146,7 @@ canonicalise t = substf (evalSubst sub) t
     sub = T.fromMap (Map.fromList (zipWith f vs [0..]))
     f x n = (x, Var (withNumber n x))
     vs  = vs' ++ (usort (concatMap vars (terms t)) \\ vs')
-    vs' = usort (vars (term t))
+    vs' = nub (vars (term t))
 
 class Pretty a => PrettyTerm a where
   termStyle :: a -> TermStyle
