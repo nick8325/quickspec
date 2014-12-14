@@ -162,11 +162,13 @@ addBounds bs p =
       where
         (x, a) = Map.findMin (vars (bound t))
         b = fmap (\t -> negate (constant t) / a) t
-    bmax x y
-      | bound x > bound y = x
-      | bound y > bound x = y
-      | otherwise = liftM2 const x y
-    bmin x y = fmap negate (bmax (fmap negate x) (fmap negate y))
+
+bmax, bmin :: (Ord a, Num a) => Bound a -> Bound a -> Bound a
+bmax x y
+  | bound x > bound y = x
+  | bound y > bound x = y
+  | otherwise = liftM2 const x y
+bmin x y = fmap negate (bmax (fmap negate x) (fmap negate y))
 
 prune :: Ord a => Problem a -> Problem a
 prune p =
@@ -278,8 +280,8 @@ solve p | Set.null (pos p) =
       return (x, a)
 solve p = do
   m <- solve p'
-  a <- solveBounds (try maximum (map (fmap (eval m)) ls),
-                    try minimum (map (fmap (eval m)) us))
+  let Just a = solveBounds (try (foldr1 bmax) (map (fmap (eval m)) ls),
+                            try (foldr1 bmin) (map (fmap (eval m)) us))
   return (Map.insert x a m)
   where
     Eliminate x ls us p':_ = eliminations p
