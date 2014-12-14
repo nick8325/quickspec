@@ -204,8 +204,8 @@ consider l1 l2 eq@(Constrained ctx (t :==: u))
           u' = norm ctx u
       case bestCases norm rules ctx (t' :==: u') of
         Nothing -> do
-          forM_ (orient (t' :==: u') >>= split) $ \rule -> do
-            traceM (NewRule rule)
+          forM_ (orientWith norm (t' :==: u')) $ \rule -> do
+            traceM (NewRule (canonicalise rule))
             l <- addRule rule
             interreduce rule
             addCriticalPairs l rule
@@ -217,6 +217,19 @@ consider l1 l2 eq@(Constrained ctx (t :==: u))
               eqs2     = split (Constrained ctx2 (t' :==: u'))
           traceM (ConditionalJoin (Constrained ctx (t' :==: u')) form)
           queueCPs l1 (map (Labelled l2) (eqs1 ++ eqs2))
+
+orientWith ::
+  (PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
+  (Context f v -> Tm f v -> Tm f v) ->
+  Equation f v -> [Constrained (Rule f v)]
+orientWith norm eq = orient eq >>= split >>= reduce
+  where
+    reduce (Constrained ctx (Rule t u))
+      | t == t' = [Constrained ctx (Rule t u')]
+      | otherwise = orientWith norm (t' :==: u')
+      where
+        t' = norm ctx t
+        u' = norm ctx u
 
 bestCases ::
   (PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
