@@ -278,8 +278,8 @@ solve p | Set.null (pos p) =
       return (x, a)
 solve p = do
   m <- solve p'
-  let Just a = solveBounds (try maximum (map (fmap (eval m)) ls),
-                            try minimum (map (fmap (eval m)) us))
+  a <- solveBounds (try maximum (map (fmap (eval m)) ls),
+                    try minimum (map (fmap (eval m)) us))
   return (Map.insert x a m)
   where
     Eliminate x ls us p':_ = eliminations p
