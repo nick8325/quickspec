@@ -316,14 +316,12 @@ interreduce new = do
 
 reduce :: (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) => Constrained (Rule f v) -> Constrained (Rule f v) -> Maybe (Reduction f v)
 reduce new old
-  | not (lhs (constrained new) `isInstanceOf` lhs (constrained old')) &&
-    not (null (tryRule (context old') new (lhs (constrained old')))) =
-      Just (Reorient old')
-  | not (null (tryRule (context old') new (rhs (constrained old')))) =
-      Just (Simplify old')
+  | not (lhs (constrained new) `isInstanceOf` lhs (constrained old)) &&
+    not (null (tryRule (context old) new (lhs (constrained old)))) =
+      Just (Reorient old)
+  | not (null (tryRule (context old) new (rhs (constrained old)))) =
+      Just (Simplify old)
   | otherwise = Nothing
-  where
-    [old'] = split old
 
 simplifyRule :: (Monad m, PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) => Label -> Constrained (Rule f v) -> StateT (KBC f v) m ()
 simplifyRule l rule@(Constrained ctx (Rule lhs rhs)) = do
