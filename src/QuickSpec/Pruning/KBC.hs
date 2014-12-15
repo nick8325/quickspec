@@ -110,7 +110,7 @@ newLabelM =
 pause :: (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Pretty v, Numbered v) => Constrained (Equation f v) -> StateT (KBC f v) m ()
 pause eqn = do
   traceM (Pause eqn)
-  modify (\s -> s { paused = Set.insert (canonicalise eqn) (paused s) })
+--  modify (\s -> s { paused = Set.insert (canonicalise eqn) (paused s) })
 
 normaliser ::
   (Monad m, PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) =>
@@ -172,7 +172,7 @@ queueCPs ::
 queueCPs l eqns = do
   norm <- normaliser
   n    <- gets maxSize
-  let cps = catMaybes (map (moveLabel . fmap (toCP norm)) eqns)
+  let cps = catMaybes (map (moveLabel . fmap (toCP n norm)) eqns)
       p (Labelled _ (CP m _)) = m <= fromIntegral n
       (cps1, cps2) = partition p cps
   unless (null cps1) (traceM (NewCPs (map peel cps1)))
@@ -181,10 +181,14 @@ queueCPs l eqns = do
 
 toCP ::
   (Sized f, Ord f, Ord v, Numbered v, PrettyTerm f, Pretty v) =>
+  Int ->
   (Context f v -> Tm f v -> Tm f v) ->
   Constrained (Equation f v) -> Maybe (CP f v)
-toCP norm (Constrained ctx (l :==: r)) = do
+toCP n norm (Constrained ctx (l :==: r)) = do
   guard (l /= r)
+  unless (minSize (solved ctx) l `max` minSize (solved ctx) r <= fromIntegral n) $ do
+    Debug.Trace.traceM ("Threw out " ++ prettyShow (Constrained ctx (l :==: r)))
+    mzero
   let l' = norm ctx l
       r' = norm ctx r
       eqn' = order (l' :==: r')
