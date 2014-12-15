@@ -196,7 +196,7 @@ instance (Sized f, Ord v) => Symbolic (Formula f v) where
 termSize :: (Sized f, Ord v) => Tm f v -> FM.Term v
 termSize = foldTerm FM.var fun
   where
-    fun f ss = fromIntegral (funSize f) + sum ss
+    fun f ss = constTerm (funSize f) + sum ss
 
 sizeAxioms :: Ord v => Bound (FM.Term v) -> [Bound (FM.Term v)]
 sizeAxioms s = [ var x >== 1 | x <- Map.keys (FM.vars (bound s)) ]

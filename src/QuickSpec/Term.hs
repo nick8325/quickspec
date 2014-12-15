@@ -16,6 +16,7 @@ import QuickSpec.Type
 import QuickSpec.Utils
 import Test.QuickCheck
 import Test.QuickCheck.Gen
+import Data.Ratio
 
 -- Terms and schemas.
 -- A schema is like a term but has holes instead of variables.
@@ -24,14 +25,14 @@ type Term = TermOf Variable
 type Schema = TermOf Hole
 
 class Sized a where
-  funSize :: a -> Int
+  funSize :: a -> Rational
 
 -- Term ordering - size, skeleton, generality.
 -- Satisfies the property:
 -- if measure (schema t) < measure (schema u) then t < u.
-type Measure f v = (Int, Int, MeasureFuns f (), Int, [v])
+type Measure f v = (Rational, Int, MeasureFuns f (), Int, [v])
 measure :: (Sized f, Ord f, Ord v) => Tm f v -> Measure f v
-measure t = (size t, -length (vars t),
+measure t = (exactSize t, -length (vars t),
              MeasureFuns (rename (const ()) t), -length (usort (vars t)), vars t)
 
 newtype MeasureFuns f v = MeasureFuns (Tm f v)
@@ -51,7 +52,7 @@ compareFuns (Fun f ts) (Fun g us) =
 -- Take two terms and find the first place where they differ.
 compareTerms :: (Sized f, Ord f, Ord v) => Tm f v -> Tm f v -> Maybe (Tm f v, Tm f v, Ordering)
 compareTerms t u =
-  here (comparing size t u) `mplus`
+  here (comparing exactSize t u) `mplus`
   case (t, u) of
     (Var x, Var y) -> here (compare x y)
     (Var{}, Fun{}) -> here LT
@@ -92,8 +93,11 @@ simplerThan :: (Sized f, Ord f, Ord v) => Tm f v -> Tm f v -> Bool
 t `simplerThan` u = orientTerms t u == Just LT
 
 size :: Sized f => Tm f v -> Int
-size (Var x) = 1
-size (Fun f xs) = funSize f + sum (map size xs)
+size t = ceiling (exactSize t)
+
+exactSize :: Sized f => Tm f v -> Rational
+exactSize (Var x) = 1
+exactSize (Fun f xs) = funSize f + sum (map exactSize xs)
 
 -- Constants have values, while variables do not (as only monomorphic
 -- variables have generators, so we need a separate defaulting phase).
@@ -116,7 +120,7 @@ instance Typed Constant where
   typ = typ . conValue
   typeSubst sub x = x { conValue = typeSubst sub (conValue x) }
 instance Sized Constant where
-  funSize = conSize
+  funSize = fromIntegral . conSize
 
 -- We're not allowed to have two variables with the same number
 -- but unifiable types.
