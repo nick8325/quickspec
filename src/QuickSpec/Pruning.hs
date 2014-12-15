@@ -80,13 +80,6 @@ createRules = PrunerT $ do
       unPrunerT $ liftPruner $
         untypedAxiom ([] :=>: Fun fun [Fun fun [Var 0]] :=: Fun fun [Var 0])
 
-  rule $ do
-    fun@(SkolemVariable x) <- event
-    execute $ do
-      generate (HasType (typ x))
-      unPrunerT $ liftPruner $
-        untypedAxiom ([] :=>: Fun (HasType (typ x)) [Fun fun []] :=: Fun fun [])
-
 axiom :: (Pruner s, Monad m) => Prop -> PrunerT s m ()
 axiom p = do
   univ <- askUniv
@@ -108,16 +101,21 @@ toGoal :: Prop -> PropOf PruningTerm
 toGoal = fmap toGoalTerm
 
 toGoalTerm :: Term -> PruningTerm
-toGoalTerm = skolemise . toPruningConstant
+toGoalTerm = skolemise . toTaggedPruningConstant
 
 toPruningConstant :: Term -> Tm PruningConstant Variable
 toPruningConstant = mapTerm f id . withArity
   where
     f (fun, n) = TermConstant fun (typ fun) n
 
+toTaggedPruningConstant :: Term -> Tm PruningConstant Variable
+toTaggedPruningConstant (Var x) = Var x
+toTaggedPruningConstant t@(Fun f ts) =
+  Fun (HasType (typ t)) [Fun (TermConstant f (typ f) (length ts)) (map toTaggedPruningConstant ts)]
+
 skolemise :: Tm PruningConstant Variable -> PruningTerm
 skolemise (Fun f xs) = Fun f (map skolemise xs)
-skolemise (Var x) = Fun (SkolemVariable x) []
+skolemise (Var x) = Fun (HasType (typ x)) [Fun (SkolemVariable (PruningVariable (number x))) []]
 
 normaliseVars t = rename (\x -> fromMaybe __ (Map.lookup x m)) t
   where
@@ -152,15 +150,12 @@ constrain univ t =
 rep :: (Pruner s, Monad m) => Term -> PrunerT s m (Maybe Term)
 rep t = liftM (liftM fromPruningTerm) $ do
   let u = toGoalTerm t
-  sequence_ [ PrunerT (generate fun) | fun <- usort (funs u) ]
   liftPruner (untypedRep [] u)
 
 type PruningTerm = Tm PruningConstant PruningVariable
 
 data PruningConstant
-    -- Skolem variables are less than constants so that skolemisation
-    -- doesn't change the term order
-  = SkolemVariable Variable
+  = SkolemVariable PruningVariable
     -- The type of a TermConstant is always the same as the underlying
     -- constant's type, it's only included here so that it's counted
     -- in the Ord instance
@@ -176,9 +171,9 @@ instance Ord PruningConstant where
       f (TermConstant x ty n) = Right (Left (x :/: n, ty))
       f (HasType ty)          = Right (Right ty)
 
--- Hopefully we have the property:
--- t `simplerThan` u => fromPruningTerm t `simplerThan` fromPruningTerm u,
--- if t and u are ground and normalised. (i.e. when HasType is eliminated)
+-- We have the property that size (skolemise t) == size t,
+-- which is useful because we use the size to decide whether
+-- to keep a critical pair.
 instance Sized PruningConstant where
   funSize (TermConstant c _ _) = funSize c
   funSize (SkolemVariable _) = 1
@@ -201,15 +196,15 @@ fromPruningTerm :: PruningTerm -> Term
 fromPruningTerm t =
   fromPruningTermWith n t
   where
-    n = maximum (0:[1+n | SkolemVariable (Variable n _) <- funs t])
+    n = maximum (0:[1+n | SkolemVariable (PruningVariable n) <- funs t])
 
 fromPruningTermWith :: Int -> PruningTerm -> Term
 fromPruningTermWith n (Fun (TermConstant fun _ _) xs) =
   Fun fun (zipWith (fromPruningTermWithType n) (typeArgs (typ fun)) xs)
 fromPruningTermWith n (Fun (HasType ty) [t]) = fromPruningTermWithType n ty t
-fromPruningTermWith n (Fun (SkolemVariable x) []) = Var x
 fromPruningTermWith _ _ = ERROR "ill-typed term?"
 
 fromPruningTermWithType :: Int -> Type -> PruningTerm -> Term
 fromPruningTermWithType m ty (Var (PruningVariable n)) = Var (Variable (m+n) ty)
+fromPruningTermWithType _ ty (Fun (SkolemVariable (PruningVariable n)) []) = Var (Variable n ty)
 fromPruningTermWithType n _  t = fromPruningTermWith n t
