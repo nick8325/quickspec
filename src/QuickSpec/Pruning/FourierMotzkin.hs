@@ -31,11 +31,6 @@ instance Pretty a => Pretty (Term a) where
       pretty' (-1) = text "-"
       pretty' x = pretty x
 
-instance (Eq a, Integral a, Pretty a) => Pretty (Ratio a) where
-  pretty a
-    | denominator a == 1 = pretty (numerator a)
-    | otherwise = text "(" <+> pretty a <+> text ")"
-
 constTerm :: Rational -> Term a
 constTerm a = Term a Map.empty
 

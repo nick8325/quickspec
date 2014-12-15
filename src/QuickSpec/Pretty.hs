@@ -5,6 +5,7 @@ import qualified Data.Map as Map
 import Data.Map(Map)
 import qualified Data.Set as Set
 import Data.Set(Set)
+import Data.Ratio
 
 class Pretty a where
   pretty :: a -> Doc
@@ -61,6 +62,11 @@ instance (Pretty k, Pretty v) => Pretty (Map k v) where
   pretty = prettySet . map binding . Map.toList
     where
       binding (x, v) = hang (pretty x <+> text "=>") 2 (pretty v)
+
+instance (Eq a, Integral a, Pretty a) => Pretty (Ratio a) where
+  pretty a
+    | denominator a == 1 = pretty (numerator a)
+    | otherwise = text "(" <+> pretty a <+> text ")"
 
 supply :: [String] -> [String]
 supply names =
