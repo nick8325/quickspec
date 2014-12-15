@@ -191,6 +191,12 @@ createRules sig = do
         EqualTo t -> do
           generate (InstantiateSchema t)
           considerRenamings isCanonical t ms
+          -- FIXME this is a bit of a hack needed for e.g booleans
+          -- where we get the schema equation x&&x=x which generalises
+          -- to x&&y=y&&x. Should do something principled for generalising
+          -- equivalence classes instead.
+          when (size ms <= maxCommutativeSize_ sig) $
+            considerRenamings (const True) t ms
         Representative -> do
           generate (ConsiderTerm (From ms (instantiate ms)))
           when (size ms <= maxCommutativeSize_ sig) $
