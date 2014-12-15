@@ -73,8 +73,8 @@ instance Ord f => Ord (Arity f) where
       twiddle 1 = 2
       twiddle n = n
 
-instance Pretty f => Pretty (Arity f) where
-  pretty (f :/: n) = pretty f <> text "/" <> pretty n
+instance PrettyTerm f => Pretty (Arity f) where
+  pretty (f :/: n) = pretty (Fun f (map Var (replicate n (text "_"))))
 
 -- Reduction ordering (i.e., a partial order closed under substitution).
 orientTerms :: (Sized f, Ord f, Ord v) => Tm f v -> Tm f v -> Maybe Ordering

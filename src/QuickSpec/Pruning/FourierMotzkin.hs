@@ -26,7 +26,10 @@ instance Pretty a => Pretty (Term a) where
     | a == 0 = prettyVars vs
     | otherwise = pretty a <+> text "+" <+> prettyVars vs
     where
-      prettyVars vs = sep (punctuate (text "+") [ pretty a <> text "*" <> pretty x | (x, a) <- Map.toList vs ])
+      prettyVars vs = sep (punctuate (text " +") [ pretty' a <> text "|" <> pretty x <> text "|" | (x, a) <- Map.toList vs ])
+      pretty' 1 = text ""
+      pretty' (-1) = text "-"
+      pretty' x = pretty x
 
 instance (Eq a, Integral a, Pretty a) => Pretty (Ratio a) where
   pretty a
