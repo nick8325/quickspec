@@ -216,8 +216,9 @@ createRules sig = do
           liftIO $ print (text "Term" <+> pretty t <+> text "timed out")
         Untestable ->
           ERROR ("Untestable instance " ++ prettyShow t ++ " of testable schema " ++ prettyShow s)
-        EqualTo (From _ u) ->
-          generate (Found ([] :=>: t :=: u))
+        EqualTo (From _ u) -> do
+          u' <- lift (lift (rep u))
+          generate (Found ([] :=>: t :=: fromMaybe u u'))
         Representative -> return ()
 
   rule $ do
