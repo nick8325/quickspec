@@ -21,6 +21,7 @@ import QuickSpec.Memo()
 import QuickSpec.Prop
 import QuickSpec.Pruning hiding (createRules, instances)
 import QuickSpec.Pruning.Completion hiding (initialState)
+import QuickSpec.Pruning.Simple(SimplePruner)
 import qualified QuickSpec.Pruning.E as E
 import qualified QuickSpec.Pruning.Z3 as Z3
 import QuickSpec.Rules

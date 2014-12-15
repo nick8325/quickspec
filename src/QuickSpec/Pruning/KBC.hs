@@ -39,16 +39,16 @@ data Event f v =
 
 traceM :: (Monad m, PrettyTerm f, Pretty v) => Event f v -> m ()
 traceM (NewRule rule) = traceIf True (hang (text "New rule") 2 (pretty rule))
-traceM (NewCPs cps) = traceIf True (hang (text "New critical pairs") 2 (pretty cps))
-traceM (Consider eq) = traceIf True (hang (text "Considering") 2 (pretty eq))
+traceM (NewCPs cps) = traceIf False (hang (text "New critical pairs") 2 (pretty cps))
+traceM (Consider eq) = traceIf False (hang (text "Considering") 2 (pretty eq))
 traceM (CaseSplit ctx form rule) = traceIf False (sep [text "Splitting on", nest 2 (pretty form), text "in", nest 2 (pretty ctx), text "to apply", nest 2 (pretty rule)])
-traceM (ConditionalJoin eq form) = traceIf True (sep [text "Conditionally joined", nest 2 (pretty eq), text "assuming", nest 2 (pretty form)])
+traceM (ConditionalJoin eq form) = traceIf False (sep [text "Conditionally joined", nest 2 (pretty eq), text "assuming", nest 2 (pretty form)])
 traceM (Pause eqn) = traceIf False (hang (text "Pausing equation") 2 (pretty eqn))
-traceM (Reduce red rule) = traceIf False (sep [pretty red, nest 2 (text "using"), nest 2 (pretty rule)])
-traceM Complete = traceIf False (text "Finished completion")
-traceM Unpausing = traceIf False (text "Found rules to unpause")
+traceM (Reduce red rule) = traceIf True (sep [pretty red, nest 2 (text "using"), nest 2 (pretty rule)])
+traceM Complete = traceIf True (text "Finished completion")
+traceM Unpausing = traceIf True (text "Found rules to unpause")
 traceIf :: Monad m => Bool -> Doc -> m ()
-traceIf True x = Debug.Trace.traceM (show x)
+--traceIf True x = Debug.Trace.traceM (show x)
 traceIf _ s = return ()
 
 data KBC f v =
@@ -187,7 +187,7 @@ toCP ::
 toCP n norm (Constrained ctx (l :==: r)) = do
   guard (l /= r)
   unless (minSize (solved ctx) l `max` minSize (solved ctx) r <= fromIntegral n) $ do
-    Debug.Trace.traceM ("Threw out " ++ prettyShow (Constrained ctx (l :==: r)))
+    --Debug.Trace.traceM ("Threw out " ++ prettyShow (Constrained ctx (l :==: r)))
     mzero
   let l' = norm ctx l
       r' = norm ctx r
