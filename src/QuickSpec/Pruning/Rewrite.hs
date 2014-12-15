@@ -40,9 +40,9 @@ tryRule ctx rule t = do
   guard (implies (solved ctx) (runM simplify (formula (context rule'))))
   return (rhs (constrained rule'))
 
-tryRules :: (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) => Context f v -> Index (Labelled (Constrained (Rule f v))) -> Strategy f v
+tryRules :: (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) => Context f v -> Index (Constrained (Rule f v)) -> Strategy f v
 tryRules ctx rules t = do
-  rule <- map peel (Index.lookup t rules)
+  rule <- Index.lookup t rules
   guard (implies (solved ctx) (runM simplify (formula (context rule))))
   -- traceM (show (hang (pretty rule <+> text "in context") 2 (pretty ctx)))
   return (rhs (constrained rule))

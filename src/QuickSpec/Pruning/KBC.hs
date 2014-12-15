@@ -53,10 +53,10 @@ traceIf _ s = return ()
 
 data KBC f v =
   KBC {
-    maxSize   :: Int,
-    rules     :: Index (Labelled (Constrained (Rule f v))),
-    queue     :: Queue (CP f v),
-    paused    :: Set (Constrained (Equation f v)) }
+    maxSize       :: Int,
+    labelledRules :: Index (Labelled (Constrained (Rule f v))),
+    queue         :: Queue (CP f v),
+    paused        :: Set (Constrained (Equation f v)) }
   deriving Show
 
 data CP f v =
@@ -75,16 +75,16 @@ instance (PrettyTerm f, Pretty v) => Pretty (CP f v) where
 report :: KBC f v -> String
 report s = show r ++ " rewrite rules, " ++ show c ++ " paused critical pairs.\n"
   where
-    r = length (Index.elems (rules s))
+    r = length (Index.elems (labelledRules s))
     c = Set.size (paused s)
 
 initialState :: Int -> KBC f v
 initialState maxSize =
   KBC {
-    maxSize   = maxSize,
-    rules     = Index.empty,
-    queue     = empty,
-    paused    = Set.empty }
+    maxSize       = maxSize,
+    labelledRules = Index.empty,
+    queue         = empty,
+    paused        = Set.empty }
 
 enqueueM ::
   (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
@@ -111,6 +111,9 @@ pause :: (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Pretty v, Numbered v) =>
 pause eqn = do
   traceM (Pause eqn)
 --  modify (\s -> s { paused = Set.insert (canonicalise eqn) (paused s) })
+
+rules :: KBC f v -> Index (Constrained (Rule f v))
+rules = Index.mapMonotonic peel id id . labelledRules
 
 normaliser ::
   (Monad m, PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) =>
@@ -141,8 +144,8 @@ unpause ::
   (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
   StateT (KBC f v) m ()
 unpause = do
-  paused    <- gets paused
-  rules   <- gets rules
+  paused <- gets paused
+  rules  <- gets rules
   let resumable (Constrained ctx eq) = isJust (caseSplit rules ctx eq)
       (resumed, paused') = Set.partition resumable paused
   when (not (Set.null resumed)) $ do
@@ -238,7 +241,7 @@ orientWith norm eq = orient eq >>= split >>= reduce
 bestCases ::
   (PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
   (Context f v -> Tm f v -> Tm f v) ->
-  Index (Labelled (Constrained (Rule f v))) ->
+  Index (Constrained (Rule f v)) ->
   Context f v -> Equation f v -> Maybe (Formula f v)
 bestCases norm rules ctx (t :==: u) =
   findCases norm rules ctx (t :==: u) >>= shrink
@@ -253,7 +256,7 @@ bestCases norm rules ctx (t :==: u) =
 findCases ::
   (PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
   (Context f v -> Tm f v -> Tm f v) ->
-  Index (Labelled (Constrained (Rule f v))) ->
+  Index (Constrained (Rule f v)) ->
   Context f v -> Equation f v -> Maybe (Formula f v)
 findCases norm rules ctx (t :==: u)
   | t' == u' = Just FTrue
@@ -266,12 +269,12 @@ findCases norm rules ctx (t :==: u)
 
 caseSplit ::
   (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) =>
-  Index (Labelled (Constrained (Rule f v))) ->
+  Index (Constrained (Rule f v)) ->
   Context f v -> Equation f v -> Maybe (Formula f v, Context f v)
 caseSplit rules ctx (t :==: u) =
   listToMaybe $ do
     v <- subterms t ++ subterms u
-    rule <- map peel (Index.lookup v rules)
+    rule <- Index.lookup v rules
     let form = formula (context rule)
         ctx' = toContext (mainSplit (form &&& formula ctx))
     guard (satisfiable (solved ctx'))
@@ -294,13 +297,13 @@ shrinkFormula _ = [FTrue]
 addRule :: (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) => Constrained (Rule f v) -> StateT (KBC f v) m Label
 addRule rule = do
   l <- newLabelM
-  modify (\s -> s { rules = Index.insert (Labelled l rule) (rules s) })
+  modify (\s -> s { labelledRules = Index.insert (Labelled l rule) (labelledRules s) })
   return l
 
 deleteRule :: (Monad m, Sized f, Ord f, Ord v, Numbered v) => Label -> Constrained (Rule f v) -> StateT (KBC f v) m ()
 deleteRule l rule =
   modify $ \s ->
-    s { rules = Index.delete (Labelled l rule) (rules s),
+    s { labelledRules = Index.delete (Labelled l rule) (labelledRules s),
         queue = deleteLabel l (queue s) }
 
 data Reduction f v = Simplify (Constrained (Rule f v)) | Reorient (Constrained (Rule f v)) deriving Show
@@ -311,7 +314,7 @@ instance (PrettyTerm f, Pretty v) => Pretty (Reduction f v) where
 
 interreduce :: (Monad m, PrettyTerm f, Ord f, Sized f, Ord v, Numbered v, Pretty v) => Constrained (Rule f v) -> StateT (KBC f v) m ()
 interreduce new = do
-  rules <- gets (Index.elems . rules)
+  rules <- gets (Index.elems . labelledRules)
   let reductions = catMaybes (map (moveLabel . fmap (reduce new)) rules)
   sequence_ [ traceM (Reduce red new) | red <- map peel reductions ]
   sequence_ [ simplifyRule l rule | Labelled l (Simplify rule) <- reductions ]
@@ -332,13 +335,13 @@ simplifyRule l rule@(Constrained ctx (Rule lhs rhs)) = do
   norm <- normaliser
   modify $ \s ->
     s {
-      rules =
+      labelledRules =
          Index.insert (Labelled l (Constrained ctx (Rule lhs (norm ctx rhs))))
-           (Index.delete (Labelled l rule) (rules s)) }
+           (Index.delete (Labelled l rule) (labelledRules s)) }
 
 addCriticalPairs :: (Monad m, PrettyTerm f, Ord f, Sized f, Ord v, Numbered v, Pretty v) => Label -> Constrained (Rule f v) -> StateT (KBC f v) m ()
 addCriticalPairs l new = do
-  rules <- gets rules
+  rules <- gets labelledRules
   queueCPs l $
     [ Labelled l' cp
     | Labelled l' old <- Index.elems rules,

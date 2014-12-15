@@ -48,6 +48,17 @@ empty = Index Set.empty Map.empty Map.empty
 null :: Index a -> Bool
 null idx = Set.null (here idx) && Map.null (fun idx) && Map.null (var idx)
 
+mapMonotonic ::
+  (a -> b) ->
+  (ConstantOf a -> ConstantOf b) ->
+  (VariableOf a -> VariableOf b) ->
+  Index a -> Index b
+mapMonotonic f g h (Index here fun var) =
+  Index
+    (Set.mapMonotonic f here)
+    (fmap (mapMonotonic f g h) (Map.mapKeysMonotonic g fun))
+    (fmap (mapMonotonic f g h) (Map.mapKeysMonotonic h var))
+
 insert ::
   (Symbolic a, Ord (ConstantOf a), Ord (VariableOf a), Numbered (VariableOf a), Ord a) =>
   a -> Index a -> Index a
