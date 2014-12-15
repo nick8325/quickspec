@@ -53,7 +53,7 @@ data Event =
   | Type           (Poly Type)
   | UntestableType (Poly Type)
   | Found          Prop
-  | InstantiateSchema Schema
+  | InstantiateSchema Schema Schema
   | FinishedSize   Int
   deriving (Eq, Ord)
 
@@ -66,7 +66,7 @@ instance Pretty Event where
   pretty (UntestableType ty) = text "untestable type" <+> pretty ty
   pretty (Found prop) = text "found" <+> pretty prop
   pretty (FinishedSize n) = text "finished size" <+> pretty n
-  pretty (InstantiateSchema s) = text "instantiate schema" <+> pretty s
+  pretty (InstantiateSchema s s') = text "instantiate schema" <+> pretty s' <+> text "from" <+> pretty s
 
 data KindOf a = Untestable | TimedOut | Representative | EqualTo a
   deriving (Eq, Ord)
@@ -189,30 +189,30 @@ createRules sig = do
           liftIO $ print (text "Schema" <+> pretty s <+> text "timed out")
         Untestable -> return ()
         EqualTo t -> do
-          generate (InstantiateSchema t)
+          generate (InstantiateSchema t t)
           considerRenamings isCanonical t ms
           -- FIXME this is a bit of a hack needed for e.g booleans
           -- where we get the schema equation x&&x=x which generalises
           -- to x&&y=y&&x. Should do something principled for generalising
           -- equivalence classes instead.
           when (size ms <= maxCommutativeSize_ sig) $
-            considerRenamings (const True) t ms
+            generate (InstantiateSchema t ms)
         Representative -> do
           generate (ConsiderTerm (From ms (instantiate ms)))
           when (size ms <= maxCommutativeSize_ sig) $
-            generate (InstantiateSchema ms)
+            generate (InstantiateSchema ms ms)
 
   rule $ do
-    InstantiateSchema s <- event
+    InstantiateSchema s s' <- event
     execute $
-      considerRenamings isCanonical s s
+      considerRenamings isCanonical s s'
 
   rule $ do
     FinishedSize n <- event
-    InstantiateSchema s <- event
-    require (size s == n)
+    InstantiateSchema s s' <- event
+    require (size s' == n)
     execute $
-      considerRenamings (const True) s s
+      considerRenamings (const True) s s'
 
   rule $ do
     Term (From s t) k <- event
