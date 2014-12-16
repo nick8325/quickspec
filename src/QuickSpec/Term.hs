@@ -25,7 +25,8 @@ type Term = TermOf Variable
 type Schema = TermOf Hole
 
 class Sized a where
-  funSize :: a -> Rational
+  funSize  :: a -> Rational
+  funArity :: a -> Int
 
 -- Term ordering - size, skeleton, generality.
 -- Satisfies the property:
@@ -46,7 +47,7 @@ compareFuns (Var x) (Var y) = compare x y
 compareFuns Var{} Fun{} = LT
 compareFuns Fun{} Var{} = GT
 compareFuns (Fun f ts) (Fun g us) =
-  compare (f :/: length ts) (g :/: length us) `orElse`
+  compare f g `orElse`
   compare (map MeasureFuns ts) (map MeasureFuns us)
 
 -- Take two terms and find the first place where they differ.
@@ -58,24 +59,11 @@ compareTerms t u =
     (Var{}, Fun{}) -> here LT
     (Fun{}, Var{}) -> here GT
     (Fun f xs, Fun g ys) ->
-      here (compare (f :/: length xs) (g :/: length ys)) `mplus`
+      here (compare f g) `mplus`
       msum (zipWith compareTerms xs ys)
   where
     here EQ = Nothing
     here ord = Just (t, u, ord)
-
-data Arity f = f :/: Int deriving (Eq, Show)
-
-instance Ord f => Ord (Arity f) where
-  compare = comparing (\(f :/: n) -> (twiddle n, f))
-    where
-      -- This tweak is taken from Prover9
-      twiddle 2 = 1
-      twiddle 1 = 2
-      twiddle n = n
-
-instance PrettyTerm f => Pretty (Arity f) where
-  pretty (f :/: n) = pretty (Fun f (map Var (replicate n (text "_"))))
 
 -- Reduction ordering (i.e., a partial order closed under substitution).
 orientTerms :: (Sized f, Ord f, Ord v) => Tm f v -> Tm f v -> Maybe Ordering
@@ -106,12 +94,19 @@ data Constant =
     conName         :: String,
     conValue        :: Value Identity,
     conGeneralValue :: Poly (Value Identity),
+    conArity        :: Int,
     conStyle        :: TermStyle,
     conSize         :: Int,
     conIsBackground :: Bool }
   deriving Show
 instance Eq Constant where x == y = x `compare` y == EQ
-instance Ord Constant where compare = comparing (\c -> (conName c, typ (conGeneralValue c)))
+instance Ord Constant where
+  compare = comparing (\c -> (twiddle (conArity c), conName c, typ (conGeneralValue c)))
+    where
+      -- This tweak is taken from Prover9
+      twiddle 2 = 1
+      twiddle 1 = 2
+      twiddle n = n
 instance Pretty Constant where
   pretty = text . conName
 instance PrettyTerm Constant where
@@ -120,7 +115,8 @@ instance Typed Constant where
   typ = typ . conValue
   typeSubst sub x = x { conValue = typeSubst sub (conValue x) }
 instance Sized Constant where
-  funSize = fromIntegral . conSize
+  funSize  = fromIntegral . conSize
+  funArity = conArity
 
 -- We're not allowed to have two variables with the same number
 -- but unifiable types.
@@ -159,8 +155,10 @@ instance Typed v => Apply (TermOf v) where
   tryApply t@(Fun f xs) u
     | arity (typ (conGeneralValue f)) > length xs =
       case typ t of
-        Fun Arrow [arg, _] | arg == typ u -> Just (Fun f (xs ++ [u]))
+        Fun Arrow [arg, _] | arg == typ u -> Just (Fun f' (xs ++ [u]))
         _ -> Nothing
+    where
+      f' = f { conArity = conArity f + 1 }
   tryApply _ _ = Nothing
 
 -- Turn a term into a schema by forgetting about its variables.

@@ -59,7 +59,8 @@ runPruner sig m =
 createRules :: (Monad m, Pruner s) => PrunerT s m ()
 createRules = PrunerT $ do
   rule $ do
-    fun@(TermConstant con _ arity) <- event
+    fun@(TermConstant con _) <- event
+    let arity = funArity con
     execute $ do
       let ty = typ (Fun con (replicate arity (undefined :: Term)))
           t = Fun fun (take arity (map Var [0..]))
@@ -104,14 +105,14 @@ toGoalTerm :: Term -> PruningTerm
 toGoalTerm = skolemise . toTaggedPruningConstant
 
 toPruningConstant :: Term -> Tm PruningConstant Variable
-toPruningConstant = mapTerm f id . withArity
+toPruningConstant = mapTerm f id
   where
-    f (fun, n) = TermConstant fun (typ fun) n
+    f fun = TermConstant fun (typ fun)
 
 toTaggedPruningConstant :: Term -> Tm PruningConstant Variable
 toTaggedPruningConstant (Var x) = Var x
 toTaggedPruningConstant t@(Fun f ts) =
-  Fun (HasType (typ t)) [Fun (TermConstant f (typ f) (length ts)) (map toTaggedPruningConstant ts)]
+  Fun (HasType (typ t)) [Fun (TermConstant f (typ f)) (map toTaggedPruningConstant ts)]
 
 skolemise :: Tm PruningConstant Variable -> PruningTerm
 skolemise (Fun f xs) = Fun f (map skolemise xs)
@@ -159,7 +160,7 @@ data PruningConstant
     -- The type of a TermConstant is always the same as the underlying
     -- constant's type, it's only included here so that it's counted
     -- in the Ord instance
-  | TermConstant Constant Type Int
+  | TermConstant Constant Type
     -- Since HasType has weight 0, it must be the biggest constant.
   | HasType Type
   deriving (Eq, Show)
@@ -168,25 +169,28 @@ instance Ord PruningConstant where
   compare = comparing f
     where
       f (SkolemVariable x)    = Left x
-      f (TermConstant x ty n) = Right (Left (x :/: n, ty))
+      f (TermConstant x ty) = Right (Left (x, ty))
       f (HasType ty)          = Right (Right ty)
 
 -- We have the property that size (skolemise t) == size t,
 -- which is useful because we use the size to decide whether
 -- to keep a critical pair.
 instance Sized PruningConstant where
-  funSize (TermConstant c _ _) = funSize c
+  funSize (TermConstant c _) = funSize c
   funSize (SkolemVariable _) = 1
   funSize (HasType _) = 0
+  funArity (TermConstant c _) = funArity c
+  funArity (SkolemVariable _) = 0
+  funArity (HasType _) = 1
 
 newtype PruningVariable = PruningVariable Int deriving (Eq, Ord, Num, Enum, Show, Numbered)
 
 instance Pretty PruningConstant where
-  pretty (TermConstant x _ _) = pretty x
+  pretty (TermConstant x _) = pretty x
   pretty (SkolemVariable x) = text "s" <> pretty x
   pretty (HasType ty) = text "@" <> prettyPrec 11 ty
 instance PrettyTerm PruningConstant where
-  termStyle (TermConstant x _ _) = termStyle x
+  termStyle (TermConstant x _) = termStyle x
   termStyle _ = Curried
 
 instance Pretty PruningVariable where
@@ -199,7 +203,7 @@ fromPruningTerm t =
     n = maximum (0:[1+n | SkolemVariable (PruningVariable n) <- funs t])
 
 fromPruningTermWith :: Int -> PruningTerm -> Term
-fromPruningTermWith n (Fun (TermConstant fun _ _) xs) =
+fromPruningTermWith n (Fun (TermConstant fun _) xs) =
   Fun fun (zipWith (fromPruningTermWithType n) (typeArgs (typ fun)) xs)
 fromPruningTermWith n (Fun (HasType ty) [t]) = fromPruningTermWithType n ty t
 fromPruningTermWith _ _ = ERROR "ill-typed term?"

@@ -28,6 +28,8 @@ instance PrettyTerm F where termStyle _ = Infix 5
 instance Sized F where
   funSize (F _) = 1
   funSize Ty    = 0
+  funArity Ty = 1
+  funArity _ = 2
 t, u :: Tm F PruningVariable
 --t = Fun (F "sx") []
 --u = Fun Ty [t]
@@ -155,7 +157,7 @@ data Formula f v =
   | Formula f v :&: Formula f v
   | Formula f v :|: Formula f v
   | Size (Bound (FM.Term v))
-  | HeadIs Sense (Tm f v) (Arity f)
+  | HeadIs Sense (Tm f v) f
   | Less (Tm f v) (Tm f v)
     -- Equal t u p q represents (t = u & p) | q.
     -- The smart constructors (|||) and (&&&) lift
@@ -282,12 +284,12 @@ simplify (Size s)
     solve s = FM.solve (addTerms [s] p)
     p = problem (sizeAxioms s)
 simplify (HeadIs sense (Fun f ts) g)
-  | test sense (f :/: length ts) g = return FTrue
+  | test sense f g = return FTrue
   | otherwise = return FFalse
   where
     test Lesser = (<)
     test Greater = (>)
-simplify (HeadIs Greater _ (f :/: 1)) | funSize f == 0 =
+simplify (HeadIs Greater _ f) | funSize f == 0 && funArity f == 1 =
   return FFalse
 simplify (Less t u) | t == u = return FFalse
 simplify (Less t (Var x)) | x `elem` vars t = return FFalse
@@ -302,7 +304,7 @@ simplify p = return p
 structLess :: (Sized f, Ord f, Ord v, Numbered v) => Tm f v -> Tm f v -> M (Formula f v)
 structLess (Fun f ts) (Fun g us) =
   return $
-  case compare (f :/: length ts) (g :/: length us) of
+  case compare f g of
     LT -> FTrue
     GT -> FFalse
     EQ -> loop ts us
@@ -310,21 +312,21 @@ structLess (Fun f ts) (Fun g us) =
     loop [] [] = FFalse
     loop (t:ts) (u:us) = Equal t u (loop ts us) (Less t u)
 structLess (Var x) (Fun f ts) = do
-  u <- specialise x (f :/: length ts)
+  u <- specialise x f
   rest <- structLess u (Fun f ts)
   return $
     Equal (Var x) u rest $
-      HeadIs Lesser (Var x) (f :/: length ts)
+      HeadIs Lesser (Var x) f
 structLess (Fun f ts) (Var x) = do
-  u <- specialise x (f :/: length ts)
+  u <- specialise x f
   rest <- structLess (Fun f ts) u
   return $
     Equal (Var x) u rest $
-      HeadIs Greater (Var x) (f :/: length ts)
+      HeadIs Greater (Var x) f
 
-specialise :: (Sized f, Ord f, Ord v, Numbered v) => v -> Arity f -> M (Tm f v)
-specialise x (f :/: n) = do
-  ns <- replicateM n (newName x)
+specialise :: (Sized f, Ord f, Ord v, Numbered v) => v -> f -> M (Tm f v)
+specialise x f = do
+  ns <- replicateM (funArity f) (newName x)
   return (Fun f (map Var ns))
 
 negFormula :: (Sized f, Numbered v, Ord f, Ord v) => Formula f v -> M (Formula f v)
@@ -362,8 +364,8 @@ data Solved f v =
     prob        :: Problem v,
     solution    :: Map v Rational,
     -- HeadLess and HeadGreater constraints for variables.
-    headLess    :: Map v (Arity f),
-    headGreater :: Map v (Arity f),
+    headLess    :: Map v f,
+    headGreater :: Map v f,
     -- Less x y constraints. Transitively closed.
     less        :: Map v (Set v) }
   deriving (Eq, Ord, Show)
@@ -461,7 +463,7 @@ data Extended f v =
     -- ConstrainedVar x n k (Just f):
     -- x is at position n among all ConstrainedVars,
     -- has size k and its head is smaller than f
-  | ConstrainedVar v Int Rational (Maybe (Arity f))
+  | ConstrainedVar v Int Rational (Maybe f)
   deriving (Eq, Show)
 
 instance (PrettyTerm f, Pretty v) => Pretty (Extended f v) where
