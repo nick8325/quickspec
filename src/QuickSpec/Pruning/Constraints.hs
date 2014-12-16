@@ -68,6 +68,19 @@ instance (Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Symbolic
   substf sub (Constrained ctx x) =
     Constrained (substf sub ctx) (substf sub x)
 
+reduce :: (Symbolic a, Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Numbered (VariableOf a)) => Constrained a -> Constrained a
+reduce x =
+  case split x of
+    [y] | simple (formula (context y)) -> y
+    _ -> x
+  where
+    simple (p :&: q) = simple p && simple q
+    simple (p :|: q) = simple p || simple q
+    simple FTrue = True
+    simple FFalse = True
+    simple Less{} = True
+    simple _ = False
+
 split :: (Symbolic a, Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Numbered (VariableOf a)) => Constrained a -> [Constrained a]
 split (Constrained ctx x) =
   case runM simplify (formula ctx) of
@@ -226,6 +239,14 @@ r &&& Equal t u p q = Equal t u (p &&& r) (q &&& r)
 p &&& (q :|: r) = (p &&& q) ||| (p &&& r)
 (p :|: q) &&& r = (p &&& r) ||| (q &&& r)
 p &&& q = p :&: q
+
+true :: (Sized f, Ord f, Ord v) => Formula f v -> Bool
+true FTrue = True
+true FFalse = False
+true (p :&: q) = true p && true q
+true (p :|: q) = true p || true q
+true (Less t u) = t `simplerThan` u
+true _ = ERROR "can't check truth of split constraints"
 
 type M = State Int
 
