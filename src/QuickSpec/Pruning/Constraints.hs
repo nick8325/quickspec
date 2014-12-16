@@ -456,6 +456,7 @@ minimiseSolved t s =
             Just m -> loop m
       where
         x = FM.eval 1 m t
+        n :: Integer
         n = ceiling x
 
 data Extended f v =
@@ -465,6 +466,40 @@ data Extended f v =
     -- has size k and its head is smaller than f
   | ConstrainedVar v Int Rational (Maybe f)
   deriving (Eq, Show)
+
+toExtended :: Ord v => Map v (Extended f v) -> Tm f v -> Tm (Extended f v) v
+toExtended m (Var x) =
+  case Map.lookup x m of
+    Nothing -> Var x
+    Just f -> Fun f []
+toExtended m (Fun f ts) =
+  Fun (Original f) (map (toExtended m) ts)
+
+fromExtended :: Tm (Extended f v) v -> Tm f v
+fromExtended (Fun (Original f) ts) = Fun f (map fromExtended ts)
+fromExtended (Fun (ConstrainedVar x _ _ _) []) = Var x
+fromExtended (Var x) = Var x
+
+instance Sized f => Sized (Extended f v) where
+  funSize (Original f) = funSize f
+  funSize (ConstrainedVar _ _ k _) = k
+  funArity (Original f) = funArity f
+  funArity ConstrainedVar{} = 0
+
+instance (Sized f, Ord f, Ord v) => Ord (Extended f v) where
+  compare (Original f) (Original g) = compare f g
+  compare (ConstrainedVar _ m _ _) (ConstrainedVar _ n _ _) = compare m n
+  compare x@Original{} y@ConstrainedVar{} =
+    case compare y x of
+      LT -> GT
+      EQ -> EQ
+      GT -> LT
+  compare (ConstrainedVar _ _ _ Nothing) (Original f)
+    | funSize f == 0 && funArity f == 1 = LT
+    | otherwise = GT
+  compare (ConstrainedVar _ _ _ (Just f)) (Original g)
+    | f <= g = LT
+    | otherwise = GT
 
 instance (PrettyTerm f, Pretty v) => Pretty (Extended f v) where
   pretty (Original f) = pretty f
