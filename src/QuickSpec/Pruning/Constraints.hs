@@ -16,6 +16,7 @@ import Data.Ord
 import qualified Data.Set as Set
 import Data.Set(Set)
 import qualified Data.Rewriting.Substitution.Type as Subst
+import Data.List
 
 import QuickSpec.Pruning
 import Data.Rewriting.Rule(Rule(Rule))
@@ -108,11 +109,14 @@ type ContextOf a = Context (ConstantOf a) (VariableOf a)
 data Context f v =
   Context {
     formula :: Formula f v,
-    solved  :: Solved f v }
+    solved  :: Solved f v,
+    model   :: Map v (Extended f v) }
   deriving Show
 
 toContext :: (Sized f, Ord f, Ord v) => Formula f v -> Context f v
-toContext x = Context x (solve x)
+toContext x = Context x s (toModel s)
+  where
+    s = solve x
 
 instance (Eq f, Eq v) => Eq (Context f v) where
   x == y = formula x == formula y
@@ -323,18 +327,19 @@ data Solved f v =
   -- We complete the set of constraints as follows:
   -- * Less is transitively closed.
   -- * If Less x y, then size x <= size y.
-  -- * If HeadGreater x f and Less x y and HeadLess y f,
-  --   then size x < size y (size x = size y implies f < f).
+  -- * If HeadGreater x f and Less x y and HeadLess y g with g <= f,
+  --   then size x < size y (size x = size y implies f < g).
   --   When x = y this becomes: if HeadGreater x f and HeadLess x f,
   --   then size x < size x, i.e. false.
   -- Once completed, the constraints are satisfiable iff:
-  -- 1. The size constrains are satisfiable.
+  -- 1. The size constraints are satisfiable.
   -- 2. There is no literal Less x x.
   Unsolvable |
   Tautological |
   Solved {
     -- Size constraints.
     prob        :: Problem v,
+    solution    :: Map v Rational,
     -- HeadLess and HeadGreater constraints for variables.
     headLess    :: Map v (Arity f),
     headGreater :: Map v (Arity f),
@@ -348,6 +353,7 @@ instance (PrettyTerm f, Pretty v) => Pretty (Solved f v) where
   pretty x =
     pretty [
       pretty (prob x),
+      pretty (solution x),
       pretty (headLess x),
       pretty (headGreater x),
       pretty (less x) ]
@@ -365,9 +371,11 @@ solve1 [] = Tautological
 solve1 ls
   | not (null equal) = ERROR "must call split before using a context"
   | FFalse `elem` ls = Unsolvable
-  | isNothing (FM.solve prob) = Unsolvable
   | or [ Set.member x s | (x, s) <- Map.toList less' ] = Unsolvable
-  | otherwise = Solved prob headLess' headGreater' less'
+  | otherwise =
+      case FM.solve prob of
+        Nothing -> Unsolvable
+        Just sol -> Solved prob sol headLess' headGreater' less'
   where
     size = [s | Size s <- ls]
     headLess = [(unVar x, f) | HeadIs Lesser x f <- ls]
@@ -400,29 +408,6 @@ satisfiable :: (Ord f, Ord v) => Solved f v -> Bool
 satisfiable Unsolvable = False
 satisfiable _ = True
 
-implies :: (Sized f, Numbered v, Ord f, Ord v) => Solved f v -> Formula f v -> Bool
-implies Unsolvable _ = __
-implies _ FTrue = True
-implies Tautological _ = False
-implies _ FFalse = False
-implies form (p :&: q) = implies form p && implies form q
-implies form (p :|: q) = implies form p || implies form q
-implies form (Equal _ _ _ p) = implies form p
-implies form (Size s) =
-  isNothing (FM.solve (addTerms ts (prob form)))
-  where
-    ts = negateBound s:sizeAxioms s
-implies form (Less (Var x) (Var y)) =
-  y `Set.member` Map.findWithDefault Set.empty x (less form)
-implies form (HeadIs Lesser (Var x) f) =
-  case Map.lookup x (headLess form) of
-    Just g | g <= f -> True
-    _ -> False
-implies form (HeadIs Greater (Var x) f) =
-  case Map.lookup x (headGreater form) of
-    Just g | g >= f -> True
-    _ -> False
-
 minSize :: (Pretty v, Sized f, Numbered v, Ord f, Ord v) => Solved f v -> Tm f v -> Integer
 minSize Unsolvable _ = __
 minSize Tautological t = fromIntegral (size t)
@@ -442,3 +427,49 @@ minimise prob t =
         Just m -> loop (eval m t)
       where
         n = ceiling x
+
+data Extended f v =
+    Original f
+    -- ConstrainedVar x n k (Just f):
+    -- x is at position n among all ConstrainedVars,
+    -- has size k and its head is smaller than f
+  | ConstrainedVar v Int Rational (Maybe (Arity f))
+  deriving (Eq, Show)
+
+instance (PrettyTerm f, Pretty v) => Pretty (Extended f v) where
+  pretty (Original f) = pretty f
+  pretty (ConstrainedVar x n k l) =
+    text "c" <> pretty n <> pretty x <> brackets (pretty k <> bound l)
+    where
+      bound Nothing = text ""
+      bound (Just f) = text ", >" <+> pretty f
+
+instance (PrettyTerm f, Pretty v) => PrettyTerm (Extended f v) where
+  termStyle (Original f) = termStyle f
+  termStyle ConstrainedVar{} = Curried
+
+toModel :: (Ord f, Ord v) => Solved f v -> Map v (Extended f v)
+toModel Unsolvable = __
+toModel Tautological = Map.empty
+toModel s =
+  Map.fromList [(x, var x i) | (x, i) <- zip (sortBy cmp vs) [0..]]
+  where
+    vs = usort (Set.toList (pvars (prob s)) ++
+                Map.keys (headLess s) ++
+                Map.keys (headGreater s) ++
+                concat [(x:Set.toList s) | (x, s) <- Map.toList (less s)])
+    cmp x y
+      | y `Set.member` Map.findWithDefault Set.empty x (less s) = LT
+      | x `Set.member` Map.findWithDefault Set.empty y (less s) = GT
+      | otherwise = compare x y
+    var x i =
+      ConstrainedVar x i
+        (varSize x)
+        (try minimum
+         (catMaybes
+          [ Map.lookup y (headLess s)
+          | y <- x:filter (sameSize x) (Set.toList (Map.findWithDefault Set.empty x (less s))) ]))
+    varSize x = Map.findWithDefault 1 x (solution s)
+    sameSize x y = varSize x == varSize y
+    try f [] = Nothing
+    try f xs = Just (f xs)
