@@ -408,24 +408,31 @@ satisfiable :: (Ord f, Ord v) => Solved f v -> Bool
 satisfiable Unsolvable = False
 satisfiable _ = True
 
-minSize :: (Pretty v, Sized f, Numbered v, Ord f, Ord v) => Solved f v -> Tm f v -> Integer
-minSize Unsolvable _ = __
-minSize Tautological t = fromIntegral (size t)
-minSize s t = minimise (addTerms ax (prob s)) sz
-  where
-    sz = termSize t
-    ax = termAxioms t
+modelSize :: (Pretty v, Sized f, Ord f, Ord v) => Tm f v -> Solved f v -> Integer
+modelSize t Unsolvable = __
+modelSize t Tautological = fromIntegral (size t)
+modelSize t s = ceiling (FM.eval 1 (solution s) (termSize t))
 
-minimise :: (Pretty v, Ord v) => Problem v -> FM.Term v -> Integer
-minimise prob t =
-  loop (eval (fromMaybe __ (FM.solve prob)) t)
+minimiseContext :: (Pretty v, Ord f, Ord v) => FM.Term v -> Context f v -> Context f v
+minimiseContext t ctx =
+  ctx { solved = s, model = toModel s }
   where
-    loop x | x < 0 = __
-    loop x =
-      case FM.solve (addTerms [t <== fromIntegral (n-1)] prob) of
-        Nothing -> n
-        Just m -> loop (eval m t)
+    s = minimiseSolved t (solved ctx)
+
+minimiseSolved :: (Pretty v, Ord v) => FM.Term v -> Solved f v -> Solved f v
+minimiseSolved t Unsolvable = __
+minimiseSolved t Tautological = Tautological
+minimiseSolved t s =
+  s { solution = loop (solution s) }
+  where
+    loop m
+      | x < 0 = __
+      | otherwise =
+          case FM.solve (addTerms [t <== fromIntegral (n-1)] (prob s)) of
+            Nothing -> m
+            Just m -> loop m
       where
+        x = FM.eval 1 m t
         n = ceiling x
 
 data Extended f v =
