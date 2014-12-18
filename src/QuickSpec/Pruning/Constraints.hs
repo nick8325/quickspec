@@ -33,11 +33,11 @@ instance Sized F where
 t, u :: Tm F PruningVariable
 --t = Fun (F "sx") []
 --u = Fun Ty [t]
---t = Fun (F "+") [Var 0, Var 1]
---u = Fun (F "+") [Var 1, Var 0]
-(t, u) = (f (Var 0) (Var 1), f (Var 1) (Var 0))
+t = Fun (F "+") [Var 0, Fun (F "+") [Var 1, Var 2]]
+u = Fun (F "+") [Var 1, Fun (F "+") [Var 0, Var 2]]
+{-(t, u) = (f (Var 0) (Var 1), f (Var 1) (Var 0))
   where
-    f x y = Fun (F "*") [x, Fun (F "+") [y, Fun (F "+") [y, y]]]
+    f x y = Fun (F "*") [x, Fun (F "+") [y, Fun (F "+") [y, y]]]-}
 r1 = Constrained (toContext (Less u t)) (Rule t u)
 r2 = Constrained (toContext (Less t u)) (Rule u t)
 form :: Formula F PruningVariable
@@ -74,6 +74,7 @@ reduce :: (Symbolic a, Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf
 reduce x =
   case split x of
     [y] | simple (formula (context y)) -> y
+    [] -> Constrained (toContext FFalse) (constrained x)
     _ -> x
   where
     simple (p :&: q) = simple p && simple q
@@ -102,7 +103,7 @@ split (Constrained ctx x) =
 
 mainSplit :: (Sized f, Numbered v, Ord f, Ord v) => Formula f v -> Formula f v
 mainSplit p =
-  case mainSplits p of
+  case filter (satisfiable . solve) (mainSplits p) of
     [] -> FFalse
     (q:_) -> q
 
@@ -111,8 +112,7 @@ mainSplits p =
   case runM simplify p of
     Equal t u p q -> mainSplits q
     p :|: q -> mainSplits p ++ mainSplits q
-    p | satisfiable (solve p) -> [p]
-      | otherwise -> []
+    p -> [p]
 
 neg :: (Symbolic a, Sized (ConstantOf a), Numbered (VariableOf a), Ord (ConstantOf a), Ord (VariableOf a)) => Constrained a -> Constrained a
 neg = runM $ \x -> do
@@ -217,8 +217,8 @@ termSize = foldTerm FM.var fun
   where
     fun f ss = constTerm (funSize f) + sum ss
 
-sizeAxioms :: Ord v => Bound (FM.Term v) -> [Bound (FM.Term v)]
-sizeAxioms s = [ var x >== 1 | x <- Map.keys (FM.vars (bound s)) ]
+sizeAxioms :: Ord v => FM.Term v -> [Bound (FM.Term v)]
+sizeAxioms s = [ var x >== 1 | x <- Map.keys (FM.vars s) ]
 
 termAxioms :: (Symbolic a, Ord (VariableOf a)) => a -> [Bound (FM.Term (VariableOf a))]
 termAxioms t = [ var x >== 1 | x <- usort (vars t) ]
@@ -248,7 +248,16 @@ true FFalse = False
 true (p :&: q) = true p && true q
 true (p :|: q) = true p || true q
 true (Less t u) = t `simplerThan` u
-true _ = ERROR "can't check truth of split constraints"
+true (HeadIs Lesser (Fun f _) g) | f < g = True
+true (HeadIs Greater (Fun f _) g) | f > g = True
+true (Size (Closed s)) | minSize s >= Just 0 = True
+true (Size (Open s))   | minSize s >  Just 0 = True
+true _ = False
+
+minSize :: Ord v => FM.Term v -> Maybe Rational
+minSize s
+  | any (< 0) (Map.elems (FM.vars s)) = Nothing
+  | otherwise = Just (sum (Map.elems (FM.vars s)) + FM.constant s)
 
 type M = State Int
 
@@ -282,7 +291,7 @@ simplify (Size s)
   | isNothing (solve (negateBound s)) = return FTrue
   where
     solve s = FM.solve (addTerms [s] p)
-    p = problem (sizeAxioms s)
+    p = problem (sizeAxioms (bound s))
 simplify (HeadIs sense (Fun f ts) g)
   | test sense f g = return FTrue
   | otherwise = return FFalse
@@ -431,31 +440,56 @@ satisfiable :: (Ord f, Ord v) => Solved f v -> Bool
 satisfiable Unsolvable = False
 satisfiable _ = True
 
+implies :: (Sized f, Numbered v, Ord f, Ord v) => Solved f v -> Formula f v -> Bool
+implies Unsolvable _ = __
+implies _ FTrue = True
+implies Tautological _ = False
+implies _ FFalse = False
+implies form (p :&: q) = implies form p && implies form q
+implies form (p :|: q) = implies form p || implies form q
+implies form (Equal _ _ _ p) = implies form p
+implies form (Size s) =
+  isNothing (FM.solve (addTerms ts (prob form)))
+  where
+    ts = negateBound s:sizeAxioms (bound s)
+implies form (Less (Var x) (Var y)) =
+  y `Set.member` Map.findWithDefault Set.empty x (less form)
+implies form (HeadIs Lesser (Var x) f) =
+  case Map.lookup x (headLess form) of
+    Just g | g <= f -> True
+    _ -> False
+implies form (HeadIs Greater (Var x) f) =
+  case Map.lookup x (headGreater form) of
+    Just g | g >= f -> True
+    _ -> False
+
 modelSize :: (Pretty v, Sized f, Ord f, Ord v) => Tm f v -> Solved f v -> Integer
 modelSize t Unsolvable = __
 modelSize t Tautological = fromIntegral (size t)
 modelSize t s = ceiling (FM.eval 1 (solution s) (termSize t))
 
-minimiseContext :: (Pretty v, Ord f, Ord v) => FM.Term v -> Context f v -> Context f v
+minimiseContext :: (Sized f, Pretty v, Ord f, Ord v) => Tm f v -> Context f v -> Context f v
 minimiseContext t ctx =
   ctx { solved = s, model = toModel s }
   where
     s = minimiseSolved t (solved ctx)
 
-minimiseSolved :: (Pretty v, Ord v) => FM.Term v -> Solved f v -> Solved f v
+minimiseSolved :: (Pretty v, Sized f, Ord f, Ord v) => Tm f v -> Solved f v -> Solved f v
 minimiseSolved t Unsolvable = __
 minimiseSolved t Tautological = Tautological
 minimiseSolved t s =
   s { solution = loop (solution s) }
   where
+    sz = termSize t
+    p = addTerms (sizeAxioms sz) (prob s)
     loop m
       | x < 0 = __
       | otherwise =
-          case FM.solve (addTerms [t <== fromIntegral (n-1)] (prob s)) of
+          case FM.solve (addTerms [sz <== fromIntegral (n-1)] p) of
             Nothing -> m
             Just m -> loop m
       where
-        x = FM.eval 1 m t
+        x = FM.eval 1 m sz
         n :: Integer
         n = ceiling x
 

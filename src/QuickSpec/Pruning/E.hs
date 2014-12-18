@@ -49,7 +49,7 @@ translate axioms goal = Jukebox.close_ Jukebox.stdNames $ do
           map (input . translateProp var fun prop) axioms)
 
 makeFunName :: PruningConstant -> String
-makeFunName (TermConstant x n ty) = conName x
+makeFunName (TermConstant x ty) = conName x
 makeFunName (SkolemVariable _)  = "x"
 makeFunName (HasType ty)          = "@"
 
