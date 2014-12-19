@@ -475,7 +475,7 @@ minimiseContext t ctx =
     s = minimiseSolved t (solved ctx)
 
 minimiseSolved :: (Pretty v, Sized f, Ord f, Ord v) => Tm f v -> Solved f v -> Solved f v
-minimiseSolved t Unsolvable = __
+minimiseSolved t Unsolvable = Unsolvable
 minimiseSolved t Tautological = Tautological
 minimiseSolved t s =
   s { solution = loop (solution s) }

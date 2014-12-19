@@ -181,8 +181,8 @@ consider l1 l2 eq@(Constrained ctx (t :==: u))
       let eq' = order (norm t :==: norm u)
           ceq = canonicalise (Constrained ctx eq')
           f (Constrained ctx (l :==: r)) = Constrained ctx (r :==: l)
-      traceM (Consider (Constrained ctx eq'))
       unless (ceq `Set.member` con || f ceq `Set.member` con) $ do
+        traceM (Consider (Constrained ctx eq'))
         modify (\s -> s { considered = Set.insert ceq (considered s) })
         case runWriter (evalStateT (consider' snorm rules) (Set.singleton (Constrained ctx eq'))) of
           (False, _) -> do
@@ -246,7 +246,7 @@ bestCases ::
   Index (Constrained (Rule f v)) ->
   Context f v -> Equation f v -> Maybe (Formula f v)
 bestCases norm rules ctx (t :==: u) =
-  findCases norm rules ctx (t :==: u) >>= fmap toForm . shrink
+  findCases norm rules ctx' (t :==: u) >>= fmap toForm . shrink
     where
       shrink (cases, forms) =
         msum (map try (shrinkSet (cases, forms))) `mplus`
@@ -256,6 +256,7 @@ bestCases norm rules ctx (t :==: u) =
         shrink (cases, forms)
       toForm s = foldr (&&&) FTrue (Set.toList s)
       shrinkSet (cases, forms) = [ (Set.delete x cases, Set.delete x forms) | x <- Set.toList cases ]
+      ctx' = minimiseContext t ctx
 
 findCases ::
   (PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
@@ -295,8 +296,8 @@ caseSplit rules ctx (t :==: u) =
     v <- subterms t ++ subterms u
     rule <- Index.lookup v rules
     let form = formula (context rule)
-        ctx' = toContext (mainSplit (form &&& formula ctx))
-    guard (satisfiable (solved ctx'))
+    ctx' <- map (minimiseContext t . toContext) (mainSplits (form &&& formula ctx))
+    guard (satisfiable (solved ctx') && modelSize t (solved ctx) == modelSize t (solved ctx'))
     traceM (CaseSplit ctx form (constrained rule))
     return (form, ctx')
 
