@@ -3,7 +3,7 @@ import QuickSpec
 sig =
   signature {
     constants = [
-      --constant "reverse" (reverse :: [A] -> [A]),
+      constant "reverse" (reverse :: [A] -> [A]),
       constant "sum" (sum :: [Int] -> Int),
       constant "++" ((++) :: [A] -> [A] -> [A]),
       constant "[]" ([] :: [A]),
