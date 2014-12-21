@@ -15,21 +15,21 @@ import QuickSpec.Pruning.Rewrite
 import QuickSpec.Term
 import QuickSpec.Utils
 import Control.Monad
-import Control.Monad.Trans.State.Strict
-import Control.Monad.Trans.Writer
-import Control.Monad.Trans.Class
 import Data.List
 import Data.Maybe
 import Data.Ord
+import Data.Functor.Identity
 import qualified Data.Rewriting.CriticalPair as CP
 import Data.Rewriting.Rule(Rule(..))
 import qualified Data.Set as Set
 import Data.Set(Set)
 import qualified Debug.Trace
 import QuickSpec.Pruning.FourierMotzkin((<==))
+import Control.Monad.Trans.State.Strict
 
 data Event f v =
     NewRule (Constrained (Rule f v))
+  | ExtraRule (Constrained (Rule f v))
   | NewCPs [CP f v]
   | Consider (Constrained (Equation f v))
   | CaseSplit (Context f v) (Formula f v) (Rule f v)
@@ -38,21 +38,22 @@ data Event f v =
 
 traceM :: (Monad m, PrettyTerm f, Pretty v) => Event f v -> m ()
 traceM (NewRule rule) = traceIf True (hang (text "New rule") 2 (pretty rule))
+traceM (ExtraRule rule) = traceIf True (hang (text "Extra rule") 2 (pretty rule))
 traceM (NewCPs cps) = traceIf False (hang (text "New critical pairs") 2 (pretty cps))
 traceM (Consider eq) = traceIf True (hang (text "Considering") 2 (pretty eq))
 traceM (CaseSplit ctx form rule) = traceIf False (sep [text "Splitting on", nest 2 (pretty form), text "in", nest 2 (pretty ctx), text "to apply", nest 2 (pretty rule)])
-traceM (ConditionalJoin eq form) = traceIf False (sep [text "Conditionally joined", nest 2 (pretty eq), text "assuming", nest 2 (pretty form)])
+traceM (ConditionalJoin eq form) = traceIf True (sep [text "Conditionally joined", nest 2 (pretty eq), text "assuming", nest 2 (pretty form)])
 traceM (Reduce red rule) = traceIf True (sep [pretty red, nest 2 (text "using"), nest 2 (pretty rule)])
 traceIf :: Monad m => Bool -> Doc -> m ()
-traceIf True x = Debug.Trace.traceM (show x)
+-- traceIf True x = Debug.Trace.traceM (show x)
 traceIf _ s = return ()
 
 data KBC f v =
   KBC {
     maxSize       :: Int,
     labelledRules :: Index (Labelled (Constrained (Rule f v))),
-    queue         :: Queue (CP f v),
-    considered    :: Set (Constrained (Equation f v)) }
+    extraRules    :: Index (Constrained (Rule f v)),
+    queue         :: Queue (CP f v) }
   deriving Show
 
 data CP f v =
@@ -69,17 +70,18 @@ instance (PrettyTerm f, Pretty v) => Pretty (CP f v) where
   pretty = pretty . cpEquation
 
 report :: KBC f v -> String
-report s = show r ++ " rewrite rules."
+report s = show r ++ " rewrite rules, " ++ show e ++ " extra rewrite rules.\n"
   where
     r = length (Index.elems (labelledRules s))
+    e = length (Index.elems (extraRules s))
 
 initialState :: Int -> KBC f v
 initialState maxSize =
   KBC {
     maxSize       = maxSize,
     labelledRules = Index.empty,
-    queue         = empty,
-    considered    = Set.empty }
+    extraRules    = Index.empty,
+    queue         = empty }
 
 enqueueM ::
   (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
@@ -105,25 +107,31 @@ newLabelM =
 rules :: KBC f v -> Index (Constrained (Rule f v))
 rules = Index.mapMonotonic peel id id . labelledRules
 
+allRules :: (Sized f, Numbered v, Ord f, Ord v) => KBC f v -> Index (Constrained (Rule f v))
+allRules x = rules x `Index.union` extraRules x
+
 constrainedNormaliser ::
   (Monad m, PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) =>
   StateT (KBC f v) m (Context f v -> Tm f v -> Tm f v)
 constrainedNormaliser = do
-  rules <- gets rules
+  rules <- gets allRules
   return $ \ctx -> normaliseWith (anywhere (tryConstrainedRules ctx rules))
 
 specificNormaliser ::
   (Monad m, PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) =>
   StateT (KBC f v) m (Set (Formula f v) -> Tm f v -> Tm f v)
 specificNormaliser = do
-  rules <- gets rules
-  return $ \forms -> normaliseWith (anywhere (trySpecificRules forms rules))
+  rules <- gets allRules
+  return $ \forms ->
+    normaliseWith (anywhere (trySpecificRules forms rules))
 
 normaliser ::
   (Monad m, PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) =>
   StateT (KBC f v) m (Tm f v -> Tm f v)
-normaliser =
-  gets (normaliseWith . anywhere . tryRules . rules)
+normaliser = do
+  rules <- gets rules
+  return $
+    normaliseWith (anywhere (tryRules rules))
 
 complete ::
   (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
@@ -167,78 +175,91 @@ toCP norm (Constrained ctx (l :==: r)) = do
   guard (l' /= r')
   return (CP (modelSize l' (solved ctx')) (canonicalise (Constrained ctx' (l' :==: r'))))
 
+-- Plan:
+-- 1. Normalise without case split.
+-- 2. Orient remaining critical pair. Each resulting split might give us a condition.
+-- 3. Normalise each critical pair without case split.
+-- 4. Normalise each critical pair with case split.
+-- If we normalise after step 4, add the critical pair to the extra rules.
+
+normalisePair ::
+  (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
+  Context f v -> Equation f v -> StateT (KBC f v) m (Equation f v)
+normalisePair ctx (t :==: u) = do
+  norm <- normaliser
+  snorm <- specificNormaliser
+  rules <- gets allRules
+  let aux forms t u
+        | t == u = t :==: u
+        | forms == forms' = order (t' :==: u')
+        | otherwise = aux forms' t' u'
+        where
+          forms' = Set.union forms (Set.fromList (impliedCases rules ctx (t' :==: u')))
+          t' = snorm forms t
+          u' = snorm forms u
+  return (aux Set.empty (norm t) (norm u))
+
+impliedCases ::
+  (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) =>
+  Index (Constrained (Rule f v)) ->
+  Context f v -> Equation f v -> [Formula f v]
+impliedCases rules ctx (t :==: u) = do
+  v <- subterms t ++ subterms u
+  rule <- Index.lookup v rules
+  let form = formula (context rule)
+  guard (any (implies (solved ctx)) (mainSplits form))
+  return form
+
 consider ::
   (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
   Label -> Label -> Constrained (Equation f v) -> StateT (KBC f v) m ()
-consider l1 l2 eq@(Constrained ctx (t :==: u))
-  | t == u = return ()
-  | otherwise = do
-      norm  <- normaliser
-      snorm <- specificNormaliser
-      cnorm <- constrainedNormaliser
-      rules <- gets rules
-      con   <- gets considered
-      let eq' = order (norm t :==: norm u)
-          ceq = canonicalise (Constrained ctx eq')
-          f (Constrained ctx (l :==: r)) = Constrained ctx (r :==: l)
-      unless (ceq `Set.member` con || f ceq `Set.member` con) $ do
-        traceM (Consider (Constrained ctx eq'))
-        modify (\s -> s { considered = Set.insert ceq (considered s) })
-        case runWriter (evalStateT (consider' snorm rules) (Set.singleton (Constrained ctx eq'))) of
-          (False, _) -> do
-            forM_ (orientWith cnorm eq') $ \rule -> do
-              traceM (NewRule (canonicalise rule))
-              l <- addRule rule
-              interreduce rule
-              addCriticalPairs l rule
-          (True, eqs) ->
-            queueCPs l1 (map (Labelled l2) (usort eqs))
+consider l1 l2 (Constrained ctx (t :==: u)) = do
+  t' :==: u' <- normalisePair ctx (t :==: u)
+  cnorm <- constrainedNormaliser
+  forM_ (orient (t' :==: u') >>= split) $ \rule -> do
+    let f (Constrained ctx (Rule t u)) = Constrained ctx (Rule t (cnorm ctx u))
+    forM_ (split rule { context = toContext (formula ctx &&& formula (context rule)) }) $ \rule' ->
+      considerRule rule' (f rule)
+
+considerRule ::
+  (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
+  Constrained (Rule f v) -> Constrained (Rule f v) -> StateT (KBC f v) m ()
+considerRule (Constrained ctx (Rule t u)) rule = do
+  t' :==: u' <- normalisePair ctx (t :==: u)
+  unless (t' == u') $ do
+    traceM (Consider (Constrained ctx (t' :==: u')))
+    snorm <- specificNormaliser
+    rules <- gets allRules
+    case consider' snorm rules (Set.singleton (Constrained ctx (t' :==: u'))) of
+      False -> do
+        traceM (NewRule (canonicalise rule))
+        l <- addRule rule
+        interreduce rule
+        addCriticalPairs l rule
+      True -> do
+        traceM (ExtraRule (canonicalise rule))
+        modify (\s -> s { extraRules = Index.insert rule (extraRules s) })
 
 consider' ::
   (PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
   (Set (Formula f v) -> Tm f v -> Tm f v) ->
   Index (Constrained (Rule f v)) ->
-  StateT (Set (Constrained (Equation f v))) (Writer [Constrained (Equation f v)]) Bool
-consider' snorm rules = do
-  set <- get
+  Set (Constrained (Equation f v)) -> Bool
+consider' snorm rules set =
   case Set.minView set of
-    Nothing -> return True
-    {-Just (Constrained ctx (t :==: u), set') | funny (formula ctx) -> return False
-      where
-        funny HeadIs{} = True
-        funny Size{} = True
-        funny (p :&: q) = funny p || funny q
-        funny (p :|: q) = funny p || funny q
-        funny _ = False-}
-    Just (Constrained ctx (t :==: u), set') -> do
-      let l :==: r = order (snorm Set.empty t :==: snorm Set.empty u)
-          n = modelSize l (minimiseSolved l (solved ctx))
-      put set'
+    Nothing -> True
+    Just (Constrained ctx (t :==: u), set') ->
+      let l :==: r = order (snorm Set.empty t :==: snorm Set.empty u) in
       case bestCases snorm rules ctx (l :==: r) of
-        Nothing -> return False
-        Just FTrue -> consider' snorm rules
-        Just form -> do
+        Nothing -> False
+        Just FTrue -> consider' snorm rules set'
+        Just form -> runIdentity $ do
           let ctx'      = toContext (formula ctx &&& runM simplify (runM negFormula form))
               (eq:eqs1) = map canonicalise (split (Constrained (toContext (formula ctx &&& form)) (l :==: r)))
               eqs2      = map canonicalise (split (Constrained ctx' (l :==: r)))
-              p (Constrained ctx (l :==: _)) =
-                -- modelSize l (minimiseSolved l (solved ctx)) <= n
-                True
-              (here, there) = partition p (eqs1 ++ eqs2)
-          modify (Set.delete eq . Set.union (Set.fromList here))
-          lift (tell there)
+              set''     = Set.union set' (Set.fromList (eqs1 ++ eqs2))
           traceM (ConditionalJoin (Constrained ctx (l :==: r)) form)
-          consider' snorm rules
-
-orientWith ::
-  (PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
-  (Context f v -> Tm f v -> Tm f v) ->
-  Equation f v -> [Constrained (Rule f v)]
-orientWith norm eq = orient eq >>= split >>= reduce
-  where
-    reduce (Constrained ctx (Rule t u)) = [Constrained ctx (Rule t u')]
-      where
-        u' = norm ctx u
+          return $ consider' snorm rules set''
 
 bestCases ::
   (PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
@@ -275,17 +296,6 @@ findCases norm rules ctx (t :==: u) = aux Set.empty Set.empty ctx t u
         forms' = Set.union forms (Set.fromList (impliedCases rules ctx (t' :==: u')))
         t' = norm forms t
         u' = norm forms u
-
-impliedCases ::
-  (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) =>
-  Index (Constrained (Rule f v)) ->
-  Context f v -> Equation f v -> [Formula f v]
-impliedCases rules ctx (t :==: u) = do
-  v <- subterms t ++ subterms u
-  rule <- Index.lookup v rules
-  let form = formula (context rule)
-  guard (any (implies (solved ctx)) (mainSplits form))
-  return form
 
 caseSplit ::
   (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) =>

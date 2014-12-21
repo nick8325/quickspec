@@ -71,7 +71,7 @@ orientTerms t u =
   case compareTerms t u of
     Just (t', u', LT) -> do { guard (check t u t' u'); return LT }
     Just (t', u', GT) -> do { guard (check u t u' t'); return GT }
-    _                 -> Nothing
+    Nothing           -> Just EQ
   where
     check t u t' u' =
       sort (vars t') `isSubsequenceOf` sort (vars u') &&

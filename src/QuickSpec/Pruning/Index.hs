@@ -79,6 +79,15 @@ delete t = deleteFlat (symbols (term u))
     deleteFlat (Left x:xs) = updateFun x (deleteFlat xs)
     deleteFlat (Right x:xs) = updateVar x (deleteFlat xs)
 
+union ::
+  (Symbolic a, Ord (ConstantOf a), Ord (VariableOf a), Ord a) =>
+  Index a -> Index a -> Index a
+union (Index here fun var) (Index here' fun' var') =
+  Index
+    (Set.union here here')
+    (Map.unionWith union fun fun')
+    (Map.unionWith union var var')
+
 data Result f v a =
   Result {
     result :: a,

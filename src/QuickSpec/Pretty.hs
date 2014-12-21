@@ -32,6 +32,12 @@ instance (Pretty a, Pretty b, Pretty c) => Pretty (a, b, c) where
   pretty (x, y, z) = prettyTuple [pretty x, pretty y, pretty z]
 instance (Pretty a, Pretty b, Pretty c, Pretty d) => Pretty (a, b, c, d) where
   pretty (x, y, z, w) = prettyTuple [pretty x, pretty y, pretty z, pretty w]
+instance (Pretty a, Pretty b, Pretty c, Pretty d, Pretty e) => Pretty (a, b, c, d, e) where
+  pretty (x, y, z, w, v) = prettyTuple [pretty x, pretty y, pretty z, pretty w, pretty v]
+instance (Pretty a, Pretty b, Pretty c, Pretty d, Pretty e, Pretty f) => Pretty (a, b, c, d, e, f) where
+  pretty (x, y, z, w, v, u) = prettyTuple [pretty x, pretty y, pretty z, pretty w, pretty v, pretty u]
+instance (Pretty a, Pretty b, Pretty c, Pretty d, Pretty e, Pretty f, Pretty g) => Pretty (a, b, c, d, e, f, g) where
+  pretty (x, y, z, w, v, u, t) = prettyTuple [pretty x, pretty y, pretty z, pretty w, pretty v, pretty u, pretty t]
 
 instance Pretty a => Pretty (Maybe a) where
   prettyPrec p (Just x) =
