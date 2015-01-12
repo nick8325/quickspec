@@ -32,6 +32,7 @@ import QuickSpec.TestSet
 import QuickSpec.Type
 import QuickSpec.Utils
 import Test.QuickCheck.Random
+import Data.Rewriting.Rule(Rule(Rule))
 
 type M = RulesT Event (StateT S (PrunerT Completion IO))
 
@@ -317,6 +318,13 @@ consider sig makeEvent x = do
     Just u | u `Set.member` terms -> return ()
     Nothing | t `Set.member` terms -> return ()
     _ -> do
+      case res of
+        Nothing -> return ()
+        Just u -> do
+          let t' = toGoalTerm t
+          Just u' <- lift $ lift $ liftPruner (untypedRep [] t')
+          return ()
+          --liftIO $ prettyPrint (text "Avoided reduction" <+> pretty (Rule t u) <+> pretty (Rule t' u'))
       ts <- getTestSet x
       res <-
         liftIO . testTimeout_ sig $

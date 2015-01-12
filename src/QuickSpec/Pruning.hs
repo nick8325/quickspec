@@ -102,21 +102,19 @@ toGoal :: Prop -> PropOf PruningTerm
 toGoal = fmap toGoalTerm
 
 toGoalTerm :: Term -> PruningTerm
-toGoalTerm = skolemise . toTaggedPruningConstant
+toGoalTerm = skolemise . guardNaked . toPruningConstant
+  where
+    guardNaked (Var x) = Fun (HasType (typ x)) [Var x]
+    guardNaked t = t
 
 toPruningConstant :: Term -> Tm PruningConstant Variable
 toPruningConstant = mapTerm f id
   where
     f fun = TermConstant fun (typ fun)
 
-toTaggedPruningConstant :: Term -> Tm PruningConstant Variable
-toTaggedPruningConstant (Var x) = Var x
-toTaggedPruningConstant t@(Fun f ts) =
-  Fun (HasType (typ t)) [Fun (TermConstant f (typ f)) (map toTaggedPruningConstant ts)]
-
 skolemise :: Tm PruningConstant Variable -> PruningTerm
 skolemise (Fun f xs) = Fun f (map skolemise xs)
-skolemise (Var x) = Fun (HasType (typ x)) [Fun (SkolemVariable (PruningVariable (number x))) []]
+skolemise (Var x) = Fun (SkolemVariable (PruningVariable (number x))) []
 
 normaliseVars t = rename (\x -> fromMaybe __ (Map.lookup x m)) t
   where

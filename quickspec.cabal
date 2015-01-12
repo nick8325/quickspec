@@ -61,7 +61,7 @@ flag jukebox
   Default: True
 
 library
-  ghc-options: -Wall -fno-warn-name-shadowing -fno-warn-incomplete-patterns
+  -- ghc-options: -Wall -fno-warn-name-shadowing -fno-warn-incomplete-patterns
   hs-source-dirs: src
   include-dirs: src
   Exposed-modules:
