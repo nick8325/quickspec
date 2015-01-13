@@ -178,7 +178,7 @@ prettyStyle (Tuple arity) p d xs
       (drop arity xs)
   | otherwise =
     prettyStyle Curried p
-      (text ("(" ++ replicate arity ',' ++ ")")) xs
+      (text ("(" ++ replicate (arity-1) ',' ++ ")")) xs
 prettyStyle Postfix p d [x] =
   prettyPrec 11 x <> d
 prettyStyle Postfix p d xs =
