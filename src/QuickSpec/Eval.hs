@@ -192,13 +192,7 @@ createRules sig = do
         Untestable -> return ()
         EqualTo t -> do
           generate (InstantiateSchema t t)
-          considerRenamings isCanonical t ms
-          -- FIXME this is a bit of a hack needed for e.g booleans
-          -- where we get the schema equation x&&x=x which generalises
-          -- to x&&y=y&&x. Should do something principled for generalising
-          -- equivalence classes instead.
-          when (size ms <= maxCommutativeSize_ sig) $
-            generate (InstantiateSchema t ms)
+          generate (InstantiateSchema t ms)
         Representative -> do
           generate (ConsiderTerm (From ms (instantiate ms)))
           when (size ms <= maxCommutativeSize_ sig) $
@@ -207,27 +201,37 @@ createRules sig = do
   rule $ do
     InstantiateSchema s s' <- event
     execute $
-      considerRenamings isCanonical s s'
-
-  rule $ do
-    FinishedSize n <- event
-    InstantiateSchema s s' <- event
-    require (size s' == n)
-    execute $
-      considerRenamings (const True) s s'
+      considerRenamings s s'
 
   rule $ do
     Term (From s t) k <- event
     execute $ do
+      let add = do
+            u <- fmap (fromMaybe t) (lift (lift (rep t)))
+            newTerm u
       case k of
-        TimedOut ->
+        TimedOut -> do
           liftIO $ print (text "Term" <+> pretty t <+> text "timed out")
+          add
         Untestable ->
           ERROR ("Untestable instance " ++ prettyShow t ++ " of testable schema " ++ prettyShow s)
         EqualTo (From _ u) -> do
-          u' <- lift (lift (rep u))
-          generate (Found ([] :=>: t :=: fromMaybe u u'))
-        Representative -> return ()
+          u' <- fmap (fromMaybe u) (lift (lift (rep u)))
+          case orientTerms t u' of
+            Just _ -> do
+              generate (Found ([] :=>: t :=: u'))
+              add
+            Nothing -> do
+              rule $ do
+                FinishedSize n <- event
+                require (n == size t)
+                execute $ do
+                  t' <- fmap (fromMaybe t) (lift (lift (rep t)))
+                  u' <- fmap (fromMaybe u) (lift (lift (rep u)))
+                  unless (t' == u') $ do
+                    generate (Found ([] :=>: t' :=: u'))
+                    add
+        Representative -> add
 
   rule $ do
     ConsiderSchema s <- event
@@ -245,8 +249,6 @@ createRules sig = do
     ConsiderTerm t@(From _ t') <- event
     execute $ do
       consider sig (Term t) t
-      u <- fmap (fromMaybe t') (lift (lift (rep t')))
-      newTerm u
 
   rule $ do
     Schema s _ <- event
@@ -285,23 +287,11 @@ createRules sig = do
 
   -- rule $ event >>= execute . liftIO . prettyPrint
 
-considerRenamings :: (Term -> Bool) -> Schema -> Schema -> M ()
-considerRenamings p s s' = do
-  sequence_ [ generate (ConsiderTerm (From s t)) | t <- ts, p t ]
+considerRenamings :: Schema -> Schema -> M ()
+considerRenamings s s' = do
+  sequence_ [ generate (ConsiderTerm (From s t)) | t <- ts ]
   where
     ts = sortBy (comparing measure) (allUnifications (instantiate s'))
-
-isCanonical :: Term -> Bool
-isCanonical t = and [ ascending [] (ofType ty) | ty <- tys ]
-  where
-    tys = usort (map typ vs)
-    vs  = vars t
-    ofType ty = [ x | x <- vs, typ x == ty ]
-    ascending vs [] = True
-    ascending vs (x:xs)
-      | x `elem` vs = ascending vs xs
-      | or [ x < y | y <- vs ] = False
-      | otherwise = ascending (x:vs) xs
 
 class (Eq a, Typed a) => Considerable a where
   generalise :: a -> Term
