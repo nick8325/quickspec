@@ -29,12 +29,12 @@ uses the following convention:
 >            | Rest Dur
 >            | Music :+: Music
 >            | Music :=: Music
->            | Tempo  (Ratio Int) Music
+>            | Tempo  (Rational) Music
 >            | Trans  Int Music
 >            | Instr  IName Music
 >     deriving (Show, Eq, Typeable,Generic)
 >
-> type Dur   = Ratio Int
+> type Dur   = Rational
 
 > data IName 
 >  = AcousticGrandPiano  | BrightAcousticPiano | ElectricGrandPiano
@@ -265,7 +265,7 @@ uses the following convention:
 > ssf = Instr Flute (Tempo 2 (ssfMelody))
 
 > trilln  :: Int -> Int -> Music -> Music
-> trilln i nTimes m = trill i (dur m / (nTimes%1)) m
+> trilln i nTimes m = trill i (dur m / (fromIntegral nTimes%1)) m
 
 > trilln' :: Int -> Int -> Music -> Music
 > trilln' i nTimes m = trilln (negate i) nTimes (Trans i m)

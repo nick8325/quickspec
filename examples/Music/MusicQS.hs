@@ -63,7 +63,7 @@ sig =
         inst (Sub Dict :: () :- Arbitrary Music),
         baseTypeNames ["i"] (undefined :: IName),
         baseTypeNames ["p"] (undefined :: PitchClass),
-        baseType (undefined :: Ratio Int),
+        baseType (undefined :: Rational),
         names (NamesFor ["m"] :: NamesFor Music)
         ]
        --extraPruner = Just (QuickSpec.E 1) 

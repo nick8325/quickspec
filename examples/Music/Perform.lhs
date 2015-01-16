@@ -38,8 +38,8 @@ uses the following convention:
 > metro :: Rational -> Dur -> DurT
 > metro setting dur = 60 / (setting * ratioToRational dur)
 
-> ratioToRational  :: Ratio Int -> Rational
-> ratioToRational r = intToRational (numerator r) / intToRational (denominator r)
+> ratioToRational  :: Rational -> Rational
+> ratioToRational r = r
 
 > intToRational :: Int -> Rational
 > intToRational  = fromInteger . toInteger
