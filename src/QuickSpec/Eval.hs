@@ -216,10 +216,12 @@ createRules sig = do
         Untestable ->
           ERROR ("Untestable instance " ++ prettyShow t ++ " of testable schema " ++ prettyShow s)
         EqualTo (From _ u) -> do
+          --t' <- fmap (fromMaybe t) (lift (lift (rep t)))
+          let t' = t
           u' <- fmap (fromMaybe u) (lift (lift (rep u)))
-          case orientTerms t u' of
+          case orientTerms t' u' of
             Just _ -> do
-              generate (Found ([] :=>: t :=: u'))
+              generate (Found ([] :=>: t' :=: u'))
               add
             Nothing -> do
               rule $ do
