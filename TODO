@@ -1,12 +1,11 @@
 High-priority
 -------------
 
-Include an arity along with each function (in the Sized class).
+Work out why music example doesn't discover Rest (max x y) = Rest x :=: Rest y!
 
 Look into constraining rewrite rules so that the constraint is l >= r instead of l > r? This would mean that irrelevant variable laws like f x -> f a would become unconditional. Might reduce amount of case splitting too.
 
 Simplify size expressions a bit more (e.g.: take out common factors, make sure that constant is always >= 0 by flipping sign)
-Re-add disjunctions to constraint language (but use splitting for unification)
 
 Make reducing-to-existing-term stuff more robust: whenever a term
 simplifies to a term which we haven't generated, generate that term,
@@ -20,14 +19,7 @@ reduces because of commutativity and we eliminate it, some proofs will
 require commutativity that didn't before. Maybe then eliminating
 schemas by simplifying using unorientable rules is something to avoid.
 
-Introduce a "have seen" predicate which we define to be true on representative terms (this predicate is added to the rewrite system - or possibly not as we know it will never participate in critical pairs). This means that we can leave out terms as we like without affecting completeness too much (rule becomes: throw away a term t if seen(t) = true).
-
 Look more into Moa's idea that any permutative law can be expressed as a permutative law over a single function (e.g. f x y = f y x)
-
-Make sure that pruningTerm t < pruningTerm u <==> t < u!
-Possible fix: add type axioms for Skolem constants.
-
-Delay permutative laws until after all other laws of same size have been explored
 
 Fix bug where ++ and zip generates loads of laws!
 
@@ -56,9 +48,6 @@ Longer term
 -----------
 
 Allow the user to attach extra data to a constant.
-
-Does the rewriting ordering need to be compatible with the term ordering?
-Or would it be enough to keep a mapping from representatives to their normal forms?
 
 Don't generate silly instances of schemas w/ commutative functions
 Easy to avoid: just don't instantiate _+_ with two variables in the wrong order!
@@ -92,8 +81,6 @@ Regexes: use Brzozowski derivatives to get a useful specification?
 
 Print out definitions
 
-If we have an equation where both sides contain a variable that doesn't appear on the other side, introduce (even if only internally) a new constant
-
 Add "ask why an equation is not printed".
 
 It isn't always true that if two schemas end up in the same class we
@@ -112,9 +99,6 @@ Cleanup ideas
 Add typeclass of "stuff which contains variables" that we can e.g. alpha-rename.
 
 Introduce a type constructor ForAll whose effect is to normalise all variables in the term.
-
-Add useful function: "is this simpler for all values of these variables?"
-Make the main pruning infrastructure check this?
 
 Maybe add a type wrapper for preserving the original type of a polymorphic value
 (store as original value + type subst??)
