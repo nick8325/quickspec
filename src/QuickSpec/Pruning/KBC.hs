@@ -210,36 +210,36 @@ consider ::
   Label -> Label -> Constrained (Equation f v) -> StateT (KBC f v) m ()
 consider l1 l2 (Constrained ctx (t :==: u)) = do
   t' :==: u' <- normalisePair ctx (t :==: u)
-  forM_ (orient (t' :==: u') >>= usort . map canonicalise . split) considerRule
+  forM_ (orient (t' :==: u') >>= usort . map canonicalise . split) $
+    \rule@(Constrained ctx' (Rule t u)) -> do
+      traceM (Consider rule)
+      let rules = split (Constrained (toContext (formula ctx &&& formula ctx')) (t :==: u))
+      res <- andM (map joinable rules)
+      unless res $ do
+        traceM (NewRule rule)
+        l <- addRule rule
+        interreduce rule
+        addCriticalPairs l rule
 
-considerRule ::
-  (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
-  Constrained (Rule f v) -> StateT (KBC f v) m ()
-considerRule (Constrained ctx (Rule t u)) = do
-  traceM (Consider (Constrained ctx (Rule t u)))
-  t' :==: u' <- normalisePair ctx (t :==: u)
-  unless (t' == u') $ do
-    x <- joinable (Constrained ctx (t' :==: u'))
-    unless x $ do
-      let rule = canonicalise (Constrained ctx (Rule t u'))
-      traceM (NewRule rule)
-      l <- addRule rule
-      interreduce rule
-      addCriticalPairs l rule
+andM :: Monad m => [m Bool] -> m Bool
+andM [] = return True
+andM (mx:xs) = do
+  x <- mx
+  if x then andM xs else return False
 
 joinable ::
   (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
   Constrained (Equation f v) -> StateT (KBC f v) m Bool
-joinable (Constrained ctx eq) = do
-  res <-
-    forM (orient eq) $ \(Constrained ctx' (Rule t u)) ->
-      forM (split (Constrained (toContext (formula ctx &&& formula ctx')) (Rule t u))) $ \(Constrained ctx (Rule t u)) -> do
-        t' :==: u' <- normalisePair ctx (t :==: u)
-        case () of
-          () | t' == u' -> return True
-             | t == t' && u == u' -> return False
-             | otherwise -> joinable (Constrained ctx (t' :==: u'))
-  return (and (concat res))
+joinable (Constrained ctx eq) =
+  andM $ do
+    Constrained ctx' (Rule t u) <- orient eq
+    Constrained ctx (Rule t u) <- split (Constrained (toContext (formula ctx &&& formula ctx')) (Rule t u))
+    return $ do
+      t' :==: u' <- normalisePair ctx (t :==: u)
+      case () of
+        () | t' == u' -> return True
+           | t == t' && u == u' -> return False
+           | otherwise -> joinable (Constrained ctx (t' :==: u'))
 
 addRule :: (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) => Constrained (Rule f v) -> StateT (KBC f v) m Label
 addRule rule = do
@@ -313,6 +313,9 @@ criticalPairs n r1 r2 = do
       f (Right x) = x
       left = rename f (CP.left cp)
       right = rename f (CP.right cp)
-      ctx = toContext FTrue
+      ctx =
+        toContext $
+          substf (rename f . evalSubst sub . Left) (formula ctx1) &&&
+          substf (rename f . evalSubst sub . Right) (formula ctx2)
 
   split (Constrained ctx (left :==: right))
