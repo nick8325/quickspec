@@ -31,14 +31,14 @@ data Event f v =
     NewRule (Constrained (Rule f v))
   | ExtraRule (Constrained (Rule f v))
   | NewCPs [CP f v]
-  | Consider (Constrained (Rule f v))
+  | Consider (Constrained (Rule f v)) (Context f v)
   | Reduce (Reduction f v) (Constrained (Rule f v))
 
 traceM :: (Monad m, PrettyTerm f, Pretty v) => Event f v -> m ()
 traceM (NewRule rule) = traceIf True (hang (text "New rule") 2 (pretty rule))
 traceM (ExtraRule rule) = traceIf True (hang (text "Extra rule") 2 (pretty rule))
 traceM (NewCPs cps) = traceIf True (hang (text "New critical pairs") 2 (pretty cps))
-traceM (Consider eq) = traceIf True (hang (text "Considering") 2 (pretty eq))
+traceM (Consider eq ctx) = traceIf True (sep [text "Considering", nest 2 (pretty eq), text "under", nest 2 (pretty ctx)])
 traceM (Reduce red rule) = traceIf True (sep [pretty red, nest 2 (text "using"), nest 2 (pretty rule)])
 traceIf :: Monad m => Bool -> Doc -> m ()
 --traceIf True x = Debug.Trace.traceM (show x)
@@ -209,17 +209,20 @@ consider ::
   (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
   Label -> Label -> Constrained (Equation f v) -> StateT (KBC f v) m ()
 consider l1 l2 (Constrained ctx (t :==: u)) = do
-  t' :==: u' <- normalisePair ctx (t :==: u)
-  forM_ (orient (t' :==: u') >>= usort . map canonicalise . split) $
-    \rule@(Constrained ctx' (Rule t u)) -> do
-      traceM (Consider rule)
-      let rules = split (Constrained (toContext (formula ctx &&& formula ctx')) (t :==: u))
-      res <- andM (map joinable rules)
-      unless res $ do
-        traceM (NewRule rule)
-        l <- addRule rule
-        interreduce rule
-        addCriticalPairs l rule
+  t :==: u <- normalisePair ctx (t :==: u)
+  forM_ (orient (t :==: u)) $
+    \(Constrained ctx' (Rule t u)) ->
+    forM_ (usort (map canonicalise (split (Constrained ctx' (Rule t u, ctx))))) $
+      \(Constrained ctx' (Rule t u, ctx)) -> do
+        let rule = Constrained ctx' (Rule t u)
+        traceM (Consider rule ctx)
+        let rules = split (Constrained (toContext (formula ctx &&& formula ctx')) (t :==: u))
+        res <- andM (map joinable rules)
+        unless res $ do
+          traceM (NewRule rule)
+          l <- addRule rule
+          interreduce rule
+          addCriticalPairs l rule
 
 andM :: Monad m => [m Bool] -> m Bool
 andM [] = return True

@@ -33,9 +33,9 @@ orient (l :==: r) =
     Just GT -> [Constrained (toContext FTrue) (Rule l r)]
     Just LT -> [Constrained (toContext FTrue) (Rule r l)]
     Just EQ -> []
-    Nothing -> rule l r ++ concat [rule r l | not (l `isVariantOf` r)]
+    Nothing -> [rule l r, rule r l]
   where
-    rule l r = [Constrained (toContext (Less r l)) (Rule l r)]
+    rule l r = Constrained (toContext (Less r l)) (Rule l r)
 
 bothSides :: (Tm f v -> Tm f v) -> Equation f v -> Equation f v
 bothSides f (t :==: u) = f t :==: f u
