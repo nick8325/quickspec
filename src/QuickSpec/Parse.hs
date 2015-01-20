@@ -24,9 +24,10 @@ instance Typed StringVar where
   typeSubst sub (StringVar name ty) = StringVar name (typeSubst sub ty)
 
 instance Parse StringVar where
-  parse _ = do
+  parse cs = do
     x <- satisfy isUpper
     xs <- munch isAlphaNum
+    guard ((x:xs) `notElem` map conName cs)
     return (StringVar (x:xs) (typeOf (undefined :: A)))
 
 instance Parse Constant where
