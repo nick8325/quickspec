@@ -12,6 +12,7 @@ import QuickSpec.Term
 import QuickSpec.Type
 import QuickSpec.Utils
 import Text.ParserCombinators.ReadP
+import Data.List
 
 class Parse a where
   parse :: [Constant] -> ReadP a
@@ -51,7 +52,10 @@ instance (Typed v, Parse v) => Parse (Literal (TermOf v)) where
         t <- parse cs
         string "="
         u <- parse cs
-        return (t :=: u)
+        let eqv = toValue (return (undefined :: A -> A -> Bool))
+            eq = Constant "eq" eqv (poly eqv) 0 undefined undefined undefined
+            Fun _ [t', u'] = unPoly (foldl apply (poly (Fun eq [])) [poly t, poly u])
+        return (t' :=: u')
       predicate = do
         t@(Fun f ts) <- parse cs
         guard (typ t == typeOf (undefined :: Bool))
@@ -69,7 +73,7 @@ parse' :: (Parse a, Show a) => [Constant] -> String -> a
 parse' cs xs =
   case readP_to_S (parse cs <* eof) (filter (not . isSpace) xs) of
     [(x, [])] -> x
-    ps -> error ("parse': got result " ++ show ps)
+    ps -> error ("parse': got result " ++ show ps ++ " while parsing " ++ xs)
 
 parseProp :: [Constant] -> String -> Prop
 parseProp cs xs = toProp (parse' cs xs)
@@ -79,3 +83,33 @@ toProp prop = fmap (rename (\x -> Variable (Map.findWithDefault __ x sub) (typ x
   where
     vs = usort (vars prop)
     sub = Map.fromList (zip vs [0..])
+
+fromProp :: Prop -> PropOf (TermOf StringVar)
+fromProp prop = fmap (rename (\x -> StringVar (Map.findWithDefault __ x sub) (typ x))) prop
+  where
+    vs = nub (vars prop)
+    sub = Map.fromList (zip vs [ "X" ++ show x | x <- [1..] ])
+
+showProp :: PropOf (Tm Constant StringVar) -> String
+showProp ([] :=>: rhs) = showLiteral rhs
+showProp (lhs :=>: rhs) =
+  intercalate " & " (map showLiteral lhs) ++ " => " ++ showLiteral rhs
+
+showLiteral :: Literal (Tm Constant StringVar) -> String
+showLiteral (p :@: []) = predName p
+showLiteral (p :@: ts) = predName p ++ "(" ++ intercalate ", " (map showTerm ts) ++ ")"
+showLiteral (t :=: u) = showTerm t ++ " = " ++ showTerm u
+
+showTerm :: Tm Constant StringVar -> String
+showTerm (Var (StringVar x _)) = x
+showTerm (Fun f []) = conName f
+showTerm (Fun f ts) = conName f ++ "(" ++ intercalate ", " (map showTerm ts) ++ ")"
+
+showTheory :: [Prop] -> String
+showTheory thy =
+  "background = [\n" ++
+  intercalate ",\n" ["  \"" ++ escape (showProp (fromProp p)) ++ "\"" | p <- thy ] ++ "]"
+  where
+    escape = concatMap f
+    f '"' = "\\\""
+    f x = [x]

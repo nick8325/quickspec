@@ -20,6 +20,7 @@ import Data.Traversable hiding (mapM)
 import Prelude hiding (sequence)
 import QuickSpec.Base
 import QuickSpec.Prop
+import QuickSpec.Parse
 import QuickSpec.Term
 import QuickSpec.Type
 import System.Timeout
@@ -300,3 +301,10 @@ prettyRename sig p = fmap (rename (\x -> Map.findWithDefault __ x m)) p
           name = head (filter (`Set.notMember` s) names)
       modify (Set.insert name)
       return (v, Name name)
+
+addBackground :: [String] -> Signature -> Signature
+addBackground props sig =
+  sig { background = background sig ++ map (parseProp (constants sig)) props }
+
+printTheory :: Signature -> IO ()
+printTheory sig = putStrLn (showTheory (background sig))
