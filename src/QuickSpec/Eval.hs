@@ -121,6 +121,13 @@ quickSpecWithBackground sig1 sig2 = do
   thy <- quickSpec sig1
   quickSpec (thy `mappend` sig2)
 
+incrementalQuickSpec :: Signature -> IO Signature
+incrementalQuickSpec sig@Signature { constants = [] } = return sig
+incrementalQuickSpec sig = do
+  thy <- incrementalQuickSpec sig { constants = init (constants sig) }
+  quickSpec sig { background = background thy,
+                  constants = constants thy ++ [last (constants sig)] }
+
 quickSpec :: Signature -> IO Signature
 quickSpec sig = unbuffered $ do
   putStrLn "== Signature =="
