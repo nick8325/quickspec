@@ -366,7 +366,8 @@ found sig prop = do
       return ()
     False -> do
       lift $ modify (\s -> s { discovered = prop:discovered s })
-      liftIO $ putStrLn (prettyShow (prettyRename sig prop))
+      when (null (funs prop) || not (null (filter (not . conIsBackground) (funs prop)))) $
+        liftIO $ putStrLn (prettyShow (prettyRename sig prop))
 
   lift (lift (axiom prop))
   terms <- fmap Set.toList (lift (gets terms))
