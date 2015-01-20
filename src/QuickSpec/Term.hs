@@ -91,6 +91,7 @@ exactSize (Fun f xs) = funSize f + sum (map exactSize xs)
 -- variables have generators, so we need a separate defaulting phase).
 data Constant =
   Constant {
+    conIndex        :: Int,
     conName         :: String,
     conValue        :: Value Identity,
     conGeneralValue :: Poly (Value Identity),
@@ -101,7 +102,7 @@ data Constant =
   deriving Show
 instance Eq Constant where x == y = x `compare` y == EQ
 instance Ord Constant where
-  compare = comparing (\c -> (twiddle (conArity c), conName c, typ (conGeneralValue c)))
+  compare = comparing (\c -> (twiddle (conArity c), conIndex c))
     where
       -- This tweak is taken from Prover9
       twiddle 2 = 1

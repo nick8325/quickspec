@@ -25,6 +25,7 @@ import QuickSpec.Term
 import QuickSpec.Type
 import System.Timeout
 import Test.QuickCheck hiding (subterms)
+import Data.Ord
 
 newtype Instance = Instance (Value Instance1) deriving Show
 newtype Instance1 a = Instance1 (Value (Instance2 a))
@@ -190,8 +191,20 @@ instance Monoid Signature where
 signature :: Signature
 signature = mempty
 
+renumber :: Signature -> Signature
+renumber sig =
+  sig {
+    constants = cs,
+    background = map (fmap (mapTerm g id)) (background sig) }
+  where
+    cs = zipWith f (sortBy (comparing conName) (constants sig)) [0..]
+    f c n = c { conIndex = n }
+    g c =
+      case [ c' | c' <- cs, conName c == conName c' ] of
+        (c':_) -> c'
+
 constant :: Typeable a => String -> a -> Constant
-constant name x = Constant name value (poly value) 0 style 1 False
+constant name x = Constant 0 name value (poly value) 0 style 1 False
   where
     value = toValue (Identity x)
     ar = arity (typeOf x)

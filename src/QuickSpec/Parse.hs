@@ -54,7 +54,7 @@ instance (Typed v, Parse v) => Parse (Literal (TermOf v)) where
         string "="
         u <- parse cs
         let eqv = toValue (return (undefined :: A -> A -> Bool))
-            eq = Constant "eq" eqv (poly eqv) 0 undefined undefined undefined
+            eq = Constant undefined "eq" eqv (poly eqv) 0 undefined undefined undefined
             Fun _ [t', u'] = unPoly (foldl apply (poly (Fun eq [])) [poly t, poly u])
         return (t' :=: u')
       predicate = do

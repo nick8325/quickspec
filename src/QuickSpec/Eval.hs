@@ -128,7 +128,8 @@ incrementalQuickSpec sig = do
                   constants = constants thy ++ [last (constants sig)] }
 
 quickSpec :: Signature -> IO Signature
-quickSpec sig = unbuffered $ do
+quickSpec sig0 = unbuffered $ do
+  let sig = renumber sig0
   putStrLn "== Signature =="
   prettyPrint sig
   putStrLn ""
