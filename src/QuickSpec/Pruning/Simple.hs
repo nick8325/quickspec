@@ -20,6 +20,7 @@ instance Pruner SimplePruner where
   emptyPruner _ = S Index.empty
   untypedAxiom  = simpleUnify
   untypedRep    = simpleRep
+  pruningReport = simpleReport
 
 modifyS f = modify (\(S x) -> S (f x))
 
@@ -37,3 +38,6 @@ simpleRep axioms t = do
       Rule _ u <- Index.lookup t idx
       guard (measure u < measure t)
       return u
+
+simpleReport :: SimplePruner -> String
+simpleReport (S eqs) = show (length (Index.elems eqs)) ++ " pruning equations.\n"
