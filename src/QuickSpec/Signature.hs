@@ -192,6 +192,7 @@ signature :: Signature
 signature = mempty
 
 renumber :: Signature -> Signature
+-- TODO get rid of this, use old-style API ("single constant" signature+monoid) instead
 renumber sig =
   sig {
     constants = cs,
@@ -201,7 +202,7 @@ renumber sig =
     f c n = c { conIndex = n }
     g c =
       case [ c' | c' <- cs, conName c == conName c' ] of
-        (c':_) -> c'
+        (c':_) -> c { conIndex = conIndex c' }
 
 constant :: Typeable a => String -> a -> Constant
 constant name x = Constant 0 name value (poly value) 0 style 1 False
