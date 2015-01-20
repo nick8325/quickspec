@@ -199,7 +199,7 @@ impliedCases ::
   Index (Constrained (Rule f v)) ->
   Context f v -> Equation f v -> [Formula f v]
 impliedCases rules ctx (t :==: u) = do
-  v <- subterms t ++ subterms u
+  v <- usort (subterms t ++ subterms u)
   rule <- Index.lookup v rules
   let form = formula (context rule)
   guard (any (implies (solved ctx)) (mainSplits form))
