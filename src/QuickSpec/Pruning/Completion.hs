@@ -21,19 +21,19 @@ initialState n =
   Completion {
     kbc       = KBC.initialState n }
 
-liftKBC :: Monad m => StateT KBC m a -> StateT Completion m a
+liftKBC :: StateT KBC IO a -> StateT Completion IO a
 liftKBC m = do
   s <- get
   (x, ks) <- lift (runStateT m (kbc s))
   put s { kbc = ks }
   return x
 
-localKBC :: Monad m => StateT KBC m a -> StateT Completion m a
+localKBC :: StateT KBC IO a -> StateT Completion IO a
 localKBC m = do
   ks <- gets kbc
   lift (evalStateT m ks)
 
-newAxiom :: Monad m => PropOf PruningTerm -> StateT Completion m ()
+newAxiom :: PropOf PruningTerm -> StateT Completion IO ()
 newAxiom ([] :=>: (t :=: u)) = do
   liftKBC $ do
     norm <- KBC.normaliser
@@ -41,14 +41,14 @@ newAxiom ([] :=>: (t :=: u)) = do
       KBC.newEquation (Constrained (toContext FTrue) (t :==: u))
       KBC.complete
 
-while :: Monad m => m Bool -> m () -> m ()
+while :: IO Bool -> IO () -> IO ()
 while cond m = do
   x <- cond
   when x $ do
     m
     while cond m
 
-findRep :: Monad m => [PropOf PruningTerm] -> PruningTerm -> StateT Completion m (Maybe PruningTerm)
+findRep :: [PropOf PruningTerm] -> PruningTerm -> StateT Completion IO (Maybe PruningTerm)
 findRep axioms t =
   localKBC $ do
     sequence_ [ KBC.newEquation (Constrained (toContext FTrue) (t :==: u)) | [] :=>: t :=: u <- axioms ]

@@ -80,21 +80,21 @@ initialState maxSize =
     queue         = empty }
 
 enqueueM ::
-  (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
-  Label -> [Labelled (CP f v)] -> StateT (KBC f v) m ()
+  (PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
+  Label -> [Labelled (CP f v)] -> StateT (KBC f v) IO ()
 enqueueM l eqns = do
   modify (\s -> s { queue = enqueue l eqns (queue s) })
 
 dequeueM ::
-  (Monad m, Sized f, Ord f, Ord v) =>
-  StateT (KBC f v) m (Maybe (Label, Label, CP f v))
+  (Sized f, Ord f, Ord v) =>
+  StateT (KBC f v) IO (Maybe (Label, Label, CP f v))
 dequeueM =
   state $ \s ->
     case dequeue (queue s) of
       Nothing -> (Nothing, s)
       Just (l1, l2, x, q) -> (Just (l1, l2, x), s { queue = q })
 
-newLabelM :: Monad m => StateT (KBC f v) m Label
+newLabelM :: StateT (KBC f v) IO Label
 newLabelM =
   state $ \s ->
     case newLabel (queue s) of
@@ -107,31 +107,31 @@ allRules :: (Sized f, Numbered v, Ord f, Ord v) => KBC f v -> Index (Constrained
 allRules x = rules x `Index.union` extraRules x
 
 constrainedNormaliser ::
-  (Monad m, PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) =>
-  StateT (KBC f v) m (Context f v -> Tm f v -> Tm f v)
+  (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) =>
+  StateT (KBC f v) IO (Context f v -> Tm f v -> Tm f v)
 constrainedNormaliser = do
   rules <- gets allRules
   return $ \ctx -> normaliseWith (anywhere (tryConstrainedRules ctx rules))
 
 specificNormaliser ::
-  (Monad m, PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) =>
-  StateT (KBC f v) m (Set (Formula f v) -> Tm f v -> Tm f v)
+  (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) =>
+  StateT (KBC f v) IO (Set (Formula f v) -> Tm f v -> Tm f v)
 specificNormaliser = do
   rules <- gets allRules
   return $ \forms ->
     normaliseWith (anywhere (trySpecificRules forms rules))
 
 normaliser ::
-  (Monad m, PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) =>
-  StateT (KBC f v) m (Tm f v -> Tm f v)
+  (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) =>
+  StateT (KBC f v) IO (Tm f v -> Tm f v)
 normaliser = do
   rules <- gets allRules
   return $
     normaliseWith (anywhere (tryRules rules))
 
 complete ::
-  (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
-  StateT (KBC f v) m ()
+  (PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
+  StateT (KBC f v) IO ()
 complete = do
   res <- dequeueM
   case res of
@@ -142,15 +142,15 @@ complete = do
       return ()
 
 newEquation ::
-  (PrettyTerm f, Pretty v, Monad m, Sized f, Ord f, Ord v, Numbered v) =>
-  Constrained (Equation f v) -> StateT (KBC f v) m ()
+  (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) =>
+  Constrained (Equation f v) -> StateT (KBC f v) IO ()
 newEquation (Constrained ctx (t :==: u)) = do
   n <- gets maxSize
   queueCPs noLabel (map unlabelled (split (Constrained (toContext FTrue) (t :==: u))))
 
 queueCPs ::
-  (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
-  Label -> [Labelled (Constrained (Equation f v))] -> StateT (KBC f v) m ()
+  (PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
+  Label -> [Labelled (Constrained (Equation f v))] -> StateT (KBC f v) IO ()
 queueCPs l eqns = do
   norm <- normaliser
   n <- gets maxSize
@@ -178,8 +178,8 @@ toCP norm (Constrained ctx (l :==: r)) = do
 -- If we normalise after step 4, add the critical pair to the extra rules.
 
 normalisePair ::
-  (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
-  Context f v -> Equation f v -> StateT (KBC f v) m (Equation f v)
+  (PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
+  Context f v -> Equation f v -> StateT (KBC f v) IO (Equation f v)
 normalisePair ctx (t :==: u) = do
   norm <- normaliser
   snorm <- specificNormaliser
@@ -206,8 +206,8 @@ impliedCases rules ctx (t :==: u) = do
   return form
 
 consider ::
-  (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
-  Label -> Label -> Constrained (Equation f v) -> StateT (KBC f v) m ()
+  (PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
+  Label -> Label -> Constrained (Equation f v) -> StateT (KBC f v) IO ()
 consider l1 l2 (Constrained ctx (t :==: u)) = do
   t :==: u <- normalisePair ctx (t :==: u)
   forM_ (orient (t :==: u)) $
@@ -224,15 +224,15 @@ consider l1 l2 (Constrained ctx (t :==: u)) = do
           interreduce rule
           addCriticalPairs l rule
 
-andM :: Monad m => [m Bool] -> m Bool
+andM :: [StateT (KBC f v) IO Bool] -> StateT (KBC f v) IO Bool
 andM [] = return True
 andM (mx:xs) = do
   x <- mx
   if x then andM xs else return False
 
 joinable ::
-  (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
-  Constrained (Equation f v) -> StateT (KBC f v) m Bool
+  (PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) =>
+  Constrained (Equation f v) -> StateT (KBC f v) IO Bool
 joinable (Constrained ctx eq) =
   andM $ do
     Constrained ctx' (Rule t u) <- orient eq
@@ -244,13 +244,13 @@ joinable (Constrained ctx eq) =
            | t == t' && u == u' -> return False
            | otherwise -> joinable (Constrained ctx (t' :==: u'))
 
-addRule :: (Monad m, PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) => Constrained (Rule f v) -> StateT (KBC f v) m Label
+addRule :: (PrettyTerm f, Sized f, Ord f, Ord v, Numbered v, Pretty v) => Constrained (Rule f v) -> StateT (KBC f v) IO Label
 addRule rule = do
   l <- newLabelM
   modify (\s -> s { labelledRules = Index.insert (Labelled l rule) (labelledRules s) })
   return l
 
-deleteRule :: (Monad m, Sized f, Ord f, Ord v, Numbered v) => Label -> Constrained (Rule f v) -> StateT (KBC f v) m ()
+deleteRule :: (Sized f, Ord f, Ord v, Numbered v) => Label -> Constrained (Rule f v) -> StateT (KBC f v) IO ()
 deleteRule l rule =
   modify $ \s ->
     s { labelledRules = Index.delete (Labelled l rule) (labelledRules s),
@@ -262,7 +262,7 @@ instance (PrettyTerm f, Pretty v) => Pretty (Reduction f v) where
   pretty (Simplify rule) = text "Simplify" <+> pretty rule
   pretty (Reorient rule) = text "Reorient" <+> pretty rule
 
-interreduce :: (Monad m, PrettyTerm f, Ord f, Sized f, Ord v, Numbered v, Pretty v) => Constrained (Rule f v) -> StateT (KBC f v) m ()
+interreduce :: (PrettyTerm f, Ord f, Sized f, Ord v, Numbered v, Pretty v) => Constrained (Rule f v) -> StateT (KBC f v) IO ()
 interreduce new = do
   rules <- gets (Index.elems . labelledRules)
   let reductions = catMaybes (map (moveLabel . fmap (reduceWith new)) rules)
@@ -280,7 +280,7 @@ reduceWith new old
       Just (Simplify old)
   | otherwise = Nothing
 
-simplifyRule :: (Monad m, PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) => Label -> Constrained (Rule f v) -> StateT (KBC f v) m ()
+simplifyRule :: (PrettyTerm f, Pretty v, Sized f, Ord f, Ord v, Numbered v) => Label -> Constrained (Rule f v) -> StateT (KBC f v) IO ()
 simplifyRule l rule@(Constrained ctx (Rule lhs rhs)) = do
   norm <- constrainedNormaliser
   modify $ \s ->
@@ -289,7 +289,7 @@ simplifyRule l rule@(Constrained ctx (Rule lhs rhs)) = do
          Index.insert (Labelled l (Constrained ctx (Rule lhs (norm ctx rhs))))
            (Index.delete (Labelled l rule) (labelledRules s)) }
 
-addCriticalPairs :: (Monad m, PrettyTerm f, Ord f, Sized f, Ord v, Numbered v, Pretty v) => Label -> Constrained (Rule f v) -> StateT (KBC f v) m ()
+addCriticalPairs :: (PrettyTerm f, Ord f, Sized f, Ord v, Numbered v, Pretty v) => Label -> Constrained (Rule f v) -> StateT (KBC f v) IO ()
 addCriticalPairs l new = do
   rules <- gets labelledRules
   size  <- gets maxSize

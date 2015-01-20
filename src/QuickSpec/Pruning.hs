@@ -24,8 +24,8 @@ import Data.Ord
 
 class Pruner s where
   emptyPruner   :: Signature -> s
-  untypedRep    :: Monad m => [PropOf PruningTerm] -> PruningTerm -> StateT s m (Maybe PruningTerm)
-  untypedAxiom  :: Monad m => PropOf PruningTerm -> StateT s m ()
+  untypedRep    :: [PropOf PruningTerm] -> PruningTerm -> StateT s IO (Maybe PruningTerm)
+  untypedAxiom  :: PropOf PruningTerm -> StateT s IO ()
   pruningReport :: s -> String
   pruningReport _ = ""
 
@@ -34,30 +34,28 @@ instance Pruner [PropOf PruningTerm] where
   untypedRep _ _    = return Nothing
   untypedAxiom prop = modify (prop:)
 
-newtype PrunerT s m a =
-  PrunerT {
-    unPrunerT :: RulesT PruningConstant (ReaderT [Type] (StateT s m)) a }
+newtype PrunerM s a =
+  PrunerM {
+    unPrunerM :: RulesT PruningConstant (ReaderT [Type] (StateT s IO)) a }
   deriving (Monad, MonadIO, Functor, Applicative)
-instance MonadTrans (PrunerT s) where
-  lift = PrunerT . lift . lift . lift
 
-askUniv :: Monad m => PrunerT s m [Type]
-askUniv = PrunerT (lift ask)
+askUniv :: PrunerM s [Type]
+askUniv = PrunerM (lift ask)
 
-liftPruner :: (Monad m, Pruner s) => StateT s m a -> PrunerT s m a
-liftPruner m = PrunerT (lift (lift m))
+liftPruner :: Pruner s => StateT s IO a -> PrunerM s a
+liftPruner m = PrunerM (lift (lift m))
 
-evalPruner :: (Monad m, Pruner s) => Signature -> PrunerT s m a -> m a
+evalPruner :: Pruner s => Signature -> PrunerM s a -> IO a
 evalPruner sig m = liftM fst (runPruner sig m)
 
-runPruner :: (Monad m, Pruner s) => Signature -> PrunerT s m a -> m (a, s)
+runPruner :: Pruner s => Signature -> PrunerM s a -> IO (a, s)
 runPruner sig m =
-  runStateT (runReaderT (runRulesT (unPrunerT m')) (Set.toList (typeUniverse sig))) (emptyPruner sig)
+  runStateT (runReaderT (runRulesT (unPrunerM m')) (Set.toList (typeUniverse sig))) (emptyPruner sig)
   where
     m' = createRules >> mapM_ axiom (background sig) >> m
 
-createRules :: (Monad m, Pruner s) => PrunerT s m ()
-createRules = PrunerT $ do
+createRules :: Pruner s => PrunerM s ()
+createRules = PrunerM $ do
   rule $ do
     fun@(TermConstant con _) <- event
     let arity = funArity con
@@ -66,26 +64,26 @@ createRules = PrunerT $ do
           t = Fun fun (take arity (map Var [0..]))
           args = take arity (typeArgs (typ con))
       generate (HasType ty)
-      unPrunerT $ liftPruner $
+      unPrunerM $ liftPruner $
         untypedAxiom ([] :=>: Fun (HasType ty) [t] :=: t)
       forM_ (zip [0..] args) $ \(i, ty) -> do
         let vs = map (Var . PruningVariable) [0..arity-1]
             tm f = Fun fun (take i vs ++ [f (vs !! i)] ++ drop (i+1) vs)
         generate (HasType ty)
-        unPrunerT $ liftPruner $
+        unPrunerM $ liftPruner $
           untypedAxiom ([] :=>: tm (\t -> Fun (HasType ty) [t]) :=: tm id)
 
   rule $ do
     fun@(HasType ty) <- event
     execute $
-      unPrunerT $ liftPruner $
+      unPrunerM $ liftPruner $
         untypedAxiom ([] :=>: Fun fun [Fun fun [Var 0]] :=: Fun fun [Var 0])
 
-axiom :: (Pruner s, Monad m) => Prop -> PrunerT s m ()
+axiom :: Pruner s => Prop -> PrunerM s ()
 axiom p = do
   univ <- askUniv
   sequence_
-    [ do sequence_ [ PrunerT (generate fun) | fun <- usort (funs p') ]
+    [ do sequence_ [ PrunerM (generate fun) | fun <- usort (funs p') ]
          liftPruner (untypedAxiom p')
     | p' <- map toAxiom (instances univ p) ]
 
@@ -146,7 +144,7 @@ constrain :: [Type] -> Term -> [Map TyVar Type]
 constrain univ t =
   usort [ toMap sub | u <- univ, Just sub <- [match (typ t) u] ]
 
-rep :: (Pruner s, Monad m) => Term -> PrunerT s m (Maybe Term)
+rep :: Pruner s => Term -> PrunerM s (Maybe Term)
 rep t = liftM (liftM fromPruningTerm) $ do
   let u = toGoalTerm t
   liftPruner (untypedRep [] u)

@@ -24,11 +24,11 @@ instance Pruner SimplePruner where
 
 modifyS f = modify (\(S x) -> S (f x))
 
-simpleUnify :: Monad m => PropOf PruningTerm -> StateT SimplePruner m ()
+simpleUnify :: PropOf PruningTerm -> StateT SimplePruner IO ()
 simpleUnify prop@([] :=>: t :=: u) = modifyS (Index.insert (Rule t u) . Index.insert (Rule u t))
 simpleUnify _ = return ()
 
-simpleRep :: Monad m => [PropOf PruningTerm] -> PruningTerm -> StateT SimplePruner m (Maybe PruningTerm)
+simpleRep :: [PropOf PruningTerm] -> PruningTerm -> StateT SimplePruner IO (Maybe PruningTerm)
 simpleRep axioms t = do
   S idx <- get
   let u = normaliseWith (usortBy (comparing measure) . anywhere (rewrite idx)) t

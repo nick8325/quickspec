@@ -33,7 +33,7 @@ import QuickSpec.Utils
 import Test.QuickCheck.Random
 import Data.Rewriting.Rule(Rule(Rule))
 
-type M = RulesT Event (StateT S (PrunerT Completion IO))
+type M = RulesT Event (StateT S (PrunerM Completion))
 
 data S = S {
   schemas       :: Schemas,
@@ -364,7 +364,7 @@ instance Considerable TermFrom where
 found :: Signature -> Prop -> M ()
 found sig prop = do
   props <- lift (gets discovered)
-  (_, props') <- runPruner sig $ mapM_ axiom (map (simplify_ sig) props)
+  (_, props') <- liftIO $ runPruner sig $ mapM_ axiom (map (simplify_ sig) props)
 
   res <- liftIO $ pruner (extraPruner_ sig) props' (toGoal (simplify_ sig prop))
   case res of
