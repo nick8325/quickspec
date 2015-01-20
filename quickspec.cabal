@@ -68,7 +68,6 @@ library
     QuickSpec
     QuickSpec.Base
     QuickSpec.Eval
-    QuickSpec.Memo
     QuickSpec.Parse
     QuickSpec.Pretty
     QuickSpec.Prop
@@ -97,7 +96,7 @@ library
                , bytestring
                , constraints
                , containers
-               , data-memocombinators
+               , uglymemo
                , dlist
                , pqueue >= 1.2.1
                , pretty

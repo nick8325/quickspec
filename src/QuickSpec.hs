@@ -1,7 +1,6 @@
 module QuickSpec(
   module QuickSpec.Base,
   module QuickSpec.Eval,
-  module QuickSpec.Memo,
   module QuickSpec.Parse,
   module QuickSpec.Pretty,
   module QuickSpec.Prop,
@@ -19,7 +18,6 @@ module QuickSpec(
 
 import QuickSpec.Base
 import QuickSpec.Eval hiding (terms)
-import QuickSpec.Memo
 import QuickSpec.Parse
 import QuickSpec.Pretty
 import QuickSpec.Prop

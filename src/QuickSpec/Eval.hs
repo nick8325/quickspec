@@ -12,12 +12,11 @@ import Data.List hiding (insert)
 import qualified Data.Map as Map
 import Data.Map(Map)
 import Data.Maybe
-import Data.MemoCombinators.Class
+import Data.MemoUgly
 import Data.Monoid hiding ((<>))
 import Data.Ord
 import qualified Data.Set as Set
 import Data.Set(Set)
-import QuickSpec.Memo()
 import QuickSpec.Prop
 import QuickSpec.Pruning hiding (createRules, instances)
 import QuickSpec.Pruning.Completion hiding (initialState)
@@ -85,15 +84,15 @@ initialState :: Signature -> [(QCGen, Int)] -> S
 initialState sig seeds =
   S { schemas       = Map.empty,
       terms         = Set.empty,
-      schemaTestSet = emptyTestSet (makeTester specialise e seeds sig),
+      schemaTestSet = emptyTestSet (memo (makeTester specialise e seeds sig)),
       termTestSet   = Map.empty,
-      freshTestSet  = emptyTestSet (makeTester specialise e seeds sig),
+      freshTestSet  = emptyTestSet (memo (makeTester specialise e seeds sig)),
       proved        = Set.empty,
       discovered    = background sig,
       someTypes     = typeUniverse sig,
       allTypes      = bigTypeUniverse sig }
   where
-    e = table (env sig)
+    e = memo (env sig)
 
 newTerm :: Term -> M ()
 newTerm t = lift (modify (\s -> s { terms = Set.insert t (terms s) }))
