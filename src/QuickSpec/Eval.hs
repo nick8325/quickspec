@@ -140,7 +140,7 @@ quickSpec sig = unbuffered $ do
     return signature {
       constants = [ c { conIsBackground = True } | c <- constants sig ],
       instances = instances sig,
-      background = background sig ++ props }
+      background = background sig ++ map (fmap (mapTerm (\c -> c { conIsBackground = True }) id)) props }
 
 runM :: Signature -> M a -> IO a
 runM sig m = do
