@@ -137,9 +137,8 @@ quickSpec sig0 = unbuffered $ do
     quickSpecLoop sig
     summarise
     props <- lift (gets (reverse . discovered))
-    return signature {
+    return sig {
       constants = [ c { conIsBackground = True } | c <- constants sig ],
-      instances = instances sig,
       background = background sig ++ map (fmap (mapTerm (\c -> c { conIsBackground = True }) id)) props }
 
 runM :: Signature -> M a -> IO a
