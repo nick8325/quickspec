@@ -132,7 +132,7 @@ lookup t idx =
 lookupPartial, lookupVar, lookupFun ::
   (Ord (ConstantOf a), Ord (VariableOf a)) =>
   TmOf a -> Index a -> Results (ConstantOf a) (VariableOf a) (Index a)
-lookupPartial t idx = lookupVar t idx `mplus` lookupFun t idx
+lookupPartial t idx = lookupFun t idx `mplus` lookupVar t idx
 
 lookupVar t idx =
   Results $ do
