@@ -319,8 +319,8 @@ consider sig makeEvent x = do
   res   <- lift (lift (rep t))
   terms <- lift (gets terms)
   case res of
-    Just u | u `Set.member` terms || canonicalise u `Set.member` terms -> return ()
-    Nothing | t `Set.member` terms || canonicalise t `Set.member` terms -> return ()
+    Just u | u `Set.member` terms -> return ()
+    Nothing | t `Set.member` terms -> return ()
     _ -> do
       case res of
         Nothing -> return ()
