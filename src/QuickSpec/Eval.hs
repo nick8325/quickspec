@@ -47,9 +47,9 @@ data S = S {
   allTypes      :: Set Type }
 
 data Event =
-    Schema (Poly Schema) (KindOf Schema)
+    Schema Origin (Poly Schema) (KindOf Schema)
   | Term   TermFrom      (KindOf TermFrom)
-  | ConsiderSchema (Poly Schema)
+  | ConsiderSchema Origin (Poly Schema)
   | ConsiderTerm   TermFrom
   | Type           (Poly Type)
   | UntestableType (Poly Type)
@@ -58,16 +58,22 @@ data Event =
   | FinishedSize   Int
   deriving (Eq, Ord)
 
+data Origin = Original | PolyInstance deriving (Eq, Ord)
+
 instance Pretty Event where
-  pretty (Schema s k) = text "schema" <+> pretty s <> text ":" <+> pretty k
+  pretty (Schema o s k) = text "schema" <+> pretty s <> text "," <+> pretty o <> text ":" <+> pretty k
   pretty (Term t k) = text "term" <+> pretty t <> text ":" <+> pretty k
-  pretty (ConsiderSchema s) = text "consider schema" <+> pretty s <+> text "::" <+> pretty (typ s)
+  pretty (ConsiderSchema o s) = text "consider schema" <+> pretty s <+> text "::" <+> pretty (typ s) <> text "," <+> pretty o
   pretty (ConsiderTerm t) = text "consider term" <+> pretty t <+> text "::" <+> pretty (typ t)
   pretty (Type ty) = text "type" <+> pretty ty
   pretty (UntestableType ty) = text "untestable type" <+> pretty ty
   pretty (Found prop) = text "found" <+> pretty prop
   pretty (FinishedSize n) = text "finished size" <+> pretty n
   pretty (InstantiateSchema s s') = text "instantiate schema" <+> pretty s' <+> text "from" <+> pretty s
+
+instance Pretty Origin where
+  pretty Original = text "original"
+  pretty PolyInstance = text "instance"
 
 data KindOf a = Untestable | TimedOut | Representative | EqualTo a
   deriving (Eq, Ord)
@@ -155,7 +161,7 @@ exploreSize sig n = do
   lift $ modify (\s -> s { schemas = Map.insert n Map.empty (schemas s) })
   ss <- fmap (sortBy (comparing measure)) (schemasOfSize n sig)
   liftIO $ putStrLn ("Size " ++ show n ++ ", " ++ show (length ss) ++ " schemas to consider:")
-  mapM_ (generate . ConsiderSchema . poly) ss
+  mapM_ (generate . ConsiderSchema Original . poly) ss
   generate (FinishedSize n)
   liftIO $ putStrLn ""
 
@@ -188,9 +194,9 @@ allUnifications t = map f ss
 createRules :: Signature -> M ()
 createRules sig = do
   rule $ do
-    Schema s k <- event
+    Schema o s k <- event
     execute $ do
-      unless (k == TimedOut) $ accept s
+      unless (k == TimedOut || o == PolyInstance) $ accept s
       let ms = oneTypeVar (unPoly s)
       case k of
         TimedOut ->
@@ -242,14 +248,14 @@ createRules sig = do
         Representative -> add
 
   rule $ do
-    ConsiderSchema s <- event
+    ConsiderSchema o s <- event
     allTypes  <- execute $ lift $ gets allTypes
     someTypes <- execute $ lift $ gets someTypes
     require (and [ oneTypeVar (typ t) `Set.member` allTypes | t <- subterms (unPoly s) ])
     execute $
       {-case oneTypeVar (typ (unPoly s)) `Set.member` someTypes of
         True ->-}
-          consider sig (Schema s) (unPoly (oneTypeVar s))
+          consider sig (Schema o s) (unPoly (oneTypeVar s))
 {-        False ->
           generate (Schema s Untestable)-}
 
@@ -259,7 +265,7 @@ createRules sig = do
       consider sig (Term t) t
 
   rule $ do
-    Schema s _ <- event
+    Schema _ s _ <- event
     execute $
       generate (Type (polyTyp s))
 
@@ -270,14 +276,14 @@ createRules sig = do
     Just mgu <- return (polyMgu ty1 ty2)
     let tys = [ty1, ty2] \\ [mgu]
 
-    Schema s Representative <- event
+    Schema Original s Representative <- event
     require (polyTyp s `elem` tys)
 
     execute $
-      generate (ConsiderSchema (fromMaybe __ (cast (unPoly mgu) s)))
+      generate (ConsiderSchema PolyInstance (fromMaybe __ (cast (unPoly mgu) s)))
 
   rule $ do
-    Schema s Untestable <- event
+    Schema _ s Untestable <- event
     require (arity (typ s) == 0)
     execute $
       generate (UntestableType (polyTyp s))
