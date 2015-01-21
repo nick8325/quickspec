@@ -148,8 +148,8 @@ defaultInstances = [
   names (NamesFor ["x", "y", "z"] :: NamesFor A),
   makeInstance (\(dict :: Dict (Ord A)) -> Observe dict return),
   makeInstance (\(obs :: Observe A B) -> observeTraversable ins obs :: Observe [A] [B]),
-  --makeInstance (\(Dict :: Dict (Arbitrary A),
-  --                obs :: Observe B C) -> observeFunction obs :: Observe (A -> B) C ),
+  makeInstance (\(Dict :: Dict (Arbitrary A),
+                 obs :: Observe B C) -> observeFunction obs :: Observe (A -> B) C ),
   makeInstance (\(obs :: Observe A B) -> Observe1 (toValue obs))]
 
 data Observe a b = Observe (Dict (Ord b)) (a -> Gen b) deriving Typeable
