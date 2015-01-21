@@ -261,7 +261,7 @@ typeUniverse sig =
   where
     types t = typeRes t:typeArgs t ++ concatMap types (typeArgs t)
 
-data TypeKind = Useless | Partial | Useful deriving Eq
+data TypeKind = Useless | Partial | Useful deriving (Eq, Show)
 
 typeKind :: Signature -> Type -> TypeKind
 typeKind sig ty
