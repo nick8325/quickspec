@@ -30,14 +30,14 @@ import Control.Monad.Trans.State.Strict
 data Event f v =
     NewRule (Constrained (Rule f v))
   | ExtraRule (Constrained (Rule f v))
-  | NewCPs [CP f v]
+  | NewCP (CP f v)
   | Consider (Constrained (Rule f v)) (Context f v)
   | Reduce (Reduction f v) (Constrained (Rule f v))
 
 traceM :: (Monad m, PrettyTerm f, Pretty v) => Event f v -> m ()
 traceM (NewRule rule) = traceIf True (hang (text "New rule") 2 (pretty rule))
 traceM (ExtraRule rule) = traceIf True (hang (text "Extra rule") 2 (pretty rule))
-traceM (NewCPs cps) = traceIf True (hang (text "New critical pairs") 2 (pretty cps))
+traceM (NewCP cps) = traceIf False (hang (text "Critical pair") 2 (pretty cps))
 traceM (Consider eq ctx) = traceIf True (sep [text "Considering", nest 2 (pretty eq), text "under", nest 2 (pretty ctx)])
 traceM (Reduce red rule) = traceIf True (sep [pretty red, nest 2 (text "using"), nest 2 (pretty rule)])
 traceIf :: Monad m => Bool -> Doc -> m ()
@@ -156,7 +156,7 @@ queueCPs l eqns = do
   n <- gets maxSize
   let cps = catMaybes (map (moveLabel . fmap (toCP norm)) eqns)
       cps' = [ cp | cp <- cps, cpSize (peel cp) <= fromIntegral n ]
-  unless (null cps') (traceM (NewCPs (map peel cps')))
+  mapM_ (traceM . NewCP . peel) cps'
   enqueueM l cps'
 
 toCP ::

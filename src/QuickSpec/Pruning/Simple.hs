@@ -13,8 +13,10 @@ import Data.Rewriting.Rule
 import qualified QuickSpec.Pruning.Index as Index
 import QuickSpec.Pruning.Index (Index)
 import QuickSpec.Pruning.Rewrite
+import QuickSpec.Pruning.Constraints
+import QuickSpec.Pruning.Equation
 
-newtype SimplePruner = S (Index (RuleOf PruningTerm))
+newtype SimplePruner = S (Index (Constrained (RuleOf PruningTerm)))
 
 instance Pruner SimplePruner where
   emptyPruner _ = S Index.empty
@@ -25,7 +27,9 @@ instance Pruner SimplePruner where
 modifyS f = modify (\(S x) -> S (f x))
 
 simpleUnify :: PropOf PruningTerm -> StateT SimplePruner IO ()
-simpleUnify prop@([] :=>: t :=: u) = modifyS (Index.insert (Rule t u) . Index.insert (Rule u t))
+simpleUnify prop@([] :=>: t :=: u) = do
+  let rules = orient (t :==: u)
+  modifyS (\s -> foldr Index.insert s rules)
 simpleUnify _ = return ()
 
 simpleRep :: [PropOf PruningTerm] -> PruningTerm -> StateT SimplePruner IO (Maybe PruningTerm)
@@ -35,8 +39,8 @@ simpleRep axioms t = do
   if t == u then return Nothing else return (Just u)
   where
     rewrite idx t = do
-      Rule _ u <- Index.lookup t idx
-      guard (measure u < measure t)
+      Constrained ctx (Rule _ u) <- Index.lookup t idx
+      guard (true (formula ctx))
       return u
 
 simpleReport :: SimplePruner -> String
