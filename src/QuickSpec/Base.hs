@@ -207,6 +207,12 @@ prettyStyle style p d xs =
       prettyParen (p > pOp) $
         hang (prettyPrec (pOp+1) x <+> d) 2
              (prettyPrec (pOp+r) y)
+    (x:y:xs) ->
+      prettyParen (p > pOp) $
+        hang (prettyStyle style 11 d [x, y]) 2
+          (fsep (map (prettyPrec 11) xs))
+    [x] ->
+      parens (prettyPrec (pOp+1) x <+> d)
     _ ->
       prettyParen (p > pOp) $
         hang (parens d) 2
