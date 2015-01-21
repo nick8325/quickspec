@@ -250,7 +250,7 @@ createRules sig = do
     let ty = typ s
     kind <- execute $ lift $ gets kind
     require (kind ty /= Useless)
-    require (and [ kind ty == Useful | t <- properSubterms (unPoly s) ])
+    require (and [ kind (typ t) == Useful | t <- properSubterms (unPoly s) ])
     execute $
       case kind ty of
         Partial -> do
