@@ -322,10 +322,10 @@ consider sig makeEvent x = do
     Just u | u `Set.member` terms -> return ()
     Nothing | t `Set.member` terms -> return ()
     _ -> do
-      case res of
+      {-case res of
         Nothing -> return ()
-        Just u ->
-          liftIO $ prettyPrint (text "Avoided reduction" <+> pretty (Rule t u))
+        Just u -> do
+          liftIO $ prettyPrint (text "Avoided reduction" <+> pretty (Rule t u))-}
       ts <- getTestSet x
       res <-
         liftIO . testTimeout_ sig $
