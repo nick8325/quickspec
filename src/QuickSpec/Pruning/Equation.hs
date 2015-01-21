@@ -4,8 +4,10 @@ module QuickSpec.Pruning.Equation where
 import QuickSpec.Base
 import QuickSpec.Pruning.Constraints
 import QuickSpec.Term
+import QuickSpec.Utils
 import Control.Monad
-import Data.Rewriting.Rule hiding (isVariantOf)
+import Data.Rewriting.Rule hiding (isVariantOf, vars)
+import Data.List
 
 data Equation f v = Tm f v :==: Tm f v deriving (Eq, Ord, Show)
 type EquationOf a = Equation (ConstantOf a) (VariableOf a)
@@ -27,15 +29,22 @@ order (l :==: r)
 unorient :: Rule f v -> Equation f v
 unorient (Rule l r) = l :==: r
 
-orient :: (Sized f, Ord f, Ord v, Numbered v) => Equation f v -> [Constrained (Rule f v)]
+orient :: (Minimal f, Sized f, Ord f, Ord v, Numbered v) => Equation f v -> [Constrained (Rule f v)]
 orient (l :==: r) =
   case orientTerms l r of
     Just GT -> [Constrained (toContext FTrue) (Rule l r)]
     Just LT -> [Constrained (toContext FTrue) (Rule r l)]
     Just EQ -> []
-    Nothing -> [rule l r, rule r l]
+    Nothing -> rule l r ++ rule r l
   where
-    rule l r = Constrained (toContext (Less r l)) (Rule l r)
+    rule l r
+      | null vs =
+          [Constrained (toContext (Less r l)) (Rule l r)]
+      | otherwise = rule l r' ++ rule r r'
+      where
+        vs = usort (vars r) \\ usort (vars l)
+        -- Replace f x = g y with f x = g k, g y = g k where k is the minimal element
+        r' = substf (\x -> if x `elem` vs then Fun minimal [] else Var x) r
 
 bothSides :: (Tm f v -> Tm f v) -> Equation f v -> Equation f v
 bothSides f (t :==: u) = f t :==: f u

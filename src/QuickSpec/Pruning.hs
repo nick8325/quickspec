@@ -161,6 +161,9 @@ data PruningConstant
   | HasType Type
   deriving (Eq, Show)
 
+instance Minimal PruningConstant where
+  minimal = SkolemVariable (PruningVariable 0)
+
 instance Ord PruningConstant where
   compare = comparing f
     where

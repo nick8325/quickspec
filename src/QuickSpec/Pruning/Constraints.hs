@@ -33,7 +33,7 @@ deriving instance (Eq a, Eq (ConstantOf a), Eq (VariableOf a)) => Eq (Constraine
 deriving instance (Ord a, Ord (ConstantOf a), Ord (VariableOf a)) => Ord (Constrained a)
 deriving instance (Show a, Show (VariableOf a), Show (ConstantOf a)) => Show (Constrained a)
 
-instance (Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Symbolic a) => Symbolic (Constrained a) where
+instance (Minimal (ConstantOf a), Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Symbolic a) => Symbolic (Constrained a) where
   type ConstantOf (Constrained a) = ConstantOf a
   type VariableOf (Constrained a) = VariableOf a
 
@@ -44,7 +44,7 @@ instance (Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Symbolic
   substf sub (Constrained ctx x) =
     Constrained (substf sub ctx) (substf sub x)
 
-reduce :: (Symbolic a, Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Numbered (VariableOf a)) => Constrained a -> Constrained a
+reduce :: (Symbolic a, Minimal (ConstantOf a), Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Numbered (VariableOf a)) => Constrained a -> Constrained a
 reduce x =
   case split x of
     [y] | simple (formula (context y)) -> y
@@ -58,7 +58,7 @@ reduce x =
     simple Less{} = True
     simple _ = False
 
-split :: (Symbolic a, Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Numbered (VariableOf a)) => Constrained a -> [Constrained a]
+split :: (Symbolic a, Minimal (ConstantOf a), Sized (ConstantOf a), Ord (ConstantOf a), Ord (VariableOf a), Numbered (VariableOf a)) => Constrained a -> [Constrained a]
 split (Constrained ctx x) =
   case runM simplify (formula ctx) of
     Equal t u p q ->
@@ -75,20 +75,20 @@ split (Constrained ctx x) =
       | satisfiable (solved (toContext p)) = p
       | otherwise = FFalse
 
-mainSplit :: (Sized f, Numbered v, Ord f, Ord v) => Formula f v -> Formula f v
+mainSplit :: (Minimal f, Sized f, Numbered v, Ord f, Ord v) => Formula f v -> Formula f v
 mainSplit p =
   case filter (satisfiable . solve) (mainSplits p) of
     [] -> FFalse
     (q:_) -> q
 
-mainSplits :: (Sized f, Numbered v, Ord f, Ord v) => Formula f v -> [Formula f v]
+mainSplits :: (Minimal f, Sized f, Numbered v, Ord f, Ord v) => Formula f v -> [Formula f v]
 mainSplits p =
   case runM simplify p of
     Equal t u p q -> mainSplits q
     p :|: q -> mainSplits p ++ mainSplits q
     p -> [p]
 
-neg :: (Symbolic a, Sized (ConstantOf a), Numbered (VariableOf a), Ord (ConstantOf a), Ord (VariableOf a)) => Constrained a -> Constrained a
+neg :: (Symbolic a, Minimal (ConstantOf a), Sized (ConstantOf a), Numbered (VariableOf a), Ord (ConstantOf a), Ord (VariableOf a)) => Constrained a -> Constrained a
 neg = runM $ \x -> do
   f <- negFormula (formula (context x))
   return x { context = toContext f }
@@ -102,7 +102,7 @@ data Context f v =
     model   :: Map v (Extended f v) }
   deriving Show
 
-toContext :: (Sized f, Ord f, Ord v) => Formula f v -> Context f v
+toContext :: (Minimal f, Sized f, Ord f, Ord v) => Formula f v -> Context f v
 toContext x = Context x s (toModel s)
   where
     s = solve x
@@ -113,7 +113,7 @@ instance (Ord f, Ord v) => Ord (Context f v) where
   compare = comparing formula
 instance (PrettyTerm f, Pretty v) => Pretty (Context f v) where
   pretty = pretty . formula
-instance (Sized f, Ord f, Ord v) => Symbolic (Context f v) where
+instance (Minimal f, Sized f, Ord f, Ord v) => Symbolic (Context f v) where
   type ConstantOf (Context f v) = f
   type VariableOf (Context f v) = v
   termsDL ctx = termsDL (formula ctx)
@@ -161,7 +161,7 @@ instance (PrettyTerm f, Pretty v) => Pretty (Formula f v) where
   prettyPrec p (Equal t u x y) =
     prettyPrec p ((Equal t u FTrue FFalse :&: x) :|: y)
 
-instance (Sized f, Ord v) => Symbolic (Formula f v) where
+instance (Minimal f, Sized f, Ord v) => Symbolic (Formula f v) where
   type ConstantOf (Formula f v) = f
   type VariableOf (Formula f v) = v
   termsDL FTrue = mzero
@@ -186,7 +186,7 @@ instance (Sized f, Ord v) => Symbolic (Formula f v) where
   substf sub (Less t u) = Less (substf sub t) (substf sub u)
   substf sub (Equal t u p q) = Equal (substf sub t) (substf sub u) (substf sub p) (substf sub q)
 
-termSize :: (Sized f, Ord v) => Tm f v -> FM.Term v
+termSize :: (Minimal f, Sized f, Ord v) => Tm f v -> FM.Term v
 termSize = foldTerm FM.var fun
   where
     fun f ss = constTerm (funSize f) + sum ss
@@ -216,7 +216,7 @@ p &&& (q :|: r) = (p &&& q) ||| (p &&& r)
 (p :|: q) &&& r = (p &&& r) ||| (q &&& r)
 p &&& q = p :&: q
 
-true :: (Sized f, Ord f, Ord v) => Formula f v -> Bool
+true :: (Minimal f, Sized f, Ord f, Ord v) => Formula f v -> Bool
 true FTrue = True
 true FFalse = False
 true (p :&: q) = true p && true q
@@ -246,7 +246,7 @@ newName x = do
   put $! n+1
   return (withNumber n x)
 
-simplify :: (Sized f, Ord f, Ord v, Numbered v) => Formula f v -> M (Formula f v)
+simplify :: (Minimal f, Sized f, Ord f, Ord v, Numbered v) => Formula f v -> M (Formula f v)
 simplify FTrue = return FTrue
 simplify FFalse = return FFalse
 simplify (p :&: q) = liftM2 (&&&) (simplify p) (simplify q)
@@ -272,9 +272,11 @@ simplify (HeadIs sense (Fun f ts) g)
   where
     test Lesser = (<)
     test Greater = (>)
+simplify (HeadIs Lesser _ x) | x == minimal = return FFalse
 simplify (HeadIs Greater _ f) | funSize f == 0 && funArity f == 1 =
   return FFalse
 simplify (Less t u) | t == u = return FFalse
+simplify (Less _ (Fun x [])) | x == minimal = return FFalse
 simplify (Less t (Var x)) | x `elem` vars t = return FFalse
 simplify (Less (Var x) t) | x `elem` vars t = return FTrue
 simplify (Less t u) | isFun t || isFun u = do
@@ -284,7 +286,7 @@ simplify (Less t u) | isFun t || isFun u = do
     sz = termSize t - termSize u
 simplify p = return p
 
-structLess :: (Sized f, Ord f, Ord v, Numbered v) => Tm f v -> Tm f v -> M (Formula f v)
+structLess :: (Minimal f, Sized f, Ord f, Ord v, Numbered v) => Tm f v -> Tm f v -> M (Formula f v)
 structLess (Fun f ts) (Fun g us) =
   return $
   case compare f g of
@@ -307,12 +309,12 @@ structLess (Fun f ts) (Var x) = do
     Equal (Var x) u rest $
       HeadIs Greater (Var x) f
 
-specialise :: (Sized f, Ord f, Ord v, Numbered v) => v -> f -> M (Tm f v)
+specialise :: (Minimal f, Sized f, Ord f, Ord v, Numbered v) => v -> f -> M (Tm f v)
 specialise x f = do
   ns <- replicateM (funArity f) (newName x)
   return (Fun f (map Var ns))
 
-negFormula :: (Sized f, Numbered v, Ord f, Ord v) => Formula f v -> M (Formula f v)
+negFormula :: (Minimal f, Sized f, Numbered v, Ord f, Ord v) => Formula f v -> M (Formula f v)
 negFormula FTrue = return FFalse
 negFormula FFalse = return FTrue
 negFormula (p :&: q) = liftM2 (|||) (negFormula p) (negFormula q)
@@ -364,7 +366,7 @@ instance (PrettyTerm f, Pretty v) => Pretty (Solved f v) where
       pretty (headGreater x),
       pretty (less x) ]
 
-solve :: (Sized f, Ord f, Ord v) => Formula f v -> Solved f v
+solve :: (Minimal f, Sized f, Ord f, Ord v) => Formula f v -> Solved f v
 solve = solve1 . filter (/= FTrue) . literals
   where
     literals (p :&: q) = literals p ++ literals q
@@ -372,7 +374,7 @@ solve = solve1 . filter (/= FTrue) . literals
     literals (Equal _ _ _ _) = ERROR "must call split before using a context"
     literals p = [p]
 
-solve1 :: (Sized f, Ord f, Ord v) => [Formula f v] -> Solved f v
+solve1 :: (Minimal f, Sized f, Ord f, Ord v) => [Formula f v] -> Solved f v
 solve1 [] = Tautological
 solve1 ls
   | not (null equal) = ERROR "must call split before using a context"
@@ -414,7 +416,7 @@ satisfiable :: (Ord f, Ord v) => Solved f v -> Bool
 satisfiable Unsolvable = False
 satisfiable _ = True
 
-implies :: (Sized f, Numbered v, Ord f, Ord v) => Solved f v -> Formula f v -> Bool
+implies :: (Minimal f, Sized f, Numbered v, Ord f, Ord v) => Solved f v -> Formula f v -> Bool
 implies Unsolvable _ = __
 implies _ FTrue = True
 implies Tautological _ = False
@@ -437,18 +439,18 @@ implies form (HeadIs Greater (Var x) f) =
     Just g | g >= f -> True
     _ -> False
 
-modelSize :: (Pretty v, Sized f, Ord f, Ord v) => Tm f v -> Solved f v -> Integer
+modelSize :: (Pretty v, Minimal f, Sized f, Ord f, Ord v) => Tm f v -> Solved f v -> Integer
 modelSize t Unsolvable = __
 modelSize t Tautological = fromIntegral (size t)
 modelSize t s = ceiling (FM.eval 1 (solution s) (termSize t))
 
-minimiseContext :: (Sized f, Pretty v, Ord f, Ord v) => Tm f v -> Context f v -> Context f v
+minimiseContext :: (Minimal f, Sized f, Pretty v, Ord f, Ord v) => Tm f v -> Context f v -> Context f v
 minimiseContext t ctx =
   ctx { solved = s, model = toModel s }
   where
     s = minimiseSolved t (solved ctx)
 
-minimiseSolved :: (Pretty v, Sized f, Ord f, Ord v) => Tm f v -> Solved f v -> Solved f v
+minimiseSolved :: (Pretty v, Minimal f, Sized f, Ord f, Ord v) => Tm f v -> Solved f v -> Solved f v
 minimiseSolved t Unsolvable = Unsolvable
 minimiseSolved t Tautological = Tautological
 minimiseSolved t s =
@@ -488,13 +490,13 @@ fromExtended (Fun (Original f) ts) = Fun f (map fromExtended ts)
 fromExtended (Fun (ConstrainedVar x _ _ _) []) = Var x
 fromExtended (Var x) = Var x
 
-instance Sized f => Sized (Extended f v) where
+instance (Minimal f, Sized f) => Sized (Extended f v) where
   funSize (Original f) = funSize f
   funSize (ConstrainedVar _ _ k _) = k
   funArity (Original f) = funArity f
   funArity ConstrainedVar{} = 0
 
-instance (Sized f, Ord f, Ord v) => Ord (Extended f v) where
+instance (Minimal f, Sized f, Ord f, Ord v) => Ord (Extended f v) where
   compare (Original f) (Original g) = compare f g
   compare (ConstrainedVar _ m _ _) (ConstrainedVar _ n _ _) = compare m n
   compare x@Original{} y@ConstrainedVar{} =

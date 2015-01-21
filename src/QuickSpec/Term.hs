@@ -24,6 +24,9 @@ type TermOf = Tm Constant
 type Term = TermOf Variable
 type Schema = TermOf Hole
 
+class Minimal a where
+  minimal :: a
+
 class Sized a where
   funSize  :: a -> Rational
   funArity :: a -> Int
