@@ -253,8 +253,9 @@ createRules sig = do
     require (and [ kind ty == Useful | t <- properSubterms (unPoly s) ])
     execute $
       case kind ty of
-        Partial ->
+        Partial -> do
           generate (Schema o s Untestable)
+          newTerm (instantiate (oneTypeVar (unPoly s)))
         Useful ->
           consider sig (Schema o s) (unPoly (oneTypeVar s))
 
