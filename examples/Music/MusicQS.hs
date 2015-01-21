@@ -37,7 +37,7 @@ instance Arbitrary Music where
 
 instance Arbitrary Context where
          shrink = genericShrink
-         arbitrary = liftM4 Context arbitrary arbitrary arbitrary arbitrary
+         arbitrary = liftM4 Context arbitrary arbitrary (arbitrary `suchThat` (> 0)) arbitrary
 
 
 note :: (PitchClass, Int) -> Positive Rational -> Music
@@ -54,6 +54,9 @@ obsMusic m = liftM2 perform arbitrary (return (m :+: c 1 tn))
 
 prop_com :: Context -> Music -> Music -> Property
 prop_com c m1 m2 = perform c (m1 :=: m2) === perform c (m2 :=: m1)
+
+prop_rest :: Context -> Positive Rational -> Positive Rational -> Property
+prop_rest c (Positive x) (Positive y) = perform c ((Rest x :=: Rest y) :+: Note (C, 1) 1) === perform c (Rest (max x y) :+: Note (C, 1) 1)
 
 prop_assoc :: Context -> Music -> Music -> Music -> Property
 prop_assoc c m1 m2 m3 = perform c ((m1 :+: m2) :+: m3) === perform c (m1 :+: (m2 :+: m3))
