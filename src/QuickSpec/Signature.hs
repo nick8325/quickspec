@@ -27,6 +27,8 @@ import System.Timeout
 import Test.QuickCheck hiding (subterms)
 import Data.Ord
 import Data.Rewriting.Substitution.Match
+import {-# SOURCE #-} QuickSpec.Pruning.Completion(Completion)
+import {-# SOURCE #-} QuickSpec.Pruning.Simple(SimplePruner)
 
 newtype Instance = Instance (Value Instance1) deriving Show
 newtype Instance1 a = Instance1 (Value (Instance2 a))
@@ -56,11 +58,14 @@ deriving instance Typeable Arbitrary
 deriving instance Typeable CoArbitrary
 deriving instance Typeable (() :: Constraint)
 
+type PrunerType = Completion
+
 data Signature =
   Signature {
     constants          :: [Constant],
     instances          :: [[Instance]],
     background         :: [Prop],
+    theory             :: Maybe PrunerType,
     defaultTo          :: Maybe Type,
     maxTermSize        :: Maybe Int,
     maxCommutativeSize :: Maybe Int,
@@ -178,9 +183,10 @@ newtype NamesFor a = NamesFor { unNamesFor :: [String] } deriving Typeable
 newtype DictOf c a = DictOf { unDictOf :: Dict (c a) } deriving Typeable
 
 instance Monoid Signature where
-  mempty = Signature [] [] [] Nothing Nothing Nothing Nothing Nothing Nothing Nothing
-  Signature cs is b d s s1 t tim simp p `mappend` Signature cs' is' b' d' s' s1' t' tim' simp' p' =
+  mempty = Signature [] [] [] Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
+  Signature cs is b th d s s1 t tim simp p `mappend` Signature cs' is' b' th' d' s' s1' t' tim' simp' p' =
     Signature (cs++cs') (is++is') (b++b')
+      (th `mplus` th')
       (d `mplus` d')
       (s `mplus` s')
       (s1 `mplus` s1')

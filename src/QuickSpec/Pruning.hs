@@ -45,12 +45,12 @@ askUniv = PrunerM (lift ask)
 liftPruner :: Pruner s => StateT s IO a -> PrunerM s a
 liftPruner m = PrunerM (lift (lift m))
 
-evalPruner :: Pruner s => Signature -> PrunerM s a -> IO a
-evalPruner sig m = liftM fst (runPruner sig m)
+evalPruner :: Pruner s => Signature -> s -> PrunerM s a -> IO a
+evalPruner sig theory m = liftM fst (runPruner sig theory m)
 
-runPruner :: Pruner s => Signature -> PrunerM s a -> IO (a, s)
-runPruner sig m =
-  runStateT (runReaderT (runRulesT (unPrunerM m')) (Set.toList (typeUniverse sig))) (emptyPruner sig)
+runPruner :: Pruner s => Signature -> s -> PrunerM s a -> IO (a, s)
+runPruner sig theory m =
+  runStateT (runReaderT (runRulesT (unPrunerM m')) (Set.toList (typeUniverse sig))) theory
   where
     m' = createRules >> mapM_ axiom (background sig) >> m
 

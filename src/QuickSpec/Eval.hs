@@ -33,7 +33,7 @@ import QuickSpec.Utils
 import Test.QuickCheck.Random
 import Data.Rewriting.Rule(Rule(Rule))
 
-type M = RulesT Event (StateT S (PrunerM Completion))
+type M = RulesT Event (StateT S (PrunerM PrunerType))
 
 data S = S {
   schemas       :: Schemas,
@@ -141,14 +141,18 @@ quickSpec sig0 = unbuffered $ do
     quickSpecLoop sig
     summarise
     props <- lift (gets (reverse . discovered))
+    theory <- lift (lift (liftPruner get))
     return sig {
       constants = [ c { conIsBackground = True } | c <- constants sig ],
-      background = background sig ++ map (fmap (mapTerm (\c -> c { conIsBackground = True }) id)) props }
+      background = background sig ++ map (fmap (mapTerm (\c -> c { conIsBackground = True }) id)) props,
+      theory = Just theory }
 
 runM :: Signature -> M a -> IO a
 runM sig m = do
   seeds <- fmap (take (maxTests_ sig)) (genSeeds 20)
-  evalPruner sig (evalStateT (runRulesT m) (initialState sig seeds))
+  evalPruner sig
+    (fromMaybe (emptyPruner sig) (theory sig))
+    (evalStateT (runRulesT m) (initialState sig seeds))
 
 quickSpecLoop :: Signature -> M ()
 quickSpecLoop sig = do
@@ -368,7 +372,7 @@ found :: Signature -> Prop -> M ()
 found sig prop0 = do
   let prop = regeneralise prop0
   props <- lift (gets discovered)
-  (_, props') <- liftIO $ runPruner sig $ mapM_ axiom (map (simplify_ sig) props)
+  (_, props') <- liftIO $ runPruner sig [] $ mapM_ axiom (map (simplify_ sig) props)
 
   res <- liftIO $ pruner (extraPruner_ sig) props' (toGoal (simplify_ sig prop))
   case res of
