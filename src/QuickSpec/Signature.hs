@@ -26,6 +26,7 @@ import QuickSpec.Type
 import System.Timeout
 import Test.QuickCheck hiding (subterms)
 import Data.Ord
+import Data.Rewriting.Substitution.Match
 
 newtype Instance = Instance (Value Instance1) deriving Show
 newtype Instance1 a = Instance1 (Value (Instance2 a))
@@ -256,17 +257,22 @@ typeUniverse :: Signature -> Set Type
 typeUniverse sig =
   Set.fromList $
     Var (TyVar 0):
-    [ oneTypeVar (typ t) | c <- constants sig, t <- subterms' (typ c) ]
+    [ oneTypeVar (typ t) | c <- constants sig, t <- types (typ c) ]
   where
-    subterms' (Fun Arrow [t, u]) = t:subterms' t ++ subterms' u
-    subterms' t@(Fun _ ts) = t:concatMap subterms' ts
-    subterms' t = [t]
+    types t = typeRes t:typeArgs t ++ concatMap types (typeArgs t)
 
-bigTypeUniverse :: Signature -> Set Type
-bigTypeUniverse sig =
-  Set.fromList $
-    Var (TyVar 0):
-    [ oneTypeVar (typ t) | c <- constants sig, t <- subterms (typ c) ]
+data TypeKind = Useless | Partial | Useful deriving Eq
+
+typeKind :: Signature -> Type -> TypeKind
+typeKind sig ty
+  | occurs ty = Useful
+  | any occurs (suffixes ty) = Partial
+  | otherwise = Useless
+  where
+    suffixes t@(Fun Arrow [_, u]) = t:suffixes u
+    suffixes t = [t]
+    occurs t = or [ isJust (match t u) | u <- Set.toList u ]
+    u = typeUniverse sig
 
 findInstanceOf :: forall f. Typeable f => Signature -> Type -> [Value f]
 findInstanceOf sig ty =

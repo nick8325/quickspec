@@ -43,8 +43,7 @@ data S = S {
   freshTestSet  :: TestSet TermFrom,
   proved        :: Set (PropOf PruningTerm),
   discovered    :: [Prop],
-  someTypes     :: Set Type,
-  allTypes      :: Set Type }
+  kind          :: Type -> TypeKind }
 
 data Event =
     Schema Origin (Poly Schema) (KindOf Schema)
@@ -95,8 +94,7 @@ initialState sig seeds =
       freshTestSet  = emptyTestSet (memo (makeTester specialise e seeds sig)),
       proved        = Set.empty,
       discovered    = background sig,
-      someTypes     = typeUniverse sig,
-      allTypes      = bigTypeUniverse sig }
+      kind          = memo (typeKind sig) }
   where
     e = memo (env sig)
 
@@ -249,15 +247,16 @@ createRules sig = do
 
   rule $ do
     ConsiderSchema o s <- event
-    allTypes  <- execute $ lift $ gets allTypes
-    someTypes <- execute $ lift $ gets someTypes
-    require (and [ oneTypeVar (typ t) `Set.member` allTypes | t <- subterms (unPoly s) ])
+    let ty = typ s
+    kind <- execute $ lift $ gets kind
+    require (kind ty /= Useless)
+    require (and [ kind ty == Useful | t <- properSubterms (unPoly s) ])
     execute $
-      {-case oneTypeVar (typ (unPoly s)) `Set.member` someTypes of
-        True ->-}
+      case kind ty of
+        Partial ->
+          generate (Schema o s Untestable)
+        Useful ->
           consider sig (Schema o s) (unPoly (oneTypeVar s))
-{-        False ->
-          generate (Schema s Untestable)-}
 
   rule $ do
     ConsiderTerm t@(From _ t') <- event
