@@ -319,16 +319,13 @@ consider sig makeEvent x = do
   res   <- lift (lift (rep t))
   terms <- lift (gets terms)
   case res of
-    Just u | u `Set.member` terms -> return ()
-    Nothing | t `Set.member` terms -> return ()
+    Just u | u `Set.member` terms || canonicalise u `Set.member` terms -> return ()
+    Nothing | t `Set.member` terms || canonicalise t `Set.member` terms -> return ()
     _ -> do
       case res of
         Nothing -> return ()
-        Just u -> do
-          let t' = toGoalTerm t
-          Just u' <- lift $ lift $ liftPruner (untypedRep [] t')
-          return ()
-          --liftIO $ prettyPrint (text "Avoided reduction" <+> pretty (Rule t u) <+> pretty (Rule t' u'))
+        Just u ->
+          liftIO $ prettyPrint (text "Avoided reduction" <+> pretty (Rule t u))
       ts <- getTestSet x
       res <-
         liftIO . testTimeout_ sig $
