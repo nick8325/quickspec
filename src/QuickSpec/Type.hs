@@ -13,7 +13,7 @@ module QuickSpec.Type(
   TypeView(..),
   Apply(..), apply, canApply,
   -- Polymorphic types.
-  Poly, poly, unPoly, polyTyp, polyPair, polyMgu,
+  Poly, poly, unPoly, polyTyp, polyMap, polyApply, polyPair, polyList, polyMgu,
   -- Dynamic values.
   Value, toValue, fromValue,
   Unwrapped(..), unwrap, Wrapper(..),
@@ -201,6 +201,12 @@ instance (Typed a, Typed b) => Typed (a, b) where
   otherTypesDL (x, y) = otherTypesDL x `mplus` otherTypesDL y
   typeSubst f (x, y) = (typeSubst f x, typeSubst f y)
 
+instance Typed a => Typed [a] where
+  typ [] = typeOf ()
+  typ (x:xs) = typ (x, xs)
+  otherTypesDL = msum . map otherTypesDL
+  typeSubst f xs = map (typeSubst f) xs
+
 -- Represents a forall-quantifier over all the type variables in a type.
 -- Wrapping a term in Poly normalises the type by alpha-renaming
 -- type variables canonically.
@@ -216,10 +222,20 @@ canonicaliseType = unTypeView . canonicalise . TypeView
 polyTyp :: Typed a => Poly a -> Poly Type
 polyTyp (Poly x) = Poly (typ x)
 
-polyPair :: (Typed a, Typed b) => Poly a -> Poly b -> Poly (a, b)
-polyPair (Poly x) (Poly y) = poly (x, y')
+polyMap :: (Typed a, Typed b) => (a -> b) -> Poly a -> Poly b
+polyMap f (Poly x) = poly (f x)
+
+polyApply :: (Typed a, Typed b, Typed c) => (a -> b -> c) -> Poly a -> Poly b -> Poly c
+polyApply f (Poly x) (Poly y) = poly (f x y')
   where
     y' = typeSubst (\(TyVar n) -> Var (TyVar (-n-1))) y
+
+polyPair :: (Typed a, Typed b) => Poly a -> Poly b -> Poly (a, b)
+polyPair = polyApply (,)
+
+polyList :: Typed a => [Poly a] -> Poly [a]
+polyList [] = poly []
+polyList (x:xs) = polyApply (:) x (polyList xs)
 
 polyMgu :: Poly Type -> Poly Type -> Maybe (Poly Type)
 polyMgu ty1 ty2 = do

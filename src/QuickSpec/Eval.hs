@@ -362,7 +362,8 @@ instance Considerable TermFrom where
     lift $ modify (\st -> st { termTestSet = Map.insert s ts (termTestSet st) })
 
 found :: Signature -> Prop -> M ()
-found sig prop = do
+found sig prop0 = do
+  let prop = regeneralise prop0
   props <- lift (gets discovered)
   (_, props') <- liftIO $ runPruner sig $ mapM_ axiom (map (simplify_ sig) props)
 

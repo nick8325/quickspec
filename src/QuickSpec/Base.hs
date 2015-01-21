@@ -6,7 +6,7 @@ module QuickSpec.Base(
   Tm, TmOf, SubstOf, CPOf, RuleOf,
   module Data.Rewriting.Term, foldTerm, mapTerm,
   module Data.Rewriting.Term.Ops,
-  module Data.Rewriting.Substitution, evalSubst, subst,
+  module Data.Rewriting.Substitution, evalSubst, subst, unifyMany,
   Symbolic(..), terms, varsDL, vars, funsDL, funs, symbolsDL, symbols,
   Numbered(..), canonicalise,
   module QuickSpec.Pretty,
@@ -46,6 +46,9 @@ evalSubst s = subst s . Var
 
 subst :: Ord v => Subst f v -> Tm f v -> Tm f v
 subst = T.apply
+
+unifyMany :: (Ord f, Ord v) => f -> [(Tm f v, Tm f v)] -> Maybe (Subst f v)
+unifyMany def ts = unify (Fun def (map fst ts)) (Fun def (map snd ts))
 
 instance (Eq f, Eq v, Eq v') => Eq (GSubst v f v') where
   x == y = T.toMap x == T.toMap y

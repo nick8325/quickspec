@@ -9,6 +9,8 @@ import QuickSpec.Base
 import QuickSpec.Term
 import QuickSpec.Type
 import QuickSpec.Utils
+import qualified Data.Map as Map
+import Data.Rewriting.Substitution.Type
 
 type Prop = PropOf Term
 data PropOf a =
@@ -77,7 +79,8 @@ instance Pretty a => Pretty (Literal a) where
 
 data Predicate = Predicate {
   predName :: String,
-  predType :: Type }
+  predType :: Type,
+  predGeneralType :: Poly Type }
   deriving (Eq, Ord, Show)
 
 instance Pretty Predicate where
@@ -85,7 +88,33 @@ instance Pretty Predicate where
 
 instance Typed Predicate where
   typ = predType
-  typeSubst sub (Predicate x ty) = Predicate x (typeSubst sub ty)
+  typeSubst sub (Predicate x ty pty) = Predicate x (typeSubst sub ty) pty
 
 boolType :: Type
 boolType = typeOf (undefined :: Bool)
+
+regeneralise :: Prop -> Prop
+regeneralise = restrict . unPoly . generalise . canonicalise
+  where
+    generalise (lhs :=>: rhs) =
+      polyApply (:=>:) (polyList (map genLit lhs)) (genLit rhs)
+    genLit (p :@: ts) =
+      polyApply (:@:) (genPred p) (polyList (map genTerm ts))
+    genLit (t :=: u) = polyApply (:=:) (genTerm t) (genTerm u)
+    genTerm (Fun f ts) = polyApply Fun (genCon f) (polyList (map genTerm ts))
+    genTerm (Var x) = polyMap Var (genVar x)
+
+    genPred p = poly (p { predType = unPoly (predGeneralType p) })
+    genCon  f = poly (f { conValue = unPoly (conGeneralValue f) })
+    genVar (Variable n _) = poly (Variable n (typeOf (undefined :: A)))
+
+    restrict prop = typeSubst f prop
+      where
+        f ty = Map.findWithDefault (Var ty) ty (toMap sub)
+        Just sub = unifyMany Arrow cs
+        cs = [(typ x, typ y) | x:xs <- vs, y <- xs] ++ concatMap litCs (lhs prop) ++ litCs (rhs prop)
+        vs = partitionBy varNumber (vars prop)
+    litCs (t :=: u) = [(typ t, typ u)] ++ termCs t ++ termCs u
+    litCs (p :@: ts) = [(typ p, arrowType (map typ ts) (typeOf True))] ++ concatMap termCs ts
+    termCs Var{} = []
+    termCs t@(Fun f ts) = [(typ f, arrowType (map typ ts) (typ t))] ++ concatMap termCs ts

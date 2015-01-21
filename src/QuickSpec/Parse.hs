@@ -60,7 +60,7 @@ instance (Typed v, Parse v) => Parse (Literal (TermOf v)) where
       predicate = do
         t@(Fun f ts) <- parse cs
         guard (typ t == typeOf (undefined :: Bool))
-        let p = Predicate (conName f) (typ f)
+        let p = Predicate (conName f) (typ f) (polyTyp (conGeneralValue f))
         return (p :@: ts)
 
 instance (Typed v, Parse v) => Parse (PropOf (TermOf v)) where
