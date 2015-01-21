@@ -18,32 +18,6 @@ import Data.Set(Set)
 import qualified Data.Rewriting.Substitution.Type as Subst
 import Data.List
 
-import QuickSpec.Pruning
-import Data.Rewriting.Rule(Rule(Rule))
-data F = F String | Ty deriving (Eq, Ord, Show)
-instance Pretty F where
-  pretty (F x) = text x
-  pretty Ty    = text "@"
-instance PrettyTerm F where termStyle _ = Infix 5
-instance Sized F where
-  funSize (F _) = 1
-  funSize Ty    = 0
-  funArity Ty = 1
-  funArity _ = 2
-t, u :: Tm F PruningVariable
---t = Fun (F "sx") []
---u = Fun Ty [t]
-t = Fun (F "+") [Var 0, Fun (F "+") [Var 1, Var 2]]
-u = Fun (F "+") [Var 1, Fun (F "+") [Var 0, Var 2]]
-{-(t, u) = (f (Var 0) (Var 1), f (Var 1) (Var 0))
-  where
-    f x y = Fun (F "*") [x, Fun (F "+") [y, Fun (F "+") [y, y]]]-}
-r1 = Constrained (toContext (Less u t)) (Rule t u)
-r2 = Constrained (toContext (Less t u)) (Rule u t)
-form :: Formula F PruningVariable
-form = Less (Var 0) (Fun (F "*") [Var 1, Var 2]) &&& Less (Var 0) (Var 1)
-r = Constrained (toContext form) (Fun Ty [Var 0, Var 1, Var 2])
-
 -- Constrained things.
 data Constrained a =
   Constrained {
