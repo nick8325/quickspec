@@ -303,7 +303,12 @@ createRules sig = do
     execute $
       found sig prop
 
-  -- rule $ event >>= execute . liftIO . prettyPrint
+  let printing _ = False
+
+  rule $ do
+    x <- event
+    require (printing x)
+    execute $ liftIO $ prettyPrint x
 
 considerRenamings :: Schema -> Schema -> M ()
 considerRenamings s s' = do
