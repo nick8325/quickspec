@@ -13,26 +13,24 @@ import System.Random
 import Test.QuickCheck
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Random
+import Control.Monad
 
 defaultTypes :: Typed a => Type -> a -> a
 defaultTypes ty = typeSubst (const ty)
 
 makeTester :: (a -> Term) -> (Type -> Value Gen) -> [(QCGen, Int)] -> Signature -> Type -> Maybe (Value (TypedTestSet a))
 makeTester toTerm env tests sig ty = do
-  let obsTests = [(fst (split g), n) | (g, n) <- tests]
-      varTests = [(snd (split g), n) | (g, n) <- tests]
   i <- listToMaybe (findInstanceOf sig (defaultTypes (defaultTo_ sig) ty))
   case unwrap (i :: Value Observe1) of
     Observe1 obs `In` w ->
       case unwrap obs of
-        Observe Dict eval `In` w' -> do
-          let eval' (g, n) x = unGen (eval x) g n
+        Observe Dict eval `In` w' ->
           return . wrap w' $
-            emptyTypedTestSet (Just . zipWith eval' obsTests . reunwrap w . makeTests (env . defaultTypes (defaultTo_ sig)) varTests . defaultTypes (defaultTo_ sig) . toTerm)
+            emptyTypedTestSet (tester (defaultTypes (defaultTo_ sig) . toTerm) env tests (reunwrap w >=> eval))
 
-makeTests :: (Type -> Value Gen) -> [(QCGen, Int)] -> Term -> Value []
-makeTests env tests t =
-  mapValue f (evaluateTerm env t)
+tester :: Ord b => (a -> Term) -> (Type -> Value Gen) -> [(QCGen, Int)] -> (Value Gen -> Gen b) -> a -> Maybe [b]
+tester toTerm env tests eval t =
+  Just . f $ eval (evaluateTerm env (toTerm t))
   where
     f :: Gen a -> [a]
     f x = map (uncurry (unGen x)) tests
