@@ -77,3 +77,7 @@ statistics (TestCase rs) = (sum (map fst ss), sum [ m + n | (m, n) <- ss ])
 numTests :: TestSet t -> Int
 numTests =
   sum . map (ofValue (snd . statistics . testResults)) . Map.elems . testSet
+
+numTerms :: TestSet t -> Int
+numTerms =
+  sum . map (ofValue (fst . statistics . testResults)) . Map.elems . testSet
