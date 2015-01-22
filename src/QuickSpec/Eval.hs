@@ -170,17 +170,22 @@ exploreSize sig n = do
 summarise :: M ()
 summarise = do
   es <- getEvents
+  sts <- lift $ gets schemaTestSet
+  tts <- lift $ gets termTestSet
   let numEvents = length es
       numSchemas  = length [ () | Schema{} <- es ]
       numTerms    = length [ () | Term{}   <- es ]
       numCreation = length [ () | ConsiderSchema{} <- es ] + length [ () | ConsiderTerm{} <- es ]
       numMisc = numEvents - numSchemas - numTerms - numCreation
+      schemaTests = numTests sts
+      termTests = sum (map numTests (Map.elems tts))
   h <- numHooks
   liftIO $ putStrLn (show numEvents ++ " events created in total (" ++
                      show numSchemas ++ " schemas, " ++
                      show numTerms ++ " terms, " ++
                      show numCreation ++ " creation, " ++
                      show numMisc ++ " miscellaneous).")
+  liftIO $ putStrLn (show schemaTests ++ " schema test cases, " ++ show termTests ++ " term test cases.")
   liftIO $ putStrLn (show h ++ " hooks installed.\n")
   s <- lift (lift (liftPruner get))
   liftIO (putStr (pruningReport s))

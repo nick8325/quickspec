@@ -67,3 +67,13 @@ insert1 x ts =
         Just res' ->
           let k' r = k (TestCase (Map.insert t r res)) in
           aux k' x ts res'
+
+statistics :: TestResults t a -> (Int, Int)
+statistics (Singleton _) = (1, 0)
+statistics (TestCase rs) = (sum (map fst ss), sum [ m + n | (m, n) <- ss ])
+  where
+    ss = map statistics (Map.elems rs)
+
+numTests :: TestSet t -> Int
+numTests =
+  sum . map (ofValue (snd . statistics . testResults)) . Map.elems . testSet
