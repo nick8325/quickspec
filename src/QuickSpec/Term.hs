@@ -105,7 +105,7 @@ data Constant =
   deriving Show
 instance Eq Constant where x == y = x `compare` y == EQ
 instance Ord Constant where
-  compare = comparing (\c -> (twiddle (conArity c), conIndex c))
+  compare = comparing (\c -> (twiddle (conArity c), conIndex c, typ (conValue c)))
     where
       -- This tweak is taken from Prover9
       twiddle 2 = 1
