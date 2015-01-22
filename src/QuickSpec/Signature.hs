@@ -99,7 +99,7 @@ maxTermSize_ = fromMaybe 9 . maxTermSize
 maxCommutativeSize_ = fromMaybe 5 . maxCommutativeSize
 
 maxTests_ :: Signature -> Int
-maxTests_ = fromMaybe 100 . maxTests
+maxTests_ = fromMaybe 500 . maxTests
 
 testTimeout_ :: Signature -> IO a -> IO (Maybe a)
 testTimeout_ sig =
