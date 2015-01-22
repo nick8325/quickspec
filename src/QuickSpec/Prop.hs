@@ -69,6 +69,9 @@ instance (Symbolic a, Typed a) => Typed (Literal a) where
   typeSubst sub (x :=: y) = typeSubst sub x :=: typeSubst sub y
   typeSubst sub (p :@: ts) = typeSubst sub p :@: map (typeSubst sub) ts
 
+propTerms :: PropOf a -> [a]
+propTerms p = literals p >>= DList.toList . literalTermsDL
+
 literalTermsDL :: Literal a -> DList.DList a
 literalTermsDL (t :=: u) = return t `mplus` return u
 literalTermsDL (p :@: ts) = DList.fromList ts
