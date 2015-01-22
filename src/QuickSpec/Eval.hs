@@ -278,7 +278,7 @@ createRules sig = do
     Type ty2 <- event
     require (ty1 < ty2)
     Just mgu <- return (polyMgu ty1 ty2)
-    let tys = [ty1, ty2] \\ [mgu]
+    let tys = [ty | ty <- [ty1, ty2], oneTypeVar ty /= oneTypeVar mgu]
 
     Schema Original s Representative <- event
     require (polyTyp s `elem` tys)
