@@ -201,15 +201,13 @@ signature = mempty
 renumber :: Signature -> Signature
 -- TODO get rid of this, use old-style API ("single constant" signature+monoid) instead
 renumber sig =
-  sig {
-    constants = cs,
-    background = map (fmap (mapTerm g id)) (background sig) }
+  sig { constants = cs }
   where
-    cs = zipWith f (sortBy (comparing conName) (constants sig)) [0..]
+    cs =
+      [ c | c <- constants sig, conIndex c > 0 ] ++
+      zipWith f (sortBy (comparing conName) [ c | c <- constants sig, conIndex c == 0 ])
+                [succ (maximum (0:map conIndex (constants sig)))..]
     f c n = c { conIndex = n }
-    g c =
-      case [ c' | c' <- cs, conName c == conName c' ] of
-        (c':_) -> c { conIndex = conIndex c' }
 
 constant :: Typeable a => String -> a -> Constant
 constant name x = Constant 0 name value (poly value) 0 style 1 False
