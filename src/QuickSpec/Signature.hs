@@ -129,6 +129,7 @@ defaultInstances = [
   inst (Sub Dict :: Arbitrary A :- Arbitrary (Maybe A)),
   inst (Sub Dict :: Ord A :- Ord (Maybe A)),
   inst (Sub Dict :: CoArbitrary A :- CoArbitrary (Maybe A)),
+  baseType (undefined :: ()),
   baseType (undefined :: Int),
   baseType (undefined :: Integer),
   baseType (undefined :: Bool),
