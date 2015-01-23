@@ -63,6 +63,7 @@ prop_assoc c m1 m2 m3 = perform c ((m1 :+: m2) :+: m3) === perform c (m1 :+: (m2
 bg =
   signature {
     maxTermSize = Just 7,
+    maxTests = Just 2000,
     instances = [
       makeInstance (\() -> observe obsMusic),
       inst (Sub Dict :: () :- Arbitrary Music),
@@ -75,11 +76,12 @@ bg =
     constants = [
       constant "+" (\(Positive x) (Positive y) -> Positive (x+y) :: Positive Rational),
       constant "+'" ((+) :: Int -> Int -> Int),
-      -- constant "max" (\(Positive x) (Positive y) -> Positive (max x y) :: Positive Rational),
+      constant "max" (\(Positive x) (Positive y) -> Positive (max x y) :: Positive Rational),
       constant "*" (\(Positive x) (Positive y) -> Positive (x*y) :: Positive Rational),
       constant "1" (Positive 1 :: Positive Rational),
       constant "recip" (\(Positive x) -> Positive (1/x) :: Positive Rational) ],
-    extraPruner = Just (QuickSpec.E 1) }
+    extraPruner = Just (QuickSpec.E 1)
+    }
 
 sig1 =
   signature {

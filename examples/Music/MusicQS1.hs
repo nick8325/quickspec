@@ -37,7 +37,7 @@ instance Arbitrary Music where
 
 instance Arbitrary Context where
          shrink = genericShrink
-         arbitrary = liftM4 Context arbitrary arbitrary arbitrary arbitrary
+         arbitrary = liftM4 Context arbitrary arbitrary (arbitrary `suchThat` (> 0)) arbitrary
 
 
 note :: (PitchClass, Int) -> Positive Rational -> Music
@@ -67,6 +67,7 @@ sig =
     vars ["x", "y", "z"] (undefined :: Positive Rational),
     vars ["x", "y", "z"] (undefined :: Int),
     fun2 "+" (\(Positive x) (Positive y) -> Positive (x+y) :: Positive Rational),
+    fun2 "max" (\(Positive x) (Positive y) -> Positive (max x y) :: Positive Rational),
     fun2 "+'" ((+) :: Int -> Int -> Int),
     fun2 "*" (\(Positive x) (Positive y) -> Positive (x*y) :: Positive Rational),
     fun0 "1" (Positive 1 :: Positive Rational),
