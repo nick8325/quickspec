@@ -74,14 +74,20 @@ instance Pretty Origin where
   pretty Original = text "original"
   pretty PolyInstance = text "instance"
 
-data KindOf a = Untestable | TimedOut | Representative | EqualTo a
+data KindOf a = Untestable | TimedOut | Representative | EqualTo a EqualReason
   deriving (Eq, Ord)
+
+data EqualReason = Testing | Pruning deriving (Eq, Ord)
 
 instance Pretty a => Pretty (KindOf a) where
   pretty Untestable = text "untestable"
   pretty TimedOut = text "timed out"
   pretty Representative = text "representative"
-  pretty (EqualTo x) = text "equal to" <+> pretty x
+  pretty (EqualTo x r) = text "equal to" <+> pretty x <+> text "by" <+> pretty r
+
+instance Pretty EqualReason where
+  pretty Testing = text "testing"
+  pretty Pruning = text "pruning"
 
 type Schemas = Map Int (Map (Poly Type) [Poly Schema])
 
@@ -173,14 +179,19 @@ summarise = do
   sts <- lift $ gets schemaTestSet
   tts <- lift $ gets termTestSet
   let numEvents = length es
-      numSchemas  = length [ () | Schema _ _ k <- es, k /= Untestable ]
-      numTerms    = length [ () | Term{}   <- es ]
+      numSchemas  = length [ () | Schema _ _ k <- es, tested k ]
+      tested Untestable = False
+      tested (EqualTo _ Pruning) = False
+      tested _ = True
+      numTerms    = length [ () | Term _ k <- es ]
       numCreation = length [ () | ConsiderSchema{} <- es ] + length [ () | ConsiderTerm{} <- es ]
       numMisc = numEvents - numSchemas - numTerms - numCreation
       schemaTests = numTests sts
       schemaReps = QuickSpec.TestSet.numTerms sts
       termTests = sum (map numTests (Map.elems tts))
       termReps = sum (map QuickSpec.TestSet.numTerms (Map.elems tts))
+      equalSchemas = length [ () | Schema _ _ (EqualTo _ Testing) <- es ]
+      equalTerms = length [ () | Term _ (EqualTo _ Testing) <- es ]
   h <- numHooks
   liftIO $ putStrLn (show numEvents ++ " events created in total (" ++
                      show numSchemas ++ " schemas, " ++
@@ -189,6 +200,7 @@ summarise = do
                      show numMisc ++ " miscellaneous).")
   liftIO $ putStrLn (show schemaTests ++ " schema test cases, " ++ show termTests ++ " term test cases.")
   liftIO $ putStrLn (show schemaReps ++ " representative schemas, " ++ show termReps ++ " representative terms.")
+  liftIO $ putStrLn (show equalSchemas ++ " equal schemas and " ++ show equalTerms ++ " equal terms generated.")
   liftIO $ putStrLn (show h ++ " hooks installed.\n")
   s <- lift (lift (liftPruner get))
   liftIO (putStr (pruningReport s))
@@ -212,7 +224,7 @@ createRules sig = do
         TimedOut ->
           liftIO $ print (text "Schema" <+> pretty s <+> text "timed out")
         Untestable -> return ()
-        EqualTo t -> do
+        EqualTo t _ -> do
           generate (InstantiateSchema t t)
           generate (InstantiateSchema t ms)
         Representative -> do
@@ -237,7 +249,7 @@ createRules sig = do
           add
         Untestable ->
           ERROR ("Untestable instance " ++ prettyShow t ++ " of testable schema " ++ prettyShow s)
-        EqualTo (From _ u) -> do
+        EqualTo (From _ u) _ -> do
           --t' <- fmap (fromMaybe t) (lift (lift (rep t)))
           let t' = t
           u' <- fmap (fromMaybe u) (lift (lift (rep u)))
@@ -325,10 +337,11 @@ considerRenamings s s' = do
     ts = sortBy (comparing measure) (allUnifications (instantiate s'))
 
 class (Eq a, Typed a) => Considerable a where
-  generalise :: a -> Term
-  specialise :: a -> Term
-  getTestSet :: a -> M (TestSet a)
-  putTestSet :: a -> TestSet a -> M ()
+  generalise   :: a -> Term
+  specialise   :: a -> Term
+  unspecialise :: a -> Term -> a
+  getTestSet   :: a -> M (TestSet a)
+  putTestSet   :: a -> TestSet a -> M ()
 
 consider :: Considerable a => Signature -> (KindOf a -> Event) -> a -> M ()
 consider sig makeEvent x = do
@@ -339,27 +352,32 @@ consider sig makeEvent x = do
     Just u | u `Set.member` terms -> return ()
     Nothing | t `Set.member` terms -> return ()
     _ -> do
-      {-case res of
-        Nothing -> return ()
-        Just u -> do
-          liftIO $ prettyPrint (text "Avoided reduction" <+> pretty (Rule t u))-}
-      ts <- getTestSet x
-      res <-
-        liftIO . testTimeout_ sig $
-        case insert x ts of
-          Nothing -> return $ do
-            generate (makeEvent Untestable)
-          Just (Old y) -> return $ do
-            generate (makeEvent (EqualTo y))
-          Just (New ts) -> return $ do
-            putTestSet x ts
-            generate (makeEvent Representative)
-      fromMaybe (generate (makeEvent TimedOut)) res
+      let t' = specialise x
+      res' <- lift (lift (rep t'))
+      case res' of
+        Just u' | u' `Set.member` terms ->
+          generate (makeEvent (EqualTo (unspecialise x u') Pruning))
+        Nothing | t' `Set.member` terms ->
+          generate (makeEvent (EqualTo (unspecialise x t') Pruning))
+        _ -> do
+          ts <- getTestSet x
+          res <-
+            liftIO . testTimeout_ sig $
+            case insert x ts of
+              Nothing -> return $ do
+                generate (makeEvent Untestable)
+              Just (Old y) -> return $ do
+                generate (makeEvent (EqualTo y Testing))
+              Just (New ts) -> return $ do
+                putTestSet x ts
+                generate (makeEvent Representative)
+          fromMaybe (generate (makeEvent TimedOut)) res
 
 instance Considerable Schema where
-  generalise = instantiate . oneTypeVar
-  specialise = skeleton . generalise
-  getTestSet _ = lift $ gets schemaTestSet
+  generalise      = instantiate . oneTypeVar
+  specialise      = skeleton . generalise
+  unspecialise _  = rename (Hole . typ)
+  getTestSet _    = lift $ gets schemaTestSet
   putTestSet _ ts = lift $ modify (\s -> s { schemaTestSet = ts })
 
 data TermFrom = From Schema Term deriving (Eq, Ord, Show)
@@ -373,8 +391,9 @@ instance Typed TermFrom where
   typeSubst sub (From s t) = From s (typeSubst sub t)
 
 instance Considerable TermFrom where
-  generalise (From _ t) = t
-  specialise (From _ t) = t
+  generalise   (From _ t) = t
+  specialise   (From _ t) = t
+  unspecialise (From s _) t = From s t
   getTestSet (From s _) = lift $ do
     ts <- gets freshTestSet
     gets (Map.findWithDefault ts s . termTestSet)
