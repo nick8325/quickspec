@@ -60,15 +60,15 @@ data Event =
 data Origin = Original | PolyInstance deriving (Eq, Ord)
 
 instance Pretty Event where
-  pretty (Schema o s k) = text "schema" <+> pretty s <> text "," <+> pretty o <> text ":" <+> pretty k
-  pretty (Term t k) = text "term" <+> pretty t <> text ":" <+> pretty k
+  pretty (Schema o s k) = hang (text "schema" <+> pretty s <> text "," <+> pretty o <> text ":") 2 (pretty k)
+  pretty (Term t k) = hang (text "term" <+> pretty t <> text ":") 2 (pretty k)
   pretty (ConsiderSchema o s) = text "consider schema" <+> pretty s <+> text "::" <+> pretty (typ s) <> text "," <+> pretty o
   pretty (ConsiderTerm t) = text "consider term" <+> pretty t <+> text "::" <+> pretty (typ t)
   pretty (Type ty) = text "type" <+> pretty ty
   pretty (UntestableType ty) = text "untestable type" <+> pretty ty
   pretty (Found prop) = text "found" <+> pretty prop
   pretty (FinishedSize n) = text "finished size" <+> pretty n
-  pretty (InstantiateSchema s s') = text "instantiate schema" <+> pretty s' <+> text "from" <+> pretty s
+  pretty (InstantiateSchema s s') = sep [text "instantiate schema", nest 2 (pretty s'), text "from", nest 2 (pretty s)]
 
 instance Pretty Origin where
   pretty Original = text "original"
@@ -83,7 +83,7 @@ instance Pretty a => Pretty (KindOf a) where
   pretty Untestable = text "untestable"
   pretty TimedOut = text "timed out"
   pretty Representative = text "representative"
-  pretty (EqualTo x r) = text "equal to" <+> pretty x <+> text "by" <+> pretty r
+  pretty (EqualTo x r) = sep [text "equal to", nest 2 (pretty x), text "by", nest 2 (pretty r)]
 
 instance Pretty EqualReason where
   pretty Testing = text "testing"
