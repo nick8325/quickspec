@@ -216,6 +216,7 @@ constant name x = Constant 0 name value (poly value) 0 style 1 False
     value = toValue (Identity x)
     ar = arity (typeOf x)
     style
+      | name == "()" = Tuple 0
       | head name == ',' = Tuple ar
       | isOp name && ar >= 2 = Infix 5
       | isOp name = Prefix
