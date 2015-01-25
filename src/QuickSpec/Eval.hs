@@ -43,6 +43,7 @@ data S = S {
   freshTestSet  :: TestSet TermFrom,
   proved        :: Set (PropOf PruningTerm),
   discovered    :: [Prop],
+  delayed       :: [(Term, Term)],
   kind          :: Type -> TypeKind }
 
 data Event =
@@ -100,6 +101,7 @@ initialState sig seeds =
       freshTestSet  = emptyTestSet (memo (makeTester specialise e seeds sig)),
       proved        = Set.empty,
       discovered    = background sig,
+      delayed       = [],
       kind          = memo (typeKind sig) }
   where
     e = memo (env sig)
@@ -166,11 +168,21 @@ quickSpecLoop sig = do
   mapM_ (exploreSize sig) [1..maxTermSize_ sig]
 
 exploreSize sig n = do
-  lift $ modify (\s -> s { schemas = Map.insert n Map.empty (schemas s) })
+  lift $ modify (\s -> s { schemas = Map.insert n Map.empty (schemas s), delayed = [] })
   ss <- fmap (sortBy (comparing measure)) (schemasOfSize n sig)
   liftIO $ putStrLn ("Size " ++ show n ++ ", " ++ show (length ss) ++ " schemas to consider:")
   mapM_ (generate . ConsiderSchema Original . poly) ss
-  generate (FinishedSize n)
+
+  let measureEquation (t, u) = (measure t, measure u)
+  del <- lift $ gets delayed
+  lift $ modify (\s -> s { delayed = [] })
+  forM_ (sortBy (comparing measureEquation) del) $ \(t, u) -> do
+    t' <- fmap (fromMaybe t) (lift (lift (rep t)))
+    u' <- fmap (fromMaybe u) (lift (lift (rep u)))
+    unless (t' == u') $ do
+      generate (Found ([] :=>: t' :=: u'))
+    newTerm u'
+
   liftIO $ putStrLn ""
 
 summarise :: M ()
@@ -253,20 +265,16 @@ createRules sig = do
           --t' <- fmap (fromMaybe t) (lift (lift (rep t)))
           let t' = t
           u' <- fmap (fromMaybe u) (lift (lift (rep u)))
-          case orientTerms t' u' of
-            Just _ -> do
+          del <- lift $ gets delayed
+          let wait = or [ isJust (match2 (x, y) (t, u)) | (x, y) <- del ]
+              match2 (x, y) (t, u) = match (Fun f [x, y]) (Fun f [t, u])
+              f = head (funs t ++ funs u)
+          case orientTerms t' u'  of
+            Just _ | not wait -> do
               generate (Found ([] :=>: t' :=: u'))
               add
-            Nothing -> do
-              rule $ do
-                FinishedSize n <- event
-                require (n == size t)
-                execute $ do
-                  t' <- fmap (fromMaybe t) (lift (lift (rep t)))
-                  u' <- fmap (fromMaybe u) (lift (lift (rep u)))
-                  unless (t' == u') $ do
-                    generate (Found ([] :=>: t' :=: u'))
-                    add
+            _ -> do
+              lift $ modify (\s -> s { delayed = (t, u):delayed s })
         Representative -> add
 
   rule $ do
