@@ -37,6 +37,7 @@ type M = RulesT Event (StateT S (PrunerM PrunerType))
 
 data S = S {
   schemas       :: Schemas,
+  allSchemas    :: Set Term,
   terms         :: Set Term,
   schemaTestSet :: TestSet Schema,
   termTestSet   :: Map Schema (TestSet TermFrom),
@@ -96,6 +97,7 @@ initialState :: Signature -> [(QCGen, Int)] -> S
 initialState sig seeds =
   S { schemas       = Map.empty,
       terms         = Set.empty,
+      allSchemas    = Set.empty,
       schemaTestSet = emptyTestSet (memo (makeTester specialise e seeds sig)),
       termTestSet   = Map.empty,
       freshTestSet  = emptyTestSet (memo (makeTester specialise e seeds sig)),
@@ -350,12 +352,14 @@ class (Eq a, Typed a) => Considerable a where
   unspecialise :: a -> Term -> a
   getTestSet   :: a -> M (TestSet a)
   putTestSet   :: a -> TestSet a -> M ()
+  findAll      :: a -> M (Set Term)
 
 consider :: Considerable a => Signature -> (KindOf a -> Event) -> a -> M ()
 consider sig makeEvent x = do
   let t = generalise x
   res   <- lift (lift (rep t))
   terms <- lift (gets terms)
+  allSchemas <- findAll x
   case res of
     Just u | u `Set.member` terms -> return ()
     Nothing | t `Set.member` terms -> return ()
@@ -363,9 +367,9 @@ consider sig makeEvent x = do
       let t' = specialise x
       res' <- lift (lift (rep t'))
       case res' of
-        Just u' | u' `Set.member` terms ->
+        Just u' | u' `Set.member` allSchemas ->
           generate (makeEvent (EqualTo (unspecialise x u') Pruning))
-        Nothing | t' `Set.member` terms ->
+        Nothing | t' `Set.member` allSchemas ->
           generate (makeEvent (EqualTo (unspecialise x t') Pruning))
         _ -> do
           ts <- getTestSet x
@@ -387,6 +391,7 @@ instance Considerable Schema where
   unspecialise _  = rename (Hole . typ)
   getTestSet _    = lift $ gets schemaTestSet
   putTestSet _ ts = lift $ modify (\s -> s { schemaTestSet = ts })
+  findAll _       = lift (gets allSchemas)
 
 data TermFrom = From Schema Term deriving (Eq, Ord, Show)
 
@@ -407,6 +412,7 @@ instance Considerable TermFrom where
     gets (Map.findWithDefault ts s . termTestSet)
   putTestSet (From s _) ts =
     lift $ modify (\st -> st { termTestSet = Map.insert s ts (termTestSet st) })
+  findAll _ = return Set.empty
 
 found :: Signature -> Prop -> M ()
 found sig prop0 = do
@@ -425,11 +431,13 @@ found sig prop0 = do
 
   lift (lift (axiom prop))
   terms <- fmap Set.toList (lift (gets terms))
+  allSchemas <- fmap Set.toList (lift (gets allSchemas))
   let rep' t = do
         u <- rep t
         return (fromMaybe t u)
   terms' <- mapM (lift . lift . rep') terms
-  lift $ modify (\s -> s { terms = Set.fromList terms' })
+  allSchemas' <- mapM( lift . lift . rep') allSchemas
+  lift $ modify (\s -> s { terms = Set.fromList terms', allSchemas = Set.fromList allSchemas' })
 
 pruner :: ExtraPruner -> [PropOf PruningTerm] -> PropOf PruningTerm -> IO Bool
 pruner (SPASS timeout) = E.spassUnify timeout
@@ -439,6 +447,9 @@ pruner None = \_ _ -> return False
 
 accept :: Poly Schema -> M ()
 accept s = do
-  lift $ modify (\st -> st { schemas = Map.adjust f (size (unPoly s)) (schemas st) })
+  let t = skeleton (instantiate (unPoly s))
+  u <- fmap (fromMaybe t) (lift . lift . rep $ t)
+  lift $ modify (\st -> st { schemas = Map.adjust f (size (unPoly s)) (schemas st),
+                             allSchemas = Set.insert u (allSchemas st) })
   where
     f m = Map.insertWith (++) (polyTyp s) [s] m
