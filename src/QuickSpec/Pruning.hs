@@ -82,6 +82,8 @@ createRules = PrunerM $ do
 axiom :: Pruner s => Prop -> PrunerM s ()
 axiom p = do
   univ <- askUniv
+  when (null (instances univ p)) $
+    ERROR (show (sep [text "No instances in", nest 2 (pretty univ), text "for", nest 2 (pretty p)]))
   sequence_
     [ do sequence_ [ PrunerM (generate fun) | fun <- usort (funs p') ]
          liftPruner (untypedAxiom p')
