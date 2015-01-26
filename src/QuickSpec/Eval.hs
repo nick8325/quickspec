@@ -57,6 +57,7 @@ data Event =
   | Found          Prop
   | InstantiateSchema Schema Schema
   | FinishedSize   Int
+  | Ignoring (RuleOf Term)
   deriving (Eq, Ord)
 
 data Origin = Original | PolyInstance deriving (Eq, Ord)
@@ -71,6 +72,7 @@ instance Pretty Event where
   pretty (Found prop) = text "found" <+> pretty prop
   pretty (FinishedSize n) = text "finished size" <+> pretty n
   pretty (InstantiateSchema s s') = sep [text "instantiate schema", nest 2 (pretty s'), text "from", nest 2 (pretty s)]
+  pretty (Ignoring rule) = hang (text "ignoring") 2 (pretty rule)
 
 instance Pretty Origin where
   pretty Original = text "original"
@@ -364,6 +366,9 @@ consider sig makeEvent x = do
     Just u | u `Set.member` terms -> return ()
     Nothing | t `Set.member` terms -> return ()
     _ -> do
+      case res of
+        Just u -> generate (Ignoring (Rule t u))
+        _ -> return ()
       let t' = specialise x
       res' <- lift (lift (rep t'))
       case res' of
