@@ -144,6 +144,9 @@ defaultInstances = [
   inst2 (Sub Dict :: (Ord A, Ord B) :- Ord (A, B)),
   inst2 (Sub Dict :: (Arbitrary A, Arbitrary B) :- Arbitrary (A, B)),
   inst2 (Sub Dict :: (CoArbitrary A, CoArbitrary B) :- CoArbitrary (A, B)),
+  makeInstance (\(x :: A, (y :: B, z :: C)) -> (x, y, z)),
+  makeInstance (\(x :: A, (y :: B, (z :: C, w :: D))) -> (x, y, z, w)),
+  makeInstance (\(x :: A, (y :: B, (z :: C, (w :: D, v :: E)))) -> (x, y, z, w, v)),
   makeInstance (\() -> Dict :: Dict ()),
   makeInstance (\(dict :: Dict (Arbitrary A)) -> DictOf dict),
   names1 (\(NamesFor names :: NamesFor A) ->
@@ -254,6 +257,24 @@ inst2 ins = makeInstance f
   where
     f :: (Dict c1, Dict c2) -> Dict c3
     f (Dict, Dict) = case ins of Sub dict -> dict
+
+inst3 :: forall c1 c2 c3 c4. (Typeable c1, Typeable c2, Typeable c3, Typeable c4) => (c1, c2, c3) :- c4 -> [Instance]
+inst3 ins = makeInstance f
+  where
+    f :: (Dict c1, Dict c2, Dict c3) -> Dict c4
+    f (Dict, Dict, Dict) = case ins of Sub dict -> dict
+
+inst4 :: forall c1 c2 c3 c4 c5. (Typeable c1, Typeable c2, Typeable c3, Typeable c4, Typeable c5) => (c1, c2, c3, c4) :- c5 -> [Instance]
+inst4 ins = makeInstance f
+  where
+    f :: (Dict c1, Dict c2, Dict c3, Dict c4) -> Dict c5
+    f (Dict, Dict, Dict, Dict) = case ins of Sub dict -> dict
+
+inst5 :: forall c1 c2 c3 c4 c5 c6. (Typeable c1, Typeable c2, Typeable c3, Typeable c4, Typeable c5, Typeable c6) => (c1, c2, c3, c4, c5) :- c6 -> [Instance]
+inst5 ins = makeInstance f
+  where
+    f :: (Dict c1, Dict c2, Dict c3, Dict c4, Dict c5) -> Dict c6
+    f (Dict, Dict, Dict, Dict, Dict) = case ins of Sub dict -> dict
 
 names  :: Typeable a => NamesFor a -> [Instance]
 names x = makeInstance (\() -> x)

@@ -5,7 +5,7 @@
 module QuickSpec.Type(
   -- Types.
   Typeable,
-  Type, TyCon(..), tyCon, toTyCon, fromTyCon, TyVar(..), A, B, C, D,
+  Type, TyCon(..), tyCon, toTyCon, fromTyCon, TyVar(..), A, B, C, D, E,
   typeOf, typeRep, applyType, toTypeRep, fromTypeRep,
   arrowType, typeArgs, typeRes, arity, oneTypeVar, skolemiseTypeVars,
   -- Things that have types.
@@ -55,6 +55,7 @@ type A = TyVarNumber Zero
 type B = TyVarNumber (Succ Zero)
 type C = TyVarNumber (Succ (Succ Zero))
 type D = TyVarNumber (Succ (Succ (Succ Zero)))
+type E = TyVarNumber (Succ (Succ (Succ (Succ Zero))))
 newtype TyVarNumber a = TyVarNumber Any deriving Typeable
 data Zero deriving Typeable
 data Succ a deriving Typeable
