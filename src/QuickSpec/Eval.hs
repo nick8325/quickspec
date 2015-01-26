@@ -425,7 +425,10 @@ instance Considerable TermFrom where
 
 found :: Signature -> Prop -> M ()
 found sig prop0 = do
-  let prop = regeneralise prop0
+  let reorder (lhs :=>: t :=: u)
+        | measure t >= measure u = lhs :=>: t :=: u
+        | otherwise = lhs :=>: u :=: t
+      prop = regeneralise (reorder prop0)
   props <- lift (gets discovered)
   (_, props') <- liftIO $ runPruner sig [] $ mapM_ axiom (map (simplify_ sig) props)
 
