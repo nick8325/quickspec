@@ -42,8 +42,7 @@ env sig ty =
       fromMaybe __ $
       cast ty $
       toValue (ERROR $ "missing arbitrary instance for " ++ prettyShow ty :: Gen A)
-    (i:_) ->
-      forValue (i :: Value (DictOf Arbitrary)) $ \(DictOf Dict) -> arbitrary
+    (i:_) -> i
 
 genSeeds :: Int -> IO [(QCGen, Int)]
 genSeeds maxSize = do

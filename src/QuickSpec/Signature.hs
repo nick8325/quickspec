@@ -57,6 +57,7 @@ deriving instance Typeable Ord
 deriving instance Typeable Arbitrary
 deriving instance Typeable CoArbitrary
 deriving instance Typeable (() :: Constraint)
+deriving instance Typeable Gen
 
 type PrunerType = Completion
 
@@ -152,6 +153,7 @@ defaultInstances = [
   names (NamesFor ["p", "q", "r"] :: NamesFor (A -> Bool)),
   names (NamesFor ["f", "g", "h"] :: NamesFor (A -> B)),
   names (NamesFor ["x", "y", "z"] :: NamesFor A),
+  makeInstance (\(Dict :: Dict (Arbitrary A)) -> arbitrary :: Gen A),
   makeInstance (\(dict :: Dict (Ord A)) -> Observe dict return),
   makeInstance (\(obs :: Observe A B) -> observeTraversable ins obs :: Observe [A] [B]),
   makeInstance (\(Dict :: Dict (Arbitrary A),
