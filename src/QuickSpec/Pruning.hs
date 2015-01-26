@@ -83,7 +83,13 @@ axiom :: Pruner s => Prop -> PrunerM s ()
 axiom p = do
   univ <- askUniv
   when (null (instances univ p)) $
-    ERROR (show (sep [text "No instances in", nest 2 (pretty univ), text "for", nest 2 (pretty p)]))
+    ERROR . show . sep $
+      [text "No instances in",
+       nest 2 (pretty univ),
+       text "for",
+       nest 2 (pretty p <+> text "::" <+> pretty (propType p)),
+       text "under",
+       nest 2 (pretty [ pretty t <+> text "::" <+> pretty (typ t) | t <- usort (terms p >>= subterms) ])]
   sequence_
     [ do sequence_ [ PrunerM (generate fun) | fun <- usort (funs p') ]
          liftPruner (untypedAxiom p')

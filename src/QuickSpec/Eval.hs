@@ -45,7 +45,6 @@ data S = S {
   proved        :: Set (PropOf PruningTerm),
   discovered    :: [Prop],
   delayed       :: [(Term, Term)],
-  univ          :: Set Type,
   kind          :: Type -> TypeKind }
 
 data Event =
@@ -107,7 +106,6 @@ initialState sig seeds =
       proved        = Set.empty,
       discovered    = background sig,
       delayed       = [],
-      univ          = typeUniverse sig,
       kind          = memo (typeKind sig) }
   where
     e = memo (env sig)
@@ -311,9 +309,9 @@ createRules sig = do
     Type ty1 <- event
     Type ty2 <- event
     require (ty1 < ty2)
-    univ <- execute $ lift $ gets univ
+    kind <- execute $ lift $ gets kind
     Just mgu <- return (polyMgu ty1 ty2)
-    require (oneTypeVar (unPoly mgu) `Set.member` univ)
+    require (kind (unPoly mgu) == Useful)
     let tys = [ty | ty <- [ty1, ty2], oneTypeVar ty /= oneTypeVar mgu]
 
     Schema Original s Representative <- event

@@ -76,6 +76,10 @@ literalTermsDL :: Literal a -> DList.DList a
 literalTermsDL (t :=: u) = return t `mplus` return u
 literalTermsDL (p :@: ts) = DList.fromList ts
 
+propType :: Typed a => PropOf a -> Type
+propType (_ :=>: p :@: ts) = typ p
+propType (_ :=>: t :=: u) = typ t
+
 instance Pretty a => Pretty (Literal a) where
   pretty (x :=: y) = hang (pretty x <+> text "=") 2 (pretty y)
   pretty (p :@: xs) = pretty p <> parens (sep (punctuate comma (map pretty xs)))

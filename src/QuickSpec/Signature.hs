@@ -286,9 +286,14 @@ typeUniverse :: Signature -> Set Type
 typeUniverse sig =
   Set.fromList $
     Var (TyVar 0):
-    [ oneTypeVar (typ t) | c <- constants sig, t <- types (typ c) ]
+    concatMap collapse
+      [ oneTypeVar (typ t) | c <- constants sig, t <- types (typ c) ]
   where
     types t = typeRes t:typeArgs t ++ concatMap types (typeArgs t)
+    collapse ty@(Fun f tys) =
+      Var (TyVar 0):ty:
+      map (Fun f) (mapM collapse tys)
+    collapse (Var x) = [Var x]
 
 data TypeKind = Useless | Partial | Useful deriving (Eq, Show)
 
