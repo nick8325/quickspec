@@ -17,7 +17,7 @@ module QuickSpec.Type(
   -- Dynamic values.
   Value, toValue, fromValue,
   Unwrapped(..), unwrap, Wrapper(..),
-  mapValue, forValue, ofValue, withValue, pairValues, unwrapFunctor) where
+  mapValue, forValue, ofValue, withValue, pairValues, wrapFunctor, unwrapFunctor) where
 
 #include "errors.h"
 import Control.Applicative
@@ -329,6 +329,15 @@ pairValues f x y =
     value = toAny (f (value x) (value y)) }
   where
     ty = typeRep (undefined :: proxy g) `applyType` typ x `applyType` typ y
+
+wrapFunctor :: forall f g h. Typeable h => (forall a. f a -> g (h a)) -> Value f -> Value g
+wrapFunctor f x =
+  ty `seq`
+  Value {
+    valueType = ty,
+    value = toAny (f (value x)) }
+  where
+    ty = typeRep (undefined :: proxy h) `applyType` valueType x
 
 unwrapFunctor :: forall f g h. Typeable g => (forall a. f (g a) -> h a) -> Value f -> Value h
 unwrapFunctor f x =
