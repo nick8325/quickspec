@@ -434,7 +434,10 @@ found sig prop0 = do
       when (null (funs prop) || not (null (filter (not . conIsBackground) (funs prop)))) $
         liftIO $ putStrLn (prettyShow (prettyRename sig prop))
 
-  lift (lift (axiom prop))
+  mapM_ (lift . lift . axiom) (etaExpand prop)
+  forM_ (map canonicalise (etaExpand prop)) $ \(_ :=>: _ :=: t) -> do
+    u <- fmap (fromMaybe t) (lift (lift (rep t)))
+    newTerm u
   terms <- fmap Set.toList (lift (gets terms))
   allSchemas <- fmap Set.toList (lift (gets allSchemas))
   let rep' t = do
@@ -443,6 +446,16 @@ found sig prop0 = do
   terms' <- mapM (lift . lift . rep') terms
   allSchemas' <- mapM( lift . lift . rep') allSchemas
   lift $ modify (\s -> s { terms = Set.fromList terms', allSchemas = Set.fromList allSchemas' })
+
+etaExpand :: Prop -> [Prop]
+etaExpand prop@(lhs :=>: t :=: u) =
+  prop:
+  case (tryApply t x, tryApply u x) of
+    (Just t', Just u') -> etaExpand (lhs :=>: t' :=: u')
+    _ -> []
+  where
+    x = Var (Variable n (head (typeArgs (typ t) ++ [typeOf ()])))
+    n = succ (maximum (0:map varNumber (vars prop)))
 
 pruner :: ExtraPruner -> [PropOf PruningTerm] -> PropOf PruningTerm -> IO Bool
 pruner (SPASS timeout) = E.spassUnify timeout
