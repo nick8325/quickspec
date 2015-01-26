@@ -33,62 +33,66 @@ instance (Arbitrary b, Observe a, Observe b) =>
          Observe (Expr b a) where
         observe = genericObserve
  
-data Program a b = Done
-                 | Const a (Program a b)
-                 | Load b (Program a b)
-                 | Apply (a -> a -> a) (Program a b)
-                 deriving (Typeable, Generic)
+data Instruction a b =
+    Const a
+  | Load b
+  | Apply (a -> a -> a)
+  deriving (Typeable, Generic)
  
 instance (Arbitrary a, Typeable a, Arbitrary b, CoArbitrary b, Typeable b) =>
-         Arbitrary (Program b a) where
-        arbitrary = fmap compile arbitrary
+         Arbitrary (Instruction b a) where
+        arbitrary =
+          oneof [fmap Const arbitrary, fmap Load arbitrary, fmap Apply arbitrary]
  
 instance (CoArbitrary a, Arbitrary b, CoArbitrary b) =>
-         CoArbitrary (Program b a) where
+         CoArbitrary (Instruction b a) where
         coarbitrary = genericCoarbitrary
  
 instance (Observe a, Arbitrary b, Observe b) =>
-         Observe (Program b a) where
+         Observe (Instruction b a) where
         observe = genericObserve
 
-exec :: (v -> c) -> Program c v -> [c] -> [c]
-exec env Done stack = stack
-exec env (Const c p) stack = exec env p (c:stack)
-exec env (Load v p) stack = exec env p (env v:stack)
-exec env (Apply b p) (x:y:stack) = exec env p (b x y:stack)
+exec :: (v -> c) -> [Instruction c v] -> [c] -> Maybe [c]
+exec env [] stack = Just stack
+exec env (Const c:p) stack = exec env p (c:stack)
+exec env (Load v:p) stack = exec env p (env v:stack)
+exec env (Apply b:p) (x:y:stack) = exec env p (b x y:stack)
+exec _ _ _ = Nothing
  
 value :: (v -> c) -> Expr c v -> c
 value env (Cex c) = c
 value env (Vex v) = env v
 value env (Bex b e1 e2) = b (value env e1) (value env e2)
 
-sequence :: Program v c -> Program v c -> Program v c
-sequence Done p = p
-sequence (Const c p) p' = Const c (sequence p p')
-sequence (Load v p) p' = Load v (sequence p p')
-sequence (Apply b p) p' = Apply b (sequence p p')
+compile :: Expr v c -> [Instruction v c]
+compile (Cex c) = [Const c]
+compile (Vex v) = [Load v]
+compile (Bex b e1 e2) = compile e2 ++ compile e1 ++ [Apply b]
 
-compile :: Expr v c -> Program v c
-compile (Cex c) = Const c Done
-compile (Vex v) = Load v Done
-compile (Bex b e1 e2) = sequence (compile e2) (sequence (compile e1) (Apply b Done))
-
-main =
-  quickSpec signature {
-    instances = [
-        makeInstance (\(Dict :: Dict (Observe A)) -> QS.Observe Dict (observe :: A -> Gen Observation)),
-        inst5 (Sub Dict :: (Arbitrary A, Typeable A, Arbitrary B, CoArbitrary B, Typeable B) :- Arbitrary (Expr B A)),
-        inst5 (Sub Dict :: (Arbitrary A, Typeable A, Arbitrary B, CoArbitrary B, Typeable B) :- Arbitrary (Program B A)),
-        inst3 (Sub Dict :: (CoArbitrary A, Arbitrary B, CoArbitrary B) :- CoArbitrary (Expr B A)),
-        inst3 (Sub Dict :: (CoArbitrary A, Arbitrary B, CoArbitrary B) :- CoArbitrary (Program B A)),
-        inst3 (Sub Dict :: (Arbitrary B, Observe A, Observe B) :- Observe (Expr B A)),
-        inst3 (Sub Dict :: (Arbitrary B, Observe A, Observe B) :- Observe (Program B A)),
-        inst (Sub Dict :: () :- Typeable Int),
-        inst (Sub Dict :: () :- Observe Int) ],
+bg =
+  signature {
     constants = [
       constant ":" ((:) :: A -> [A] -> [A]),
       constant "[]" ([] :: [A]),
-      constant "compile" (compile :: Expr A B -> Program A B),
-      constant "sequence" (sequence :: Program A B -> Program A B -> Program A B),
+      constant "Just" (Just :: A -> Maybe A),
+      constant "++" ((++) :: [A] -> [A] -> [A]) ]}
+
+main =
+  quickSpecWithBackground bg signature {
+    instances = [
+        names (NamesFor ["i"] :: NamesFor (Instruction A B)),
+        names (NamesFor ["e"] :: NamesFor (Expr A B)),
+        names (NamesFor ["env"] :: NamesFor (A -> B)),
+        makeInstance (\(Dict :: Dict (Observe A)) -> QS.Observe Dict (observe :: A -> Gen Observation)),
+        inst5 (Sub Dict :: (Arbitrary A, Typeable A, Arbitrary B, CoArbitrary B, Typeable B) :- Arbitrary (Expr B A)),
+        inst5 (Sub Dict :: (Arbitrary A, Typeable A, Arbitrary B, CoArbitrary B, Typeable B) :- Arbitrary (Instruction B A)),
+        inst3 (Sub Dict :: (CoArbitrary A, Arbitrary B, CoArbitrary B) :- CoArbitrary (Expr B A)),
+        inst3 (Sub Dict :: (CoArbitrary A, Arbitrary B, CoArbitrary B) :- CoArbitrary (Instruction B A)),
+        inst3 (Sub Dict :: (Arbitrary B, Observe A, Observe B) :- Observe (Expr B A)),
+        inst3 (Sub Dict :: (Arbitrary B, Observe A, Observe B) :- Observe (Instruction B A)),
+        inst (Sub Dict :: () :- Typeable Int),
+        inst (Sub Dict :: () :- Observe Int) ],
+    constants = [
+      constant "compile" (compile :: Expr A B -> [Instruction A B]),
       constant "value" (value :: (A -> B) -> Expr B A -> B),
-      constant "exec" (exec :: (A -> B) -> Program B A -> [B] -> [B]) ]}
+      constant "exec" (exec :: (A -> B) -> [Instruction B A] -> [B] -> Maybe [B]) ]}
