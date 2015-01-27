@@ -1,49 +1,53 @@
-{-# LANGUAGE DeriveDataTypeable, TypeOperators #-}
+{-# LANGUAGE DeriveDataTypeable, TypeOperators, StandaloneDeriving #-}
 import Control.Monad
 import Test.QuickCheck
 import QuickSpec hiding (background, (<>), text, nest, ($$))
+import Text.PrettyPrint.HughesPJ
 
-newtype Layout a = Layout [(Int, [a])] deriving (Typeable, Eq, Ord, Show)
+deriving instance Typeable Doc
 
-instance Arbitrary a => Arbitrary (Layout a) where
-  arbitrary = fmap Layout (liftM2 (:) arbitrary arbitrary)
+instance Arbitrary Doc where
+  arbitrary =
+    sized $ \n ->
+      let bin = resize (n `div` 2) arbitrary
+          un = resize (n-1) arbitrary in
+      oneof $
+        [ liftM2 ($$) bin bin | n > 0 ] ++
+        [ liftM2 (<>) bin bin | n > 0 ] ++
+        [ liftM2 nest arbitrary un | n > 0 ] ++
+        [ fmap text arbString ]
 
-instance CoArbitrary a => CoArbitrary (Layout a) where
-  coarbitrary (Layout a) = coarbitrary a
-
-text :: [a] -> Layout a
-text s = Layout [(0, s)]
-
-nest :: Int -> Layout a -> Layout a
-nest k (Layout l) = Layout [(i+k, s) | (i, s) <- l]
-
-($$) :: Layout a -> Layout a -> Layout a
-Layout xs $$ Layout ys = Layout (xs ++ ys)
-
-(<>) :: Layout a -> Layout a -> Layout a
-Layout xs <> Layout ys = f (init xs) (last xs) (head ys) (tail ys)
-  where f xs (i, s) (j, t) ys = Layout xs $$ Layout [(i, s ++ t)] $$ nest (i + length s - j) (Layout ys)
+arbString :: Gen String
+arbString = listOf (elements "ab")
 
 background =
   signature {
+    maxTests = Just 1000,
     constants = [
        constant "[]" ([] :: [A]),
        constant "++" ((++) :: [A] -> [A] -> [A]),
        constant "0" (0 :: Int),
        constant "+" ((+) :: Int -> Int -> Int),
-       constant "length" (length :: [A] -> Int) ]}
+       -- FIXME why does this not work when we use [A]?
+       constant "length" (length :: [Char] -> Int) ]}
+
+obsDoc :: Doc -> Gen String
+obsDoc d = do
+  n <- arbitrary
+  return (show (text "" $$ nest n d))
 
 sig =
   signature {
+    maxTests = Just 1000,
     constants = [
-       constant "text" (text :: [A] -> Layout A),
-       constant "nest" (nest :: Int -> Layout A -> Layout A),
-       constant "$$" (($$) :: Layout A -> Layout A -> Layout A),
-       constant "<>" ((<>) :: Layout A -> Layout A -> Layout A) ],
+       constant "text" text,
+       constant "nest" nest,
+       constant "$$" ($$),
+       constant "<>" (<>) ],
     instances = [
-      inst (Sub Dict :: Ord A         :- Ord       (Layout A)),
-      inst (Sub Dict :: Arbitrary A   :- Arbitrary (Layout A)),
-      inst (Sub Dict :: CoArbitrary A :- CoArbitrary (Layout A)) ],
+      makeInstance (\() -> arbString),
+      makeInstance (\() -> observe obsDoc),
+      inst (Sub Dict :: () :- Arbitrary Doc) ],
     defaultTo = Just (typeOf (undefined :: Bool)) }
 
 main = quickSpecWithBackground background sig
