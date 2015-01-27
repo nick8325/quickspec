@@ -167,7 +167,7 @@ constrain univ t =
 rep :: Pruner s => Term -> PrunerM s (Maybe Term)
 rep t = liftM (liftM fromPruningTerm) $ do
   let u = toGoalTerm t
-  sequence_ [ PrunerM (generate fun) | fun@(TermConstant con _) <- funs u, isId con ]
+  sequence_ [ PrunerM (generate fun) | fun@(TermConstant con _) <- funs u ]
   liftPruner (untypedRep [] u)
 
 type PruningTerm = Tm PruningConstant PruningVariable
