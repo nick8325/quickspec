@@ -430,17 +430,19 @@ found sig prop0 = do
   props <- lift (gets discovered)
   (_, props') <- liftIO $ runPruner sig [] $ mapM_ axiom (map (simplify_ sig) props)
 
+  let props = etaExpand prop
   res <- liftIO $ pruner (extraPruner_ sig) props' (toGoal (simplify_ sig prop))
   case res of
     True ->
       return ()
     False -> do
-      lift $ modify (\s -> s { discovered = prop:discovered s })
-      when (null (funs prop) || not (null (filter (not . conIsBackground) (funs prop)))) $
-        liftIO $ putStrLn (prettyShow (prettyRename sig prop))
+      lift $ modify (\s -> s { discovered = props ++ discovered s })
+      let prop' = last props
+      when (null (funs prop') || not (null (filter (not . conIsBackground) (funs prop')))) $
+        liftIO $ putStrLn (prettyShow (prettyRename sig prop'))
 
-  mapM_ (lift . lift . axiom) (etaExpand prop)
-  forM_ (map canonicalise (etaExpand prop)) $ \(_ :=>: _ :=: t) -> do
+  mapM_ (lift . lift . axiom) props
+  forM_ (map canonicalise props) $ \(_ :=>: _ :=: t) -> do
     u <- fmap (fromMaybe t) (lift (lift (rep t)))
     newTerm u
   terms <- fmap Set.toList (lift (gets terms))
