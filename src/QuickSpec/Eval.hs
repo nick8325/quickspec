@@ -437,7 +437,18 @@ found sig prop0 = do
       return ()
     False -> do
       lift $ modify (\s -> s { discovered = props ++ discovered s })
-      let prop' = last props
+      let (prop':_) = filter isPretty props ++ [prop]
+          isPretty (_ :=>: t :=: u) = isPretty1 t && isPretty1 u
+          isPretty1 (Fun f ts) | undersaturated (conStyle f) (length ts) = False
+          isPretty1 _ = True
+          undersaturated Invisible 0 = True
+          undersaturated (Tuple m) n | m > n = True
+          undersaturated (Infix _) n | n < 2 = True
+          undersaturated (Infixr _) n | n < 2 = True
+          undersaturated Prefix 0 = True
+          undersaturated Postfix 0 = True
+          undersaturated Gyrator n | n < 2 = True
+          undersaturated _ _ = False
       when (null (funs prop') || not (null (filter (not . conIsBackground) (funs prop')))) $
         liftIO $ prettyPrint (prettyRename sig prop')
 
