@@ -222,7 +222,8 @@ constant name x = Constant 0 name value (poly value) 0 style 1 False
     ar = arity (typeOf x)
     style
       | name == "()" = Tuple 0
-      | head name == ',' = Tuple ar
+      | take 1 name == "," = Tuple ar
+      | take 2 name == "(," = Tuple ar
       | isOp name && ar >= 2 = Infix 5
       | isOp name = Prefix
       | otherwise = Curried
