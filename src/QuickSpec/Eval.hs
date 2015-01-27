@@ -439,7 +439,7 @@ found sig prop0 = do
       lift $ modify (\s -> s { discovered = props ++ discovered s })
       let prop' = last props
       when (null (funs prop') || not (null (filter (not . conIsBackground) (funs prop')))) $
-        liftIO $ putStrLn (prettyShow (prettyRename sig prop'))
+        liftIO $ prettyPrint (prettyRename sig prop')
 
   mapM_ (lift . lift . axiom) props
   forM_ (map canonicalise props) $ \(_ :=>: _ :=: t) -> do
@@ -457,8 +457,8 @@ found sig prop0 = do
 etaExpand :: Prop -> [Prop]
 etaExpand prop@(lhs :=>: t :=: u) =
   prop:
-  case (tryApply t x, tryApply u x) of
-    (Just t', Just u') -> etaExpand (lhs :=>: t' :=: u')
+  case (typ t, tryApply t x, tryApply u x) of
+    (Fun Arrow _, Just t', Just u') -> etaExpand (lhs :=>: t' :=: u')
     _ -> []
   where
     x = Var (Variable n (head (typeArgs (typ t) ++ [typeOf ()])))

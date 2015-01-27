@@ -288,7 +288,7 @@ typeUniverse sig =
   Set.fromList $
     Var (TyVar 0):
     concatMap collapse
-      [ oneTypeVar (typ t) | c <- constants sig, t <- types (typ c) ]
+      [ oneTypeVar (typ t) | c <- constants sig, not (isId c), t <- types (typ c) ]
   where
     types t = typeRes t:typeArgs t ++ concatMap types (typeArgs t)
     collapse ty@(Fun f tys) =

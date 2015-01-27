@@ -74,6 +74,18 @@ createRules = PrunerM $ do
           untypedAxiom ([] :=>: tm (\t -> Fun (HasType ty) [t]) :=: tm id)
 
   rule $ do
+    idFun@(TermConstant idCon idTy) <- event
+    require (isId idCon)
+    fun@(TermConstant con ty) <- event
+    require (idTy == Fun Arrow [ty, ty])
+    execute $ do
+      let fun' = TermConstant con { conArity = arity + 1 } ty
+          arity = conArity con
+          x:xs = map (Var . PruningVariable) [0..arity]
+      unPrunerM $ liftPruner $
+        untypedAxiom ([] :=>: Fun idFun [Fun fun xs, x] :=: Fun fun' (xs ++ [x]))
+
+  rule $ do
     fun@(HasType ty) <- event
     execute $
       unPrunerM $ liftPruner $

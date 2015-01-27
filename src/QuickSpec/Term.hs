@@ -112,9 +112,9 @@ idConstant =
     conValue        = toValue (return (id :: (A -> B) -> A -> B)),
     conGeneralValue = poly (toValue (return (id :: (A -> B) -> A -> B))),
     conArity        = 0,
-    conStyle        = Uncurried, --Invisible,
+    conStyle        = Invisible,
     conSize         = 0,
-    conIsBackground = False }
+    conIsBackground = True }
 
 isId :: Constant -> Bool
 isId x = conIndex x == -1
