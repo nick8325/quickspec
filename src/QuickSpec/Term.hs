@@ -103,9 +103,35 @@ data Constant =
     conSize         :: Int,
     conIsBackground :: Bool }
   deriving Show
+
+idConstant :: Constant
+idConstant =
+  Constant {
+    conIndex        = -1,
+    conName         = "id",
+    conValue        = toValue (return (id :: (A -> B) -> A -> B)),
+    conGeneralValue = poly (toValue (return (id :: (A -> B) -> A -> B))),
+    conArity        = 0,
+    conStyle        = Uncurried, --Invisible,
+    conSize         = 0,
+    conIsBackground = False }
+
+isId :: Constant -> Bool
+isId x = conIndex x == -1
+
+idTerm :: Typed v => TermOf v -> Maybe (TermOf v)
+idTerm t = do
+  Fun Arrow [arg, res] <- return (typ t)
+  let f (TyVar 0) = arg
+      f (TyVar 1) = res
+  let con = idConstant {
+        conValue = typeSubst f (conValue idConstant),
+        conArity = 1 }
+  return (Fun con [t])
+
 instance Eq Constant where x == y = x `compare` y == EQ
 instance Ord Constant where
-  compare = comparing (\c -> (twiddle (conArity c), conIndex c, typ (conValue c)))
+  compare = comparing (\c -> (isId c, twiddle (conArity c), conIndex c, typ (conValue c)))
     where
       -- This tweak is taken from Prover9
       twiddle 2 = 1
@@ -157,13 +183,13 @@ instance Typed v => Typed (TermOf v) where
 
 instance Typed v => Apply (TermOf v) where
   tryApply t@(Fun f xs) u
-    | arity (typ (conGeneralValue f)) > length xs =
-      case typ t of
-        Fun Arrow [arg, _] | arg == typ u -> Just (Fun f' (xs ++ [u]))
-        _ -> Nothing
+    | arity (typ (conGeneralValue f) ) > length xs =
+        case typ t of
+          Fun Arrow [arg, _] | arg == typ u -> Just (Fun f' (xs ++ [u]))
+          _ -> Nothing
     where
       f' = f { conArity = conArity f + 1 }
-  tryApply _ _ = Nothing
+  tryApply t u = do { t' <- idTerm t; tryApply t' u }
 
 -- Turn a term into a schema by forgetting about its variables.
 schema :: Term -> Schema

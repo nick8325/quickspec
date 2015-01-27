@@ -210,7 +210,7 @@ renumber sig =
   sig { constants = cs }
   where
     cs =
-      [ c | c <- constants sig, conIndex c > 0 ] ++
+      [ c | c <- constants sig, conIndex c /= 0 ] ++
       zipWith f (sortBy (comparing conName) [ c | c <- constants sig, conIndex c == 0 ])
                 [succ (maximum (0:map conIndex (constants sig)))..]
     f c n = c { conIndex = n }

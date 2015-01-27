@@ -108,11 +108,12 @@ regeneralise = restrict . unPoly . generalise . canonicalise
     genLit (p :@: ts) =
       polyApply (:@:) (genPred p) (polyList (map genTerm ts))
     genLit (t :=: u) = polyApply (:=:) (genTerm t) (genTerm u)
-    genTerm (Fun f ts) = polyApply Fun (genCon f) (polyList (map genTerm ts))
+    genTerm (Fun f []) = polyMap (\f -> Fun f []) (genCon f)
+    genTerm (Fun f ts) = apply (genTerm (Fun f (init ts))) (genTerm (last ts))
     genTerm (Var x) = polyMap Var (genVar x)
 
     genPred p = poly (p { predType = unPoly (predGeneralType p) })
-    genCon  f = poly (f { conValue = unPoly (conGeneralValue f) })
+    genCon  f = poly (f { conValue = unPoly (conGeneralValue f), conArity = 0 })
     genVar (Variable n _) = poly (Variable n (typeOf (undefined :: A)))
 
     restrict prop = typeSubst f prop

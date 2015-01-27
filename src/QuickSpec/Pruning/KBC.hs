@@ -29,6 +29,7 @@ import Control.Monad.Trans.State.Strict
 
 data Event f v =
     NewRule (Constrained (Rule f v))
+  | NewAxiom (Equation f v)
   | ExtraRule (Constrained (Rule f v))
   | NewCP (CP f v)
   | Consider (Constrained (Rule f v)) (Context f v)
@@ -36,6 +37,7 @@ data Event f v =
 
 traceM :: (Monad m, PrettyTerm f, Pretty v) => Event f v -> m ()
 traceM (NewRule rule) = traceIf True (hang (text "New rule") 2 (pretty rule))
+traceM (NewAxiom axiom) = traceIf True (hang (text "New axiom") 2 (pretty axiom))
 traceM (ExtraRule rule) = traceIf True (hang (text "Extra rule") 2 (pretty rule))
 traceM (NewCP cps) = traceIf False (hang (text "Critical pair") 2 (pretty cps))
 traceM (Consider eq ctx) = traceIf True (sep [text "Considering", nest 2 (pretty eq), text "under", nest 2 (pretty ctx)])

@@ -36,6 +36,7 @@ localKBC m = do
 newAxiom :: PropOf PruningTerm -> StateT Completion IO ()
 newAxiom ([] :=>: (t :=: u)) = do
   liftKBC $ do
+    KBC.traceM (KBC.NewAxiom (t :==: u))
     norm <- KBC.normaliser
     unless (norm t == norm u) $ do
       KBC.newEquation (Constrained (toContext FTrue) (t :==: u))

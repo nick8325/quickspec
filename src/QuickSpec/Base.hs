@@ -155,7 +155,7 @@ class Pretty a => PrettyTerm a where
   termStyle :: a -> TermStyle
   termStyle _ = Curried
 
-data TermStyle = Curried | Uncurried | Tuple Int | TupleType | ListType | Infix Int | Infixr Int | Prefix | Postfix | Gyrator deriving Show
+data TermStyle = Invisible | Curried | Uncurried | Tuple Int | TupleType | ListType | Infix Int | Infixr Int | Prefix | Postfix | Gyrator deriving Show
 
 instance (PrettyTerm f, Pretty v) => Pretty (Tm f v) where
   prettyPrec p (Var x) = prettyPrec p x
@@ -166,6 +166,13 @@ instance (PrettyTerm f, Pretty v) => Pretty (Rule f v) where
   pretty (Rule l r) =
     hang (pretty l <+> text "->") 2 (pretty r)
 
+prettyStyle :: Pretty a => TermStyle -> Int -> Doc -> [a] -> Doc
+prettyStyle Invisible p d [] = d
+prettyStyle Invisible p _ [t] = prettyPrec p t
+prettyStyle Invisible p _ (t:ts) =
+  prettyParen (p > 10) $
+    hang (pretty t) 2
+      (fsep (map (prettyPrec 11) ts))
 prettyStyle Curried p d [] = d
 prettyStyle Curried p d xs =
   prettyParen (p > 10) $
