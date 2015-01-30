@@ -16,6 +16,7 @@ import QuickSpec.Type
 import QuickSpec.Utils
 import Test.QuickCheck
 import Test.QuickCheck.Gen
+import Test.QuickCheck.Random
 import Data.Ratio
 
 -- Terms and schemas.
@@ -223,14 +224,6 @@ evaluateTm env (Fun f xs) =
   where
     x = mapValue (pure . runIdentity) (conValue f)
 
-evaluateTerm :: (CoArbitrary v, Ord v, Typed v, Show v) => (Type -> Value Gen) -> TermOf v -> Value Gen
-evaluateTerm env t =
-  -- The evaluation itself doesn't happen in the Gen monad but in the
-  -- (StdGen, Int) reader monad. This is to avoid splitting the seed,
-  -- which would cause different occurrences of the same variable
-  -- to get different values!
-  toGen (evaluateTm f t)
-  where
-    f x = fromGen (mapValue (coarbitrary x) (env (typ x)))
-    toGen = mapValue (MkGen . curry)
-    fromGen = mapValue (uncurry . unGen)
+makeValuation :: (CoArbitrary v, Typed v) => (Type -> Value Gen) -> QCGen -> Int -> v -> Value Identity
+makeValuation env g n x =
+  mapValue (\gen -> Identity (unGen (coarbitrary x gen) g n)) (env (typ x))

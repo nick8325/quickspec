@@ -31,6 +31,7 @@ import QuickSpec.TestSet
 import QuickSpec.Type
 import QuickSpec.Utils
 import Test.QuickCheck.Random
+import System.Random
 import Data.Rewriting.Rule(Rule(Rule))
 
 type M = RulesT Event (StateT S (PrunerM PrunerType))
@@ -100,15 +101,18 @@ initialState sig seeds =
   S { schemas       = Map.empty,
       terms         = Set.empty,
       allSchemas    = Set.empty,
-      schemaTestSet = emptyTestSet (memo (makeTester specialise e seeds sig)),
+      schemaTestSet = emptyTestSet (memo (makeTester specialise v seeds2 sig)),
       termTestSet   = Map.empty,
-      freshTestSet  = emptyTestSet (memo (makeTester specialise e seeds sig)),
+      freshTestSet  = emptyTestSet (memo (makeTester specialise v seeds2 sig)),
       proved        = Set.empty,
       discovered    = background sig,
       delayed       = [],
       kind          = memo (typeKind sig) }
   where
+    seeds1 = [ (fst (split g), n) | (g, n) <- seeds ]
+    seeds2 = [ (snd (split g), n) | (g, n) <- seeds ]
     e = memo (env sig)
+    v = [ memo (makeValuation e g n) | (g, n) <- seeds1 ]
 
 newTerm :: Term -> M ()
 newTerm t = lift (modify (\s -> s { terms = Set.insert t (terms s) }))
