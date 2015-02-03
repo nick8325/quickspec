@@ -31,10 +31,29 @@ background =
        -- FIXME why does this not work when we use [A]?
        constant "length" (length :: [Char] -> Int) ]}
 
+-- obsDoc :: Doc -> Gen String
+-- obsDoc d = do
+--   n <- arbitrary
+--   return (render (nest n d))
+
 obsDoc :: Doc -> Gen String
-obsDoc d = do
-  n <- arbitrary
-  return (show (text "" $$ nest n d))
+obsDoc d = fmap render ctx
+  where
+    ctx =
+      sized $ \n ->
+      oneof $
+        [ return d ] ++
+        [ liftM2 op (resize (n `div` 2) ctx) (resize (n `div` 2) arbitrary) | n > 0, op <- [(<>), ($$)] ] ++
+        [ liftM2 op (resize (n `div` 2) arbitrary) (resize (n `div` 2) ctx) | n > 0, op <- [(<>), ($$)] ] ++
+        [ liftM2 nest arbitrary (resize (n-1) ctx) | n > 0 ]
+
+unindented :: Doc -> Bool
+unindented d = render (nest 100 (text "" <> d)) == render (nest 100 d)
+
+nesting :: Doc -> Int
+nesting d = head [ i | i <- nums, unindented (nest (-i) d) ]
+  where
+    nums = 0:concat [ [i, -i] | i <- [1..] ]
 
 sig =
   signature {
@@ -42,6 +61,7 @@ sig =
     constants = [
        constant "text" text,
        constant "nest" nest,
+       constant "nesting" nesting,
        constant "$$" ($$),
        constant "<>" (<>) ],
     instances = [
