@@ -68,7 +68,7 @@ instance (PrettyTerm f, Pretty v) => Pretty (CP f v) where
   pretty = pretty . cpEquation
 
 report :: KBC f v -> String
-report s = show r ++ " rewrite rules, " ++ show e ++ " extra rewrite rules.\n"
+report s = show r ++ " rewrite rules, " ++ show e ++ " extra rewrite rules."
   where
     r = length (Index.elems (labelledRules s))
     e = length (Index.elems (extraRules s))

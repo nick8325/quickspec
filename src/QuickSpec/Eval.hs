@@ -31,6 +31,7 @@ import QuickSpec.TestSet
 import QuickSpec.Type
 import QuickSpec.Utils
 import Test.QuickCheck.Random
+import Test.QuickCheck.Text
 import System.Random
 import Data.Rewriting.Rule(Rule(Rule))
 
@@ -148,13 +149,15 @@ incrementalQuickSpec sig = do
                   constants = constants thy ++ [last (constants sig)] }
 
 quickSpec :: Signature -> IO Signature
-quickSpec sig0 = unbuffered $ do
+quickSpec sig0 = withStdioTerminal $ \term -> do
   let sig = renumber sig0 { constants = idConstant:filter (/= idConstant) (constants sig0) }
   putStrLn "== Signature =="
   prettyPrint sig
   putStrLn ""
+  putStrLn "== Laws =="
   runM sig $ do
-    quickSpecLoop sig
+    quickSpecLoop sig term
+    liftIO $ putStrLn "== Statistics =="
     summarise
     props <- lift (gets (reverse . discovered))
     theory <- lift (lift (liftPruner get))
@@ -170,16 +173,19 @@ runM sig m = do
     (fromMaybe (emptyPruner sig) (theory sig))
     (evalStateT (runRulesT m) (initialState sig seeds))
 
-quickSpecLoop :: Signature -> M ()
-quickSpecLoop sig = do
-  createRules sig
-  mapM_ (exploreSize sig) [1..maxTermSize_ sig]
+quickSpecLoop :: Signature -> Terminal -> M ()
+quickSpecLoop sig term = do
+  createRules sig term
+  mapM_ (exploreSize sig term) [1..maxTermSize_ sig]
+  liftIO $ putLine term ""
 
-exploreSize sig n = do
+exploreSize sig term n = do
   lift $ modify (\s -> s { schemas = Map.insert n Map.empty (schemas s), delayed = [] })
   ss <- fmap (sortBy (comparing measure)) (schemasOfSize n sig)
-  liftIO $ putStrLn ("Size " ++ show n ++ ", " ++ show (length ss) ++ " schemas to consider:")
-  mapM_ (generate . ConsiderSchema Original . poly) ss
+  let m = length ss
+  forM_ (zip [1..] ss) $ \(i, s) -> do
+    liftIO (putTemp term ("[testing schemas of size " ++ show n ++ ": " ++ show i ++ "/" ++ show m ++ "...]"))
+    generate (ConsiderSchema Original (poly s))
 
   let measureEquation (t, u) = (measure t, measure u)
   del <- lift $ gets delayed
@@ -190,8 +196,6 @@ exploreSize sig n = do
     unless (t' == u') $ do
       generate (Found ([] :=>: t' :=: u'))
     newTerm u'
-
-  liftIO $ putStrLn ""
 
 summarise :: M ()
 summarise = do
@@ -217,13 +221,14 @@ summarise = do
                      show numSchemas ++ " schemas, " ++
                      show numTerms ++ " terms, " ++
                      show numCreation ++ " creation, " ++
-                     show numMisc ++ " miscellaneous).")
-  liftIO $ putStrLn (show schemaTests ++ " schema test cases, " ++ show termTests ++ " term test cases.")
-  liftIO $ putStrLn (show schemaReps ++ " representative schemas, " ++ show termReps ++ " representative terms.")
+                     show numMisc ++ " miscellaneous), " ++
+                     show h ++ " hooks.")
+  liftIO $ putStrLn (show schemaTests ++ " schema test cases for " ++ show schemaReps ++ " representative schemas.")
+  liftIO $ putStrLn (show termTests ++ " term test cases for " ++ show termReps ++ " representative terms.")
   liftIO $ putStrLn (show equalSchemas ++ " equal schemas and " ++ show equalTerms ++ " equal terms generated.")
-  liftIO $ putStrLn (show h ++ " hooks installed.\n")
   s <- lift (lift (liftPruner get))
-  liftIO (putStr (pruningReport s))
+  liftIO (putStrLn (pruningReport s))
+  liftIO (putStrLn "")
 
 allUnifications :: Term -> [Term]
 allUnifications t = map f ss
@@ -233,8 +238,8 @@ allUnifications t = map f ss
     go s x = Map.findWithDefault __ x s
     f s = rename (go s) t
 
-createRules :: Signature -> M ()
-createRules sig = do
+createRules :: Signature -> Terminal -> M ()
+createRules sig term = do
   rule $ do
     Schema o s k <- event
     execute $ do
@@ -339,7 +344,7 @@ createRules sig = do
   rule $ do
     Found prop <- event
     execute $
-      found sig prop
+      found sig term prop
 
   let printing _ = False
 
@@ -425,8 +430,8 @@ instance Considerable TermFrom where
     lift $ modify (\st -> st { termTestSet = Map.insert s ts (termTestSet st) })
   findAll _ = return Set.empty
 
-found :: Signature -> Prop -> M ()
-found sig prop0 = do
+found :: Signature -> Terminal -> Prop -> M ()
+found sig term prop0 = do
   let reorder (lhs :=>: t :=: u)
         | measure t >= measure u = lhs :=>: t :=: u
         | otherwise = lhs :=>: u :=: t
@@ -435,6 +440,7 @@ found sig prop0 = do
   (_, props') <- liftIO $ runPruner sig [] $ mapM_ axiom (map (simplify_ sig) props)
 
   let props = etaExpand prop
+  liftIO $ putTemp term "[running extra pruner...]"
   res <- liftIO $ pruner (extraPruner_ sig) props' (toGoal (simplify_ sig prop))
   case res of
     True ->
@@ -454,12 +460,14 @@ found sig prop0 = do
           undersaturated Gyrator n | n < 2 = True
           undersaturated _ _ = False
       when (null (funs prop') || not (null (filter (not . conIsBackground) (funs prop')))) $
-        liftIO $ prettyPrint (prettyRename sig prop')
+        liftIO $ putLine term (prettyShow (prettyRename sig prop'))
 
+  liftIO $ putTemp term "[completing theory...]"
   mapM_ (lift . lift . axiom) props
   forM_ (map canonicalise props) $ \(_ :=>: _ :=: t) -> do
     u <- fmap (fromMaybe t) (lift (lift (rep t)))
     newTerm u
+  liftIO $ putTemp term "[renormalising existing terms...]"
   terms <- fmap Set.toList (lift (gets terms))
   allSchemas <- fmap Set.toList (lift (gets allSchemas))
   let rep' t = do

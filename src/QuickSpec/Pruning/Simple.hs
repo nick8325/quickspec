@@ -44,4 +44,4 @@ simpleRep axioms t = do
       return u
 
 simpleReport :: SimplePruner -> String
-simpleReport (S eqs) = show (length (Index.elems eqs)) ++ " pruning equations.\n"
+simpleReport (S eqs) = show (length (Index.elems eqs)) ++ " pruning equations."
