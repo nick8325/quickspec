@@ -73,7 +73,7 @@ propTerms :: PropOf a -> [a]
 propTerms p = literals p >>= DList.toList . literalTermsDL
 
 literalTermsDL :: Literal a -> DList.DList a
-literalTermsDL (t :=: u) = return t `mplus` return u
+literalTermsDL (t :=: u) = return u `mplus` return t
 literalTermsDL (p :@: ts) = DList.fromList ts
 
 propType :: Typed a => PropOf a -> Type

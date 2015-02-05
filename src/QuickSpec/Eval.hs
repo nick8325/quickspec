@@ -29,6 +29,7 @@ import QuickSpec.Term
 import QuickSpec.Test
 import QuickSpec.TestSet
 import QuickSpec.Type
+import QuickSpec.Pruning.Equation
 import QuickSpec.Utils
 import Test.QuickCheck.Random
 import Test.QuickCheck.Text
@@ -459,8 +460,13 @@ found sig term prop0 = do
           undersaturated Postfix 0 = True
           undersaturated Gyrator n | n < 2 = True
           undersaturated _ _ = False
+          rename prop@(lhs :=>: t :=: u)
+            | t `isVariantOf` u = lhs' :=>: u' :=: t'
+            | otherwise = prettyRename sig prop
+            where
+              lhs' :=>: t' :=: u' = prettyRename sig prop
       when (null (funs prop') || not (null (filter (not . conIsBackground) (funs prop')))) $
-        liftIO $ putLine term (prettyShow (prettyRename sig prop'))
+        liftIO $ putLine term (prettyShow (rename (canonicalise prop')))
 
   liftIO $ putTemp term "[completing theory...]"
   mapM_ (lift . lift . axiom) props
