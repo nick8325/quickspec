@@ -207,13 +207,15 @@ signature = mempty
 renumber :: Signature -> Signature
 -- TODO get rid of this, use old-style API ("single constant" signature+monoid) instead
 renumber sig =
-  sig { constants = cs }
+  sig { constants = cs, background = map (fmap (mapTerm find id)) (background sig) }
   where
     cs =
       [ c | c <- constants sig, conIndex c /= 0 ] ++
       zipWith f (sortBy (comparing conName) [ c | c <- constants sig, conIndex c == 0 ])
                 [succ (maximum (0:map conIndex (constants sig)))..]
     f c n = c { conIndex = n }
+    find c | conIndex c == 0 = f c (head [ conIndex c' | c' <- cs, conName c == conName c' ])
+           | otherwise = c
 
 constant :: Typeable a => String -> a -> Constant
 constant name x = Constant 0 name value (poly value) 0 style 1 False
