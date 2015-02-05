@@ -29,6 +29,8 @@ background =
        constant "0" (0 :: Int),
        constant "+" ((+) :: Int -> Int -> Int),
        -- FIXME why does this not work when we use [A]?
+       -- Answer: because in the schema, text _ and length _
+       -- have different hole types.
        constant "length" (length :: [Char] -> Int) ]}
 
 -- obsDoc :: Doc -> Gen String
@@ -61,9 +63,9 @@ sig =
     constants = [
        constant "text" text,
        constant "nest" nest,
-       constant "nesting" nesting,
-       constant "$$" ($$),
-       constant "<>" (<>) ],
+       --constant "nesting" nesting,
+       constant "<>" (<>),
+       constant "$$" ($$) ],
     instances = [
       makeInstance (\() -> arbString),
       makeInstance (\() -> observe obsDoc),
