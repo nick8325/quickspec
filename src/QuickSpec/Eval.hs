@@ -234,7 +234,7 @@ summarise = do
 allUnifications :: Term -> [Term]
 allUnifications t = map f ss
   where
-    vs = [ map (x,) (take 3 xs) | xs <- partitionBy typ (usort (vars t)), x <- xs ]
+    vs = [ map (x,) (take 4 xs) | xs <- partitionBy typ (usort (vars t)), x <- xs ]
     ss = map Map.fromList (sequence vs)
     go s x = Map.findWithDefault __ x s
     f s = rename (go s) t
