@@ -48,7 +48,8 @@ data S = S {
   proved        :: Set (PropOf PruningTerm),
   discovered    :: [Prop],
   delayed       :: [(Term, Term)],
-  kind          :: Type -> TypeKind }
+  kind          :: Type -> TypeKind,
+  terminal      :: Terminal }
 
 data Event =
     Schema Origin (Poly Schema) (KindOf Schema)
@@ -98,8 +99,8 @@ instance Pretty EqualReason where
 
 type Schemas = Map Int (Map (Poly Type) [Poly Schema])
 
-initialState :: Signature -> [(QCGen, Int)] -> S
-initialState sig seeds =
+initialState :: Signature -> [(QCGen, Int)] -> Terminal -> S
+initialState sig seeds terminal =
   S { schemas       = Map.empty,
       terms         = Set.empty,
       allSchemas    = Set.empty,
@@ -109,7 +110,8 @@ initialState sig seeds =
       proved        = Set.empty,
       discovered    = background sig,
       delayed       = [],
-      kind          = memo (typeKind sig) }
+      kind          = memo (typeKind sig),
+      terminal      = terminal }
   where
     seeds1 = [ (fst (split g), n) | (g, n) <- seeds ]
     seeds2 = [ (snd (split g), n) | (g, n) <- seeds ]
@@ -150,14 +152,14 @@ incrementalQuickSpec sig = do
                   constants = constants thy ++ [last (constants sig)] }
 
 quickSpec :: Signature -> IO Signature
-quickSpec sig0 = withStdioTerminal $ \term -> do
+quickSpec sig0 = do
   let sig = renumber sig0 { constants = idConstant:filter (/= idConstant) (constants sig0) }
   putStrLn "== Signature =="
   prettyPrint sig
   putStrLn ""
   putStrLn "== Laws =="
   runM sig $ do
-    quickSpecLoop sig term
+    quickSpecLoop sig
     liftIO $ putStrLn "== Statistics =="
     summarise
     props <- lift (gets (reverse . discovered))
@@ -168,24 +170,29 @@ quickSpec sig0 = withStdioTerminal $ \term -> do
       theory = Just theory }
 
 runM :: Signature -> M a -> IO a
-runM sig m = do
+runM sig m = withStdioTerminal $ \term -> do
   seeds <- fmap (take (maxTests_ sig)) (genSeeds 20)
   evalPruner sig
     (fromMaybe (emptyPruner sig) (theory sig))
-    (evalStateT (runRulesT m) (initialState sig seeds))
+    (evalStateT (runRulesT m) (initialState sig seeds term))
 
-quickSpecLoop :: Signature -> Terminal -> M ()
-quickSpecLoop sig term = do
-  createRules sig term
-  mapM_ (exploreSize sig term) [1..maxTermSize_ sig]
-  liftIO $ putLine term ""
+onTerm :: (Terminal -> String -> IO ()) -> String -> M ()
+onTerm f s = do
+  term <- lift (gets terminal)
+  liftIO (f term s)
 
-exploreSize sig term n = do
+quickSpecLoop :: Signature -> M ()
+quickSpecLoop sig = do
+  createRules sig
+  mapM_ (exploreSize sig) [1..maxTermSize_ sig]
+  onTerm putLine ""
+
+exploreSize sig n = do
   lift $ modify (\s -> s { schemas = Map.insert n Map.empty (schemas s), delayed = [] })
   ss <- fmap (sortBy (comparing measure)) (schemasOfSize n sig)
   let m = length ss
   forM_ (zip [1..] ss) $ \(i, s) -> do
-    liftIO (putTemp term ("[testing schemas of size " ++ show n ++ ": " ++ show i ++ "/" ++ show m ++ "...]"))
+    onTerm putTemp ("[testing schemas of size " ++ show n ++ ": " ++ show i ++ "/" ++ show m ++ "...]")
     generate (ConsiderSchema Original (poly s))
 
   let measureEquation (t, u) = (measure t, measure u)
@@ -239,8 +246,8 @@ allUnifications t = map f ss
     go s x = Map.findWithDefault __ x s
     f s = rename (go s) t
 
-createRules :: Signature -> Terminal -> M ()
-createRules sig term = do
+createRules :: Signature -> M ()
+createRules sig = do
   rule $ do
     Schema o s k <- event
     execute $ do
@@ -345,7 +352,7 @@ createRules sig term = do
   rule $ do
     Found prop <- event
     execute $
-      found sig term prop
+      found sig prop
 
   let printing _ = False
 
@@ -431,8 +438,8 @@ instance Considerable TermFrom where
     lift $ modify (\st -> st { termTestSet = Map.insert s ts (termTestSet st) })
   findAll _ = return Set.empty
 
-found :: Signature -> Terminal -> Prop -> M ()
-found sig term prop0 = do
+found :: Signature -> Prop -> M ()
+found sig prop0 = do
   let reorder (lhs :=>: t :=: u)
         | measure t >= measure u = lhs :=>: t :=: u
         | otherwise = lhs :=>: u :=: t
@@ -441,7 +448,7 @@ found sig term prop0 = do
   (_, props') <- liftIO $ runPruner sig [] $ mapM_ axiom (map (simplify_ sig) props)
 
   let props = etaExpand prop
-  liftIO $ putTemp term "[running extra pruner...]"
+  onTerm putTemp "[running extra pruner...]"
   res <- liftIO $ pruner (extraPruner_ sig) props' (toGoal (simplify_ sig prop))
   case res of
     True ->
@@ -466,14 +473,14 @@ found sig term prop0 = do
             where
               lhs' :=>: t' :=: u' = prettyRename sig prop
       when (null (funs prop') || not (null (filter (not . conIsBackground) (funs prop')))) $
-        liftIO $ putLine term (prettyShow (rename (canonicalise prop')))
+        onTerm putLine (prettyShow (rename (canonicalise prop')))
 
-  liftIO $ putTemp term "[completing theory...]"
+  onTerm putTemp "[completing theory...]"
   mapM_ (lift . lift . axiom) props
   forM_ (map canonicalise props) $ \(_ :=>: _ :=: t) -> do
     u <- fmap (fromMaybe t) (lift (lift (rep t)))
     newTerm u
-  liftIO $ putTemp term "[renormalising existing terms...]"
+  onTerm putTemp "[renormalising existing terms...]"
   terms <- fmap Set.toList (lift (gets terms))
   allSchemas <- fmap Set.toList (lift (gets allSchemas))
   let rep' t = do
@@ -482,6 +489,7 @@ found sig term prop0 = do
   terms' <- mapM (lift . lift . rep') terms
   allSchemas' <- mapM( lift . lift . rep') allSchemas
   lift $ modify (\s -> s { terms = Set.fromList terms', allSchemas = Set.fromList allSchemas' })
+  onTerm putPart ""
 
 etaExpand :: Prop -> [Prop]
 etaExpand prop@(lhs :=>: t :=: u) =
