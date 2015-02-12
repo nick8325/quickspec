@@ -3,8 +3,6 @@ High-priority
 
 Quick-and-dirty mode where we only discover schema equations and don't try to generalise them (like ?++(?++?) = (?++?)++?)
 
-Work out why music example doesn't discover Rest (max x y) = Rest x :=: Rest y!
-
 Look into constraining rewrite rules so that the constraint is l >= r instead of l > r? This would mean that irrelevant variable laws like f x -> f a would become unconditional. Might reduce amount of case splitting too.
 
 Simplify size expressions a bit more (e.g.: take out common factors, make sure that constant is always >= 0 by flipping sign)
@@ -23,28 +21,9 @@ schemas by simplifying using unorientable rules is something to avoid.
 
 Look more into Moa's idea that any permutative law can be expressed as a permutative law over a single function (e.g. f x y = f y x)
 
-Fix bug where ++ and zip generates loads of laws!
-
-Fix bug where schemas are generated twice
-
-Fix eta-expansion
-
 Make it so that arbitrary instances are not compulsory
 
-Implement big-universe/small-universe thing in a more principled way.
-I don't think it works at the moment!
-
-Make E-pruning work in a more principled way!
-
-Generalise type variables after discovering equations!
-
 Make main QuickSpec module export sensible stuff and clean up code
-
-Add an explicit application constructor, use it when applying variables.
-
-Make combinator example work (bug with polymorphic instantiation,
-eta-expand laws about functions - perhaps just don't generate any
-equalities on function types during pruning?)
 
 Longer term
 -----------
@@ -73,9 +52,6 @@ E.g., if we have f x y = g x z, then we should also find f x y = g x k,
 where k is an arbitrary constant - if we don't find this then we don't
 need to search for f x y = g x z.
 
-Teach E about application?
-Alternatively, eta-expand all laws before passing on.
-
 Teach crappy pruner about commutativity-like (schema-preserving) laws.
 Or improve pruning.
 
@@ -85,20 +61,12 @@ Print out definitions
 
 Add "ask why an equation is not printed".
 
-It isn't always true that if two schemas end up in the same class we
-print an equation! It might be that we can't simplify the schema but
-can simplify the one-variable case. Investigate how common this is and
-perhaps try using the pruner to find the schema equation, to avoid
-needlessly testing.
-
 Try optimising the set of test cases - e.g., after completing each size,
 analyse the test set and find the "most effective" set of test cases,
 then move it to the front.
 
 Cleanup ideas
 -------------
-
-Add typeclass of "stuff which contains variables" that we can e.g. alpha-rename.
 
 Introduce a type constructor ForAll whose effect is to normalise all variables in the term.
 
