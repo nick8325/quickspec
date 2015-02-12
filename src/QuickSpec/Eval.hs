@@ -35,6 +35,7 @@ import Test.QuickCheck.Random
 import Test.QuickCheck.Text
 import System.Random
 import Data.Rewriting.Rule(Rule(Rule))
+import Control.Spoon
 
 type M = RulesT Event (StateT S (PrunerM PrunerType))
 
@@ -399,12 +400,13 @@ consider sig makeEvent x = do
           ts <- getTestSet x
           res <-
             liftIO . testTimeout_ sig $
-            case insert x ts of
+            case fmap teaspoon (insert x ts) of
               Nothing -> return $ do
                 generate (makeEvent Untestable)
-              Just (Old y) -> return $ do
+              Just Nothing -> return $ return () -- partial term
+              Just (Just (Old y)) -> return $ do
                 generate (makeEvent (EqualTo y Testing))
-              Just (New ts) -> return $ do
+              Just (Just (New ts)) -> return $ do
                 putTestSet x ts
                 generate (makeEvent Representative)
           fromMaybe (generate (makeEvent TimedOut)) res
