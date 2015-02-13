@@ -1,8 +1,8 @@
 import Prelude hiding (cycle, flip)
 import qualified Diagrams.Prelude as D
-import qualified Diagrams.Backend.Cairo as D
+import qualified Diagrams.Backend.SVG as D
 
-type Drawing = D.Diagram D.Cairo D.R2
+type Drawing = D.Diagram D.SVG D.R2
 
 size :: Double
 size = 600
@@ -15,7 +15,7 @@ prim x = D.centerXY (x D.# D.sized (D.Dims size size)) `D.atop` D.phantom (D.squ
 
 image :: FilePath -> IO Drawing
 image file = do
-  res <- D.loadImageExt file
+  res <- D.loadImageEmb file
   case res of
     Left err -> error (show err)
     Right img -> return (prim (D.image img))
@@ -41,8 +41,8 @@ cycle x = quartet x (rot (rot (rot x))) (rot x) (rot (rot x))
 cycle' x = quartet' x (rot (rot (rot x))) (rot x) (rot (rot x))
 anticycle x = quartet x (rot x) (rot (rot (rot x))) (rot (rot x))
 
-render file dia = D.renderCairo file (D.Width size) dia
+render file dia = D.renderSVG file (D.Width size) dia
 
 main = do
   img <- image "whatever.png"
-  render "cycle-whatever.png" (cycle' (cycle' img))
+  render "cycle-whatever.svg" (cycle' (cycle' img))
