@@ -29,6 +29,9 @@ over x y = D.atop x y
 rot :: Drawing -> Drawing
 rot = D.rotate (90 D.@@ D.deg)
 
+flip :: Drawing -> Drawing
+flip = D.reflectX
+
 quartet, quartet' :: Drawing -> Drawing -> Drawing -> Drawing -> Drawing
 quartet a b c d = (a `beside` b) `above` (c `beside` d)
 quartet' a b c d = (a `beside` b) `above'` (c `beside` d)
