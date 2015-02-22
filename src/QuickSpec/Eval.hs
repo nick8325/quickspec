@@ -483,14 +483,13 @@ found sig prop0 = do
     u <- fmap (fromMaybe t) (lift (lift (rep t)))
     newTerm u
   onTerm putTemp "[renormalising existing terms...]"
-  terms <- fmap Set.toList (lift (gets terms))
-  allSchemas <- fmap Set.toList (lift (gets allSchemas))
-  let rep' t = do
-        u <- rep t
-        return (fromMaybe t u)
-  terms' <- mapM (lift . lift . rep') terms
-  allSchemas' <- mapM( lift . lift . rep') allSchemas
-  lift $ modify (\s -> s { terms = Set.fromList terms', allSchemas = Set.fromList allSchemas' })
+  let norm s = do
+        ts <- filterM (fmap isJust . rep) (Set.toList s)
+        us <- mapM (fmap (fromMaybe __) . rep) ts
+        return ((s Set.\\ Set.fromList ts) `Set.union` Set.fromList us)
+  terms <- lift (gets terms) >>= lift . lift . norm
+  allSchemas <- lift (gets allSchemas) >>= lift . lift . norm
+  lift $ modify (\s -> s { terms = terms, allSchemas = allSchemas })
   onTerm putPart ""
 
 etaExpand :: Prop -> [Prop]
