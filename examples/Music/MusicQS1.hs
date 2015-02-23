@@ -60,6 +60,9 @@ prop_assoc c m1 m2 m3 = perform c ((m1 :+: m2) :+: m3) === perform c (m1 :+: (m2
 
 sig =
   signature [
+    withDepth 5,
+    withSize 7,
+    withTests 100,
     observer2 (\ctx x -> perform ctx (x :+: c 1 tn)),
     vars ["x", "y", "z"] (undefined :: (PitchClass, Int)),
     vars ["x", "y", "z"] (undefined :: IName),

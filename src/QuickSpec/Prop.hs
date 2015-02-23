@@ -114,6 +114,11 @@ regeneralise = restrict . unPoly . generalise . canonicalise
 
     genPred p = poly (p { predType = unPoly (predGeneralType p) })
     genCon  f = poly (f { conValue = unPoly (conGeneralValue f), conArity = 0 })
+    -- FIXME if we discover a unit law x = y :: (), won't it be falsely
+    -- generalised to x = y :: a? Instead of using A here, need to freshen
+    -- all type variables in type of var.
+    -- Currently this isn't a problem since we can't get a law with a
+    -- variable on both sides, but may break with smarter schema instantiation
     genVar (Variable n _) = poly (Variable n (typeOf (undefined :: A)))
 
     restrict prop = typeSubst f prop

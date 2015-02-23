@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, TypeOperators #-}
+{-# LANGUAGE DeriveDataTypeable, TypeOperators, FlexibleInstances, GeneralizedNewtypeDeriving #-}
 import QuickSpec
 import Test.QuickCheck
 import qualified Data.Set as Set
@@ -48,7 +48,12 @@ instance Half Rat where
 type Vector = (Rat, Rat)
 type Object = (Vector, Vector, Vector, Word)
 
-newtype Drawing = Drawing (Vector -> Vector -> Vector -> Set Object) deriving Typeable
+newtype Drawing = Drawing (Vector -> Vector -> Vector -> Objs) deriving Typeable
+newtype Objs = Objs { unObjs :: Set Object } deriving (Eq, Ord, Typeable, Show)
+instance Arbitrary Objs where arbitrary = fmap objs arbitrary
+
+objs :: Set Object -> Objs
+objs = Objs . Set.filter (\(_,b,c,_) -> b /= zero && c /= zero)
 
 instance Show Drawing where
   show (Drawing x) = show (x one one one)
@@ -57,24 +62,29 @@ instance Show Drawing where
 
 instance Arbitrary Drawing where
   arbitrary = do
-    objs <- arbitrary
-    return . Drawing $ \x y z -> Set.fromList [(x, y, z, o) | o <- objs ]
+    os <- arbitrary
+    return . Drawing $ \x y z -> objs (Set.fromList [(x, y, z, o) | o <- os])
   shrink (Drawing f) =
-    [ Drawing $ \x y z -> Set.fromList [(x, y, z, o) | o <- objs' ]
-    | let objs = [ o | (_, _, _, o) <- Set.toList (f zero zero zero) ],
-      objs' <- shrink objs ]
+    [ Drawing $ \x y z -> objs (Set.fromList [(x, y, z, o) | o <- objs'])
+    | let os = [ o | (_, _, _, o) <- Set.toList (unObjs (f one one one)) ],
+      objs' <- shrink os ]
+    where
+      one = (1,1)
 
 instance (Ord a, Arbitrary a) => Arbitrary (Set a) where
   arbitrary = fmap Set.fromList arbitrary
 
 blank :: Drawing
-blank = Drawing (\_ _ _ -> Set.empty)
+blank = Drawing (\_ _ _ -> objs Set.empty)
 
 over, beside, above, above' :: Drawing -> Drawing -> Drawing
-over (Drawing p) (Drawing q) = Drawing (\a b c -> p a b c `Set.union` q a b c)
-beside (Drawing p) (Drawing q) = Drawing (\a b c -> p a (half b) c `Set.union` q (a `plus` half b) (half b) c)
-above' (Drawing p) (Drawing q) = Drawing (\a b c -> p a b (half c) `Set.union` q (a `plus` half c) b (half c))
-above (Drawing p) (Drawing q) = Drawing (\a b c -> p (a `plus` half c) b (half c) `Set.union` q a b (half c))
+over (Drawing p) (Drawing q) = Drawing (\a b c -> p a b c `union` q a b c)
+beside (Drawing p) (Drawing q) = Drawing (\a b c -> p a (half b) c `union` q (a `plus` half b) (half b) c)
+above' (Drawing p) (Drawing q) = Drawing (\a b c -> p a b (half c) `union` q (a `plus` half c) b (half c))
+above (Drawing p) (Drawing q) = Drawing (\a b c -> p (a `plus` half c) b (half c) `union` q a b (half c))
+
+union :: Objs -> Objs -> Objs
+union (Objs x) (Objs y) = objs (x `Set.union` y)
 
 rot, flip, rot45 :: Drawing -> Drawing
 rot (Drawing p) = Drawing (\a b c -> p (a `plus` b) c (neg b))
@@ -89,7 +99,7 @@ cycle, cycle' :: Drawing -> Drawing
 cycle x = quartet x (rot (rot (rot x))) (rot x) (rot (rot x))
 cycle' x = quartet' x (rot (rot (rot x))) (rot x) (rot (rot x))
 
-obsDrawing :: Drawing -> Gen (Set Object)
+obsDrawing :: Drawing -> Gen Objs
 obsDrawing (Drawing d) = do
   (a, b, c) <- arbitrary
   return (d a b c)
@@ -102,8 +112,7 @@ sig1 =
       inst (Sub Dict :: () :- Arbitrary Drawing),
       makeInstance (\() -> observe obsDrawing) ],
     constants = [
-      constant "over" over,
-      constant "rot" rot ]}
+      constant "over" over ]}
 
 sig2 =
   signature {
@@ -115,16 +124,36 @@ sig2 =
 sig3 =
   signature {
     constants = [
-      constant "flip" flip ]}
+      constant "rot" rot ]}
 
 sig4 =
   signature {
     constants = [
-      -- constant "cycle" cycle' ]}
-      constant "cycle" cycle ]}
+      constant "flip" flip ]}
+
+sig5 =
+  signature {
+    constants = [
+      constant "cycle" cycle,
+      -- constant "cycle" cycle',
+      constant "quartet" quartet ]}
+
+sig6 =
+  signature {
+    constants = [
+      constant "rot45" rot45 ]}
+
+sig7 =
+  signature {
+    constants = [
+      constant "blank" blank ]}
 
 main = do
   thy1 <- quickSpec sig1
   thy2 <- quickSpec (thy1 `mappend` sig2)
   thy3 <- quickSpec (thy2 `mappend` sig3)
-  quickSpec (thy3 `mappend` sig4)
+  thy4 <- quickSpec (thy3 `mappend` sig4)
+  thy5 <- quickSpec (thy4 `mappend` sig5)
+  thy6 <- quickSpec (thy5 `mappend` sig6)
+  quickSpec (thy6 `mappend` sig7)
+  return ()
