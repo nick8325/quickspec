@@ -315,8 +315,17 @@ createRules sig = do
 
   rule $ do
     ConsiderTerm t@(From _ t') <- event
-    execute $ do
-      consider sig (Term t) t
+    -- Check if term is LHS of a delayed law
+    del <- execute $ lift $ gets delayed
+    terms <- execute $ lift $ gets terms
+    let delayed = not . null $ do
+          (x, y) <- del
+          sub <- maybeToList (match x t')
+          let u = subst sub y
+          guard (u `Set.member` terms)
+    unless delayed $
+      execute $ do
+        consider sig (Term t) t
 
   rule $ do
     Schema _ s _ <- event
