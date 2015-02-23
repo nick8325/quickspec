@@ -112,8 +112,7 @@ sig1 =
       inst (Sub Dict :: () :- Arbitrary Drawing),
       makeInstance (\() -> observe obsDrawing) ],
     constants = [
-      constant "over" over,
-      constant "rot" rot ]}
+      constant "over" over ]}
 
 sig2 =
   signature {
@@ -125,16 +124,36 @@ sig2 =
 sig3 =
   signature {
     constants = [
-      constant "flip" flip ]}
+      constant "rot" rot ]}
 
 sig4 =
   signature {
     constants = [
-      -- constant "cycle" cycle' ]}
-      constant "cycle" cycle ]}
+      constant "flip" flip ]}
+
+sig5 =
+  signature {
+    constants = [
+      constant "cycle" cycle,
+      -- constant "cycle" cycle',
+      constant "quartet" quartet ]}
+
+sig6 =
+  signature {
+    constants = [
+      constant "rot45" rot45 ]}
+
+sig7 =
+  signature {
+    constants = [
+      constant "blank" blank ]}
 
 main = do
   thy1 <- quickSpec sig1
   thy2 <- quickSpec (thy1 `mappend` sig2)
   thy3 <- quickSpec (thy2 `mappend` sig3)
-  quickSpec (thy3 `mappend` sig4)
+  thy4 <- quickSpec (thy3 `mappend` sig4)
+  thy5 <- quickSpec (thy4 `mappend` sig5)
+  thy6 <- quickSpec (thy5 `mappend` sig6)
+  quickSpec (thy6 `mappend` sig7)
+  return ()
