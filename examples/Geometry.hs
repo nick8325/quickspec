@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, TypeOperators #-}
+{-# LANGUAGE DeriveDataTypeable, TypeOperators, FlexibleInstances, GeneralizedNewtypeDeriving #-}
 import QuickSpec
 import Test.QuickCheck
 import qualified Data.Set as Set
@@ -48,7 +48,12 @@ instance Half Rat where
 type Vector = (Rat, Rat)
 type Object = (Vector, Vector, Vector, Word)
 
-newtype Drawing = Drawing (Vector -> Vector -> Vector -> Set Object) deriving Typeable
+newtype Drawing = Drawing (Vector -> Vector -> Vector -> Objs) deriving Typeable
+newtype Objs = Objs { unObjs :: Set Object } deriving (Eq, Ord, Typeable, Show)
+instance Arbitrary Objs where arbitrary = fmap objs arbitrary
+
+objs :: Set Object -> Objs
+objs = Objs . Set.filter (\(_,b,c,_) -> b /= zero && c /= zero)
 
 instance Show Drawing where
   show (Drawing x) = show (x one one one)
@@ -57,24 +62,29 @@ instance Show Drawing where
 
 instance Arbitrary Drawing where
   arbitrary = do
-    objs <- arbitrary
-    return . Drawing $ \x y z -> Set.fromList [(x, y, z, o) | o <- objs ]
+    os <- arbitrary
+    return . Drawing $ \x y z -> objs (Set.fromList [(x, y, z, o) | o <- os])
   shrink (Drawing f) =
-    [ Drawing $ \x y z -> Set.fromList [(x, y, z, o) | o <- objs' ]
-    | let objs = [ o | (_, _, _, o) <- Set.toList (f zero zero zero) ],
-      objs' <- shrink objs ]
+    [ Drawing $ \x y z -> objs (Set.fromList [(x, y, z, o) | o <- objs'])
+    | let os = [ o | (_, _, _, o) <- Set.toList (unObjs (f one one one)) ],
+      objs' <- shrink os ]
+    where
+      one = (1,1)
 
 instance (Ord a, Arbitrary a) => Arbitrary (Set a) where
   arbitrary = fmap Set.fromList arbitrary
 
 blank :: Drawing
-blank = Drawing (\_ _ _ -> Set.empty)
+blank = Drawing (\_ _ _ -> objs Set.empty)
 
 over, beside, above, above' :: Drawing -> Drawing -> Drawing
-over (Drawing p) (Drawing q) = Drawing (\a b c -> p a b c `Set.union` q a b c)
-beside (Drawing p) (Drawing q) = Drawing (\a b c -> p a (half b) c `Set.union` q (a `plus` half b) (half b) c)
-above' (Drawing p) (Drawing q) = Drawing (\a b c -> p a b (half c) `Set.union` q (a `plus` half c) b (half c))
-above (Drawing p) (Drawing q) = Drawing (\a b c -> p (a `plus` half c) b (half c) `Set.union` q a b (half c))
+over (Drawing p) (Drawing q) = Drawing (\a b c -> p a b c `union` q a b c)
+beside (Drawing p) (Drawing q) = Drawing (\a b c -> p a (half b) c `union` q (a `plus` half b) (half b) c)
+above' (Drawing p) (Drawing q) = Drawing (\a b c -> p a b (half c) `union` q (a `plus` half c) b (half c))
+above (Drawing p) (Drawing q) = Drawing (\a b c -> p (a `plus` half c) b (half c) `union` q a b (half c))
+
+union :: Objs -> Objs -> Objs
+union (Objs x) (Objs y) = objs (x `Set.union` y)
 
 rot, flip, rot45 :: Drawing -> Drawing
 rot (Drawing p) = Drawing (\a b c -> p (a `plus` b) c (neg b))
@@ -89,7 +99,7 @@ cycle, cycle' :: Drawing -> Drawing
 cycle x = quartet x (rot (rot (rot x))) (rot x) (rot (rot x))
 cycle' x = quartet' x (rot (rot (rot x))) (rot x) (rot (rot x))
 
-obsDrawing :: Drawing -> Gen (Set Object)
+obsDrawing :: Drawing -> Gen Objs
 obsDrawing (Drawing d) = do
   (a, b, c) <- arbitrary
   return (d a b c)
