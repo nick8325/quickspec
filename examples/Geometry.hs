@@ -69,7 +69,7 @@ instance Arbitrary Drawing where
     | let os = [ o | (_, _, _, o) <- Set.toList (unObjs (f one one one)) ],
       objs' <- shrink os ]
     where
-      one = (1,1)
+      one = (Rat 1 0, Rat 1 0)
 
 instance (Ord a, Arbitrary a) => Arbitrary (Set a) where
   arbitrary = fmap Set.fromList arbitrary
