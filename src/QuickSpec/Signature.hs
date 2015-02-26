@@ -95,7 +95,7 @@ defaultTo_ sig =
         error $ "Default type is not ground: " ++ prettyShow ty
 
 maxTermSize_ :: Signature -> Int
-maxTermSize_ = fromMaybe 9 . maxTermSize
+maxTermSize_ = fromMaybe 7 . maxTermSize
 
 maxCommutativeSize_ = fromMaybe 5 . maxCommutativeSize
 
