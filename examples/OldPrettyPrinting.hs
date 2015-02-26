@@ -21,6 +21,9 @@ Layout xs $$ Layout ys = Layout (xs ++ ys)
 Layout xs <> Layout ys = f (init xs) (last xs) (head ys) (tail ys)
   where f xs (i, s) (j, t) ys = Layout xs $$ Layout [(i, s ++ t)] $$ nest (i + length s - j) (Layout ys)
 
+nesting :: Layout a -> Int
+nesting (Layout ((i,_):_)) = i
+
 background =
   signature {
     constants = [
@@ -35,6 +38,7 @@ sig =
     constants = [
        constant "text" (text :: [A] -> Layout A),
        constant "nest" (nest :: Int -> Layout A -> Layout A),
+       constant "nesting" (nesting :: Layout A -> Int),
        constant "$$" (($$) :: Layout A -> Layout A -> Layout A),
        constant "<>" ((<>) :: Layout A -> Layout A -> Layout A) ],
     instances = [
