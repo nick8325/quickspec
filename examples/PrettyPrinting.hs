@@ -22,6 +22,7 @@ arbString = listOf (elements "ab")
 
 background =
   signature {
+    maxTermSize = Just 9,
     maxTests = Just 1000,
     constants = [
        constant "[]" ([] :: [A]),

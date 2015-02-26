@@ -26,6 +26,7 @@ nesting (Layout ((i,_):_)) = i
 
 background =
   signature {
+    maxTermSize = Just 9,
     constants = [
        constant "[]" ([] :: [A]),
        constant "++" ((++) :: [A] -> [A] -> [A]),
