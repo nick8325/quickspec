@@ -38,13 +38,9 @@ Exception: (e.g.) (_+_)+(_+_) - application of commutative function where both a
 Make timeouts a bit cleverer e.g. reduce test size
 Instead of timeouts, allow the test evaluator to return a Maybe (if Nothing, throw out the test)
 
-Fix heuristics so we get sum . map length = length . concat
-
 Make main loop understand conditions in some way or other
 
 Generalise to other things than equalities
-
-Really take care of partiality.
 
 Instantiate schemas in a smarter way. Also, try to avoid having to
 look explicitly for laws with totally different variables on both sides.
