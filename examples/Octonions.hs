@@ -170,7 +170,7 @@ instance ConLike Const where
 sig1 =
   signature {
     constants = map toConstant [One, Star, Inverse],
-    maxTests = Just 5,
+    maxTermSize = Just 9,
     instances = [
       baseType (undefined :: It) ]}
   where
