@@ -4,12 +4,13 @@ import qualified Prelude
 import Data.Ratio
 import Control.Monad
 import Control.Monad.IO.Class
-import Test.QuickCheck hiding (Result)
-import Test.QuickCheck.Gen
+import Test.QuickCheck hiding (Result, shuffle)
+import Test.QuickCheck.Gen hiding (shuffle)
 import Test.QuickCheck.Random
 import Data.Ord
 import Data.Monoid
 import Data.List hiding ((\\))
+import qualified Data.List
 import QuickSpec hiding (compose, (\\), Result, apply)
 
 class Fractional a => Conj a where
@@ -84,21 +85,21 @@ shuffle xs = do
   f <- resize 100 arbitrary :: Gen (a -> Large Int)
   return (sortBy (comparing f) xs)
 
-data Ext a = Normal a | Weird a deriving (Eq, Ord, Typeable, Show)
+data Ext a = Norm a | Weird a deriving (Eq, Ord, Typeable, Show)
 
 instance Arbitrary a => Arbitrary (Ext a) where
-  arbitrary = oneof [fmap Normal arbitrary, fmap Weird arbitrary]
+  arbitrary = oneof [fmap Norm arbitrary, fmap Weird arbitrary]
 instance CoArbitrary a => CoArbitrary (Ext a) where
-  coarbitrary (Normal x) = variant (0 :: Int) . coarbitrary x
+  coarbitrary (Norm x) = variant (0 :: Int) . coarbitrary x
   coarbitrary (Weird x)  = variant (1 :: Int) . coarbitrary x
 instance Group a => Group (Ext a) where
-  ident = Normal ident
-  inv (Normal x) = Normal (inv x)
+  ident = Norm ident
+  inv (Norm x) = Norm (inv x)
   inv (Weird x)  = Weird  x
-  op (Normal x) (Normal y) = Normal (op x y)
-  op (Weird x)  (Normal y) = Weird (op x (inv y))
-  op (Normal x) (Weird y)  = Weird (op y x)
-  op (Weird x)  (Weird y)  = Normal (op (inv y) x)
+  op (Norm x) (Norm y) = Norm (op x y)
+  op (Weird x)  (Norm y) = Weird (op x (inv y))
+  op (Norm x) (Weird y)  = Weird (op y x)
+  op (Weird x)  (Weird y)  = Norm (op (inv y) x)
 
 newtype It = It (Octonion, Ext Perms) deriving (Eq, Ord, Typeable, CoArbitrary, Group, Show)
 instance Arbitrary It where arbitrary = liftM2 (curry It) it arbitrary
@@ -143,7 +144,7 @@ obsItFun f = fmap (apply f) arbitrary
 
 data Const =
   -- Base constants
-  One | Star | Inverse |
+  One | Star | Inverse | LeftInv | RightInv |
   -- Functionals
   Id | Compose | Inversion | L1 | R1 | L2 | R2 | Apply | C | T | J | ConjJ
   deriving (Enum, Bounded, Show)
@@ -154,6 +155,8 @@ instance ConLike Const where
   toConstant One       =  constant "1"   (ident :: It)
   toConstant Star      =  constant "*"   (op :: It -> It -> It)
   toConstant Inverse   = (constant "^-1" (inv :: It -> It)) { conStyle = Postfix }
+  toConstant LeftInv   =  constant "\\" ((\\) :: It -> It -> It)
+  toConstant RightInv  =  constant "/" ((/) :: It -> It -> It)
   toConstant Id        =  constant "id"  (ident :: ItFun)
   toConstant Compose   =  constant "."   (op    :: ItFun -> ItFun -> ItFun)
   toConstant Inversion = (constant "^-1" (inv   :: ItFun -> ItFun)) { conStyle = Postfix }
@@ -169,21 +172,47 @@ instance ConLike Const where
 
 sig1 =
   signature {
-    constants = map toConstant [One, Star, Inverse],
-    maxTermSize = Just 9,
+    constants = cs,
+    maxTermSize = Just 7,
+    maxTests = Just 10,
+    --extraPruner = Just (E 5),
+    background = quasimoufang cs,
+    --background = diassociativity cs ++ loop cs,
     instances = [
       baseType (undefined :: It) ]}
   where
-
-diassociativity :: [Prop]
-diassociativity = map (parseProp (constants sig1 ++ [bi])) background
-  where
+    cs = map toConstant [Star, LeftInv, RightInv] ++ [bi]
     bi = constant "bi" (undefined :: It -> It -> It -> Bool)
+
+diassociativity :: [Constant] -> [Prop]
+diassociativity cs = map (parseProp cs) background
+  where
     background = [
-      "bi(X, Y, Z)",
+      "bi(X, Y, X)",
       "bi(X, Y, Y)",
       "bi(X, Y, A) & bi(X, Y, B) => bi(X, Y, *(A, B))",
       "bi(X, Y, A) & bi(X, Y, B) & bi(X, Y, C) => *(A, *(B, C)) = *(*(A, B), C)"]
+
+loop :: [Constant] -> [Prop]
+loop cs = map (parseProp cs) background
+  where
+    background = [
+      "*(1, X) = X",
+      "*(X, 1) = X",
+      "*(X, ^-1(X)) = 1",
+      "*(^-1(X), X) = 1"
+      ]
+
+quasimoufang :: [Constant] -> [Prop]
+quasimoufang cs = map (parseProp cs) background
+  where
+    background = [
+      "*(X, \\(X, Y)) = Y",
+      "\\(X, *(X, Y)) = Y",
+      "*(/(X, Y), Y) = X",
+      "/(*(X, Y), Y) = X",
+      "*(A,*(B,*(A,C))) = *(*(*(A,B),A),C)"
+      ]
 
 sig2 =
   signature {
@@ -246,12 +275,90 @@ instance Group (Tm Const Variable) where
   ident = Fun One []
   op x y = Fun Star [x, y]
   inv x = Fun Inverse [x]
-{-
-main = do
+
+{-main = do
   thy1 <- quickSpec sig1
   thy2 <- quickSpec sig2
   let sig = thy1 `mappend` thy2 `mappend` sig3
-  quickSpec sig
--}
+  quickSpec sig-}
 
-main = quickSpec sig1
+main = do
+  let sig = renumber sig1
+      bg = quasimoufang (constants sig)
+      goal = parseProp (constants sig) "*(X, /(Y, Y)) = X"
+  thy <- quickSpec sig
+  props <- upTo (\n bg -> establish n sig bg (background thy)) timeout bg
+  case goal `elem` props of
+    False ->
+      putStrLn "Failed to prove goal"
+    True -> do
+      putStrLn "Proved goal!\n"
+      props' <- shrinkProof sig bg goal props
+      putStrLn "\nFinal chain of lemmas:"
+      mapM_ prettyPrint props'
+
+timeout = 3
+
+upTo :: (Int -> a -> IO a) -> Int -> a -> IO a
+upTo f n x = go n x
+  where
+    go m x | m > n = return x
+    go m x = f m x >>= go (m+1)
+
+shrinkProof :: Signature -> [Prop] -> Prop -> [Prop] -> IO [Prop]
+shrinkProof sig bg goal props =
+  upTo (\n props -> shrinkProof' n sig bg [goal] (reverse props)) timeout props
+
+shrinkProof' :: Int -> Signature -> [Prop] -> [Prop] -> [Prop] -> IO [Prop]
+shrinkProof' timeout sig bg goals [] = return goals
+shrinkProof' timeout sig bg goals (p:ps) = do
+  res <- allProvable timeout sig (bg ++ ps) goals
+  case res of
+    True -> do
+      putStrLn ("Didn't need " ++ prettyShow p)
+      shrinkProof' timeout sig bg goals ps
+    False -> do
+      putStrLn ("Needed " ++ prettyShow p)
+      shrinkProof' timeout sig bg (p:goals) ps
+
+establish :: Int -> Signature -> [Prop] -> [Prop] -> IO [Prop]
+establish timeout sig bg ps = do
+  new <- establish1 timeout sig bg [] ps
+  let bg' = bg ++ new
+  case new of
+    [] -> do
+      putStrLn ("Proved following laws:")
+      mapM_ prettyPrint bg'
+      return bg'
+    _ -> do
+      putStrLn "Loop!\n"
+      establish timeout sig bg' (ps Data.List.\\ new)
+
+establish1 :: Int -> Signature -> [Prop] -> [Prop] -> [Prop] -> IO [Prop]
+establish1 timeout sig bg new [] = return new
+establish1 timeout sig bg new (p:ps) = do
+  res <- provable timeout sig (bg ++ new) p
+  case res of
+    True -> do
+      putStrLn ("Proved " ++ prettyShow p)
+      establish1 timeout sig bg (new ++ [p]) ps
+    False -> do
+      putStrLn ("Failed to prove " ++ prettyShow p)
+      establish1 timeout sig bg new ps
+
+provable :: Int -> Signature -> [Prop] -> Prop -> IO Bool
+provable timeout sig bg p = do
+  let bg' = map strip bg
+      strip = fmap (mapTerm stripCon stripVar)
+      stripCon c = TermConstant c (typ c)
+      stripVar x = PruningVariable (number x)
+      skolemise = substf (\x -> Fun (SkolemVariable (stripVar x)) [])
+  liftIO $ pruner (E timeout) bg' (skolemise (strip (simplify_ sig p)))
+
+allProvable :: Int -> Signature -> [Prop] -> [Prop] -> IO Bool
+allProvable _ _ _ [] = return True
+allProvable timeout sig ps (q:qs) = do
+  res <- provable timeout sig ps q
+  case res of
+    False -> return False
+    True -> allProvable timeout sig (ps ++ [q]) qs
