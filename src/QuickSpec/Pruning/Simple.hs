@@ -19,10 +19,10 @@ import QuickSpec.Pruning.Equation
 newtype SimplePruner = S (Index (Constrained (RuleOf PruningTerm)))
 
 instance Pruner SimplePruner where
-  emptyPruner _ = S Index.empty
-  untypedAxiom  = simpleUnify
-  untypedRep    = simpleRep
-  pruningReport = simpleReport
+  emptyPruner _  = S Index.empty
+  untypedAxiom _ = simpleUnify
+  untypedRep     = simpleRep
+  pruningReport  = simpleReport
 
 modifyS f = modify (\(S x) -> S (f x))
 
@@ -35,7 +35,7 @@ simpleUnify _ = return ()
 simpleRep :: [PropOf PruningTerm] -> PruningTerm -> StateT SimplePruner IO (Maybe PruningTerm)
 simpleRep axioms t = do
   S idx <- get
-  let u = normaliseWith (usortBy (comparing measure) . anywhere (rewrite idx)) t
+  let u = normaliseWith ({- usortBy (comparing measure) . -} anywhere (rewrite idx)) t
   if t == u then return Nothing else return (Just u)
   where
     rewrite idx t = do

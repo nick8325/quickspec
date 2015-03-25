@@ -22,17 +22,19 @@ import Control.Monad
 import Control.Applicative
 import Data.Ord
 
+data AxiomMode = Normal | WithoutConsequences
+
 class Pruner s where
   emptyPruner   :: Signature -> s
   untypedRep    :: [PropOf PruningTerm] -> PruningTerm -> StateT s IO (Maybe PruningTerm)
-  untypedAxiom  :: PropOf PruningTerm -> StateT s IO ()
+  untypedAxiom  :: AxiomMode -> PropOf PruningTerm -> StateT s IO ()
   pruningReport :: s -> String
   pruningReport _ = ""
 
 instance Pruner [PropOf PruningTerm] where
-  emptyPruner _     = []
-  untypedRep _ _    = return Nothing
-  untypedAxiom prop = modify (prop:)
+  emptyPruner _       = []
+  untypedRep _ _      = return Nothing
+  untypedAxiom _ prop = modify (prop:)
 
 newtype PrunerM s a =
   PrunerM {
@@ -52,7 +54,7 @@ runPruner :: Pruner s => Signature -> s -> PrunerM s a -> IO (a, s)
 runPruner sig theory m =
   runStateT (runReaderT (runRulesT (unPrunerM m')) (Set.toList (typeUniverse sig))) theory
   where
-    m' = createRules >> mapM_ axiom (background sig) >> m
+    m' = createRules >> mapM_ (axiom Normal) (background sig) >> m
 
 createRules :: Pruner s => PrunerM s ()
 createRules = PrunerM $ do
@@ -65,13 +67,13 @@ createRules = PrunerM $ do
           args = take arity (typeArgs (typ con))
       generate (HasType ty)
       unPrunerM $ liftPruner $
-        untypedAxiom ([] :=>: Fun (HasType ty) [t] :=: t)
+        untypedAxiom Normal ([] :=>: Fun (HasType ty) [t] :=: t)
       forM_ (zip [0..] args) $ \(i, ty) -> do
         let vs = map (Var . PruningVariable) [0..arity-1]
             tm f = Fun fun (take i vs ++ [f (vs !! i)] ++ drop (i+1) vs)
         generate (HasType ty)
         unPrunerM $ liftPruner $
-          untypedAxiom ([] :=>: tm (\t -> Fun (HasType ty) [t]) :=: tm id)
+          untypedAxiom Normal ([] :=>: tm (\t -> Fun (HasType ty) [t]) :=: tm id)
 
   rule $ do
     idFun@(TermConstant idCon idTy) <- event
@@ -83,16 +85,16 @@ createRules = PrunerM $ do
           arity = conArity con
           x:xs = map (Var . PruningVariable) [0..arity]
       unPrunerM $ liftPruner $
-        untypedAxiom ([] :=>: Fun idFun [Fun fun xs, x] :=: Fun fun' (xs ++ [x]))
+        untypedAxiom Normal ([] :=>: Fun idFun [Fun fun xs, x] :=: Fun fun' (xs ++ [x]))
 
   rule $ do
     fun@(HasType ty) <- event
     execute $
       unPrunerM $ liftPruner $
-        untypedAxiom ([] :=>: Fun fun [Fun fun [Var 0]] :=: Fun fun [Var 0])
+        untypedAxiom Normal ([] :=>: Fun fun [Fun fun [Var 0]] :=: Fun fun [Var 0])
 
-axiom :: Pruner s => Prop -> PrunerM s ()
-axiom p = do
+axiom :: Pruner s => AxiomMode -> Prop -> PrunerM s ()
+axiom mode p = do
   univ <- askUniv
   when (null (instances univ p)) $
     ERROR . show . sep $
@@ -104,7 +106,7 @@ axiom p = do
        nest 2 (pretty [ pretty t <+> text "::" <+> pretty (typ t) | t <- usort (terms p >>= subterms) ])]
   sequence_
     [ do sequence_ [ PrunerM (generate fun) | fun <- usort (funs p') ]
-         liftPruner (untypedAxiom p')
+         liftPruner (untypedAxiom mode p')
     | p' <- map toAxiom (instances univ p) ]
 
 toAxiom :: Prop -> PropOf PruningTerm

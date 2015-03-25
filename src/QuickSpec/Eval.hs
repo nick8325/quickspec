@@ -456,7 +456,7 @@ found sig prop0 = do
         | otherwise = lhs :=>: u :=: t
       prop = regeneralise (reorder prop0)
   props <- lift (gets discovered)
-  (_, props') <- liftIO $ runPruner sig [] $ mapM_ axiom (map (simplify_ sig) props)
+  (_, props') <- liftIO $ runPruner sig [] $ mapM_ (axiom Normal) (map (simplify_ sig) props)
 
   let props = etaExpand prop
   onTerm putTemp "[running extra pruner...]"
@@ -487,7 +487,7 @@ found sig prop0 = do
         onTerm putLine (prettyShow (rename (canonicalise prop')))
 
   onTerm putTemp "[completing theory...]"
-  mapM_ (lift . lift . axiom) props
+  mapM_ (lift . lift . axiom Normal) props
   forM_ (map canonicalise props) $ \(_ :=>: _ :=: t) -> do
     u <- fmap (fromMaybe t) (lift (lift (rep t)))
     newTerm u

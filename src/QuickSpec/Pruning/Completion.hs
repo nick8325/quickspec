@@ -9,6 +9,7 @@ import QuickSpec.Signature
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.State.Strict
+import qualified QuickSpec.Pruning.Index as Index
 
 newtype Completion =
   Completion {
@@ -33,14 +34,21 @@ localKBC m = do
   ks <- gets kbc
   lift (evalStateT m ks)
 
-newAxiom :: PropOf PruningTerm -> StateT Completion IO ()
-newAxiom ([] :=>: (t :=: u)) = do
+newAxiom :: AxiomMode -> PropOf PruningTerm -> StateT Completion IO ()
+newAxiom Normal ([] :=>: (t :=: u)) = do
   liftKBC $ do
     KBC.traceM (KBC.NewAxiom (t :==: u))
     norm <- KBC.normaliser
     unless (norm t == norm u) $ do
       KBC.newEquation (Constrained (toContext FTrue) (t :==: u))
       KBC.complete
+newAxiom WithoutConsequences ([] :=>: (t :=: u)) = do
+  liftKBC $ do
+    KBC.traceM (KBC.NewAxiom (t :==: u))
+    norm <- KBC.normaliser
+    forM_ (orient (norm t :==: norm u) >>= split) $ \rule ->
+      modify (\s -> s { KBC.extraRules = Index.insert rule (KBC.extraRules s) })
+newAxiom _ _ = return ()
 
 while :: IO Bool -> IO () -> IO ()
 while cond m = do

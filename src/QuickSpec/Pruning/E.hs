@@ -18,22 +18,24 @@ import qualified Jukebox.Form as Jukebox
 import qualified Jukebox.Name as Jukebox
 import qualified Jukebox.Provers.E as Jukebox
 import qualified Jukebox.Provers.SPASS as Jukebox
+import qualified Jukebox.TPTP.Print as Jukebox
+import qualified Text.PrettyPrint as Jukebox
 
 eUnify, spassUnify :: Int -> [PropOf PruningTerm] -> PropOf PruningTerm -> IO Bool
-eUnify timeout = foUnify (Jukebox.runE (Jukebox.EFlags "eprover" (Just timeout) Nothing)) (Left Jukebox.Unsatisfiable)
-spassUnify timeout = foUnify (Jukebox.runSPASS (Jukebox.SPASSFlags "SPASS" (Just timeout) False)) Jukebox.Unsatisfiable
+eUnify timeout = foUnify True (Jukebox.runE (Jukebox.EFlags "eprover" (Just timeout) Nothing)) (Left Jukebox.Unsatisfiable)
+spassUnify timeout = foUnify False (Jukebox.runSPASS (Jukebox.SPASSFlags "SPASS" (Just timeout) False)) Jukebox.Unsatisfiable
 
-foUnify prove unsat axioms goal = do
+foUnify hasConj prove unsat axioms goal = do
   -- putStrLn ("\nSending to prover: " ++ prettyShow (fmap fromPruningTerm goal))
-  let prob = translate (map unitProp (lhs goal) ++ axioms) (rhs goal)
-  -- putStrLn (Jukebox.render (Jukebox.prettyProblem "cnf" Jukebox.Normal prob))
+  let prob = translate hasConj (map unitProp (lhs goal) ++ axioms) (rhs goal)
+  --putStrLn (Jukebox.render (Jukebox.prettyProblem "cnf" Jukebox.Normal prob))
   res <- prove prob
   -- print res
   return (res == unsat)
 
-translate :: [PropOf PruningTerm] -> Literal PruningTerm ->
+translate :: Bool -> [PropOf PruningTerm] -> Literal PruningTerm ->
              Jukebox.Closed [Jukebox.Input Jukebox.Form]
-translate axioms goal = Jukebox.close_ Jukebox.stdNames $ do
+translate hasConj axioms goal = Jukebox.close_ Jukebox.stdNames $ do
   ty <- Jukebox.newType "i"
   let vs = usort (concatMap vars (unitProp goal:axioms))
       fs = usort (concatMap funs (unitProp goal:axioms))
@@ -44,9 +46,11 @@ translate axioms goal = Jukebox.close_ Jukebox.stdNames $ do
   let var  = find (Map.fromList (zip vs varSyms))
       fun  = find (Map.fromList (zip fs funSyms))
       prop = find (Map.fromList (zip ps propSyms))
-      input form = Jukebox.Input (BS.pack "clause") Jukebox.Axiom form
-  return (input (Jukebox.nt (translateLiteral var fun prop goal)):
-          map (input . translateProp var fun prop) axioms)
+      input kind form = Jukebox.Input (BS.pack "clause") kind form
+      conj | hasConj = input Jukebox.Conjecture
+           | otherwise = input Jukebox.Axiom . Jukebox.nt
+  return (conj (translateLiteral var fun prop goal):
+          map (input Jukebox.Axiom . translateProp var fun prop) axioms)
 
 makeFunName :: PruningConstant -> String
 makeFunName (TermConstant x ty) = conName x
