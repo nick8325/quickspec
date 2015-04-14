@@ -110,6 +110,6 @@ library
   else
     cpp-options: -DNO_JUKEBOX
   if flag(z3)
-    Build-depends: z3
+    Build-depends: z3 >= 4
   else
     cpp-options: -DNO_Z3

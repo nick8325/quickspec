@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveFunctor, CPP, TypeFamilies #-}
+{-# LANGUAGE DeriveFunctor, CPP, TypeFamilies, FlexibleContexts #-}
 module QuickSpec.Prop where
 
 #include "errors.h"

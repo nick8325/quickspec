@@ -1,5 +1,6 @@
 -- | Miscellaneous utility functions.
 
+{-# LANGUAGE CPP #-}
 module QuickSpec.Utils where
 
 import Control.Arrow((&&&))
@@ -83,9 +84,11 @@ instance Ord a => Monoid (Min a) where
 labelM :: Monad m => (a -> m b) -> [a] -> m [(a, b)]
 labelM f = mapM (\x -> do { y <- f x; return (x, y) })
 
+#if __GLASGOW_HASKELL__ < 710
 isSubsequenceOf :: Ord a => [a] -> [a] -> Bool
 [] `isSubsequenceOf` ys = True
 (x:xs) `isSubsequenceOf` [] = False
 (x:xs) `isSubsequenceOf` (y:ys)
   | x == y = xs `isSubsequenceOf` ys
   | otherwise = (x:xs) `isSubsequenceOf` ys
+#endif

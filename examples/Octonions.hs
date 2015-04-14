@@ -159,11 +159,11 @@ instance ConLike Const where
   toConstant RightInv  =  constant "/" ((/) :: It -> It -> It)
   toConstant Id        =  constant "id"  (ident :: ItFun)
   toConstant Compose   =  constant "."   (op    :: ItFun -> ItFun -> ItFun)
-  toConstant Inversion = (constant "^-1" (inv   :: ItFun -> ItFun)) { conStyle = Postfix }
-  toConstant L1        = (constant "L"   (l :: It -> ItFun))     { conStyle = Uncurried }
-  toConstant R1        = (constant "R"   (r :: It -> ItFun))     { conStyle = Uncurried }
-  toConstant L2        = (constant "L"  (l2 :: It -> It -> ItFun))    { conStyle = Uncurried }
-  toConstant R2        = (constant "R"  (r2 :: It -> It -> ItFun))    { conStyle = Uncurried }
+  toConstant Inversion = (constant "^^-1" (inv   :: ItFun -> ItFun)) { conStyle = Postfix }
+  toConstant L1        = (constant "L1"   (l :: It -> ItFun))     { conStyle = Uncurried }
+  toConstant R1        = (constant "R1"   (r :: It -> ItFun))     { conStyle = Uncurried }
+  toConstant L2        = (constant "L2"  (l2 :: It -> It -> ItFun))    { conStyle = Uncurried }
+  toConstant R2        = (constant "R2"  (r2 :: It -> It -> ItFun))    { conStyle = Uncurried }
   toConstant Apply     =  constant "@"   (flip apply :: It -> ItFun -> It)
   toConstant C         = (constant "C"   (c :: It -> It -> ItFun))     { conStyle = Uncurried }
   toConstant T         = (constant "T"   (t :: It -> ItFun))     { conStyle = Uncurried }
@@ -175,6 +175,7 @@ sig1 =
     constants = cs,
     maxTermSize = Just 7,
     maxTests = Just 10,
+    QuickSpec.simplify = Just Main.simplify,
     --extraPruner = Just (E 5),
     background = quasimoufang cs,
     --background = diassociativity cs ++ loop cs,
@@ -226,7 +227,6 @@ sig2 =
 sig3 =
   signature {
     constants = map toConstant [L1, R1, L2, R2, Apply, C, T, J, ConjJ],
-    --QuickSpec.simplify = Just Main.simplify,
     maxTests = Just 5}
     --instances = [baseType (undefined :: Result)],
     --background = background,
@@ -236,7 +236,7 @@ class (Enum a, Bounded a) => ConLike a where
 
 fromConstant :: ConLike a => Signature -> Constant -> a
 fromConstant sig c =
-  head [ x | x <- [minBound..maxBound], toConstant x == c ]
+  head [ x | x <- [minBound..maxBound], conName (toConstant x) == conName c ]
 
 simplify :: Signature -> Prop -> Prop
 simplify sig ([] :=>: t :=: u) | typ t == typeOf (undefined :: ItFun) =

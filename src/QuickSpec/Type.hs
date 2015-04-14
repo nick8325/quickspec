@@ -137,8 +137,13 @@ toTyCon (TyCon tyCon) = tyCon
 
 -- CoArbitrary instances.
 instance CoArbitrary Ty.TypeRep where
+#if __GLASGOW_HASKELL__ >= 710
+  coarbitrary (Ty.TypeRep (Ty.Fingerprint x y) _ _ _) =
+    coarbitrary x . coarbitrary y
+#else
   coarbitrary (Ty.TypeRep (Ty.Fingerprint x y) _ _) =
     coarbitrary x . coarbitrary y
+#endif
 
 instance CoArbitrary Type where
   coarbitrary = coarbitrary . toTypeRep

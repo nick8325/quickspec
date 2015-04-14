@@ -15,8 +15,8 @@ z3Unify timeout axioms goal =
   evalZ3With Nothing (opt "SOFT_TIMEOUT" timeout) $ do
     bool <- mkBoolSort
     ind  <- mkStringSymbol "$i" >>= mkUninterpretedSort
-    sequence_ [ flatten bool ind prop >>= assertCnstr | prop <- axioms ]
-    flatten bool ind goal >>= mkNot >>= assertCnstr
+    sequence_ [ flatten bool ind prop >>= solverAssertCnstr | prop <- axioms ]
+    flatten bool ind goal >>= mkNot >>= solverAssertCnstr
     res <- check
     case res of
       Unsat ->
