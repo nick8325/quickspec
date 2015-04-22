@@ -155,12 +155,15 @@ class Pretty a => PrettyTerm a where
   termStyle :: a -> TermStyle
   termStyle _ = Curried
 
+  implicitArguments :: a -> Int
+  implicitArguments _ = 0
+
 data TermStyle = Invisible | Curried | Uncurried | Tuple Int | TupleType | ListType | Infix Int | Infixr Int | Prefix | Postfix | Gyrator deriving Show
 
 instance (PrettyTerm f, Pretty v) => Pretty (Tm f v) where
   prettyPrec p (Var x) = prettyPrec p x
   prettyPrec p (Fun f xs) =
-    prettyStyle (termStyle f) p (pretty f) xs
+    prettyStyle (termStyle f) p (pretty f) (drop (implicitArguments f) xs)
 
 instance (PrettyTerm f, Pretty v) => Pretty (Rule f v) where
   pretty (Rule l r) =

@@ -8,6 +8,7 @@ module QuickSpec.Type(
   Type, TyCon(..), tyCon, toTyCon, fromTyCon, TyVar(..), A, B, C, D, E,
   typeOf, typeRep, applyType, toTypeRep, fromTypeRep,
   arrowType, typeArgs, typeRes, arity, oneTypeVar, skolemiseTypeVars,
+  isDictionary,
   -- Things that have types.
   Typed(..), typesDL, tyVars, cast,
   TypeView(..),
@@ -31,6 +32,7 @@ import GHC.Exts(Any)
 import QuickSpec.Base
 import Test.QuickCheck
 import Unsafe.Coerce
+import Data.Constraint
 
 -- A (possibly polymorphic) type.
 type Type = Tm TyCon TyVar
@@ -109,13 +111,14 @@ fromTyCon tyCon
   | tyCon == arrowTyCon = Arrow
   | otherwise = TyCon tyCon
 
-arrowTyCon, commaTyCon, listTyCon, varTyCon, succTyCon, zeroTyCon :: Ty.TyCon
+arrowTyCon, commaTyCon, listTyCon, varTyCon, succTyCon, zeroTyCon, dictTyCon :: Ty.TyCon
 arrowTyCon = con (undefined :: () -> ())
 commaTyCon = con (undefined :: ((),()))
 listTyCon  = con (undefined :: [()])
 varTyCon   = con (undefined :: TyVarNumber ())
 succTyCon  = con (undefined :: Succ ())
 zeroTyCon  = con (undefined :: Zero)
+dictTyCon  = con (undefined :: Dict ())
 
 con :: Typeable a => a -> Ty.TyCon
 con = fst . Ty.splitTyConApp . Ty.typeOf
@@ -134,6 +137,10 @@ toTypeRep (Var (TyVar n)) = Ty.mkTyConApp varTyCon [toTyVar n]
 toTyCon :: TyCon -> Ty.TyCon
 toTyCon Arrow = arrowTyCon
 toTyCon (TyCon tyCon) = tyCon
+
+isDictionary :: Type -> Bool
+isDictionary (Fun (TyCon tc) _) | tc == dictTyCon = True
+isDictionary _ = False
 
 -- CoArbitrary instances.
 instance CoArbitrary Ty.TypeRep where

@@ -142,6 +142,11 @@ instance Pretty Constant where
   pretty = text . conName
 instance PrettyTerm Constant where
   termStyle = conStyle
+  implicitArguments f =
+    go (typ (conGeneralValue f))
+    where
+      go (Fun Arrow [t, u]) | isDictionary t = 1 + go u
+      go _ = 0
 instance Typed Constant where
   typ = typ . conValue
   typeSubst sub x = x { conValue = typeSubst sub (conValue x) }
