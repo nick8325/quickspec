@@ -23,6 +23,7 @@ import QuickSpec.Pruning.Completion hiding (initialState)
 import QuickSpec.Pruning.Simple(SimplePruner)
 import qualified QuickSpec.Pruning.E as E
 import qualified QuickSpec.Pruning.Z3 as Z3
+import qualified QuickSpec.Pruning.Waldmeister as WM
 import QuickSpec.Rules
 import QuickSpec.Signature
 import QuickSpec.Term
@@ -518,6 +519,7 @@ pruner :: ExtraPruner -> [PropOf PruningTerm] -> PropOf PruningTerm -> IO Bool
 pruner (SPASS timeout) = E.spassUnify timeout
 pruner (E timeout) = E.eUnify timeout
 pruner (Z3 timeout) = Z3.z3Unify timeout
+pruner (Waldmeister timeout) = WM.wmUnify timeout
 pruner None = \_ _ -> return False
 
 accept :: Poly Schema -> M ()

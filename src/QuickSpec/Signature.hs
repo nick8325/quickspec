@@ -114,7 +114,7 @@ simplify_ sig =
     Nothing -> id
     Just f -> f sig
 
-data ExtraPruner = E Int | SPASS Int | Z3 Int | None deriving Show
+data ExtraPruner = E Int | SPASS Int | Z3 Int | Waldmeister Int | None deriving Show
 
 extraPruner_ :: Signature -> ExtraPruner
 extraPruner_ = fromMaybe None . extraPruner
