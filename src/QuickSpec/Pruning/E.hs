@@ -22,7 +22,7 @@ import qualified Jukebox.TPTP.Print as Jukebox
 import qualified Text.PrettyPrint as Jukebox
 
 eUnify, spassUnify :: Int -> [PropOf PruningTerm] -> PropOf PruningTerm -> IO Bool
-eUnify timeout = foUnify True (Jukebox.runE (Jukebox.EFlags "eprover" (Just timeout) Nothing)) (Left Jukebox.Unsatisfiable)
+eUnify timeout = foUnify True (Jukebox.runE (Jukebox.EFlags "eprover" (Just timeout) (Just 1000))) (Left Jukebox.Unsatisfiable)
 spassUnify timeout = foUnify False (Jukebox.runSPASS (Jukebox.SPASSFlags "SPASS" (Just timeout) False)) Jukebox.Unsatisfiable
 
 foUnify hasConj prove unsat axioms goal = do
