@@ -74,6 +74,7 @@ library
     QuickSpec.Pruning
     QuickSpec.Pruning.E
     QuickSpec.Pruning.Z3
+    QuickSpec.Pruning.Waldmeister
     QuickSpec.Pruning.Simple
     QuickSpec.Pruning.Constraints
     QuickSpec.Pruning.Equation
@@ -100,6 +101,7 @@ library
                , dlist
                , pqueue >= 1.2.1
                , pretty
+               , process
                , random
                , spoon >= 0.2
                , term-rewriting >= 0.1.2
