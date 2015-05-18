@@ -233,9 +233,10 @@ constant name x = Constant 0 name value (poly value) 0 style 1 False
 
 isOp :: String -> Bool
 isOp "[]" = False
+isOp xs | all (== '.') xs = True
 isOp xs = not (all isIdent xs)
   where
-    isIdent x = isAlphaNum x || x == '\'' || x == '_'
+    isIdent x = isAlphaNum x || x == '\'' || x == '_' || x == '.'
 
 baseType :: forall a. (Ord a, Arbitrary a, Typeable a) => a -> [Instance]
 baseType _ =
