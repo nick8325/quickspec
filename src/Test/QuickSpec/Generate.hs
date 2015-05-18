@@ -92,14 +92,26 @@ generateTermsSatisfying shutUp p strat sig = unbuffered $ do
       ts = termsSatisfying p sig rs
   quietly $ printf "%d terms, " (count sum length ts)
   seeds <- genSeeds (maxQuickCheckSize sig)
-  let cs = test (map (toValuation strat sig) seeds) sig ts
-  quietly $
-    printf "%d tests, %d evaluations, %d classes, %d raw equations.\n"
-      (count (maximum . (0:)) numTests cs)
-      (count sum numResults cs)
-      (count sum (length . classes) cs)
-      (count sum (sum . map (subtract 1 . length) . classes) cs)
-  return cs
+  let p (val, _, _) = condition sig sig val
+      tests = filter' 1000 10 p (map (toValuation strat sig) seeds)
+      filter' m n p xs
+        | length ps < n = Nothing
+        | otherwise     = Just (ps ++ qs)
+        where
+          (ys, zs) = splitAt m xs
+          ps = filter p ys
+          qs = filter p zs
+  case tests of
+    Nothing -> return TypeMap.empty
+    Just tests -> do
+      let cs = test tests sig ts
+      quietly $
+        printf "%d tests, %d evaluations, %d classes, %d raw equations.\n"
+          (count (maximum . (0:)) numTests cs)
+          (count sum numResults cs)
+          (count sum (length . classes) cs)
+          (count sum (sum . map (subtract 1 . length) . classes) cs)
+      return cs
 
 eraseClasses :: TypeMap (TestResults `O` Expr) -> [[Tagged Term]]
 eraseClasses = concatMap (some (map (map (tagged term)) . classes . unO)) . TypeMap.toList

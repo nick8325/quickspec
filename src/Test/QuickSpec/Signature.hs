@@ -39,6 +39,9 @@ data Sig = Sig {
   partial   :: TypeMap Gen,
   observers :: TypeMap Observer,
 
+  -- Condition which must hold for the test case to be allowed
+  condition :: Sig -> Valuation -> Bool,
+
   -- Ord instances, added whenever the 'fun' family of functions is used.
   ords :: TypeMap Observer,
 
@@ -195,7 +198,7 @@ observe x sig =
   where msg = "no observers found for type " ++ show (typeOf x)
 
 emptySig :: Sig
-emptySig = Sig TypeRel.empty TypeRel.empty TypeMap.empty TypeMap.empty TypeMap.empty TypeMap.empty TypeMap.empty mempty mempty mempty mempty
+emptySig = Sig TypeRel.empty TypeRel.empty TypeMap.empty TypeMap.empty TypeMap.empty (\_ _ -> True) TypeMap.empty TypeMap.empty mempty mempty mempty mempty
 
 instance Monoid Sig where
   mempty = emptySig
@@ -206,6 +209,7 @@ instance Monoid Sig where
       observers = observers s1 `mappend` observers s2,
       total = total s1 `mappend` total s2,
       partial = partial s1 `mappend` partial s2,
+      condition = \sig val -> condition s1 sig val && condition s2 sig val,
       ords = ords s1 `mappend` ords s2,
       witnesses = witnesses s1 `mappend` witnesses s2,
       maxDepth_ = maxDepth_ s1 `mappend` maxDepth_ s2,
@@ -279,6 +283,9 @@ withTests n = emptySig { minTests_ = First (Just n) }
 --   (the default is 20).
 withQuickCheckSize :: Int -> Sig
 withQuickCheckSize n = emptySig { maxQuickCheckSize_ = First (Just n) }
+
+withCondition :: (Sig -> Valuation -> Bool) -> Sig
+withCondition f = emptySig { condition = f }
 
 -- | @sig \`without\` xs@ will remove the functions
 --   in @xs@ from the signature @sig@.
