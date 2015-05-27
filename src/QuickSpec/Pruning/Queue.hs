@@ -4,54 +4,59 @@ module QuickSpec.Pruning.Queue where
 
 import QuickSpec.Base
 import Data.Ord
-import qualified Data.PQueue.Min as Queue
-import Data.PQueue.Min(MinQueue)
+import qualified Data.Heap as Heap
+import Data.Heap(Heap)
 import qualified Data.Set as Set
 import Data.Set(Set)
 
 data Queue a =
   Queue {
-    queue     :: MinQueue (Labelled (Subqueue a)),
+    queue     :: Heap (Labelled (Subqueue a)),
     labels    :: Set Label,
     nextLabel :: Label }
   deriving Show
 
 newtype Subqueue a =
-  Subqueue { unSubqueue :: MinQueue (Labelled a) }
+  Subqueue { unSubqueue :: Heap (Labelled a) }
   deriving Show
 
 instance Eq a => Eq (Subqueue a) where
-  Subqueue x == Subqueue y = Queue.getMin x == Queue.getMin y
+  Subqueue x == Subqueue y = getMin x == getMin y
 instance Ord a => Ord (Subqueue a) where
-  compare = comparing (\(Subqueue x) -> Queue.getMin x)
+  compare = comparing (\(Subqueue x) -> getMin x)
+
+getMin :: Heap a -> Maybe a
+getMin h
+  | Heap.null h = Nothing
+  | otherwise = Just (Heap.minimum h)
 
 empty :: Queue q
-empty = Queue Queue.empty (Set.singleton noLabel) (noLabel+1)
+empty = Queue Heap.empty (Set.singleton noLabel) (noLabel+1)
 
 enqueue :: Ord a => Label -> [Labelled a] -> Queue a -> Queue a
 enqueue l [] q = q
-enqueue l xs q = q { queue = Queue.insert q' (queue q) }
+enqueue l xs q = q { queue = Heap.insert q' (queue q) }
   where
-    q' = Labelled l (Subqueue (Queue.fromList xs))
+    q' = Labelled l (Subqueue (Heap.fromList xs))
 
 dequeue :: Ord a => Queue a -> Maybe (Label, Label, a, Queue a)
 dequeue q@Queue{labels = ls, queue = q0} =
   fmap (\(l1, l2, x, q1) -> (l1, l2, x, q { queue = q1 })) (dequeue1 q0)
   where
     dequeue1 q = do
-      (Labelled l (Subqueue sq), q) <- minView q
-      case minView sq of
+      (Labelled l (Subqueue sq), q) <- Heap.viewMin q
+      case viewMin sq of
         Nothing -> dequeue1 q
         Just (Labelled l' x, sq) ->
-          return (l, l', x, Queue.insert (Labelled l (Subqueue sq)) q)
+          return (l, l', x, Heap.insert (Labelled l (Subqueue sq)) q)
 
-    minView ::
+    viewMin ::
       Ord a =>
-      MinQueue (Labelled a) ->
-      Maybe (Labelled a, MinQueue (Labelled a))
-    minView q = do
-      x@(Labelled l _, q) <- Queue.minView q
-      if l `Set.member` ls then return x else minView q
+      Heap (Labelled a) ->
+      Maybe (Labelled a, Heap (Labelled a))
+    viewMin q = do
+      x@(Labelled l _, q) <- Heap.viewMin q
+      if l `Set.member` ls then return x else viewMin q
 
 newtype Label = Label Int deriving (Eq, Ord, Num, Show)
 

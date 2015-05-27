@@ -99,7 +99,7 @@ library
                , containers
                , uglymemo
                , dlist
-               , pqueue >= 1.2.1
+               , heaps
                , pretty
                , process
                , random
