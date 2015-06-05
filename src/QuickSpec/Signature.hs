@@ -79,7 +79,7 @@ data Signature =
 instance Pretty Signature where
   pretty sig = vcat (map prettyDecl decls)
     where
-      decls = [(show (pretty (Fun c [] :: Term)), pretty (typ c)) | c <- constants sig, not (conIsBackground c)]
+      decls = [(show (pretty (Fun c [] :: Term)), pretty (typeDrop (implicitArguments c) (typ c))) | c <- constants sig, not (conIsBackground c)]
       maxWidth = maximum (0:map (length . fst) decls)
       pad xs = replicate (maxWidth - length xs) ' ' ++ xs
       prettyDecl (name, ty) =
