@@ -157,6 +157,8 @@ defaultInstances = [
   names (NamesFor ["f", "g", "h"] :: NamesFor (A -> B)),
   names (NamesFor ["x", "y", "z"] :: NamesFor A),
   makeInstance (\(dict :: Dict (Ord A)) -> return dict :: Gen (Dict (Ord A))),
+  makeInstance (\(dict :: Dict (Arbitrary A)) -> return dict :: Gen (Dict (Arbitrary A))),
+  makeInstance (\(dict :: Dict (CoArbitrary A)) -> return dict :: Gen (Dict (CoArbitrary A))),
   makeInstance (\(Dict :: Dict (Arbitrary A)) -> arbitrary :: Gen A),
   makeInstance (\(dict :: Dict (Ord A)) -> Observe dict return),
   makeInstance (\(obs :: Observe A B) -> observeTraversable ins obs :: Observe [A] [B]),
