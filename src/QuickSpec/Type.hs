@@ -7,7 +7,7 @@ module QuickSpec.Type(
   Typeable,
   Type, TyCon(..), tyCon, toTyCon, fromTyCon, TyVar(..), A, B, C, D, E,
   typeOf, typeRep, applyType, toTypeRep, fromTypeRep,
-  arrowType, typeArgs, typeRes, arity, oneTypeVar, skolemiseTypeVars,
+  arrowType, typeArgs, typeRes, typeDrop, arity, oneTypeVar, skolemiseTypeVars,
   isDictionary,
   -- Things that have types.
   Typed(..), typesDL, tyVars, cast,
@@ -83,6 +83,10 @@ typeArgs _ = []
 typeRes :: Type -> Type
 typeRes (Fun Arrow [_, res]) = typeRes res
 typeRes ty = ty
+
+typeDrop :: Int -> Type -> Type
+typeDrop 0 ty = ty
+typeDrop n (Fun Arrow [_, ty]) = typeDrop (n-1) ty
 
 arity :: Type -> Int
 arity = length . typeArgs

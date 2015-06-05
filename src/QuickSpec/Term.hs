@@ -179,9 +179,6 @@ instance Pretty Hole where pretty _ = text "_"
 instance Typed v => Typed (TermOf v) where
   typ (Var x) = typ x
   typ (Fun f xs) = typeDrop (length xs) (typ f)
-    where
-      typeDrop 0 ty = ty
-      typeDrop n (Fun Arrow [_, ty]) = typeDrop (n-1) ty
   otherTypesDL t = (varsDL t >>= typesDL) `mplus` (funsDL t >>= typesDL)
 
   typeSubst sub (Var x) = Var (typeSubst sub x)
