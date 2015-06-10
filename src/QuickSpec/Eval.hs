@@ -471,13 +471,10 @@ consider sig makeEvent x = do
         Just u -> generate (Ignoring (Rule t u))
         _ -> return ()
       let t' = specialise x
-      res' <- maybeNormalise t'
-      case res' of
-        Just u' | u' `Set.member` allSchemas ->
-          generate (makeEvent (EqualTo (unspecialise x u') Pruning))
-        Nothing | t' `Set.member` allSchemas ->
-          generate (makeEvent (EqualTo (unspecialise x t') Pruning))
-        _ -> do
+      u' <- normalise t'
+      if u' `Set.member` allSchemas
+        then generate (makeEvent (EqualTo (unspecialise x u') Pruning))
+        else do
           ts <- getTestSet x
           res <-
             liftIO . testTimeout_ sig $
