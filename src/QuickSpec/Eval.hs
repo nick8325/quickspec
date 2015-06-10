@@ -230,8 +230,8 @@ exploreSize sig n = do
   del <- lift $ gets delayed
   lift $ modify (\s -> s { delayed = [] })
   forM_ (sortBy (comparing measureEquation) del) $ \(t, u) -> do
-    t' <- fmap (fromMaybe t) (lift (lift (rep t)))
-    u' <- fmap (fromMaybe u) (lift (lift (rep u)))
+    t' <- normalise t
+    u' <- normalise t
     unless (t' == u') $ do
       generate (Found ([] :=>: t' :=: u'))
     newTerm u'
@@ -321,7 +321,7 @@ createRules sig = do
     Term (From s t) k <- event
     execute $ do
       let add = do
-            u <- fmap (fromMaybe t) (lift (lift (rep t)))
+            u <- normalise t
             newTerm u
       case k of
         TimedOut -> do
@@ -332,7 +332,7 @@ createRules sig = do
         EqualTo (From _ u) _ -> do
           --t' <- fmap (fromMaybe t) (lift (lift (rep t)))
           let t' = t
-          u' <- fmap (fromMaybe u) (lift (lift (rep u)))
+          u' <- normalise u
           del <- lift $ gets delayed
           let wait = or [ isJust (match2 (x, y) (t, u)) | (x, y) <- del ]
               match2 (x, y) (t, u) = match (Fun f [x, y]) (Fun f [t, u])
@@ -445,13 +445,22 @@ class (Eq a, Typed a) => Considerable a where
   putTestSet   :: a -> TestSet a -> M ()
   findAll      :: a -> M (Set Term)
 
+-- | Tries to normalise a term using current term rewriting rules.  If the term
+--   cannot be normalise returns Nothing.  This is wrapped into an M environment.
+maybeNormalise :: Term -> M (Maybe Term)
+maybeNormalise = lift . lift . rep
+
+-- | Normalises a term according to current term rewriting rules.  If the term cannot be normalised the original term is returned.
+normalise :: Term -> M Term
+normalise t = fmap (fromMaybe t) (maybeNormalise t)
+
 -- | Considers a Schema (@_ + _@) or a Term (@x + y@) creating relevant events.
 --   Given a signature `sig`, an event creating function `makeEvent` and a
 --   Schema or Term `x` to consider, triggers a relevant event.
 consider :: Considerable a => Signature -> (KindOf a -> Event) -> a -> M ()
 consider sig makeEvent x = do
   let t = generalise x
-  res   <- lift (lift (rep t))
+  res   <- maybeNormalise t
   terms <- lift (gets terms)
   allSchemas <- findAll x
   case res of
@@ -462,7 +471,7 @@ consider sig makeEvent x = do
         Just u -> generate (Ignoring (Rule t u))
         _ -> return ()
       let t' = specialise x
-      res' <- lift (lift (rep t'))
+      res' <- maybeNormalise t'
       case res' of
         Just u' | u' `Set.member` allSchemas ->
           generate (makeEvent (EqualTo (unspecialise x u') Pruning))
@@ -552,7 +561,7 @@ found sig prop0 = do
   onTerm putTemp "[completing theory...]"
   mapM_ (lift . lift . axiom Normal) props
   forM_ (map canonicalise props) $ \(_ :=>: _ :=: t) -> do
-    u <- fmap (fromMaybe t) (lift (lift (rep t)))
+    u <- normalise t
     newTerm u
   onTerm putTemp "[renormalising existing terms...]"
   let norm s = do
@@ -584,7 +593,7 @@ pruner None = \_ _ -> return False
 accept :: Poly Schema -> M ()
 accept s = do
   let t = skeleton (instantiate (unPoly s))
-  u <- fmap (fromMaybe t) (lift . lift . rep $ t)
+  u <- normalise t
   lift $ modify (\st -> st { schemas = Map.adjust f (size (unPoly s)) (schemas st),
                              allSchemas = Set.insert u (allSchemas st) })
   where
