@@ -123,9 +123,9 @@ instance (Minimal f, Sized f, Ord f, Ord v) => Symbolic (Context f v) where
 type FormulaOf a = Formula (ConstantOf a) (VariableOf a)
 data Formula f v =
   -- After calling split, formulas are in the following form:
-  -- * No occurrences of Equal.
-  -- * HeadIs and Less can only be applied to variables.
-  -- * No tautological or impossible literals.
+  --   * No occurrences of Equal.
+  --   * HeadIs and Less can only be applied to variables.
+  --   * No tautological or impossible literals.
     FTrue
   | FFalse
   | Formula f v :&: Formula f v
@@ -333,12 +333,12 @@ negFormula _ = ERROR "must call split before using a context"
 type SolvedOf a = Solved (ConstantOf a) (VariableOf a)
 data Solved f v =
   -- We complete the set of constraints as follows:
-  -- * Less is transitively closed.
-  -- * If Less x y, then size x <= size y.
-  -- * If HeadGreater x f and Less x y and HeadLess y g with g <= f,
-  --   then size x < size y (size x = size y implies f < g).
-  --   When x = y this becomes: if HeadGreater x f and HeadLess x f,
-  --   then size x < size x, i.e. false.
+  --   * Less is transitively closed.
+  --   * If Less x y, then size x <= size y.
+  --   * If HeadGreater x f and Less x y and HeadLess y g with g <= f,
+  --     then size x < size y (size x = size y implies f < g).
+  --     When x = y this becomes: if HeadGreater x f and HeadLess x f,
+  --     then size x < size x, i.e. false.
   -- Once completed, the constraints are satisfiable iff:
   -- 1. The size constraints are satisfiable.
   -- 2. There is no literal Less x x.
