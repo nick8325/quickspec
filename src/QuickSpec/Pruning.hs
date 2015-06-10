@@ -166,6 +166,7 @@ constrain :: [Type] -> Term -> [Map TyVar Type]
 constrain univ t =
   usort [ toMap sub | u <- univ, Just sub <- [match (typ t) u] ]
 
+-- | Given a term, tries to normalise it according to current rewriting rules
 rep :: Pruner s => Term -> PrunerM s (Maybe Term)
 rep t = liftM (liftM fromPruningTerm) $ do
   let u = toGoalTerm t
