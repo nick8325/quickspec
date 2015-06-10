@@ -457,6 +457,9 @@ normalise t = fmap (fromMaybe t) (maybeNormalise t)
 -- | Considers a Schema (@_ + _@) or a Term (@x + y@) creating relevant events.
 --   Given a signature `sig`, an event creating function `makeEvent` and a
 --   Schema or Term `x` to consider, triggers a relevant event.
+--
+--   This function discard terms that match an existing term after application
+--   of rewrite rules.
 consider :: Considerable a => Signature -> (KindOf a -> Event) -> a -> M ()
 consider sig makeEvent x = do
   let t = generalise x
