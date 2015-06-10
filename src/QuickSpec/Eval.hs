@@ -470,8 +470,7 @@ consider sig makeEvent x = do
       case res of
         Just u -> generate (Ignoring (Rule t u))
         _ -> return ()
-      let t' = specialise x
-      u' <- normalise t'
+      u' <- normalise (specialise x)
       if u' `Set.member` allSchemas
         then generate (makeEvent (EqualTo (unspecialise x u') Pruning))
         else do
