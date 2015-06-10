@@ -1,3 +1,5 @@
+-- | Main QuickSpec module.
+
 module QuickSpec(
   module QuickSpec.Base,
   module QuickSpec.Eval,

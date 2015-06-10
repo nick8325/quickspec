@@ -1,4 +1,7 @@
 {-# LANGUAGE CPP, TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables, TupleSections #-}
+-- |  Eval module.
+-- Implements the 'quickSpec' function, the entry point to quickSpec
+-- execution.
 module QuickSpec.Eval where
 
 #include "errors.h"
@@ -53,6 +56,7 @@ data S = S {
   kind          :: Type -> TypeKind,
   terminal      :: Terminal }
 
+-- | Internal QuickSpec event.
 data Event =
     Schema Origin (Poly Schema) (KindOf Schema)
   | Term   TermFrom      (KindOf TermFrom)
@@ -175,6 +179,8 @@ choppyQuickSpec cs sig =
   where
    (sig', sigs) = chopUpSignature cs sig
 
+-- | Run QuickSpec on a signature.  This returns another signature (wrapped in
+--   a IO context) that can potentially be used in further runs of QuickSpec.
 quickSpec :: Signature -> IO Signature
 quickSpec sig0 = do
   let sig = renumber sig0 { constants = idConstant:filter (/= idConstant) (constants sig0) }
@@ -205,6 +211,7 @@ onTerm f s = do
   term <- lift (gets terminal)
   liftIO (f term s)
 
+-- | Given a Signature, explore each size up to the maximum term size.
 quickSpecLoop :: Signature -> M ()
 quickSpecLoop sig = do
   createRules sig
@@ -273,8 +280,17 @@ allUnifications t = map f ss
       | isDictionary (typ x) = 1
       | otherwise = 4
 
+-- | Given a signature, create the rules for processing QuickSpec events.
 createRules :: Signature -> M ()
 createRules sig = do
+  -- NOTES:
+  --  * Each rule can process events by matching on the result of event;
+  --  * Rules can overlap, so multiple rules can match different events
+  --    they will be executed in order of declaration;
+  --  * Duplicated events are automaticaly filtered, so if two overlapping
+  --    rules create the same event, it will get filtered.
+
+  -- A new schema was discovered.
   rule $ do
     Schema o s k <- event
     execute $ do
@@ -292,6 +308,10 @@ createRules sig = do
           when (size ms <= maxCommutativeSize_ sig) $
             generate (InstantiateSchema ms ms)
 
+  -- Instantiate a Schema
+  -- Creates events for considering terms of that schema:
+  --   for schema # + #
+  --   terms:     x + x, x + y, y + x, ...
   rule $ do
     InstantiateSchema s s' <- event
     execute $
@@ -385,6 +405,7 @@ createRules sig = do
       liftIO $ putStrLn $
         "Warning: generated term of untestable type " ++ prettyShow ty
 
+  -- An equation was found, we should (possibly) print it.
   rule $ do
     Found prop <- event
     execute $
@@ -392,6 +413,8 @@ createRules sig = do
 
   let printing _ = False
 
+  -- Debug: print the received event
+  -- set the variable above to true to print everything
   rule $ do
     x <- event
     require (printing x)
@@ -404,13 +427,27 @@ considerRenamings s s' = do
     ts = sortBy (comparing measure) (allUnifications (instantiate s'))
 
 class (Eq a, Typed a) => Considerable a where
+
+  -- | Returns the most generic version, e.g.:
+  --
+  --   * Given the schema @_ + _@, returns @x + y@
+  --   * Given the term   @x + x@, returns @x + x@
   generalise   :: a -> Term
+
+  -- | Returns the most specific version, e.g.:
+  --
+  --   * Given the schema @_ + _@, returns @x + x@
+  --   * Given the term   @x + y@, returns @x + y@
   specialise   :: a -> Term
+
   unspecialise :: a -> Term -> a
   getTestSet   :: a -> M (TestSet a)
   putTestSet   :: a -> TestSet a -> M ()
   findAll      :: a -> M (Set Term)
 
+-- | Considers a Schema (@_ + _@) or a Term (@x + y@) creating relevant events.
+--   Given a signature `sig`, an event creating function `makeEvent` and a
+--   Schema or Term `x` to consider, triggers a relevant event.
 consider :: Considerable a => Signature -> (KindOf a -> Event) -> a -> M ()
 consider sig makeEvent x = do
   let t = generalise x
