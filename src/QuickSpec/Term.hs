@@ -19,10 +19,22 @@ import Test.QuickCheck.Gen
 import Test.QuickCheck.Random
 import Data.Ratio
 
--- Terms and schemas.
--- A schema is like a term but has holes instead of variables.
+-- * Terms and schemas
+
 type TermOf = Tm Constant
+
+-- | A term is composed of nested functions applications over free variables, e.g.:
+--
+-- * @x + y@
+-- * @x + x@
+-- * @f ((x + 0) + y)@
 type Term = TermOf Variable
+
+-- | A schema is like a term but has holes instead of variables, e.g.:
+--
+--   * @_ + _@
+--   * @_ + (0 + _)@
+--   * @f _ _@
 type Schema = TermOf Hole
 
 class Minimal a where
@@ -32,10 +44,12 @@ class Sized a where
   funSize  :: a -> Rational
   funArity :: a -> Int
 
--- Term ordering - size, skeleton, generality.
+type Measure f v = (Rational, Int, MeasureFuns f (), Int, [v])
+
+-- | Measures term ordering - size, skeleton, generality.
+--
 -- Satisfies the property:
 -- if measure (schema t) < measure (schema u) then t < u.
-type Measure f v = (Rational, Int, MeasureFuns f (), Int, [v])
 measure :: (Sized f, Ord f, Ord v) => Tm f v -> Measure f v
 measure t = (exactSize t, -length (vars t),
              MeasureFuns (rename (const ()) t), -length (usort (vars t)), vars t)
@@ -54,7 +68,7 @@ compareFuns (Fun f ts) (Fun g us) =
   compare f g `orElse`
   compare (map MeasureFuns ts) (map MeasureFuns us)
 
--- Take two terms and find the first place where they differ.
+-- | Take two terms and find the first place where they differ.
 compareTerms :: (Sized f, Ord f, Ord v) => Tm f v -> Tm f v -> Maybe (Tm f v, Tm f v, Ordering)
 compareTerms t u =
   here (comparing exactSize t u) `mplus`
@@ -69,7 +83,7 @@ compareTerms t u =
     here EQ = Nothing
     here ord = Just (t, u, ord)
 
--- Reduction ordering (i.e., a partial order closed under substitution).
+-- | Reduction ordering (i.e., a partial order closed under substitution).
 orientTerms :: (Sized f, Ord f, Ord v) => Tm f v -> Tm f v -> Maybe Ordering
 orientTerms t u =
   case compareTerms t u of
@@ -91,8 +105,8 @@ exactSize :: Sized f => Tm f v -> Rational
 exactSize (Var x) = 1
 exactSize (Fun f xs) = funSize f + sum (map exactSize xs)
 
--- Constants have values, while variables do not (as only monomorphic
--- variables have generators, so we need a separate defaulting phase).
+-- | Constants have values, while variables do not (as only monomorphic
+--   variables have generators, so we need a separate defaulting phase).
 data Constant =
   Constant {
     conIndex        :: Int,
@@ -172,7 +186,7 @@ instance Numbered Variable where
 instance CoArbitrary Variable where
   coarbitrary x = coarbitrary (varNumber x) . coarbitrary (varType x)
 
--- Holes - a newtype largely so that we can improve the pretty-printing.
+-- | Holes - a newtype largely so that we can improve the pretty-printing.
 newtype Hole = Hole Type deriving (Eq, Ord, Show, Typed)
 instance Pretty Hole where pretty _ = text "_"
 
@@ -194,11 +208,11 @@ instance Typed v => Apply (TermOf v) where
       f' = f { conArity = conArity f + 1 }
   tryApply t u = do { t' <- idTerm t; tryApply t' u }
 
--- Turn a term into a schema by forgetting about its variables.
+-- | Turn a term into a schema by forgetting about its variables.
 schema :: Term -> Schema
 schema = rename (Hole . typ)
 
--- Instantiate a schema by making all the variables different.
+-- | Instantiate a schema by making all the variables different.
 instantiate :: Schema -> Term
 instantiate s = evalState (aux s) Map.empty
   where
@@ -209,8 +223,10 @@ instantiate s = evalState (aux s) Map.empty
       return (Var (Variable n ty))
     aux (Fun f xs) = fmap (Fun f) (mapM aux xs)
 
--- Take a term and unify all type variables,
--- and then all variables of the same type.
+-- | Take a term and unify all type variables,
+--   and then all variables of the same type.
+--
+--   The term @x + (y + z)@ becomes @x + (x + x)@
 skeleton :: (Ord v, Typed v) => TermOf v -> TermOf v
 skeleton = unifyTermVars . unifyTypeVars
   where
