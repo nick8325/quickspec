@@ -1,3 +1,6 @@
+-- | This re-exports the 'Text.PrettyPrint.HughesPJ' library and provides
+--   other several useful instances for 'Pretty'-printable datatypes, like
+--   'Set's and 'Map's.
 module QuickSpec.Pretty where
 
 import Text.PrettyPrint.HughesPJ

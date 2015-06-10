@@ -1,4 +1,6 @@
--- | Main QuickSpec module.
+-- | Main QuickSpec module.  Export basic functionality.
+--
+-- You typically only need this module when using QuickSpec.
 
 module QuickSpec(
   module QuickSpec.Base,

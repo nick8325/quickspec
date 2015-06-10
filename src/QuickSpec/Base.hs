@@ -1,5 +1,5 @@
--- Imports the relevant parts of the term-rewriting package
--- and provides a few things on top.
+-- | Imports the relevant parts of the term-rewriting package
+--   and provides a few things on top.
 
 {-# LANGUAGE CPP, TypeSynonymInstances, TypeFamilies, FlexibleContexts #-}
 module QuickSpec.Base(

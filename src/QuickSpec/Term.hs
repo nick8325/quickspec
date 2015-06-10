@@ -1,4 +1,4 @@
--- Terms and evaluation.
+-- | This module define terms and term evaluation.
 {-# LANGUAGE CPP, GeneralizedNewtypeDeriving, TypeSynonymInstances, FlexibleInstances, DeriveFunctor, FlexibleContexts, GADTs #-}
 module QuickSpec.Term where
 
