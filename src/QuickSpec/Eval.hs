@@ -139,7 +139,8 @@ schemasOfSize n sig = do
       canApply fty xty,
       f <- fs,
       canApply f (poly (Var (Hole (Var (TyVar 0))))),
-      x <- xs ]
+      x <- xs,
+      case maxTermDepth sig of { Nothing -> True; Just d -> depth (unPoly x) < d } ]
 
 quickSpecWithBackground :: Signature -> Signature -> IO Signature
 quickSpecWithBackground sig1 sig2 = do

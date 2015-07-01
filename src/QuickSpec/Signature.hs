@@ -69,6 +69,7 @@ data Signature =
     theory             :: Maybe PrunerType,
     defaultTo          :: Maybe Type,
     maxTermSize        :: Maybe Int,
+    maxTermDepth       :: Maybe Int,
     maxCommutativeSize :: Maybe Int,
     maxTests           :: Maybe Int,
     testTimeout        :: Maybe Int,
@@ -192,12 +193,13 @@ newtype NamesFor a = NamesFor { unNamesFor :: [String] } deriving Typeable
 newtype DictOf c a = DictOf { unDictOf :: Dict (c a) } deriving Typeable
 
 instance Monoid Signature where
-  mempty = Signature [] [] [] Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
-  Signature cs is b th d s s1 t tim simp p `mappend` Signature cs' is' b' th' d' s' s1' t' tim' simp' p' =
+  mempty = Signature [] [] [] Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
+  Signature cs is b th d s dp s1 t tim simp p `mappend` Signature cs' is' b' th' d' s' dp' s1' t' tim' simp' p' =
     Signature (cs++cs') (is++is') (b++b')
       (th `mplus` th')
       (d `mplus` d')
       (s `mplus` s')
+      (dp `mplus` dp')
       (s1 `mplus` s1')
       (t `mplus` t')
       (tim `mplus` tim')

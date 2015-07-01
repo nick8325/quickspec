@@ -91,6 +91,10 @@ exactSize :: Sized f => Tm f v -> Rational
 exactSize (Var x) = 1
 exactSize (Fun f xs) = funSize f + sum (map exactSize xs)
 
+depth :: Tm f v -> Int
+depth Var{} = 1
+depth (Fun _ ts) = 1 + maximum (0:map (succ . depth) ts)
+
 -- Constants have values, while variables do not (as only monomorphic
 -- variables have generators, so we need a separate defaulting phase).
 data Constant =
