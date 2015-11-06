@@ -65,6 +65,7 @@ library
   hs-source-dirs: src
   include-dirs: src
   Exposed-modules:
+    Paths_quickspec
     QuickSpec
     QuickSpec.Base
     QuickSpec.Eval
