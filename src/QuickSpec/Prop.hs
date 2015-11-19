@@ -5,14 +5,13 @@ module QuickSpec.Prop where
 import Control.Monad
 import qualified Data.DList as DList
 import Data.Ord
-import QuickSpec.Base
 import QuickSpec.Term
 import QuickSpec.Type
 import QuickSpec.Utils
 import qualified Data.Map as Map
-import Data.Rewriting.Substitution.Type
+import Twee.Base
 
-type Prop = PropOf Term
+type Prop = PropOf (Term Constant)
 data PropOf a =
   (:=>:) {
     lhs :: [Literal a],
@@ -34,22 +33,22 @@ unitProp p = [] :=>: p
 instance (Symbolic a, Typed a) => Typed (PropOf a) where
   typ _ = boolType
   otherTypesDL p = DList.fromList (literals p) >>= typesDL
-  typeSubst sub (lhs :=>: rhs) =
+  typeSubst_ sub (lhs :=>: rhs) =
     map (typeSubst sub) lhs :=>: typeSubst sub rhs
 instance Symbolic a => Symbolic (PropOf a) where
   type ConstantOf (PropOf a) = ConstantOf a
-  type VariableOf (PropOf a) = VariableOf a
+  term = __
   termsDL p = DList.fromList (literals p) >>= termsDL
-  substf sub (lhs :=>: rhs) = map (substf sub) lhs :=>: substf sub rhs
+  subst_ sub (lhs :=>: rhs) = map (subst sub) lhs :=>: subst sub rhs
 
 instance Pretty a => Pretty (PropOf a) where
-  pretty ([] :=>: rhs) = pretty rhs
-  pretty p =
+  pPrint ([] :=>: rhs) = pPrint rhs
+  pPrint p =
     sep [
       fsep
         (punctuate (text "" <+> text "&")
-          (map pretty (lhs p))) <+> text "=>",
-      nest 2 (pretty (rhs p))]
+          (map pPrint (lhs p))) <+> text "=>",
+      nest 2 (pPrint (rhs p))]
 
 data Literal a = a :=: a | Predicate :@: [a] deriving (Show, Functor, Eq, Ord)
 
@@ -58,16 +57,16 @@ infix 5 :=:
 
 instance Symbolic a => Symbolic (Literal a) where
   type ConstantOf (Literal a) = ConstantOf a
-  type VariableOf (Literal a) = VariableOf a
+  term = __
   termsDL l = literalTermsDL l >>= termsDL
-  substf sub (t :=: u) = substf sub t :=: substf sub u
-  substf sub (p :@: ts) = p :@: map (substf sub) ts
+  subst_ sub (t :=: u) = subst_ sub t :=: subst_ sub u
+  subst_ sub (p :@: ts) = p :@: map (subst_ sub) ts
 
 instance (Symbolic a, Typed a) => Typed (Literal a) where
   typ _ = boolType
   otherTypesDL l = literalTermsDL l >>= typesDL
-  typeSubst sub (x :=: y) = typeSubst sub x :=: typeSubst sub y
-  typeSubst sub (p :@: ts) = typeSubst sub p :@: map (typeSubst sub) ts
+  typeSubst_ sub (x :=: y) = typeSubst sub x :=: typeSubst sub y
+  typeSubst_ sub (p :@: ts) = typeSubst sub p :@: map (typeSubst sub) ts
 
 propTerms :: PropOf a -> [a]
 propTerms p = literals p >>= DList.toList . literalTermsDL
@@ -81,8 +80,8 @@ propType (_ :=>: p :@: ts) = typ p
 propType (_ :=>: t :=: u) = typ t
 
 instance Pretty a => Pretty (Literal a) where
-  pretty (x :=: y) = hang (pretty x <+> text "=") 2 (pretty y)
-  pretty (p :@: xs) = pretty p <> parens (sep (punctuate comma (map pretty xs)))
+  pPrint (x :=: y) = hang (pPrint x <+> text "=") 2 (pPrint y)
+  pPrint (p :@: xs) = pPrint p <> parens (sep (punctuate comma (map pPrint xs)))
 
 data Predicate = Predicate {
   predName :: String,
@@ -91,11 +90,11 @@ data Predicate = Predicate {
   deriving (Eq, Ord, Show)
 
 instance Pretty Predicate where
-  pretty = text . predName
+  pPrint = text . predName
 
 instance Typed Predicate where
   typ = predType
-  typeSubst sub (Predicate x ty pty) = Predicate x (typeSubst sub ty) pty
+  typeSubst_ sub (Predicate x ty pty) = Predicate x (typeSubst sub ty) pty
 
 boolType :: Type
 boolType = typeOf (undefined :: Bool)
@@ -108,26 +107,28 @@ regeneralise = restrict . unPoly . generalise . canonicalise
     genLit (p :@: ts) =
       polyApply (:@:) (genPred p) (polyList (map genTerm ts))
     genLit (t :=: u) = polyApply (:=:) (genTerm t) (genTerm u)
-    genTerm (Fun f []) = polyMap (\f -> Fun f []) (genCon f)
-    genTerm (Fun f ts) = apply (genTerm (Fun f (init ts))) (genTerm (last ts))
-    genTerm (Var x) = polyMap Var (genVar x)
-
-    genPred p = poly (p { predType = unPoly (predGeneralType p) })
-    genCon  f = poly (f { conValue = unPoly (conGeneralValue f), conArity = 0 })
     -- FIXME if we discover a unit law x = y :: (), won't it be falsely
     -- generalised to x = y :: a? Instead of using A here, need to freshen
     -- all type variables in type of var.
     -- Currently this isn't a problem since we can't get a law with a
     -- variable on both sides, but may break with smarter schema instantiation
-    genVar (Variable n _) = poly (Variable n (typeOf (undefined :: A)))
+    genTerm x@Var{} =
+      poly (app (Id (typeOf (undefined :: A))) [x])
+    genTerm (App (Id _) [x@Var{}]) =
+      poly (app (Id (typeOf (undefined :: A))) [x])
+    genTerm (App f []) = polyMap (\f -> app f []) (genCon f)
+    genTerm (App f ts) = apply (genTerm (app f (init ts))) (genTerm (last ts))
 
-    restrict prop = typeSubst f prop
+    genPred p = poly (p { predType = unPoly (predGeneralType p) })
+    genCon  f = poly (f { conValue = unPoly (conGeneralValue f), conArity = 0 })
+
+    restrict prop = typeSubst sub prop
       where
-        f ty = Map.findWithDefault (Var ty) ty (toMap sub)
-        Just sub = unifyMany Arrow cs
-        cs = [(typ x, typ y) | x:xs <- vs, y <- xs] ++ concatMap litCs (lhs prop) ++ litCs (rhs prop)
-        vs = partitionBy varNumber (vars prop)
+        Just sub = unifyList (buildList (map fst cs)) (buildList (map snd cs))
+        cs = [(fst x, fst y) | x:xs <- vs, y <- xs] ++ concatMap litCs (lhs prop) ++ litCs (rhs prop)
+        vs = partitionBy fst (concatMap typedVars (propTerms prop))
     litCs (t :=: u) = [(typ t, typ u)] ++ termCs t ++ termCs u
     litCs (p :@: ts) = [(typ p, arrowType (map typ ts) (typeOf True))] ++ concatMap termCs ts
     termCs Var{} = []
-    termCs t@(Fun f ts) = [(typ f, arrowType (map typ ts) (typ t))] ++ concatMap termCs ts
+    termCs (App (Id _) [Var _]) = []
+    termCs t@(App f ts) = [(typ f, arrowType (map typ ts) (typ t))] ++ concatMap termCs ts

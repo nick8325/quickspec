@@ -1,9 +1,7 @@
-{-# LANGUAGE CPP, TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables, TupleSections #-}
+{-# LANGUAGE CPP, TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables, TupleSections, FlexibleContexts #-}
 module QuickSpec.Eval where
 
 #include "errors.h"
-import QuickSpec.Base hiding (unify, terms)
-
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
@@ -30,59 +28,60 @@ import QuickSpec.Term
 import QuickSpec.Test
 import QuickSpec.TestSet
 import QuickSpec.Type
-import QuickSpec.Pruning.Equation
 import QuickSpec.Utils
 import Test.QuickCheck.Random
 import Test.QuickCheck.Text
 import System.Random
-import Data.Rewriting.Rule(Rule(Rule))
 import Control.Spoon
+import Twee.Base hiding (terms)
+import Twee.Rule(Rule(Rule))
+import qualified Twee.Rule as Rule
 
 type M = RulesT Event (StateT S (PrunerM PrunerType))
 
 data S = S {
   schemas       :: Schemas,
-  allSchemas    :: Set Term,
-  terms         :: Set Term,
-  schemaTestSet :: TestSet Schema,
-  termTestSet   :: Map Schema (TestSet TermFrom),
+  allSchemas    :: Set (Term Constant),
+  terms         :: Set (Term Constant),
+  schemaTestSet :: TestSet (Term Constant),
+  termTestSet   :: Map (Term Constant) (TestSet TermFrom),
   freshTestSet  :: TestSet TermFrom,
-  proved        :: Set (PropOf PruningTerm),
+  proved        :: Set PruningProp,
   discovered    :: [Prop],
-  delayed       :: [(Term, Term)],
+  delayed       :: [(Term Constant, Term Constant)],
   kind          :: Type -> TypeKind,
   terminal      :: Terminal }
 
 data Event =
-    Schema Origin (Poly Schema) (KindOf Schema)
+    Schema Origin (Poly (Term Constant)) (KindOf (Term Constant))
   | Term   TermFrom      (KindOf TermFrom)
-  | ConsiderSchema Origin (Poly Schema)
+  | ConsiderSchema Origin (Poly (Term Constant))
   | ConsiderTerm   TermFrom
   | Type           (Poly Type)
   | UntestableType (Poly Type)
   | Found          Prop
-  | InstantiateSchema Schema Schema
+  | InstantiateSchema (Term Constant) (Term Constant)
   | FinishedSize   Int
-  | Ignoring (RuleOf Term)
+  | Ignoring (Rule Constant)
   deriving (Eq, Ord)
 
 data Origin = Original | PolyInstance deriving (Eq, Ord)
 
 instance Pretty Event where
-  pretty (Schema o s k) = hang (text "schema" <+> pretty s <> text "," <+> pretty o <> text ":") 2 (pretty k)
-  pretty (Term t k) = hang (text "term" <+> pretty t <> text ":") 2 (pretty k)
-  pretty (ConsiderSchema o s) = text "consider schema" <+> pretty s <+> text "::" <+> pretty (typ s) <> text "," <+> pretty o
-  pretty (ConsiderTerm t) = text "consider term" <+> pretty t <+> text "::" <+> pretty (typ t)
-  pretty (Type ty) = text "type" <+> pretty ty
-  pretty (UntestableType ty) = text "untestable type" <+> pretty ty
-  pretty (Found prop) = text "found" <+> pretty prop
-  pretty (FinishedSize n) = text "finished size" <+> pretty n
-  pretty (InstantiateSchema s s') = sep [text "instantiate schema", nest 2 (pretty s'), text "from", nest 2 (pretty s)]
-  pretty (Ignoring rule) = hang (text "ignoring") 2 (pretty rule)
+  pPrint (Schema o s k) = hang (text "schema" <+> pPrint s <> text "," <+> pPrint o <> text ":") 2 (pPrint k)
+  pPrint (Term t k) = hang (text "term" <+> pPrint t <> text ":") 2 (pPrint k)
+  pPrint (ConsiderSchema o s) = text "consider schema" <+> pPrint s <+> text "::" <+> pPrint (typ s) <> text "," <+> pPrint o
+  pPrint (ConsiderTerm t) = text "consider term" <+> pPrint t <+> text "::" <+> pPrint (typ t)
+  pPrint (Type ty) = text "type" <+> pPrint ty
+  pPrint (UntestableType ty) = text "untestable type" <+> pPrint ty
+  pPrint (Found prop) = text "found" <+> pPrint prop
+  pPrint (FinishedSize n) = text "finished size" <+> pPrint n
+  pPrint (InstantiateSchema s s') = sep [text "instantiate schema", nest 2 (pPrint s'), text "from", nest 2 (pPrint s)]
+  pPrint (Ignoring rule) = hang (text "ignoring") 2 (pPrint rule)
 
 instance Pretty Origin where
-  pretty Original = text "original"
-  pretty PolyInstance = text "instance"
+  pPrint Original = text "original"
+  pPrint PolyInstance = text "instance"
 
 data KindOf a = Untestable | TimedOut | Representative | EqualTo a EqualReason
   deriving (Eq, Ord)
@@ -90,16 +89,16 @@ data KindOf a = Untestable | TimedOut | Representative | EqualTo a EqualReason
 data EqualReason = Testing | Pruning deriving (Eq, Ord)
 
 instance Pretty a => Pretty (KindOf a) where
-  pretty Untestable = text "untestable"
-  pretty TimedOut = text "timed out"
-  pretty Representative = text "representative"
-  pretty (EqualTo x r) = sep [text "equal to", nest 2 (pretty x), text "by", nest 2 (pretty r)]
+  pPrint Untestable = text "untestable"
+  pPrint TimedOut = text "timed out"
+  pPrint Representative = text "representative"
+  pPrint (EqualTo x r) = sep [text "equal to", nest 2 (pPrint x), text "by", nest 2 (pPrint r)]
 
 instance Pretty EqualReason where
-  pretty Testing = text "testing"
-  pretty Pruning = text "pruning"
+  pPrint Testing = text "testing"
+  pPrint Pruning = text "pruning"
 
-type Schemas = Map Int (Map (Poly Type) [Poly Schema])
+type Schemas = Map Int (Map (Poly Type) [Poly (Term Constant)])
 
 initialState :: Signature -> [(QCGen, Int)] -> Terminal -> S
 initialState sig seeds terminal =
@@ -120,25 +119,27 @@ initialState sig seeds terminal =
     e = memo (env sig)
     v = [ memo (makeValuation e g n) | (g, n) <- seeds1 ]
 
-newTerm :: Term -> M ()
+newTerm :: Term Constant -> M ()
 newTerm t = lift (modify (\s -> s { terms = Set.insert t (terms s) }))
 
-schemasOfSize :: Int -> Signature -> M [Schema]
+schemasOfSize :: Int -> Signature -> M [Term Constant]
 schemasOfSize n sig = do
   ss <- lift $ gets schemas
+  let varty = build (var (MkVar 0))
+      vartm = build (fun (toFun (Id varty)) [var (MkVar 0)])
   return $
-    [ Var (Hole (Var (TyVar 0))) | n == 1 ] ++
-    [ Fun c [] | c <- constants sig, n == conSize c ] ++
+    [ vartm | n == 1 ] ++
+    [ app c [] | c <- constants sig, n == conSize c ] ++
     [ unPoly (apply f x)
     | i <- [1..n-1],
       let j = n-i,
       (fty, fs) <- Map.toList =<< maybeToList (Map.lookup i ss),
-      canApply fty (poly (Var (TyVar 0))),
-      or [ canApply f (poly (Var (Hole (Var (TyVar 0))))) | f <- fs ],
+      canApply fty (poly varty),
+      or [ canApply f (poly vartm) | f <- fs ],
       (xty, xs) <- Map.toList =<< maybeToList (Map.lookup j ss),
       canApply fty xty,
       f <- fs,
-      canApply f (poly (Var (Hole (Var (TyVar 0))))),
+      canApply f (poly vartm),
       x <- xs,
       case maxTermDepth sig of { Nothing -> True; Just d -> depth (unPoly x) < d } ]
 
@@ -156,18 +157,17 @@ incrementalQuickSpec sig = do
 
 chopUpSignature :: [(Constant, [Int])] -> Signature -> (Signature, [Signature -> Signature])
 chopUpSignature cs sig =
-  (sig'', id:map phase phases)
+  (sig', id:map phase phases)
   where
     phase n sig =
-      sig'' {
+      sig' {
         background = background sig,
-        constants = constants sig'' ++ [ c | (c, ns) <- cs', n `elem` ns ] }
+        constants = constants sig' ++ [ c | (c, ns) <- cs', n `elem` ns ] }
     phases = usort (concatMap snd cs)
     cs1 = constants sig
     cs2 = map fst cs
-    sig' = renumber sig { constants = cs1 ++ cs2 }
-    (cs1', cs2') = splitAt (length cs1) (constants sig')
-    sig'' = sig' { constants = cs1' }
+    (cs1', cs2') = splitAt (length cs1) (constants sig)
+    sig' = sig { constants = cs1' }
     cs' = zip cs2' (map snd cs)
 
 choppyQuickSpec :: [(Constant, [Int])] -> Signature -> IO Signature
@@ -177,8 +177,7 @@ choppyQuickSpec cs sig =
    (sig', sigs) = chopUpSignature cs sig
 
 quickSpec :: Signature -> IO Signature
-quickSpec sig0 = do
-  let sig = renumber sig0 { constants = idConstant:filter (/= idConstant) (constants sig0) }
+quickSpec sig = do
   putStrLn "== Signature =="
   prettyPrint sig
   putStrLn ""
@@ -191,7 +190,8 @@ quickSpec sig0 = do
     theory <- lift (lift (liftPruner get))
     return sig {
       constants = [ c { conIsBackground = True } | c <- constants sig ],
-      background = background sig ++ map (fmap (mapTerm (\c -> c { conIsBackground = True }) id)) props,
+      -- XXX
+      background = background sig ++ props,
       theory = Just theory }
 
 runM :: Signature -> M a -> IO a
@@ -263,15 +263,15 @@ summarise = do
   liftIO (putStrLn (pruningReport s))
   liftIO (putStrLn "")
 
-allUnifications :: Term -> [Term]
+allUnifications :: Term Constant -> [Term Constant]
 allUnifications t = map f ss
   where
-    vs = [ map (x,) (take (varCount x) xs) | xs <- partitionBy typ (usort (vars t)), x <- xs ]
+    vs = [ map (snd x,) (take (varCount x) (map snd xs)) | xs <- partitionBy fst (usort (typedVars t)), x <- xs ]
     ss = map Map.fromList (sequence vs)
     go s x = Map.findWithDefault __ x s
-    f s = rename (go s) t
-    varCount x
-      | isDictionary (typ x) = 1
+    f s = subst (var . go s) t
+    varCount (ty, _)
+      | isDictionary ty = 1
       | otherwise = 4
 
 createRules :: Signature -> M ()
@@ -283,7 +283,7 @@ createRules sig = do
       let ms = oneTypeVar (unPoly s)
       case k of
         TimedOut ->
-          liftIO $ print (text "Schema" <+> pretty s <+> text "timed out")
+          liftIO $ print (text "Schema" <+> pPrint s <+> text "timed out")
         Untestable -> return ()
         EqualTo t _ -> do
           generate (InstantiateSchema t t)
@@ -306,7 +306,7 @@ createRules sig = do
             newTerm u
       case k of
         TimedOut -> do
-          liftIO $ print (text "Term" <+> pretty t <+> text "timed out")
+          liftIO $ print (text "Term" <+> pPrint t <+> text "timed out")
           add
         Untestable ->
           ERROR ("Untestable instance " ++ prettyShow t ++ " of testable schema " ++ prettyShow s)
@@ -315,11 +315,15 @@ createRules sig = do
           let t' = t
           u' <- fmap (fromMaybe u) (lift (lift (rep u)))
           del <- lift $ gets delayed
-          let wait = or [ isJust (match2 (x, y) (t, u)) | (x, y) <- del ]
-              match2 (x, y) (t, u) = match (Fun f [x, y]) (Fun f [t, u])
+          let wait = or [ isJust (matchList (buildList [x, y]) (buildList [t, u])) | (x, y) <- del ]
               f = head (funs t ++ funs u)
-          case orientTerms t' u'  of
-            Just _ | not wait -> do
+              munge = build . extended . buildList . noTypeTags
+              noTypeTags :: Term Constant -> Builder Constant
+              noTypeTags (Var x) = var x
+              noTypeTags (App (Id _) [Var x]) = var x
+              noTypeTags (Fun f ts) = fun f (map noTypeTags (fromTermList ts))
+          case orientTerms (munge t') (munge u') of
+            Just dir | not wait -> do
               generate (Found ([] :=>: t' :=: u'))
               add
             _ -> do
@@ -331,7 +335,7 @@ createRules sig = do
     let ty = typ s
     kind <- execute $ lift $ gets kind
     require (kind ty /= Useless)
-    require (and [ kind (typ t) == Useful | t <- properSubterms (unPoly s) ])
+    require (and [ kind (typ t) == Useful | t@Fun{} <- properSubterms (unPoly s) ])
     execute $
       case kind ty of
         Partial -> do
@@ -376,7 +380,7 @@ createRules sig = do
 
   rule $ do
     Schema _ s Untestable <- event
-    require (arity (typ s) == 0)
+    require (typeArity (typ s) == 0)
     execute $
       generate (UntestableType (polyTyp s))
 
@@ -398,19 +402,19 @@ createRules sig = do
     require (printing x)
     execute $ liftIO $ prettyPrint x
 
-considerRenamings :: Schema -> Schema -> M ()
+considerRenamings :: Term Constant -> Term Constant -> M ()
 considerRenamings s s' = do
   sequence_ [ generate (ConsiderTerm (From s t)) | t <- ts ]
   where
     ts = sortBy (comparing measure) (allUnifications (instantiate s'))
 
-class (Eq a, Typed a) => Considerable a where
-  generalise   :: a -> Term
-  specialise   :: a -> Term
-  unspecialise :: a -> Term -> a
+class (Eq a, Typed a, Pretty a) => Considerable a where
+  generalise   :: a -> Term Constant
+  specialise   :: a -> Term Constant
+  unspecialise :: a -> Term Constant -> a
   getTestSet   :: a -> M (TestSet a)
   putTestSet   :: a -> TestSet a -> M ()
-  findAll      :: a -> M (Set Term)
+  findAll      :: a -> M (Set (Term Constant))
 
 consider :: Considerable a => Signature -> (KindOf a -> Event) -> a -> M ()
 consider sig makeEvent x = do
@@ -423,7 +427,7 @@ consider sig makeEvent x = do
     Nothing | t `Set.member` terms -> return ()
     _ -> do
       case res of
-        Just u -> generate (Ignoring (Rule t u))
+        Just u -> generate (Ignoring (Rule Rule.Oriented t u))
         _ -> return ()
       let t' = specialise x
       res' <- lift (lift (rep t'))
@@ -436,10 +440,10 @@ consider sig makeEvent x = do
           ts <- getTestSet x
           res <-
             liftIO . testTimeout_ sig $
-            case fmap teaspoon (insert x ts) of
+            case fmap Just {-teaspoon-} (insert x ts) of
               Nothing -> return $ do
                 generate (makeEvent Untestable)
-              Just Nothing -> return $ return () -- partial term
+              Just Nothing -> return (return ()) -- partial term
               Just (Just (Old y)) -> return $ do
                 generate (makeEvent (EqualTo y Testing))
               Just (Just (New ts)) -> return $ do
@@ -447,23 +451,23 @@ consider sig makeEvent x = do
                 generate (makeEvent Representative)
           fromMaybe (generate (makeEvent TimedOut)) res
 
-instance Considerable Schema where
+instance Considerable (Term Constant) where
   generalise      = instantiate . oneTypeVar
   specialise      = skeleton . generalise
-  unspecialise _  = rename (Hole . typ)
+  unspecialise _  = subst (const (var (MkVar 0)))
   getTestSet _    = lift $ gets schemaTestSet
   putTestSet _ ts = lift $ modify (\s -> s { schemaTestSet = ts })
   findAll _       = lift (gets allSchemas)
 
-data TermFrom = From Schema Term deriving (Eq, Ord, Show)
+data TermFrom = From (Term Constant) (Term Constant) deriving (Eq, Ord, Show)
 
 instance Pretty TermFrom where
-  pretty (From s t) = pretty t <+> text "from" <+> pretty s
+  pPrint (From s t) = pPrint t <+> text "from" <+> pPrint s
 
 instance Typed TermFrom where
   typ (From _ t) = typ t
   otherTypesDL (From _ t) = otherTypesDL t
-  typeSubst sub (From s t) = From s (typeSubst sub t)
+  typeSubst_ sub (From s t) = From s (typeSubst_ sub t)
 
 instance Considerable TermFrom where
   generalise   (From _ t) = t
@@ -495,22 +499,27 @@ found sig prop0 = do
       lift $ modify (\s -> s { discovered = props ++ discovered s })
       let (prop':_) = filter isPretty props ++ [prop]
           isPretty (_ :=>: t :=: u) = isPretty1 t && isPretty1 u
-          isPretty1 (Fun f ts) | undersaturated (conStyle f) (length ts) = False
+          isPretty1 (App f ts) | undersaturated (conStyle f) (length ts) = False
           isPretty1 _ = True
-          undersaturated Invisible 0 = True
-          undersaturated (Tuple m) n | m > n = True
-          undersaturated (Infix _) n | n < 2 = True
-          undersaturated (Infixr _) n | n < 2 = True
-          undersaturated Prefix 0 = True
-          undersaturated Postfix 0 = True
-          undersaturated Gyrator n | n < 2 = True
+          -- XXX
+          -- undersaturated Invisible 0 = True
+          -- undersaturated (Tuple m) n | m > n = True
+          -- undersaturated (Infix _) n | n < 2 = True
+          -- undersaturated (Infixr _) n | n < 2 = True
+          -- undersaturated Prefix 0 = True
+          -- undersaturated Postfix 0 = True
+          -- undersaturated Gyrator n | n < 2 = True
           undersaturated _ _ = False
           rename prop@(lhs :=>: t :=: u)
             | t `isVariantOf` u = lhs' :=>: u' :=: t'
             | otherwise = prettyRename sig prop
             where
               lhs' :=>: t' :=: u' = prettyRename sig prop
-      when (null (funs prop') || not (null (filter (not . conIsBackground) (funs prop')))) $
+              -- XXX
+              prettyRename _ = id
+      let conIsBackground_ (Id _) = True
+          conIsBackground_ con = conIsBackground con
+      when (null (funs prop') || not (null (filter (not . conIsBackground_ . fromFun) (funs prop')))) $
         onTerm putLine (prettyShow (rename (canonicalise prop')))
 
   onTerm putTemp "[completing theory...]"
@@ -532,20 +541,20 @@ etaExpand :: Prop -> [Prop]
 etaExpand prop@(lhs :=>: t :=: u) =
   prop:
   case (typ t, tryApply t x, tryApply u x) of
-    (Fun Arrow _, Just t', Just u') -> etaExpand (lhs :=>: t' :=: u')
+    (App Arrow _, Just t', Just u') -> etaExpand (lhs :=>: t' :=: u')
     _ -> []
   where
-    x = Var (Variable n (head (typeArgs (typ t) ++ [typeOf ()])))
-    n = succ (maximum (0:map varNumber (vars prop)))
+    x = build (fun (toFun (Id (head (typeArgs (typ t) ++ [typeOf ()])))) [var (MkVar n)])
+    n = boundList (buildList (map var (vars prop)))
 
-pruner :: ExtraPruner -> [PropOf PruningTerm] -> PropOf PruningTerm -> IO Bool
+pruner :: ExtraPruner -> [PruningProp] -> PruningProp -> IO Bool
 pruner (SPASS timeout) = E.spassUnify timeout
 pruner (E timeout) = E.eUnify timeout
 pruner (Z3 timeout) = Z3.z3Unify timeout
 pruner (Waldmeister timeout) = WM.wmUnify timeout
 pruner None = \_ _ -> return False
 
-accept :: Poly Schema -> M ()
+accept :: Poly (Term Constant) -> M ()
 accept s = do
   let t = skeleton (instantiate (unPoly s))
   u <- fmap (fromMaybe t) (lift . lift . rep $ t)

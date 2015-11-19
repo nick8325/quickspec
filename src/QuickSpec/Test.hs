@@ -4,7 +4,6 @@ module QuickSpec.Test where
 #include "errors.h"
 import Data.Constraint
 import Data.Maybe
-import QuickSpec.Base
 import QuickSpec.Signature
 import QuickSpec.Term
 import QuickSpec.TestSet
@@ -15,11 +14,12 @@ import Test.QuickCheck.Gen
 import Test.QuickCheck.Random
 import Control.Monad
 import Data.Functor.Identity
+import Twee.Base
 
 defaultTypes :: Typed a => Type -> a -> a
 defaultTypes ty = typeSubst (const ty)
 
-makeTester :: (a -> Term) -> [Variable -> Value Identity] -> [(QCGen, Int)] -> Signature -> Type -> Maybe (Value (TypedTestSet a))
+makeTester :: (a -> Term Constant) -> [Type -> Var -> Value Identity] -> [(QCGen, Int)] -> Signature -> Type -> Maybe (Value (TypedTestSet a))
 makeTester toTerm vals tests sig ty = do
   i <- listToMaybe (findInstanceOf sig (defaultTypes (defaultTo_ sig) ty))
   case unwrap (i :: Value Observe1) of
@@ -29,7 +29,7 @@ makeTester toTerm vals tests sig ty = do
           return . wrap w' $
             emptyTypedTestSet (tester (defaultTypes (defaultTo_ sig) . toTerm) vals tests (eval . runIdentity . reunwrap w))
 
-tester :: Ord b => (a -> Term) -> [Variable -> Value Identity] -> [(QCGen, Int)] -> (Value Identity -> Gen b) -> a -> Maybe [b]
+tester :: Ord b => (a -> Term Constant) -> [Type -> Var -> Value Identity] -> [(QCGen, Int)] -> (Value Identity -> Gen b) -> a -> Maybe [b]
 tester toTerm vals tests eval t =
   Just [ unGen (eval (evaluateTm val (toTerm t))) g n | (val, (g, n)) <- zip vals tests ]
 

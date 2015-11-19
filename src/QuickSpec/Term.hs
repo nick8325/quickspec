@@ -1,5 +1,5 @@
 -- Terms and evaluation.
-{-# LANGUAGE CPP, GeneralizedNewtypeDeriving, TypeSynonymInstances, FlexibleInstances, DeriveFunctor, FlexibleContexts, GADTs #-}
+{-# LANGUAGE CPP, GeneralizedNewtypeDeriving, TypeSynonymInstances, FlexibleInstances, DeriveFunctor, FlexibleContexts, GADTs, RecordWildCards #-}
 module QuickSpec.Term where
 
 #include "errors.h"
@@ -10,96 +10,49 @@ import Data.Functor.Identity
 import Data.List
 import qualified Data.Map as Map
 import Data.Ord
-import qualified Data.Rewriting.Substitution.Type as T
-import QuickSpec.Base
 import QuickSpec.Type
 import QuickSpec.Utils
-import Test.QuickCheck
+import Test.QuickCheck hiding (subterms)
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Random
-import Data.Ratio
-
--- Terms and schemas.
--- A schema is like a term but has holes instead of variables.
-type TermOf = Tm Constant
-type Term = TermOf Variable
-type Schema = TermOf Hole
-
-class Minimal a where
-  minimal :: a
-
-class Sized a where
-  funSize  :: a -> Rational
-  funArity :: a -> Int
+import Twee.Base
+import qualified QuickSpec.Label as Label
+import Data.Maybe
+import qualified Data.DList as DList
 
 -- Term ordering - size, skeleton, generality.
 -- Satisfies the property:
 -- if measure (schema t) < measure (schema u) then t < u.
-type Measure f v = (Rational, Int, MeasureFuns f (), Int, [v])
-measure :: (Sized f, Ord f, Ord v) => Tm f v -> Measure f v
-measure t = (exactSize t, -length (vars t),
-             MeasureFuns (rename (const ()) t), -length (usort (vars t)), vars t)
+type Measure f = (Int, Int, MeasureFuns (Extended f), Int, [Var])
+measure :: (Numbered f, Sized f) => Term f -> Measure f
+measure t = (size t, -length (vars t),
+             MeasureFuns (skolemSkeleton (build (extended (singleton t)))), -length (usort (vars t)), vars t)
 
-newtype MeasureFuns f v = MeasureFuns (Tm f v)
-instance (Sized f, Ord f, Ord v) => Eq (MeasureFuns f v) where
+skolemSkeleton :: (Numbered f, Minimal f) => Term f -> Term f
+skolemSkeleton = subst (const (con minimal))
+
+newtype MeasureFuns f = MeasureFuns (Term f)
+instance Function f => Eq (MeasureFuns f) where
   t == u = compare t u == EQ
-instance (Sized f, Ord f, Ord v) => Ord (MeasureFuns f v) where
+instance Function f => Ord (MeasureFuns f) where
   compare (MeasureFuns t) (MeasureFuns u) = compareFuns t u
 
-compareFuns :: (Sized f, Ord f, Ord v) => Tm f v -> Tm f v -> Ordering
+compareFuns :: Function f => Term f -> Term f -> Ordering
 compareFuns (Var x) (Var y) = compare x y
 compareFuns Var{} Fun{} = LT
 compareFuns Fun{} Var{} = GT
-compareFuns (Fun f ts) (Fun g us) =
+compareFuns (App f ts) (App g us) =
   compare f g `orElse`
   compare (map MeasureFuns ts) (map MeasureFuns us)
 
--- Take two terms and find the first place where they differ.
-compareTerms :: (Sized f, Ord f, Ord v) => Tm f v -> Tm f v -> Maybe (Tm f v, Tm f v, Ordering)
-compareTerms t u =
-  here (comparing exactSize t u) `mplus`
-  case (t, u) of
-    (Var x, Var y) -> here (compare x y)
-    (Var{}, Fun{}) -> here LT
-    (Fun{}, Var{}) -> here GT
-    (Fun f xs, Fun g ys) ->
-      here (compare f g) `mplus`
-      msum (zipWith compareTerms xs ys)
-  where
-    here EQ = Nothing
-    here ord = Just (t, u, ord)
-
--- Reduction ordering (i.e., a partial order closed under substitution).
-orientTerms :: (Sized f, Ord f, Ord v) => Tm f v -> Tm f v -> Maybe Ordering
-orientTerms t u =
-  case compareTerms t u of
-    Just (t', u', LT) -> do { guard (check t u t' u'); return LT }
-    Just (t', u', GT) -> do { guard (check u t u' t'); return GT }
-    Nothing           -> Just EQ
-  where
-    check t u t' u' =
-      sort (vars t') `isSubsequenceOf` sort (vars u') &&
-      sort (vars t)  `isSubsequenceOf` sort (vars u)
-
-simplerThan :: (Sized f, Ord f, Ord v) => Tm f v -> Tm f v -> Bool
-t `simplerThan` u = orientTerms t u == Just LT
-
-size :: Sized f => Tm f v -> Int
-size t = ceiling (exactSize t)
-
-exactSize :: Sized f => Tm f v -> Rational
-exactSize (Var x) = 1
-exactSize (Fun f xs) = funSize f + sum (map exactSize xs)
-
-depth :: Tm f v -> Int
+depth :: Term f -> Int
 depth Var{} = 1
-depth (Fun _ ts) = 1 + maximum (0:map (succ . depth) ts)
+depth (Fun _ ts) = 1 + maximum (0:map (succ . depth) (fromTermList ts))
 
 -- Constants have values, while variables do not (as only monomorphic
 -- variables have generators, so we need a separate defaulting phase).
 data Constant =
   Constant {
-    conIndex        :: Int,
     conName         :: String,
     conValue        :: Value Identity,
     conGeneralValue :: Poly (Value Identity),
@@ -107,129 +60,114 @@ data Constant =
     conStyle        :: TermStyle,
     conSize         :: Int,
     conIsBackground :: Bool }
-  deriving Show
+  | Id Type
 
-idConstant :: Constant
-idConstant =
-  Constant {
-    conIndex        = -1,
-    conName         = "id",
-    conValue        = toValue (return (id :: (A -> B) -> A -> B)),
-    conGeneralValue = poly (toValue (return (id :: (A -> B) -> A -> B))),
-    conArity        = 0,
-    conStyle        = Invisible,
-    conSize         = 0,
-    conIsBackground = True }
+instance Show Constant where
+  show con@Constant{} = conName con
+  show (Id ty) = "id[" ++ show ty ++ "]"
 
-isId :: Constant -> Bool
-isId x = conIndex x == -1
+instance Label.Labelled Constant where
+  cache = constantCache
 
-idTerm :: Typed v => TermOf v -> Maybe (TermOf v)
-idTerm t = do
-  Fun Arrow [arg, res] <- return (typ t)
-  let f (TyVar 0) = arg
-      f (TyVar 1) = res
-  let con = idConstant {
-        conValue = typeSubst f (conValue idConstant),
-        conArity = 1 }
-  return (Fun con [t])
+{-# NOINLINE constantCache #-}
+constantCache :: Label.Cache Constant
+constantCache = Label.mkCache
+
+instance Numbered Constant where
+  fromInt n = fromMaybe __ (Label.find n)
+  toInt = Label.label
+
+idTerm :: Term Constant -> Term Constant
+idTerm t = app (Id (typ t)) [t]
 
 instance Eq Constant where x == y = x `compare` y == EQ
 instance Ord Constant where
-  compare = comparing (\c -> (isId c, twiddle (conArity c), conIndex c, typ (conValue c)))
+  compare = comparing f
     where
+      f con@Constant{..} = Left (twiddle conArity, conName, typ conGeneralValue, typ conValue)
+      f (Id ty) = Right ty
       -- This tweak is taken from Prover9
       twiddle 2 = 1
       twiddle 1 = 2
       twiddle n = n
 instance Pretty Constant where
-  pretty = text . conName
+  pPrint (Id ty) = text "id[" <> pPrint ty <> text "]"
+  pPrint con = text (conName con)
 instance PrettyTerm Constant where
-  termStyle = conStyle
-  implicitArguments f =
-    go (typ (conGeneralValue f))
+  termStyle (Id _) = invisible
+  termStyle f = implicitArguments n (conStyle f)
     where
-      go (Fun Arrow [t, u]) | isDictionary t = 1 + go u
-      go _ = 0
+      n = implicitArity (typ (conGeneralValue f))
 instance Typed Constant where
-  typ = typ . conValue
-  typeSubst sub x = x { conValue = typeSubst sub (conValue x) }
+  typ (Id ty) = app Arrow [ty, ty]
+  typ con = typ (conValue con)
+  typeSubst_ sub (Id ty) = Id (typeSubst_ sub ty)
+  typeSubst_ sub x = x { conValue = typeSubst_ sub (conValue x) }
 instance Sized Constant where
-  funSize  = fromIntegral . conSize
-  funArity = conArity
+  size (Id _) = 0
+  size con = fromIntegral (conSize con)
+instance Arity Constant where
+  arity (Id _) = 1
+  arity con = conArity con
 
--- We're not allowed to have two variables with the same number
--- but unifiable types.
-data Variable =
-  Variable {
-    varNumber :: Int,
-    varType   :: Type }
-  deriving (Show, Eq, Ord)
-instance Pretty Variable where
-  pretty x = text (supply ["x","y","z"] !! varNumber x)
-instance Typed Variable where
-  typ = varType
-  typeSubst sub (Variable n ty) = Variable n (typeSubst sub ty)
-instance Numbered Variable where
-  number = varNumber
-  withNumber n x = x { varNumber = n }
-instance CoArbitrary Variable where
-  coarbitrary x = coarbitrary (varNumber x) . coarbitrary (varType x)
+implicitArity :: Type -> Int
+implicitArity (App Arrow [t, u]) | isDictionary t = 1 + implicitArity u
+implicitArity _ = 0
 
--- Holes - a newtype largely so that we can improve the pretty-printing.
-newtype Hole = Hole Type deriving (Eq, Ord, Show, Typed)
-instance Pretty Hole where pretty _ = text "_"
+maxArity :: Constant -> Int
+maxArity (Id ty) = typeArity ty
+maxArity con = typeArity (typ (conGeneralValue con))
 
-instance Typed v => Typed (TermOf v) where
-  typ (Var x) = typ x
-  typ (Fun f xs) = typeDrop (length xs) (typ f)
-  otherTypesDL t = (varsDL t >>= typesDL) `mplus` (funsDL t >>= typesDL)
+instance Typed (Term Constant) where
+  typ (Var x) = ERROR("variables must be wrapped in type tags")
+  typ (App f xs) = typeDrop (length xs) (typ f)
+  otherTypesDL t =
+    DList.fromList (funs t) >>= typesDL . fromFun
 
-  typeSubst sub (Var x) = Var (typeSubst sub x)
-  typeSubst sub (Fun f ts) = Fun (typeSubst sub f) (map (typeSubst sub) ts)
+  typeSubst_ sub x@Var{} = x
+  typeSubst_ sub (App f ts) = app (typeSubst sub f) (map (typeSubst sub) ts)
 
-instance Typed v => Apply (TermOf v) where
-  tryApply t@(Fun f xs) u
-    | arity (typ (conGeneralValue f) ) > length xs =
-        case typ t of
-          Fun Arrow [arg, _] | arg == typ u -> Just (Fun f' (xs ++ [u]))
-          _ -> Nothing
-    where
-      f' = f { conArity = conArity f + 1 }
-  tryApply t u = do { t' <- idTerm t; tryApply t' u }
-
--- Turn a term into a schema by forgetting about its variables.
-schema :: Term -> Schema
-schema = rename (Hole . typ)
+instance Apply (Term Constant) where
+  tryApply t@(App f xs) u = do
+    let f' = f { conArity = conArity f + 1 }
+    guard (maxArity f > length xs)
+    case typ t of
+      App Arrow [arg, _] | arg == typ u -> Just (app f' (xs ++ [u]))
+      _ -> Nothing
 
 -- Instantiate a schema by making all the variables different.
-instantiate :: Schema -> Term
-instantiate s = evalState (aux s) Map.empty
+instantiate :: Term Constant -> Term Constant
+instantiate s = build (evalState (aux s) Map.empty)
   where
-    aux (Var (Hole ty)) = do
+    aux (App (Id ty) [Var _]) = do
       m <- get
       let n = Map.findWithDefault 0 ty m
       put $! Map.insert ty (n+1) m
-      return (Var (Variable n ty))
-    aux (Fun f xs) = fmap (Fun f) (mapM aux xs)
+      return (fun (toFun (Id ty)) [var (MkVar n)])
+    aux (Fun f xs) = fmap (fun f) (mapM aux (fromTermList xs))
 
 -- Take a term and unify all type variables,
 -- and then all variables of the same type.
-skeleton :: (Ord v, Typed v) => TermOf v -> TermOf v
+skeleton :: Term Constant -> Term Constant
 skeleton = unifyTermVars . unifyTypeVars
   where
-    unifyTypeVars = typeSubst (const (Var (TyVar 0)))
-    unifyTermVars t = subst (T.fromMap (Map.fromList (makeSubst (vars t)))) t
-    makeSubst xs =
-      [ (v, Var w) | vs@(w:_) <- partitionBy typ xs, v <- vs ]
+    unifyTypeVars = typeSubst (const (var (MkVar 0)))
+    unifyTermVars = subst (const (var (MkVar 0)))
 
-evaluateTm :: (Typed v, Applicative f, Show v) => (v -> Value f) -> Tm Constant v -> Value f
-evaluateTm env (Var v) = env v
-evaluateTm env (Fun f xs) =
+typedVars :: Term Constant -> [(Type, Var)]
+typedVars t = [(ty, x) | App (Id ty) [Var x] <- subterms t]
+
+evaluateTm :: Applicative f => (Type -> Var -> Value f) -> Term Constant -> Value f
+evaluateTm env (App (Id ty) [Var v]) = env ty v
+evaluateTm env (App (Id _) [t]) = evaluateTm env t
+evaluateTm env (App f xs) =
   foldl apply x (map (evaluateTm env) xs)
   where
     x = mapValue (pure . runIdentity) (conValue f)
 
-makeValuation :: (CoArbitrary v, Typed v) => (Type -> Value Gen) -> QCGen -> Int -> v -> Value Identity
-makeValuation env g n x =
-  mapValue (\gen -> Identity (unGen (coarbitrary x gen) g n)) (env (typ x))
+instance CoArbitrary Var where
+  coarbitrary (MkVar x) = coarbitrary x
+
+makeValuation :: (Type -> Value Gen) -> QCGen -> Int -> Type -> Var -> Value Identity
+makeValuation env g n ty x =
+  mapValue (\gen -> Identity (unGen (coarbitrary x gen) g n)) (env ty)

@@ -18,7 +18,6 @@ import qualified Data.Set as Set
 import Data.Set(Set)
 import Data.Traversable hiding (mapM)
 import Prelude hiding (sequence)
-import QuickSpec.Base
 import QuickSpec.Prop
 import QuickSpec.Parse
 import QuickSpec.Term
@@ -26,9 +25,9 @@ import QuickSpec.Type
 import System.Timeout
 import Test.QuickCheck hiding (subterms)
 import Data.Ord
-import Data.Rewriting.Substitution.Match
 import {-# SOURCE #-} QuickSpec.Pruning.Completion(Completion)
 import {-# SOURCE #-} QuickSpec.Pruning.Simple(SimplePruner)
+import Twee.Base
 
 newtype Instance = Instance (Value Instance1) deriving Show
 newtype Instance1 a = Instance1 (Value (Instance2 a))
@@ -40,7 +39,7 @@ instance Typed Instance where
     otherTypesDL x `mplus`
     case unwrap x of
       Instance1 y `In` _ -> typesDL y
-  typeSubst sub (Instance x) =
+  typeSubst_ sub (Instance x) =
     case unwrap (typeSubst sub x) of
       Instance1 y `In` w ->
         Instance (wrap w (Instance1 (typeSubst sub y)))
@@ -48,7 +47,7 @@ instance Typed Instance where
 makeInstance :: forall a b. (Typeable a, Typeable b) => (b -> a) -> [Instance]
 makeInstance f =
   case typeOf (undefined :: a) of
-    Fun Arrow _ ->
+    App Arrow _ ->
       ERROR "makeInstance: curried functions not supported"
     _ ->
       [Instance (toValue (Instance1 (toValue (Instance2 f))))]
@@ -78,9 +77,9 @@ data Signature =
   deriving Typeable
 
 instance Pretty Signature where
-  pretty sig = vcat (map prettyDecl decls)
+  pPrint sig = vcat (map prettyDecl decls)
     where
-      decls = [(show (pretty (Fun c [] :: Term)), pretty (typeDrop (implicitArguments c) (typ c))) | c <- constants sig, not (conIsBackground c)]
+      decls = [(show (pPrint (app c [])), pPrint (typeDrop (implicitArity (typ (conGeneralValue c))) (typ c))) | c <- constants sig, not (conIsBackground c)]
       maxWidth = maximum (0:map (length . fst) decls)
       pad xs = replicate (maxWidth - length xs) ' ' ++ xs
       prettyDecl (name, ty) =
@@ -209,31 +208,18 @@ instance Monoid Signature where
 signature :: Signature
 signature = mempty
 
-renumber :: Signature -> Signature
--- TODO get rid of this, use old-style API ("single constant" signature+monoid) instead
-renumber sig =
-  sig { constants = cs, background = map (fmap (mapTerm find id)) (background sig) }
-  where
-    cs =
-      [ c | c <- constants sig, conIndex c /= 0 ] ++
-      zipWith f [ c | c <- constants sig, conIndex c == 0 ]
-                [succ (maximum (0:map conIndex (constants sig)))..]
-    f c n = c { conIndex = n }
-    find c | conIndex c == 0 = f c (head [ conIndex c' | c' <- cs, conName c == conName c' ])
-           | otherwise = c
-
 constant :: Typeable a => String -> a -> Constant
-constant name x = Constant 0 name value (poly value) 0 style 1 False
+constant name x = Constant name value (poly value) 0 style 1 False
   where
     value = toValue (Identity x)
-    ar = arity (typeOf x)
+    ar = typeArity (typeOf x)
     style
-      | name == "()" = Tuple 0
-      | take 1 name == "," = Tuple ar
-      | take 2 name == "(," = Tuple ar
-      | isOp name && ar >= 2 = Infix 5
-      | isOp name = Prefix
-      | otherwise = Curried
+      | name == "()" = curried
+      | take 1 name == "," = fixedArity (length name) tupleStyle
+      | take 2 name == "(," = fixedArity (length name-2) tupleStyle
+      | isOp name && ar >= 2 = infixStyle 5
+      | isOp name = prefix
+      | otherwise = curried
 
 isOp :: String -> Bool
 isOp "[]" = False
@@ -294,15 +280,15 @@ names1 = makeInstance
 typeUniverse :: Signature -> Set Type
 typeUniverse sig =
   Set.fromList $
-    Var (TyVar 0):
+    build (var (MkVar 0)):
     concatMap collapse
-      [ oneTypeVar (typ t) | c <- constants sig, not (isId c), t <- types (typ c) ]
+      [ oneTypeVar (typ t) | c@Constant{} <- constants sig, t <- types (typ c) ]
   where
     types t = typeRes t:typeArgs t ++ concatMap types (typeArgs t)
-    collapse ty@(Fun f tys) =
-      Var (TyVar 0):ty:
-      map (Fun f) (mapM collapse tys)
-    collapse (Var x) = [Var x]
+    collapse ty@(App f tys) =
+      build (var (MkVar 0)):ty:
+      map (app f) (mapM collapse tys)
+    collapse x@Var{} = [x]
 
 data TypeKind = Useless | Partial | Useful deriving (Eq, Show)
 
@@ -312,7 +298,7 @@ typeKind sig ty
   | any occurs (suffixes ty) = Partial
   | otherwise = Useless
   where
-    suffixes t@(Fun Arrow [_, u]) = t:suffixes u
+    suffixes t@(App Arrow [_, u]) = t:suffixes u
     suffixes t = [t]
     occurs t = or [ isJust (match t u) | u <- Set.toList u ]
     u = typeUniverse sig
@@ -324,10 +310,10 @@ findInstanceOf sig ty =
     ty' = typeRep (undefined :: proxy f) `applyType` ty
 
 findInstance :: Signature -> Type -> [Value Identity]
-findInstance sig (Fun unit [])
+findInstance sig (App unit [])
   | unit == tyCon () =
     return (toValue (Identity ()))
-findInstance sig (Fun pair [ty1, ty2])
+findInstance sig (App pair [ty1, ty2])
   | pair == tyCon ((),()) = do
     x <- findInstance sig ty1
     y <- findInstance sig ty2
@@ -347,13 +333,13 @@ findInstance sig ty = do
           case unwrap i1' of
             Instance2 f `In` w2 ->
               return $! wrap w1 $! fmap f $! reunwrap w2 $! i2
-
+{-
 newtype Name = Name String deriving Eq
 instance Pretty Name where
-  pretty (Name x) = text x
+  pPrint (Name x) = text x
 
-prettyRename :: Signature -> Prop -> PropOf (TermOf Name)
-prettyRename sig p = fmap (rename (\x -> Map.findWithDefault __ x m)) p
+prettyRename :: Signature -> Prop -> PropOf (Term Constant)
+prettyRename sig p = fmap (subst (\x -> var (Map.findWithDefault __ x m))) p
   where
     vs = nub (vars p)
     m = Map.fromList sub
@@ -364,7 +350,7 @@ prettyRename sig p = fmap (rename (\x -> Map.findWithDefault __ x m)) p
           name = head (filter (`Set.notMember` s) names)
       modify (Set.insert name)
       return (v, Name name)
-
+-}
 addBackground :: [String] -> Signature -> Signature
 addBackground props sig =
   sig { background = background sig ++ map (parseProp (constants sig)) props }

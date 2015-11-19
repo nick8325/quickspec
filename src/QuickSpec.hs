@@ -1,8 +1,6 @@
 module QuickSpec(
-  module QuickSpec.Base,
   module QuickSpec.Eval,
   module QuickSpec.Parse,
-  module QuickSpec.Pretty,
   module QuickSpec.Prop,
   module QuickSpec.Pruning,
   module QuickSpec.Pruning.E,
@@ -16,10 +14,8 @@ module QuickSpec(
   module QuickSpec.Utils,
   module Data.Constraint) where
 
-import QuickSpec.Base
 import QuickSpec.Eval hiding (terms)
 import QuickSpec.Parse
-import QuickSpec.Pretty
 import QuickSpec.Prop
 import QuickSpec.Pruning hiding (createRules, instances)
 import QuickSpec.Pruning.E
