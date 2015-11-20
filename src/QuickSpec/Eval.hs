@@ -117,7 +117,9 @@ initialState sig seeds terminal =
     seeds1 = [ (fst (split g), n) | (g, n) <- seeds ]
     seeds2 = [ (snd (split g), n) | (g, n) <- seeds ]
     e = memo (env sig)
-    v = [ memo (makeValuation e g n) | (g, n) <- seeds1 ]
+    v = [ memo2 (makeValuation e g n) | (g, n) <- seeds1 ]
+    memo2 :: (Ord a, Ord b) => (a -> b -> c) -> a -> b -> c
+    memo2 f = curry (memo (uncurry f))
 
 newTerm :: Term Constant -> M ()
 newTerm t = lift (modify (\s -> s { terms = Set.insert t (terms s) }))
