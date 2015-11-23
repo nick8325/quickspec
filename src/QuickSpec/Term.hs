@@ -23,13 +23,17 @@ import qualified Data.DList as DList
 -- Term ordering - size, skeleton, generality.
 -- Satisfies the property:
 -- if measure (schema t) < measure (schema u) then t < u.
-type Measure f = (Int, Int, MeasureFuns (Extended f), Int, [Var])
-measure :: (Numbered f, Sized f) => Term f -> Measure f
+type Measure = (Int, Int, MeasureFuns (Extended Constant), Int, [Var])
+measure :: Term Constant -> Measure
 measure t = (size t, -length (vars t),
-             MeasureFuns (skolemSkeleton (build (extended (singleton t)))), -length (usort (vars t)), vars t)
-
-skolemSkeleton :: (Numbered f, Minimal f) => Term f -> Term f
-skolemSkeleton = subst (const (con minimal))
+             MeasureFuns (build (skel (buildList (extended (singleton t))))), -length (usort (vars t)), vars t)
+  where
+    skel Empty = mempty
+    skel (Cons (Var x) ts) = con minimal `mappend` skel ts
+    skel (Cons (Fun f ts) us) =
+      case fromFun f of
+        Function (Id _) -> skel ts `mappend` skel us
+        _ -> fun f (skel ts) `mappend` skel us
 
 newtype MeasureFuns f = MeasureFuns (Term f)
 instance Function f => Eq (MeasureFuns f) where
