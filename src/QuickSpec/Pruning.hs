@@ -75,7 +75,6 @@ createRules = PrunerM $ do
       generate (Id ty)
       unPrunerM $ liftPruner $
         untypedAxiom Normal ([] :=>: app (Function (Id ty)) [t] :=: t)
-      -- XXX we can't really erase type tags cos it confuses the rest of QuickSpec
       forM_ (zip [0..] args) $ \(i, ty) -> do
         let vs = map (build . var . MkVar) [0..arity-1]
             tm f = app (Function con) (take i vs ++ [f (vs !! i)] ++ drop (i+1) vs)
