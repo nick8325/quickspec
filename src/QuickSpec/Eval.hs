@@ -517,8 +517,6 @@ found sig prop0 = do
             | otherwise = prettyRename sig prop
             where
               lhs' :=>: t' :=: u' = prettyRename sig prop
-              -- XXX
-              prettyRename _ = id
       let conIsBackground_ (Id _) = True
           conIsBackground_ con = conIsBackground con
       when (null (funs prop') || not (null (filter (not . conIsBackground_ . fromFun) (funs prop')))) $

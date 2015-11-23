@@ -28,6 +28,7 @@ import Data.Ord
 import {-# SOURCE #-} QuickSpec.Pruning.Completion(Completion)
 import {-# SOURCE #-} QuickSpec.Pruning.Simple(SimplePruner)
 import Twee.Base
+import qualified QuickSpec.Label as Label
 
 newtype Instance = Instance (Value Instance1) deriving Show
 newtype Instance1 a = Instance1 (Value (Instance2 a))
@@ -333,24 +334,50 @@ findInstance sig ty = do
           case unwrap i1' of
             Instance2 f `In` w2 ->
               return $! wrap w1 $! fmap f $! reunwrap w2 $! i2
-{-
-newtype Name = Name String deriving Eq
+
+newtype Name = Name String deriving (Eq, Ord)
 instance Pretty Name where
   pPrint (Name x) = text x
+instance PrettyTerm Name
 
-prettyRename :: Signature -> Prop -> PropOf (Term Constant)
-prettyRename sig p = fmap (subst (\x -> var (Map.findWithDefault __ x m))) p
+instance Numbered Name where
+  fromInt = fromMaybe __ . Label.find
+  toInt = Label.label
+instance Label.Labelled Name where
+  cache = nameCache
+{-# NOINLINE nameCache #-}
+nameCache :: Label.Cache Name
+nameCache = Label.mkCache
+
+data Union a b = L a | R b
+instance (Pretty a, Pretty b) => Pretty (Union a b) where
+  pPrintPrec l p (L x) = pPrintPrec l p x
+  pPrintPrec l p (R x) = pPrintPrec l p x
+instance (PrettyTerm a, PrettyTerm b) => PrettyTerm (Union a b) where
+  termStyle (L x) = termStyle x
+  termStyle (R x) = termStyle x
+instance (Numbered a, Numbered b) => Numbered (Union a b) where
+  fromInt n
+    | even n = L (fromInt (n `div` 2))
+    | otherwise = R (fromInt (n `div` 2))
+  toInt (L x) = 2*toInt x
+  toInt (R x) = 2*toInt x+1
+
+prettyRename :: Signature -> Prop -> PropOf (Term (Union Name Constant))
+prettyRename sig p =
+  subst (\x -> con (toFun (L (Map.findWithDefault __ x m))))
+    (fmap (build . mapFun (toFun . R . fromFun)) p)
   where
-    vs = nub (vars p)
+    vs = nub (terms p >>= fromTermList >>= typedVars)
     m = Map.fromList sub
     sub = evalState (mapM assign vs) Set.empty
-    assign v = do
+    assign (ty, v) = do
       s <- get
-      let names = supply (namesFor_ sig (typ v))
+      let names = supply (namesFor_ sig ty)
           name = head (filter (`Set.notMember` s) names)
       modify (Set.insert name)
       return (v, Name name)
--}
+
 addBackground :: [String] -> Signature -> Signature
 addBackground props sig =
   sig { background = background sig ++ map (parseProp (constants sig)) props }
