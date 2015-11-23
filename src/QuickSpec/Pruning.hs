@@ -137,10 +137,13 @@ constrain univ t =
   usort [ Map.fromList (listSubst sub) | u <- univ, Just sub <- [match (typ t) u] ]
 
 rep :: Pruner s => Term Constant -> PrunerM s (Maybe (Term Constant))
-rep t = liftM (liftM (build . inferTypes . build . unextended . singleton)) $ do
+rep t = liftM (check . liftM (build . inferTypes . build . unextended . singleton)) $ do
   let u = build (subst (con . skolem) (build (extended (singleton t))))
   sequence_ [ PrunerM (generate (fromFun con)) | con <- funs t ]
   liftPruner (untypedRep [] u)
+  where
+    check (Just u) | t == u = Nothing
+    check x = x
 
 inferTypes :: Term Constant -> Builder Constant
 inferTypes t = aux __ t
