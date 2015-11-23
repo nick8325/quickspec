@@ -25,8 +25,8 @@ liftTwee :: State (Twee PruningConstant) a -> StateT Completion IO a
 liftTwee m = do
   s <- get
   let (x, ks) = runState m (twee s)
-  put s { twee = ks }
-  return x
+  put $! s { twee = ks }
+  return $! x
 
 localTwee :: State (Twee PruningConstant) a -> StateT Completion IO a
 localTwee m = do
