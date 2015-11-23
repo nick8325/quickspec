@@ -364,9 +364,7 @@ instance (Numbered a, Numbered b) => Numbered (Union a b) where
   toInt (R x) = 2*toInt x+1
 
 prettyRename :: Signature -> Prop -> PropOf (Term (Union Name Constant))
-prettyRename sig p =
-  subst (\x -> con (toFun (L (Map.findWithDefault __ x m))))
-    (fmap (build . mapFun (toFun . R . fromFun)) p)
+prettyRename sig p = fmap (build . aux . singleton) p
   where
     vs = nub (terms p >>= fromTermList >>= typedVars)
     m = Map.fromList sub
@@ -376,7 +374,12 @@ prettyRename sig p =
       let names = supply (namesFor_ sig ty)
           name = head (filter (`Set.notMember` s) names)
       modify (Set.insert name)
-      return (v, Name name)
+      return ((ty, v), Name name)
+    aux Empty = mempty
+    aux (Cons (App (Id ty) [Var x]) ts) =
+      con (toFun (L (Map.findWithDefault __ (ty, x) m))) `mappend` aux ts
+    aux (Cons (Fun f ts) us) =
+      fun (toFun (R (fromFun f))) (aux ts) `mappend` aux us
 
 addBackground :: [String] -> Signature -> Signature
 addBackground props sig =
