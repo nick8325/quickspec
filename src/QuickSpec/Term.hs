@@ -25,8 +25,10 @@ import qualified Data.DList as DList
 -- if measure (schema t) < measure (schema u) then t < u.
 type Measure = (Int, Int, MeasureFuns (Extended Constant), Int, [Var])
 measure :: Term Constant -> Measure
-measure t = (size t, -length (vars t),
-             MeasureFuns (build (skel (buildList (extended (singleton t))))), -length (usort (vars t)), vars t)
+measure t =
+  (size t, -length (vars t),
+   MeasureFuns (build (skel (buildList (extended (singleton t))))),
+   -length (usort (vars t)), vars t)
   where
     skel Empty = mempty
     skel (Cons (Var x) ts) = con minimal `mappend` skel ts
@@ -65,10 +67,12 @@ data Constant =
     conSize         :: Int,
     conIsBackground :: Bool }
   | Id Type
+  | Apply Type
 
 instance Show Constant where
   show con@Constant{} = conName con
   show (Id ty) = "id[" ++ show ty ++ "]"
+  show (Apply ty) = "apply[" ++ show ty ++ "]"
 
 instance Label.Labelled Constant where
   cache = constantCache
@@ -81,36 +85,40 @@ instance Numbered Constant where
   fromInt n = fromMaybe __ (Label.find n)
   toInt = Label.label
 
-idTerm :: Term Constant -> Term Constant
-idTerm t = app (Id (typ t)) [t]
-
 instance Eq Constant where x == y = x `compare` y == EQ
 instance Ord Constant where
   compare = comparing f
     where
       f con@Constant{..} = Left (twiddle conArity, conName, typ conGeneralValue, typ conValue)
-      f (Id ty) = Right ty
+      f (Apply ty) = Right (Left ty)
+      f (Id ty) = Right (Right ty)
       -- This tweak is taken from Prover9
       twiddle 2 = 1
       twiddle 1 = 2
       twiddle n = n
 instance Pretty Constant where
+  pPrint (Apply ty) = text "apply[" <> pPrint ty <> text "]"
   pPrint (Id ty) = text "id[" <> pPrint ty <> text "]"
   pPrint con = text (conName con)
 instance PrettyTerm Constant where
-  termStyle (Id _) = invisible
+  termStyle (Apply _) = curried --invisible
+  termStyle (Id _) = curried --invisible
   termStyle f = implicitArguments n (conStyle f)
     where
       n = implicitArity (typ (conGeneralValue f))
 instance Typed Constant where
+  typ (Apply ty) = app Arrow [ty, ty]
   typ (Id ty) = app Arrow [ty, ty]
   typ con = typ (conValue con)
-  typeSubst_ sub (Id ty) = Id (typeSubst_ sub ty)
-  typeSubst_ sub x = x { conValue = typeSubst_ sub (conValue x) }
+  typeReplace sub (Apply ty) = Apply (typeReplace sub ty)
+  typeReplace sub (Id ty) = Id (typeReplace sub ty)
+  typeReplace sub x = x { conValue = typeReplace sub (conValue x) }
 instance Sized Constant where
+  size (Apply _) = 0
   size (Id _) = 0
   size con = fromIntegral (conSize con)
 instance Arity Constant where
+  arity (Apply _) = 2
   arity (Id _) = 1
   arity con = conArity con
 
@@ -118,26 +126,30 @@ implicitArity :: Type -> Int
 implicitArity (App Arrow [t, u]) | isDictionary t = 1 + implicitArity u
 implicitArity _ = 0
 
-maxArity :: Constant -> Int
-maxArity (Id ty) = typeArity ty
-maxArity con = typeArity (typ (conGeneralValue con))
-
 instance Typed (Term Constant) where
   typ (Var x) = ERROR("variables must be wrapped in type tags")
   typ (App f xs) = typeDrop (length xs) (typ f)
   otherTypesDL t =
     DList.fromList (funs t) >>= typesDL . fromFun
 
-  typeSubst_ sub x@Var{} = x
-  typeSubst_ sub (App f ts) = app (typeSubst sub f) (map (typeSubst sub) ts)
+  typeReplace sub x@Var{} = x
+  typeReplace sub (App f ts) = app (typeReplace sub f) (map (typeReplace sub) ts)
 
 instance Apply (Term Constant) where
-  tryApply t@(App f xs) u = do
-    let f' = f { conArity = conArity f + 1 }
-    guard (maxArity f > length xs)
-    case typ t of
-      App Arrow [arg, _] | arg == typ u -> Just (app f' (xs ++ [u]))
-      _ -> Nothing
+  tryApply t@(App Constant{} xs) u = tryApply' t u
+  tryApply t u = do
+    let ty = typ t
+    tryApply ty (typ u)
+    return (app (Apply ty) [t, u])
+
+tryApply' :: Term Constant -> Term Constant -> Maybe (Term Constant)
+tryApply' t@(App f@Constant{} xs) u = do
+  let f' = f { conArity = conArity f + 1 }
+  guard (typeArity (typ (conGeneralValue f)) > length xs)
+  case typ t of
+    App Arrow [arg, _] | arg == typ u -> Just (app f' (xs ++ [u]))
+    _ -> Nothing
+tryApply' _ _ = Nothing
 
 -- Instantiate a schema by making all the variables different.
 instantiate :: Term Constant -> Term Constant
@@ -158,12 +170,23 @@ skeleton = unifyTermVars . unifyTypeVars
     unifyTypeVars = typeSubst (const (var (MkVar 0)))
     unifyTermVars = subst (const (var (MkVar 0)))
 
+typedSubst ::
+  (Symbolic a, ConstantOf a ~ Constant) =>
+  (Type -> Var -> Builder Constant) -> a -> a
+typedSubst sub x = replace aux x
+  where
+    aux Empty = mempty
+    aux (Cons (App (Id ty) [Var x]) ts) = sub ty x `mappend` aux ts
+    aux (Cons (Fun f ts) us) = fun f (aux ts) `mappend` aux us
+
 typedVars :: Term Constant -> [(Type, Var)]
 typedVars t = [(ty, x) | App (Id ty) [Var x] <- subterms t]
 
 evaluateTm :: Applicative f => (Type -> Var -> Value f) -> Term Constant -> Value f
 evaluateTm env (App (Id ty) [Var v]) = env ty v
 evaluateTm env (App (Id _) [t]) = evaluateTm env t
+evaluateTm env (App (Apply _) [t, u]) =
+  apply (evaluateTm env t) (evaluateTm env u)
 evaluateTm env (App f xs) =
   foldl apply x (map (evaluateTm env) xs)
   where

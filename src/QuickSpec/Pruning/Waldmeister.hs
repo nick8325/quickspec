@@ -63,6 +63,7 @@ translate bg prop =
     showFun (Skolem n) = "sk" ++ show n
     showFun (Function c@Constant{}) = "f" ++ escape (conName c) ++ "_" ++ show (toInt c)
     showFun (Function (Id ty)) = "ty" ++ showTy ty
+    showFun (Function (Apply ty)) = "@" ++ showTy ty
 
     showVar (MkVar n) = "x" ++ show n
     showTy ty = show (Label.label (Ty ty))

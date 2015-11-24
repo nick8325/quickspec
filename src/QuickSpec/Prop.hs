@@ -33,13 +33,13 @@ unitProp p = [] :=>: p
 instance (Symbolic a, Typed a) => Typed (PropOf a) where
   typ _ = boolType
   otherTypesDL p = DList.fromList (literals p) >>= typesDL
-  typeSubst_ sub (lhs :=>: rhs) =
-    map (typeSubst sub) lhs :=>: typeSubst sub rhs
+  typeReplace sub (lhs :=>: rhs) =
+    map (typeReplace sub) lhs :=>: typeReplace sub rhs
 instance Symbolic a => Symbolic (PropOf a) where
   type ConstantOf (PropOf a) = ConstantOf a
   term = __
   termsDL p = DList.fromList (literals p) >>= termsDL
-  subst_ sub (lhs :=>: rhs) = map (subst sub) lhs :=>: subst sub rhs
+  replace sub (lhs :=>: rhs) = map (replace sub) lhs :=>: replace sub rhs
 
 instance Pretty a => Pretty (PropOf a) where
   pPrint ([] :=>: rhs) = pPrint rhs
@@ -59,14 +59,14 @@ instance Symbolic a => Symbolic (Literal a) where
   type ConstantOf (Literal a) = ConstantOf a
   term = __
   termsDL l = literalTermsDL l >>= termsDL
-  subst_ sub (t :=: u) = subst_ sub t :=: subst_ sub u
-  subst_ sub (p :@: ts) = p :@: map (subst_ sub) ts
+  replace sub (t :=: u) = replace sub t :=: replace sub u
+  replace sub (p :@: ts) = p :@: map (replace sub) ts
 
 instance (Symbolic a, Typed a) => Typed (Literal a) where
   typ _ = boolType
   otherTypesDL l = literalTermsDL l >>= typesDL
-  typeSubst_ sub (x :=: y) = typeSubst sub x :=: typeSubst sub y
-  typeSubst_ sub (p :@: ts) = typeSubst sub p :@: map (typeSubst sub) ts
+  typeReplace sub (x :=: y) = typeReplace sub x :=: typeReplace sub y
+  typeReplace sub (p :@: ts) = typeReplace sub p :@: map (typeReplace sub) ts
 
 propTerms :: PropOf a -> [a]
 propTerms p = literals p >>= DList.toList . literalTermsDL
@@ -94,7 +94,7 @@ instance Pretty Predicate where
 
 instance Typed Predicate where
   typ = predType
-  typeSubst_ sub (Predicate x ty pty) = Predicate x (typeSubst sub ty) pty
+  typeReplace sub (Predicate x ty pty) = Predicate x (typeReplace sub ty) pty
 
 boolType :: Type
 boolType = typeOf (undefined :: Bool)

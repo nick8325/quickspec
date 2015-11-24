@@ -56,6 +56,7 @@ makeFunName :: PruningConstant -> String
 makeFunName Minimal = "a"
 makeFunName (Skolem _) = "sk"
 makeFunName (Function (Id ty)) = "@"
+makeFunName (Function (Apply ty)) = "@"
 makeFunName (Function c) = conName c
 
 strip = filter (not . isSpace)

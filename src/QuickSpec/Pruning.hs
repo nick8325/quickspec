@@ -21,6 +21,14 @@ import Control.Applicative
 import Data.Ord
 import Twee.Base
 import qualified Twee.KBO as KBO
+import qualified QuickSpec.Label as Label
+
+instance Label.Labelled (Type, Var) where
+  cache = typedVarCache
+
+{-# NOINLINE typedVarCache #-}
+typedVarCache :: Label.Cache (Type, Var)
+typedVarCache = Label.mkCache
 
 data AxiomMode = Normal | WithoutConsequences
 type PruningConstant = Extended Constant
@@ -81,6 +89,13 @@ createRules = PrunerM $ do
         generate (Id ty)
         unPrunerM $ liftPruner $
           untypedAxiom Normal ([] :=>: tm (\t -> app (Function (Id ty)) [t]) :=: tm id)
+      unPrunerM $ liftPruner $
+        let u = app con (take arity (map (build . var . MkVar) [0..]))
+            x = build (var (MkVar arity)) in
+        case tryApply' u x of
+          Nothing -> return ()
+          Just v ->
+            untypedAxiom Normal ([] :=>: build (extended (singleton v)) :=: app (Function (Apply ty)) [t, build (var (MkVar arity))])
 
   rule $ do
     fun@Id{} <- event
@@ -113,6 +128,8 @@ toPruner :: Prop -> PruningProp
 toPruner = fmap (build . aux . singleton)
   where
     aux Empty = mempty
+    aux (Cons (App (Id ty) [Var x]) ts) =
+      fun (toFun (Function (Id ty))) (var (MkVar (Label.label (ty, x)))) `mappend` aux ts
     aux (Cons (Fun f ts) us) = fun (toFun (Function (fromFun f))) (aux ts) `mappend` aux us
     aux (Cons (Var x) ts) = var x `mappend` aux ts
 
@@ -139,7 +156,7 @@ constrain univ t =
 rep :: Pruner s => Term Constant -> PrunerM s (Maybe (Term Constant))
 rep t = liftM (check . liftM (build . inferTypes . build . unextended . singleton)) $ do
   let u = build (subst (con . skolem) (build (extended (singleton t))))
-  sequence_ [ PrunerM (generate (fromFun con)) | con <- funs t ]
+  --sequence_ [ PrunerM (generate (fromFun con)) | con <- funs t ]
   liftPruner (untypedRep [] u)
   where
     check (Just u) | t == u = Nothing

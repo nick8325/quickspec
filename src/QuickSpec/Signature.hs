@@ -40,10 +40,10 @@ instance Typed Instance where
     otherTypesDL x `mplus`
     case unwrap x of
       Instance1 y `In` _ -> typesDL y
-  typeSubst_ sub (Instance x) =
-    case unwrap (typeSubst sub x) of
+  typeReplace sub (Instance x) =
+    case unwrap (typeReplace sub x) of
       Instance1 y `In` w ->
-        Instance (wrap w (Instance1 (typeSubst sub y)))
+        Instance (wrap w (Instance1 (typeReplace sub y)))
 
 makeInstance :: forall a b. (Typeable a, Typeable b) => (b -> a) -> [Instance]
 makeInstance f =

@@ -33,6 +33,7 @@ import Test.QuickCheck
 import Unsafe.Coerce
 import Data.Constraint
 import Twee.Base
+import qualified Twee.Term as Term
 import qualified QuickSpec.Label as Label
 import Data.Ord
 
@@ -184,11 +185,11 @@ class Typed a where
   otherTypesDL :: a -> DList Type
   otherTypesDL _ = mzero
   -- Substitute for all type variables.
-  typeSubst_ :: (Var -> Builder TyCon) -> a -> a
+  typeReplace :: (TermListOf Type -> Builder TyCon) -> a -> a
 
 {-# INLINE typeSubst #-}
 typeSubst :: (Typed a, Substitution TyCon s) => s -> a -> a
-typeSubst s x = typeSubst_ (evalSubst s) x
+typeSubst s x = typeReplace (Term.substList s) x
 
 -- Using the normal term machinery on types.
 newtype TypeView a = TypeView { unTypeView :: a }
@@ -196,7 +197,7 @@ instance Typed a => Symbolic (TypeView a) where
   type ConstantOf (TypeView a) = TyCon
   term = typ . unTypeView
   termsDL = fmap singleton . typesDL . unTypeView
-  subst_ sub = TypeView . typeSubst sub . unTypeView
+  replace f = TypeView . typeReplace f . unTypeView
 
 typesDL :: Typed a => a -> DList Type
 typesDL ty = return (typ ty) `mplus` otherTypesDL ty
@@ -227,7 +228,7 @@ canApply f x = isJust (tryApply f x)
 -- Instances.
 instance Typed Type where
   typ = id
-  typeSubst_ = subst_
+  typeReplace = replace
 
 instance Apply Type where
   tryApply (App Arrow [arg, res]) t | t == arg = Just res
@@ -236,13 +237,13 @@ instance Apply Type where
 instance (Typed a, Typed b) => Typed (a, b) where
   typ (x, y) = app (TyCon commaTyCon) [typ x, typ y]
   otherTypesDL (x, y) = otherTypesDL x `mplus` otherTypesDL y
-  typeSubst_ f (x, y) = (typeSubst_ f x, typeSubst_ f y)
+  typeReplace f (x, y) = (typeReplace f x, typeReplace f y)
 
 instance Typed a => Typed [a] where
   typ [] = typeOf ()
   typ (x:xs) = typ (x, xs)
   otherTypesDL = msum . map otherTypesDL
-  typeSubst_ f xs = map (typeSubst_ f) xs
+  typeReplace f xs = map (typeReplace f) xs
 
 -- Represents a forall-quantifier over all the type variables in a type.
 -- Wrapping a term in Poly normalises the type by alpha-renaming
@@ -284,7 +285,7 @@ polyMgu ty1 ty2 = do
 instance Typed a => Typed (Poly a) where
   typ = typ . unPoly
   otherTypesDL = otherTypesDL . unPoly
-  typeSubst_ f (Poly x) = poly (typeSubst_ f x)
+  typeReplace f (Poly x) = poly (typeReplace f x)
 
 instance Apply a => Apply (Poly a) where
   tryApply f x = do
@@ -318,7 +319,7 @@ fromValue x = do
 
 instance Typed (Value f) where
   typ = valueType
-  typeSubst_ f (Value ty x) = Value (typeSubst_ f ty) x
+  typeReplace f (Value ty x) = Value (typeReplace f ty) x
 instance Applicative f => Apply (Value f) where
   tryApply f x = do
     ty <- tryApply (typ f) (typ x)

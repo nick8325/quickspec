@@ -268,10 +268,11 @@ summarise = do
 allUnifications :: Term Constant -> [Term Constant]
 allUnifications t = map f ss
   where
-    vs = [ map (snd x,) (take (varCount x) (map snd xs)) | xs <- partitionBy fst (usort (typedVars t)), x <- xs ]
+    vs = [ map (x,) (take (varCount x) xs) | xs <- partitionBy fst (usort (typedVars t)), x <- xs ]
     ss = map Map.fromList (sequence vs)
     go s x = Map.findWithDefault __ x s
-    f s = subst (var . go s) t
+    f s = typedSubst (curry (typedVar . go s)) t
+    typedVar (ty, x) = fun (toFun (Id ty)) [var x]
     varCount (ty, _)
       | isDictionary ty = 1
       | otherwise = 4
@@ -319,11 +320,7 @@ createRules sig = do
           del <- lift $ gets delayed
           let wait = or [ isJust (matchList (buildList [x, y]) (buildList [t, u])) | (x, y) <- del ]
               f = head (funs t ++ funs u)
-              munge = build . extended . buildList . noTypeTags
-              noTypeTags :: Term Constant -> Builder Constant
-              noTypeTags (Var x) = var x
-              noTypeTags (App (Id _) [Var x]) = var x
-              noTypeTags (Fun f ts) = fun f (map noTypeTags (fromTermList ts))
+              munge = build . extended . singleton . typedSubst (\_ x -> var x)
           case orientTerms (munge t') (munge u') of
             Just dir | not wait -> do
               generate (Found ([] :=>: t' :=: u'))
@@ -469,7 +466,7 @@ instance Pretty TermFrom where
 instance Typed TermFrom where
   typ (From _ t) = typ t
   otherTypesDL (From _ t) = otherTypesDL t
-  typeSubst_ sub (From s t) = From s (typeSubst_ sub t)
+  typeReplace sub (From s t) = From s (typeReplace sub t)
 
 instance Considerable TermFrom where
   generalise   (From _ t) = t
@@ -491,16 +488,15 @@ found sig prop0 = do
   props <- lift (gets discovered)
   (_, props') <- liftIO $ runPruner sig [] $ mapM_ (axiom Normal) (map (simplify_ sig) props)
 
-  let props = etaExpand prop
+  let prop' = etaExpand prop
   onTerm putTemp "[running extra pruner...]"
   res <- liftIO $ pruner (extraPruner_ sig) props' (toGoal (simplify_ sig prop))
   case res of
     True ->
       return ()
     False -> do
-      lift $ modify (\s -> s { discovered = props ++ discovered s })
-      let (prop':_) = filter isPretty props ++ [prop]
-          isPretty (_ :=>: t :=: u) = isPretty1 t && isPretty1 u
+      lift $ modify (\s -> s { discovered = prop':discovered s })
+      let isPretty (_ :=>: t :=: u) = isPretty1 t && isPretty1 u
           isPretty1 (App f ts) | undersaturated (conStyle f) (length ts) = False
           isPretty1 _ = True
           -- XXX
@@ -518,15 +514,16 @@ found sig prop0 = do
             where
               lhs' :=>: t' :=: u' = prettyRename sig prop
       let conIsBackground_ (Id _) = True
+          conIsBackground_ (Apply _) = True
           conIsBackground_ con = conIsBackground con
       when (null (funs prop') || not (null (filter (not . conIsBackground_ . fromFun) (funs prop')))) $
         onTerm putLine (prettyShow (rename (canonicalise prop')))
 
   onTerm putTemp "[completing theory...]"
-  mapM_ (lift . lift . axiom Normal) props
-  forM_ (map canonicalise props) $ \(_ :=>: _ :=: t) -> do
-    u <- fmap (fromMaybe t) (lift (lift (rep t)))
-    newTerm u
+  lift (lift (axiom Normal prop'))
+  let _ :=>: _ :=: t = canonicalise prop'
+  u <- fmap (fromMaybe t) (lift (lift (rep (oneTypeVar t))))
+  newTerm u
   onTerm putTemp "[renormalising existing terms...]"
   let norm s = do
         ts <- filterM (fmap isJust . rep) (Set.toList s)
@@ -537,12 +534,11 @@ found sig prop0 = do
   lift $ modify (\s -> s { terms = terms, allSchemas = allSchemas })
   onTerm putPart ""
 
-etaExpand :: Prop -> [Prop]
+etaExpand :: Prop -> Prop
 etaExpand prop@(lhs :=>: t :=: u) =
-  prop:
-  case (typ t, tryApply t x, tryApply u x) of
-    (App Arrow _, Just t', Just u') -> etaExpand (lhs :=>: t' :=: u')
-    _ -> []
+  case (tryApply t x, tryApply u x) of
+    (Just t', Just u') -> etaExpand (lhs :=>: t' :=: u')
+    _ -> prop
   where
     x = build (fun (toFun (Id (head (typeArgs (typ t) ++ [typeOf ()])))) [var (MkVar n)])
     n = boundList (buildList (map var (vars prop)))
