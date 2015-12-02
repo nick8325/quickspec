@@ -1,5 +1,5 @@
 -- Polymorphic types and dynamic values.
-{-# LANGUAGE DeriveDataTypeable, CPP, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances, GeneralizedNewtypeDeriving, Rank2Types, ExistentialQuantification, PolyKinds, TypeFamilies #-}
+{-# LANGUAGE DeriveDataTypeable, CPP, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances, GeneralizedNewtypeDeriving, Rank2Types, ExistentialQuantification, PolyKinds, TypeFamilies, StandaloneDeriving #-}
 -- To avoid a warning about TyVarNumber's constructor being unused:
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
 module QuickSpec.Type(
@@ -33,6 +33,8 @@ import QuickSpec.Base
 import Test.QuickCheck
 import Unsafe.Coerce
 import Data.Constraint
+
+deriving instance Typeable (() :: Constraint)
 
 -- A (possibly polymorphic) type.
 type Type = Tm TyCon TyVar

@@ -56,7 +56,6 @@ makeInstance f =
 deriving instance Typeable Ord
 deriving instance Typeable Arbitrary
 deriving instance Typeable CoArbitrary
-deriving instance Typeable (() :: Constraint)
 deriving instance Typeable Gen
 
 type PrunerType = Completion
