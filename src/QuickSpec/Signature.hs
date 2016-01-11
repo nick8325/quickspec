@@ -69,6 +69,7 @@ data Signature =
     theory             :: Maybe PrunerType,
     defaultTo          :: Maybe Type,
     maxTermSize        :: Maybe Int,
+    maxPruningSize     :: Maybe Int,
     maxTermDepth       :: Maybe Int,
     maxCommutativeSize :: Maybe Int,
     maxTests           :: Maybe Int,
@@ -97,6 +98,10 @@ defaultTo_ sig =
 
 maxTermSize_ :: Signature -> Int
 maxTermSize_ = fromMaybe 7 . maxTermSize
+
+maxPruningSize_ :: Signature -> Int
+maxPruningSize_ sig =
+  max (fromMaybe 0 (maxPruningSize sig)) (maxTermSize_ sig)
 
 maxCommutativeSize_ = fromMaybe 5 . maxCommutativeSize
 
@@ -193,12 +198,13 @@ newtype NamesFor a = NamesFor { unNamesFor :: [String] } deriving Typeable
 newtype DictOf c a = DictOf { unDictOf :: Dict (c a) } deriving Typeable
 
 instance Monoid Signature where
-  mempty = Signature [] [] [] Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
-  Signature cs is b th d s dp s1 t tim simp p `mappend` Signature cs' is' b' th' d' s' dp' s1' t' tim' simp' p' =
+  mempty = Signature [] [] [] Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
+  Signature cs is b th d s ps dp s1 t tim simp p `mappend` Signature cs' is' b' th' d' s' ps' dp' s1' t' tim' simp' p' =
     Signature (cs++cs') (is++is') (b++b')
       (th `mplus` th')
       (d `mplus` d')
       (s `mplus` s')
+      (ps `mplus` ps')
       (dp `mplus` dp')
       (s1 `mplus` s1')
       (t `mplus` t')
