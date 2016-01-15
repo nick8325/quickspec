@@ -50,7 +50,7 @@ instance Parse (Term Constant) where
       return (unPoly (foldl apply (poly (app f [])) (map poly args)))
     where
       parseArgs = between (char '(') (char ')') (sepBy (parse cs) (char ','))
-      typedVar x = app (Id (typeOf (undefined :: A))) [x]
+      typedVar x = app (Id (typeOf (undefined :: A))) [build (var x)]
 
 instance Parse (Literal (Term Constant)) where
   parse cs = equality <++ predicate
