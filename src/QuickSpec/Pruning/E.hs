@@ -10,7 +10,6 @@ import QuickSpec.Prop
 import QuickSpec.Pruning
 import QuickSpec.Term
 import QuickSpec.Utils
-import qualified Data.ByteString.Char8 as BS
 import Data.Char
 import qualified Data.Map as Map
 import Data.Map(Map)
@@ -34,8 +33,8 @@ foUnify hasConj prove unsat axioms goal = do
   return (res == unsat)
 
 translate :: Bool -> [PropOf PruningTerm] -> Literal PruningTerm ->
-             Jukebox.Closed [Jukebox.Input Jukebox.Form]
-translate hasConj axioms goal = Jukebox.close_ Jukebox.stdNames $ do
+             Jukebox.Problem Jukebox.Form
+translate hasConj axioms goal = Jukebox.runNameM [] $ do
   ty <- Jukebox.newType "i"
   let vs = usort (concatMap vars (unitProp goal:axioms))
       fs = usort (concatMap funs (unitProp goal:axioms))
@@ -46,7 +45,7 @@ translate hasConj axioms goal = Jukebox.close_ Jukebox.stdNames $ do
   let var  = find (Map.fromList (zip vs varSyms))
       fun  = find (Map.fromList (zip fs funSyms))
       prop = find (Map.fromList (zip ps propSyms))
-      input kind form = Jukebox.Input (BS.pack "clause") kind form
+      input kind form = Jukebox.Input "clause" kind form
       conj | hasConj = input Jukebox.Conjecture
            | otherwise = input Jukebox.Axiom . Jukebox.nt
   return (conj (translateLiteral var fun prop goal):
@@ -72,7 +71,7 @@ translateProp :: (PruningVariable -> Jukebox.Variable) ->
              (Predicate -> Jukebox.Function) ->
              PropOf PruningTerm -> Jukebox.Form
 translateProp var fun prop p =
-  Jukebox.disj
+  Jukebox.Or
     (translateLiteral var fun prop (rhs p):
      map (Jukebox.nt . translateLiteral var fun prop) (lhs p))
 
