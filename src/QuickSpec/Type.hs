@@ -87,7 +87,7 @@ typeRep x = fromTypeRep (Ty.typeRep x)
 
 applyType :: Type -> Type -> Type
 applyType (Fun f tys) ty = build (fun f (fromTermList tys ++ [ty]))
-applyType _ _ = ERROR "tried to apply type variable"
+applyType _ _ = ERROR("tried to apply type variable")
 
 arrowType :: [Type] -> Type -> Type
 arrowType [] res = res
@@ -219,7 +219,7 @@ infixl `apply`
 apply :: Apply a => a -> a -> a
 apply f x =
   case tryApply f x of
-    Nothing -> ERROR "apply: ill-typed term"
+    Nothing -> ERROR("apply: ill-typed term")
     Just y -> y
 
 canApply :: Apply a => a -> a -> Bool
@@ -341,7 +341,7 @@ unwrap x =
       (\y ->
         if typ x == typ y
         then fromAny (value y)
-        else ERROR "non-matching types")
+        else ERROR("non-matching types"))
 
 mapValue :: (forall a. f a -> g a) -> Value f -> Value g
 mapValue f v =
@@ -387,6 +387,6 @@ unwrapFunctor f x =
             valueType = last tys,
             value = f (fromAny (value x)) }
         False ->
-          ERROR "non-matching types"
+          ERROR("non-matching types")
   where
     ty = typeRep (__ :: proxy g)

@@ -39,7 +39,7 @@ env sig ty =
     [] ->
       fromMaybe __ $
       cast ty $
-      toValue (ERROR $ "missing arbitrary instance for " ++ prettyShow ty :: Gen A)
+      toValue (ERROR("missing arbitrary instance for " ++ prettyShow ty) :: Gen A)
     (i:_) -> i
 
 genSeeds :: Int -> IO [(QCGen, Int)]

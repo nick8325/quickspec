@@ -49,7 +49,7 @@ makeInstance :: forall a b. (Typeable a, Typeable b) => (b -> a) -> [Instance]
 makeInstance f =
   case typeOf (undefined :: a) of
     App Arrow _ ->
-      ERROR "makeInstance: curried functions not supported"
+      ERROR("makeInstance: curried functions not supported")
     _ ->
       [Instance (toValue (Instance1 (toValue (Instance2 f))))]
 
