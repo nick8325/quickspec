@@ -439,7 +439,7 @@ consider sig makeEvent x = do
           ts <- getTestSet x
           res <-
             liftIO . testTimeout_ sig $
-            case fmap Just {-teaspoon-} (insert x ts) of
+            case teaspoon (insert x ts) of
               Nothing -> return $ do
                 generate (makeEvent Untestable)
               Just Nothing -> return (return ()) -- partial term
