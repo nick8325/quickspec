@@ -197,4 +197,4 @@ instance CoArbitrary Var where
 
 makeValuation :: (Type -> Value Gen) -> QCGen -> Int -> Type -> Var -> Value Identity
 makeValuation env g n ty x =
-  mapValue (\gen -> Identity (unGen (coarbitrary x gen) g n)) (env ty)
+  mapValue (\gen -> Identity (unGen (coarbitrary (ty, x) gen) g n)) (env ty)
