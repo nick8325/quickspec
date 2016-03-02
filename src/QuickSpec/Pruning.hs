@@ -2,7 +2,6 @@
 module QuickSpec.Pruning where
 
 #include "errors.h"
-import QuickSpec.Base
 import QuickSpec.Type
 import QuickSpec.Term
 import QuickSpec.Utils
@@ -16,29 +15,45 @@ import Control.Monad.IO.Class
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import Data.Map(Map)
-import Data.Rewriting.Substitution.Type
 import Data.Maybe
 import Control.Monad
 import Control.Applicative
 import Data.Ord
+import Twee.Base
+import qualified Twee.KBO as KBO
+import qualified QuickSpec.Label as Label
+
+instance Label.Labelled (Type, Var) where
+  cache = typedVarCache
+
+{-# NOINLINE typedVarCache #-}
+typedVarCache :: Label.Cache (Type, Var)
+typedVarCache = Label.mkCache
 
 data AxiomMode = Normal | WithoutConsequences
+type PruningConstant = Extended Constant
+type PruningTerm = Term PruningConstant
+type PruningProp = PropOf PruningTerm
+
+instance Ordered PruningConstant where
+  lessEq = KBO.lessEq
+  lessIn = KBO.lessIn
 
 class Pruner s where
   emptyPruner   :: Signature -> s
-  untypedRep    :: [PropOf PruningTerm] -> PruningTerm -> StateT s IO (Maybe PruningTerm)
-  untypedAxiom  :: AxiomMode -> PropOf PruningTerm -> StateT s IO ()
+  untypedRep    :: [PruningProp] -> PruningTerm -> StateT s IO (Maybe PruningTerm)
+  untypedAxiom  :: AxiomMode -> PruningProp -> StateT s IO ()
   pruningReport :: s -> String
   pruningReport _ = ""
 
-instance Pruner [PropOf PruningTerm] where
+instance Pruner [PruningProp] where
   emptyPruner _       = []
   untypedRep _ _      = return Nothing
   untypedAxiom _ prop = modify (prop:)
 
 newtype PrunerM s a =
   PrunerM {
-    unPrunerM :: RulesT PruningConstant (ReaderT [Type] (StateT s IO)) a }
+    unPrunerM :: RulesT Constant (ReaderT [Type] (StateT s IO)) a }
   deriving (Monad, MonadIO, Functor, Applicative)
 
 askUniv :: PrunerM s [Type]
@@ -59,178 +74,99 @@ runPruner sig theory m =
 createRules :: Pruner s => PrunerM s ()
 createRules = PrunerM $ do
   rule $ do
-    fun@(TermConstant con _) <- event
-    let arity = funArity con
+    con@Constant{} <- event
+    let arity = conArity con
     execute $ do
-      let ty = typ (Fun con (replicate arity (undefined :: Term)))
-          t = Fun fun (take arity (map Var [0..]))
+      let ty = typ (app con (replicate arity (build (var (MkVar 0)) :: Term Constant)))
+          t = app (Function con) (take arity (map (build . var . MkVar) [0..]))
           args = take arity (typeArgs (typ con))
-      generate (HasType ty)
+      generate (Id ty)
       unPrunerM $ liftPruner $
-        untypedAxiom Normal ([] :=>: Fun (HasType ty) [t] :=: t)
+        untypedAxiom Normal ([] :=>: app (Function (Id ty)) [t] :=: t)
       forM_ (zip [0..] args) $ \(i, ty) -> do
-        let vs = map (Var . PruningVariable) [0..arity-1]
-            tm f = Fun fun (take i vs ++ [f (vs !! i)] ++ drop (i+1) vs)
-        generate (HasType ty)
+        let vs = map (build . var . MkVar) [0..arity-1]
+            tm f = app (Function con) (take i vs ++ [f (vs !! i)] ++ drop (i+1) vs)
+        generate (Id ty)
         unPrunerM $ liftPruner $
-          untypedAxiom Normal ([] :=>: tm (\t -> Fun (HasType ty) [t]) :=: tm id)
-
-  rule $ do
-    idFun@(TermConstant idCon idTy) <- event
-    require (isId idCon)
-    fun@(TermConstant con ty) <- event
-    require (idTy == Fun Arrow [ty, ty])
-    execute $ do
-      let fun' = TermConstant con { conArity = arity + 1 } ty
-          arity = conArity con
-          x:xs = map (Var . PruningVariable) [0..arity]
+          untypedAxiom Normal ([] :=>: tm (\t -> app (Function (Id ty)) [t]) :=: tm id)
       unPrunerM $ liftPruner $
-        untypedAxiom Normal ([] :=>: Fun idFun [Fun fun xs, x] :=: Fun fun' (xs ++ [x]))
+        let u = app con (take arity (map (build . var . MkVar) [0..]))
+            x = build (var (MkVar arity)) in
+        case tryApply' u x of
+          Nothing -> return ()
+          Just v ->
+            untypedAxiom Normal ([] :=>: build (extended (singleton v)) :=: app (Function (Apply ty)) [t, build (var (MkVar arity))])
 
   rule $ do
-    fun@(HasType ty) <- event
+    fun@Id{} <- event
+    let x = build (var (MkVar 0))
     execute $
       unPrunerM $ liftPruner $
-        untypedAxiom Normal ([] :=>: Fun fun [Fun fun [Var 0]] :=: Fun fun [Var 0])
+        untypedAxiom Normal ([] :=>: app (Function fun) [app (Function fun) [x]] :=: app (Function fun) [x])
 
 axiom :: Pruner s => AxiomMode -> Prop -> PrunerM s ()
 axiom mode p = do
   univ <- askUniv
   when (null (instances univ p)) $
-    ERROR . show . sep $
+    ERROR(show (sep
       [text "No instances in",
-       nest 2 (pretty univ),
+       nest 2 (pPrint univ),
        text "for",
-       nest 2 (pretty p <+> text "::" <+> pretty (propType p)),
+       nest 2 (pPrint p <+> text "::" <+> pPrint (propType p)),
        text "under",
-       nest 2 (pretty [ pretty t <+> text "::" <+> pretty (typ t) | t <- usort (terms p >>= subterms) ])]
+       nest 2 (pPrint [ pPrint t <+> text "::" <+> pPrint (typ t) | t <- filter isFun (usort (terms p >>= termListToList >>= subterms)) ])]))
   sequence_
-    [ do sequence_ [ PrunerM (generate fun) | fun <- usort (funs p') ]
-         liftPruner (untypedAxiom mode p')
-    | p' <- map toAxiom (instances univ p) ]
+    [ do sequence_ [ PrunerM (generate (fromFun fun)) | fun <- usort (funs p') ]
+         liftPruner (untypedAxiom mode (toPruner p'))
+    | p' <- instances univ p ]
 
-toAxiom :: Prop -> PropOf PruningTerm
-toAxiom = normaliseProp . guardNakedVariables . fmap toPruningConstant
+toGoal :: Prop -> PruningProp
+toGoal = fmap (build . subst (con . skolem)) . toPruner
+
+{-# INLINE toPruner #-}
+toPruner :: Prop -> PruningProp
+toPruner = fmap (build . aux . singleton)
   where
-    guardNakedVariables (lhs :=>: t :=: u) =
-      lhs :=>: guardTerm t :=: guardTerm u
-    guardNakedVariables prop = prop
-    guardTerm (Var x) = Fun (HasType (typ x)) [Var x]
-    guardTerm t = t
-
-toGoal :: Prop -> PropOf PruningTerm
-toGoal = fmap toGoalTerm
-
-toGoalTerm :: Term -> PruningTerm
-toGoalTerm = skolemise . guardNaked . toPruningConstant
-  where
-    guardNaked (Var x) = Fun (HasType (typ x)) [Var x]
-    guardNaked t = t
-
-toPruningConstant :: Term -> Tm PruningConstant Variable
-toPruningConstant = mapTerm f id
-  where
-    f fun = TermConstant fun (typ fun)
-
-skolemise :: Tm PruningConstant Variable -> PruningTerm
-skolemise (Fun f xs) = Fun f (map skolemise xs)
-skolemise (Var x) = Fun (SkolemVariable (PruningVariable (number x))) []
-
-normaliseVars t = rename (\x -> fromMaybe __ (Map.lookup x m)) t
-  where
-    m = Map.fromList (zip (usort (vars t)) [0..])
-
-normaliseProp prop =
-  fmap (rename (\x -> fromMaybe __ (Map.lookup x m))) prop
-  where
-    m = Map.fromList (zip (usort (vars prop)) [0..])
+    aux Empty = mempty
+    aux (Cons (App (Id ty) [Var x]) ts) =
+      fun (toFun (Function (Id ty))) (var (MkVar (Label.label (ty, x)))) `mappend` aux ts
+    aux (Cons (Fun f ts) us) = fun (toFun (Function (fromFun f))) (aux ts) `mappend` aux us
+    aux (Cons (Var x) ts) = var x `mappend` aux ts
 
 instances :: [Type] -> Prop -> [Prop]
 instances univ prop =
-  [ fmap (typeSubst (evalSubst sub)) prop
-  | sub <- map fromMap cs ]
+  [ fmap (typeSubst (\x -> Map.findWithDefault __ x sub)) prop
+  | sub <- cs ]
   where
     cs =
       foldr intersection [Map.empty]
         (map (constrain univ)
-          (usort
-            (concatMap subterms
-              (terms prop))))
+          (filter isFun
+            (usort (terms prop >>= termListToList >>= subterms))))
 
-intersection :: [Map TyVar Type] -> [Map TyVar Type] -> [Map TyVar Type]
+intersection :: [Map Var Type] -> [Map Var Type] -> [Map Var Type]
 ms1 `intersection` ms2 = usort [ Map.union m1 m2 | m1 <- ms1, m2 <- ms2, ok m1 m2 ]
   where
     ok m1 m2 = and [ Map.lookup x m1 == Map.lookup x m2 | x <- Map.keys (Map.intersection m1 m2) ]
 
-constrain :: [Type] -> Term -> [Map TyVar Type]
+constrain :: [Type] -> Term Constant -> [Map Var Type]
 constrain univ t =
-  usort [ toMap sub | u <- univ, Just sub <- [match (typ t) u] ]
+  usort [ Map.fromList (listSubst sub) | u <- univ, Just sub <- [match (typ t) u] ]
 
-rep :: Pruner s => Term -> PrunerM s (Maybe Term)
-rep t = liftM (liftM fromPruningTerm) $ do
-  let u = toGoalTerm t
-  sequence_ [ PrunerM (generate fun) | fun@(TermConstant con _) <- funs u ]
+rep :: Pruner s => Term Constant -> PrunerM s (Maybe (Term Constant))
+rep t = liftM (check . liftM (build . inferTypes . build . unextended . singleton)) $ do
+  let u = build (subst (con . skolem) (build (extended (singleton t))))
+  --sequence_ [ PrunerM (generate (fromFun con)) | con <- funs t ]
   liftPruner (untypedRep [] u)
-
-type PruningTerm = Tm PruningConstant PruningVariable
-
-data PruningConstant
-  = SkolemVariable PruningVariable
-    -- The type of a TermConstant is always the same as the underlying
-    -- constant's type, it's only included here so that it's counted
-    -- in the Ord instance
-  | TermConstant Constant Type
-    -- Since HasType has weight 0, it must be the biggest constant.
-  | HasType Type
-  deriving (Eq, Show)
-
-instance Minimal PruningConstant where
-  minimal = SkolemVariable (PruningVariable 0)
-
-instance Ord PruningConstant where
-  compare = comparing f
-    where
-      f (SkolemVariable x)    = Left x
-      f (TermConstant x ty) = Right (Left (x, ty))
-      f (HasType ty)          = Right (Right ty)
-
--- We have the property that size (skolemise t) == size t,
--- which is useful because we use the size to decide whether
--- to keep a critical pair.
-instance Sized PruningConstant where
-  funSize (TermConstant c _) = funSize c
-  funSize (SkolemVariable _) = 1
-  funSize (HasType _) = 0
-  funArity (TermConstant c _) = funArity c
-  funArity (SkolemVariable _) = 0
-  funArity (HasType _) = 1
-
-newtype PruningVariable = PruningVariable Int deriving (Eq, Ord, Num, Enum, Show, Numbered)
-
-instance Pretty PruningConstant where
-  pretty (TermConstant x _) = pretty x
-  pretty (SkolemVariable x) = text "s" <> pretty x
-  pretty (HasType ty) = text "@" <> prettyPrec 11 ty
-instance PrettyTerm PruningConstant where
-  termStyle (TermConstant x _) = termStyle x
-  termStyle _ = Curried
-
-instance Pretty PruningVariable where
-  pretty (PruningVariable x) = text "v" <> pretty x
-
-fromPruningTerm :: PruningTerm -> Term
-fromPruningTerm t =
-  fromPruningTermWith n t
   where
-    n = maximum (0:[1+n | SkolemVariable (PruningVariable n) <- funs t])
+    check (Just u) | t == u = Nothing
+    check x = x
 
-fromPruningTermWith :: Int -> PruningTerm -> Term
-fromPruningTermWith n (Fun (TermConstant fun _) xs) =
-  Fun fun (zipWith (fromPruningTermWithType n) (typeArgs (typ fun)) xs)
-fromPruningTermWith n (Fun (HasType ty) [t]) = fromPruningTermWithType n ty t
-fromPruningTermWith _ _ = ERROR "ill-typed term?"
-
-fromPruningTermWithType :: Int -> Type -> PruningTerm -> Term
-fromPruningTermWithType m ty (Var (PruningVariable n)) = Var (Variable (m+n) ty)
-fromPruningTermWithType _ ty (Fun (SkolemVariable (PruningVariable n)) []) = Var (Variable n ty)
-fromPruningTermWithType n _  t = fromPruningTermWith n t
+inferTypes :: Term Constant -> Builder Constant
+inferTypes t = aux __ t
+  where
+    aux ty (Var x) = fun (toFun (Id ty)) (var x)
+    aux ty t@(App (Id _) [Var _]) = builder t
+    aux _ (Fun f ts) = fun f (zipWith aux tys (fromTermList ts))
+      where
+        tys = typeArgs (typ (fromFun f))

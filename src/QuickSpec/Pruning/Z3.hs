@@ -4,13 +4,13 @@ module QuickSpec.Pruning.Z3 where
 #ifdef NO_Z3
 z3Unify _ _ _ = return False
 #else
-import QuickSpec.Base
 import QuickSpec.Prop
 import QuickSpec.Pruning
 import QuickSpec.Utils
 import Z3.Monad hiding (Symbol, Context, reset)
+import Twee.Base
 
-z3Unify :: Int -> [PropOf PruningTerm] -> PropOf PruningTerm -> IO Bool
+z3Unify :: Int -> [PruningProp] -> PruningProp -> IO Bool
 z3Unify timeout axioms goal =
   evalZ3With Nothing (opt "SOFT_TIMEOUT" timeout) $ do
     bool <- mkBoolSort
@@ -54,10 +54,10 @@ flattenTerm ind (Var x) = do
   sym <- mkStringSymbol (show x)
   mkConst sym ind
 
-flattenTerm ind (Fun f ts) = flattenApp ind ind f ts
+flattenTerm ind (App f ts) = flattenApp ind ind f ts
 
 quantify ind [] t = return t
 quantify ind xs t = do
-  apps <- mapM (flattenTerm ind . Var) xs >>= mapM toApp
+  apps <- mapM (flattenTerm ind . build . var) xs >>= mapM toApp
   mkForallConst [] apps t
 #endif

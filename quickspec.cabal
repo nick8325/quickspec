@@ -67,23 +67,15 @@ library
   Exposed-modules:
     Paths_quickspec
     QuickSpec
-    QuickSpec.Base
     QuickSpec.Eval
+    QuickSpec.Label
     QuickSpec.Parse
-    QuickSpec.Pretty
     QuickSpec.Prop
     QuickSpec.Pruning
     QuickSpec.Pruning.E
     QuickSpec.Pruning.Z3
     QuickSpec.Pruning.Waldmeister
     QuickSpec.Pruning.Simple
-    QuickSpec.Pruning.Constraints
-    QuickSpec.Pruning.Equation
-    QuickSpec.Pruning.Index
-    QuickSpec.Pruning.Rewrite
-    QuickSpec.Pruning.KBC
-    QuickSpec.Pruning.Queue
-    QuickSpec.Pruning.FourierMotzkin
     QuickSpec.Pruning.Completion
     QuickSpec.Rules
     QuickSpec.Signature
@@ -97,15 +89,15 @@ library
                , base < 5
                , constraints
                , containers
-               , uglymemo
                , dlist
                , heaps
                , pretty
                , process
                , random
                , spoon >= 0.2
-               , term-rewriting >= 0.1.2
                , transformers
+               , twee
+               , uglymemo
 
   if flag(jukebox)
     Build-depends: jukebox >= 0.2

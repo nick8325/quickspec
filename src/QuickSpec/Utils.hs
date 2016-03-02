@@ -76,6 +76,9 @@ getMinWith :: Ord a => a -> Min a -> a
 getMinWith x (Min (Just y)) = x `min` y
 getMinWith x (Min Nothing)  = x
 
+minimumBy :: (a -> a -> Bool) -> [a] -> a
+minimumBy f = foldr1 (\x y -> if f x y then x else y)
+
 instance Ord a => Monoid (Min a) where
   mempty = Min Nothing
   Min (Just x) `mappend` y = Min (Just (getMinWith x y))

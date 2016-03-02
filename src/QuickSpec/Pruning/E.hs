@@ -5,7 +5,6 @@ module QuickSpec.Pruning.E where
 eUnify _ _ _ = return False
 spassUnify _ _ _ = return False
 #else
-import QuickSpec.Base
 import QuickSpec.Prop
 import QuickSpec.Pruning
 import QuickSpec.Term
@@ -19,6 +18,7 @@ import qualified Jukebox.Provers.E as Jukebox
 import qualified Jukebox.Provers.SPASS as Jukebox
 import qualified Jukebox.TPTP.Print as Jukebox
 import qualified Text.PrettyPrint as Jukebox
+import Twee.Base
 
 eUnify, spassUnify :: Int -> [PropOf PruningTerm] -> PropOf PruningTerm -> IO Bool
 eUnify timeout = foUnify True (Jukebox.runE (Jukebox.EFlags "eprover" (Just timeout) (Just 1000))) (Left Jukebox.Unsatisfiable)
@@ -37,7 +37,7 @@ translate :: Bool -> [PropOf PruningTerm] -> Literal PruningTerm ->
 translate hasConj axioms goal = Jukebox.runNameM [] $ do
   ty <- Jukebox.newType "i"
   let vs = usort (concatMap vars (unitProp goal:axioms))
-      fs = usort (concatMap funs (unitProp goal:axioms))
+      fs = map fromFun (usort (concatMap funs (unitProp goal:axioms)))
       ps = usort [ p | p :@: _ <- concatMap literals (unitProp goal:axioms) ]
   varSyms  <- sequence [ Jukebox.newSymbol "X" ty | x <- vs ]
   funSyms  <- sequence [ Jukebox.newFunction (makeFunName x) [] ty | x <- fs]
@@ -52,9 +52,11 @@ translate hasConj axioms goal = Jukebox.runNameM [] $ do
           map (input Jukebox.Axiom . translateProp var fun prop) axioms)
 
 makeFunName :: PruningConstant -> String
-makeFunName (TermConstant x ty) = conName x
-makeFunName (SkolemVariable _)  = "x"
-makeFunName (HasType ty)          = "@"
+makeFunName Minimal = "a"
+makeFunName (Skolem _) = "sk"
+makeFunName (Function (Id ty)) = "@"
+makeFunName (Function (Apply ty)) = "@"
+makeFunName (Function c) = conName c
 
 strip = filter (not . isSpace)
 
@@ -66,7 +68,7 @@ find m x = Map.findWithDefault (error $ "E: couldn't find " ++ prettyShow x ++ "
         "  " ++ prettyShow k ++ " -> " ++ show v
       | (k, v) <- xs ]
 
-translateProp :: (PruningVariable -> Jukebox.Variable) ->
+translateProp :: (Var -> Jukebox.Variable) ->
              (PruningConstant -> Jukebox.Function) ->
              (Predicate -> Jukebox.Function) ->
              PropOf PruningTerm -> Jukebox.Form
@@ -76,7 +78,7 @@ translateProp var fun prop p =
      map (Jukebox.nt . translateLiteral var fun prop) (lhs p))
 
 translateLiteral ::
-  (PruningVariable -> Jukebox.Variable) ->
+  (Var -> Jukebox.Variable) ->
   (PruningConstant -> Jukebox.Function) ->
   (Predicate -> Jukebox.Function) ->
   Literal PruningTerm -> Jukebox.Form
@@ -85,9 +87,9 @@ translateLiteral var fun prop (t :=: u) =
 translateLiteral var fun prop (p :@: ts) =
   Jukebox.Literal (Jukebox.Pos (Jukebox.Tru (prop p Jukebox.:@: map (translateTerm var fun) ts)))
 
-translateTerm :: (PruningVariable -> Jukebox.Variable) ->
+translateTerm :: (Var -> Jukebox.Variable) ->
                  (PruningConstant -> Jukebox.Function) ->
                  PruningTerm -> Jukebox.Term
 translateTerm var _fun (Var x) = Jukebox.Var (var x)
-translateTerm var  fun (Fun f ts) = fun f Jukebox.:@: map (translateTerm var fun) ts
+translateTerm var  fun (App f ts) = fun f Jukebox.:@: map (translateTerm var fun) ts
 #endif
