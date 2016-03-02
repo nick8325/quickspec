@@ -1,43 +1,73 @@
-{-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables #-}
-module Main where
-
+{-# LANGUAGE DeriveDataTypeable, TypeOperators, StandaloneDeriving #-}
 import Control.Monad
-import Data.Typeable
 import Test.QuickCheck
-import Test.QuickSpec
+import QuickSpec hiding (background, (<>), text, nest, ($$))
+import Text.PrettyPrint.HughesPJ
 
-newtype Layout a = Layout [(Int, [a])] deriving (Typeable, Eq, Ord, Show)
+deriving instance Typeable Doc
 
-instance Arbitrary a => Arbitrary (Layout a) where
-  arbitrary = fmap Layout (liftM2 (:) arbitrary arbitrary)
+instance Arbitrary Doc where
+  arbitrary =
+    sized $ \n ->
+      let bin = resize (n `div` 2) arbitrary
+          un = resize (n-1) arbitrary in
+      oneof $
+        [ liftM2 ($$) bin bin | n > 0 ] ++
+        [ liftM2 (<>) bin bin | n > 0 ] ++
+        [ liftM2 nest arbitrary un | n > 0 ] ++
+        [ fmap text arbString ]
 
-text :: [a] -> Layout a
-text s = Layout [(0, s)]
+arbString :: Gen String
+arbString = listOf (elements "ab")
 
-nest :: Int -> Layout a -> Layout a
-nest k (Layout l) = Layout [(i+k, s) | (i, s) <- l]
+background =
+  signature {
+    maxTermSize = Just 9,
+    maxTests = Just 1000,
+    constants = [
+       constant "[]" ([] :: [A]),
+       constant "++" ((++) :: [A] -> [A] -> [A]),
+       constant "0" (0 :: Int),
+       constant "+" ((+) :: Int -> Int -> Int),
+       constant "length" (length :: String -> Int) ]}
 
-($$) :: Layout a -> Layout a -> Layout a
-Layout xs $$ Layout ys = Layout (xs ++ ys)
+-- obsDoc :: Doc -> Gen String
+-- obsDoc d = do
+--   n <- arbitrary
+--   return (render (nest n d))
 
-(<>) :: Layout a -> Layout a -> Layout a
-Layout xs <> Layout ys = f (init xs) (last xs) (head ys) (tail ys)
-  where f xs (i, s) (j, t) ys = Layout xs $$ Layout [(i, s ++ t)] $$ nest (i + length s - j) (Layout ys)
+obsDoc :: Doc -> Gen String
+obsDoc d = fmap render ctx
+  where
+    ctx =
+      sized $ \n ->
+      oneof $
+        [ return d ] ++
+        [ liftM2 op (resize (n `div` 2) ctx) (resize (n `div` 2) arbitrary) | n > 0, op <- [(<>), ($$)] ] ++
+        [ liftM2 op (resize (n `div` 2) arbitrary) (resize (n `div` 2) ctx) | n > 0, op <- [(<>), ($$)] ] ++
+        [ liftM2 nest arbitrary (resize (n-1) ctx) | n > 0 ]
 
-pretty :: forall a. (Typeable a, Ord a, Arbitrary a) => a -> [Sig]
-pretty a = [
-  ["d","e","f"] `vars` (undefined :: Layout a),
-  ["s","t","u"] `vars` (undefined :: [a]),
-  ["n","m","o"] `vars` (undefined :: Int),
-  "text" `fun1` (text :: [a] -> Layout a),
-  "nest" `fun2` (nest :: Int -> Layout a -> Layout a),
-  "$$" `fun2` (($$) :: Layout a -> Layout a -> Layout a),
-  "<>" `fun2` ((<>) :: Layout a -> Layout a -> Layout a),
-  background [
-    "[]" `fun0` ([] :: [a]),
-    "++" `fun2` ((++) :: [a] -> [a] -> [a]),
-    "0" `fun0` (0 :: Int),
-    "length" `fun1` (length :: [a] -> Int),
-    "+" `fun2` ((+) :: Int -> Int -> Int)]]
+unindented :: Doc -> Bool
+unindented d = render (nest 100 (text "" <> d)) == render (nest 100 d)
 
-main = quickSpec (pretty (undefined :: Two))
+nesting :: Doc -> Int
+nesting d = head [ i | i <- nums, unindented (nest (-i) d) ]
+  where
+    nums = 0:concat [ [i, -i] | i <- [1..] ]
+
+sig =
+  signature {
+    maxTests = Just 1000,
+    constants = [
+       constant "text" text,
+       constant "nest" nest,
+       --constant "nesting" nesting,
+       constant "<>" (<>),
+       constant "$$" ($$) ],
+    instances = [
+      makeInstance (\() -> arbString),
+      makeInstance (\() -> observe obsDoc),
+      inst (Sub Dict :: () :- Arbitrary Doc) ],
+    defaultTo = Just (typeOf (undefined :: Bool)) }
+
+main = quickSpecWithBackground background sig

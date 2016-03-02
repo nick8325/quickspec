@@ -1,7 +1,3 @@
-*~
-/#*#
 /dist
-*.o
-*.p_o
-*.hi
-*.swp
+examples/*
+!examples/*.hs

@@ -1,5 +1,5 @@
 Name:                quickspec
-Version:             0.9.6
+Version:             2
 Cabal-version:       >= 1.6
 Build-type:          Simple
 
@@ -45,40 +45,65 @@ Extra-source-files:
   examples/Lists.hs
   examples/PrettyPrinting.hs
   examples/TinyWM.hs
-  src/Test/QuickSpec/errors.h
+  src/errors.h
 
 source-repository head
   type:     git
   location: git://github.com/nick8325/quickspec.git
   branch:   master
 
-library
-  hs-source-dirs: src
-  include-dirs: src/Test/QuickSpec/
-  Exposed-modules:
-    Test.QuickSpec,
-    Test.QuickSpec.Main,
-    Test.QuickSpec.Signature,
-    Test.QuickSpec.Prelude,
-    Test.QuickSpec.Term,
-    Test.QuickSpec.Equation,
-    Test.QuickSpec.Generate,
-    Test.QuickSpec.TestTree,
-    Test.QuickSpec.Reasoning.UnionFind,
-    Test.QuickSpec.Reasoning.CongruenceClosure,
-    Test.QuickSpec.Reasoning.NaiveEquationalReasoning,
-    Test.QuickSpec.Reasoning.PartialEquationalReasoning,
-    Test.QuickSpec.TestTotality,
-    Test.QuickSpec.Utils,
-    Test.QuickSpec.Utils.Typeable,
-    Test.QuickSpec.Utils.Typed,
-    Test.QuickSpec.Utils.TypeMap,
-    Test.QuickSpec.Utils.TypeRel,
-    Test.QuickSpec.Approximate
-  Other-modules:
-    -- Dangerous!
-    Test.QuickSpec.Utils.MemoValuation
+flag z3
+  Description: Use the Z3 prover for pruning.
+  Default: True
 
-  Build-depends:
-    base < 5, containers, transformers, QuickCheck >= 2.7,
-    random, spoon >= 0.2, array, ghc-prim
+flag jukebox
+  Description: Use the E and SPASS provers for pruning.
+  Default: True
+
+library
+  -- ghc-options: -Wall -fno-warn-name-shadowing -fno-warn-incomplete-patterns
+  hs-source-dirs: src
+  include-dirs: src
+  Exposed-modules:
+    Paths_quickspec
+    QuickSpec
+    QuickSpec.Eval
+    QuickSpec.Label
+    QuickSpec.Parse
+    QuickSpec.Prop
+    QuickSpec.Pruning
+    QuickSpec.Pruning.E
+    QuickSpec.Pruning.Z3
+    QuickSpec.Pruning.Waldmeister
+    QuickSpec.Pruning.Simple
+    QuickSpec.Pruning.Completion
+    QuickSpec.Rules
+    QuickSpec.Signature
+    QuickSpec.Term
+    QuickSpec.Test
+    QuickSpec.TestSet
+    QuickSpec.Type
+    QuickSpec.Utils
+
+  Build-depends: QuickCheck >= 2.7
+               , base < 5
+               , constraints
+               , containers
+               , dlist
+               , heaps
+               , pretty
+               , process
+               , random
+               , spoon >= 0.2
+               , transformers
+               , twee
+               , uglymemo
+
+  if flag(jukebox)
+    Build-depends: jukebox >= 0.2
+  else
+    cpp-options: -DNO_JUKEBOX
+  if flag(z3)
+    Build-depends: z3 >= 4
+  else
+    cpp-options: -DNO_Z3

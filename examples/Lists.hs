@@ -1,21 +1,22 @@
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables, ConstraintKinds, RankNTypes, ConstraintKinds, FlexibleContexts #-}
+import QuickSpec
+import Data.List
 
-import Test.QuickSpec hiding (lists)
-import Test.QuickCheck
-import Data.Typeable
+sig =
+  signature {
+    maxTermSize = Just 9,
+    constants = [
+      constant "reverse" (reverse :: [A] -> [A]),
+--      constant "sum" (sum :: [Int] -> Int),
+--      constant "+" ((+) :: Int -> Int -> Int),
+      constant "++" ((++) :: [A] -> [A] -> [A]),
+      constant "[]" ([] :: [A]),
+      constant "map" (map :: (A -> B) -> [A] -> [B]),
+      --constant "length" (length :: [A] -> Int),
+      constant "sort" (typeclass sort :: Dict (Ord A) -> [A] -> [A]),
+      constant "concat" (concat :: [[A]] -> [A]) ]}
 
-lists :: forall a. (Typeable a, Ord a, Arbitrary a, CoArbitrary a) =>
-         a -> [Sig]
-lists a = [
-  prelude (undefined :: a) `without` ["++"],
-  funs (undefined :: a),
+typeclass :: (c => a) -> Dict c -> a
+typeclass x Dict = x
 
-  "unit"    `fun1` (return  :: a -> [a]),
-  -- Don't take ++ from the prelude because we want to see laws about it
-  "++"      `fun2` ((++)    :: [a] -> [a] -> [a]),
-  "length"  `fun1` (length  :: [a] -> Int),
-  "reverse" `fun1` (reverse :: [a] -> [a]),
-  "map"     `fun2` (map     :: (a -> a) -> [a] -> [a])
-  ]
-
-main = quickSpec (lists (undefined :: A))
+main = quickSpec sig

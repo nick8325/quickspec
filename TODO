@@ -1,135 +1,87 @@
-Two things after testing alpha-renamed terms:
-  * Generate all permutations of representatives
-  * Check for ignored variables
-Is there any way to avoid generating some of these?
-E.g., if t[x->u] can be reduced, then x in t can't be ignored.
+High-priority
+-------------
 
-Testing tree: collapse levels that don't refine any classes,
-compute a minimal test suite for distinguishing terms,
-make conversion to classes more efficient
+Quick-and-dirty mode where we only discover schema equations and don't try to generalise them (like ?++(?++?) = (?++?)++?)
 
-Idea for term generation:
-  * Koen/Moa: enumerate terms in order of size.
-    If we generate a term, and we know that term is equal
-    to a smaller term, discard it. Otherwise, add it to testing
-    tree; if it's equal to some other term, print an equation.
-    Has the property: the only generated terms are singleton terms
-    and ones that appear in printed equations.
-    Concretely use QS's old pruning for discarding terms:
-    if we already have t = u, and generate v such that tS = v and uS <
-    v, then throw away v.
-  * When we generate a new representative, also need to generate
-    all renamings, plus check if any variables are unused.
-  * Easy refinement: combine with commutativity.
-    When we check a term, apply all possible commutativity laws first,
-    then a law, then commutativity again.
-    If the final result is simpler then discard term.
-    N.B. commutativity doesn't change depth or size or num vars, so only need
-    to try applying commutativity at end if
-    (depth u, size u, numVars u) <= (depth t, size t, numVars t)
-    where t = initial term, u = final term
-  * Refinement: use schemas.
-    Let's use the word *schema* for a term with all variables replaced
-    by holes, and *skeleton* for a term with all variables unified.
-    A term has a schema and a skeleton.
-    Have an equivalence relation on *skeletons*. For each equivalence
-    class, an equivalence relation on all terms whose skeletons are
-    in that class.
-    Enumerate schemas in order of size.
-    Instantiate the schema with all variables different and see if
-    we can simplify it; if so, throw away the schema.
-    (If not, we need to add at least that instance to the test tree
-    so what follows is necessary work.)
-    Now take the skeleton of that schema and put it in the test tree.
-    See what class it ends up in, generate all instances of the schema
-    and stick in that class.
+Look into constraining rewrite rules so that the constraint is l >= r instead of l > r? This would mean that irrelevant variable laws like f x -> f a would become unconditional. Might reduce amount of case splitting too.
 
-    Maybe the one-variable stuff is just an optimisation, checking the
-    schema once is the important thing. Would be interesting to know
-    how big each class of skeletons is - one-variable stuff helps if
-    most classes have more than one element.
+Simplify size expressions a bit more (e.g.: take out common factors, make sure that constant is always >= 0 by flipping sign)
 
-    Could be useful though because it allows us to avoid generating
-    terms at all in the common case, if we don't want to discover
-    commutativity. Also we can perhaps check for commutativity cheaply?
+Make reducing-to-existing-term stuff more robust: whenever a term
+simplifies to a term which we haven't generated, generate that term,
+but only once we've come to the end of the current size.
 
-    Extra trick: if we can simplify the skeleton, we can put it in its
-    class without testing! But probably this is the uncommon case of an unpruned law.
+Think about why we want to prefer equations with different schemas on
+both sides. 1: simplification rules are nicer than random shuffling
+about of stuff. 2: If we eliminate one equation because it reduces to
+another, certain proofs may become harder. E.g. if the equation
+reduces because of commutativity and we eliminate it, some proofs will
+require commutativity that didn't before. Maybe then eliminating
+schemas by simplifying using unorientable rules is something to avoid.
 
-Is there some very narrow condition for when we need to substitute all
-possible values, not just representatives? Is x==y the only
-problematic case? I *think* the reasoning is as follows:
-  1. Suppose we have an equation t[x] = u[x],
-     a representative r and non-representative n.
-  2. We only need to substitute t[r] = u[r] and not t[n] = u[n],
-     because the pruning will prove r = n.
-  3. But this assumes that we can't use t[n] = u[n] to prove r = n.
-  4. At this point the reasoning breaks down, it's clearly nonsense :-\
+Look more into Moa's idea that any permutative law can be expressed as a permutative law over a single function (e.g. f x y = f y x)
 
-Alpha-equivalence stuff: once we have classes, take each
-representative and see which variables we can replace with underscores
-(i.e. their value is irrelevant). This should be very quick because
-normally we won't be able to get rid of any variables. Then the extra
-terms we need to generate are only the ones we get by permuting the
-variables (e.g., no need for x+z). Incidentally, we will know that two
-terms can only be equal if they have exactly the same set of
-variables. Does that help? P.S. This story is not quite true.
-For example, x-x=y-y is an equation. Problem is, we can't exactly
-"underscore" a variable that appears twice in a term. Nonetheless, we
-don't need to permute that variable, and can represent the
-"underscore" information by an equation like x-x=y-y.
+Make it so that arbitrary instances are not compulsory
 
-Note to self: the problem with mixing size and depth.
-Currently, we don't instantiate variables with just any old term but
-only with representatives. Because the terms are ordered by depth,
-this is OK, because we cannot go out of the universe by replacing a
-non-representative subterm with a representative. If we mix depth and
-size, we might need to keep several "instantiation representatives"
-for each class and try all (or rather, try in sequence until one works).
-Ickier. Better approach: keep only one representative plus all
-size/depth combos that it "stands for" (at CC level this is identical,
-anyway).
+Make main QuickSpec module export sensible stuff and clean up code
 
-Many terms live in their own equivalence class. This is almost free
-EXCEPT that we still instantiate equations with these terms.
-Do we need to? I suspect the answer is yes, because we generate terms
-with these singleton terms as subterms. However, for terms of maximum
-depth, we probably don't need to use them in instances.
+Longer term
+-----------
 
-Port all possible old QS examples to new QS
-Switch from depth to size?!
-For things like modifiers (sortedList etc.): if a type has no terms of depth 1 (only depth 2), terms of that type should have their depth reduced by 1. Brittle, though: what about variables?
-Add definitions and missing terms warnings.
-Add user-accessible term generator like in Erlang QS?
-Add "ask why equation not printed."
+Allow the user to attach extra data to a constant.
 
-Regexes: use Brzozowski derivatives to get a useful specification
+Don't generate silly instances of schemas w/ commutative functions
+Easy to avoid: just don't instantiate _+_ with two variables in the wrong order!
+Any other commutativity-simplification will result in a different schema so already avoided
+Exception: (e.g.) (_+_)+(_+_) - application of commutative function where both arguments have the same schema, but maybe we can deal with this later
 
-Fix loss of completeness with depth optimisation when testing at depth
-n splits two terms that were tested equal at depth n-1
+Make timeouts a bit cleverer e.g. reduce test size
+Instead of timeouts, allow the test evaluator to return a Maybe (if Nothing, throw out the test)
 
-Use definitions to mangle up the equation order. Namely, if you have
-two definitions,
-   negate x=0-x
-   x-y=x+negate y,
-then try alternately putting each definition first in the equation
-order and see if either makes the defined symbol disappear in the
-pruned equations, and which choice makes the set of pruned equations
-smallest.
+Make main loop understand conditions in some way or other
 
-Reduce number of terms generated by bundling a term together with
-things we know are equal to it---classify lists of terms instead of
-terms. Maybe, instead of classifying terms, classify TestTrees, so we
-can do the whole incremental thingy safely. Plus have some combinators
-for constructing sets of terms incrementally.
+Generalise to other things than equalities
 
-In PER, don't generate congruence closures for variables that can't be partial.
+Instantiate schemas in a smarter way. Also, try to avoid having to
+look explicitly for laws with totally different variables on both sides.
+E.g., if we have f x y = g x z, then we should also find f x y = g x k,
+where k is an arbitrary constant - if we don't find this then we don't
+need to search for f x y = g x z.
 
-If an equation is false (e.g., has false instances), the depth
-optimisation doesn't work properly on that equation! We neglect to
-generate terms that we should. So in the false equation detection in
-pruning, we should print a nasty error if that happens.
+Teach crappy pruner about commutativity-like (schema-preserving) laws.
+Or improve pruning.
 
-Improve heuristics for Rene's example.
+Regexes: use Brzozowski derivatives to get a useful specification?
+
+Print out definitions
 
 Add "ask why an equation is not printed".
+
+Try optimising the set of test cases - e.g., after completing each size,
+analyse the test set and find the "most effective" set of test cases,
+then move it to the front.
+
+Cleanup ideas
+-------------
+
+Introduce a type constructor ForAll whose effect is to normalise all variables in the term.
+
+Maybe add a type wrapper for preserving the original type of a polymorphic value
+(store as original value + type subst??)
+
+Instead of conGeneralValue/regeneralise nonsense, have a type
+constructor "Mono a" which wraps its argument while having its Typed
+instance unify all types.
+
+Change Symbolic typeclass so you have Symbolic Tm instead of Symbolic
+(Tm f v) (and lose Symbolic instance for types), or monomorphise the entire
+pruning infrastructure.
+
+Stuff for HipSpec
+-----------------
+
+Incrementally add functions to the signature?
+Incrementally increase size?
+(Rule? - "consider this size".
+ Needs a notion of quiescence/ordering maybe?)
+Alternatively, implement everything just by restarting.
