@@ -151,7 +151,7 @@ tryApply' t@(App f@Constant{} xs) u = do
     _ -> Nothing
 tryApply' _ _ = Nothing
 
--- Instantiate a schema by making all the variables different.
+-- | Instantiate a schema by making all the variables different.
 instantiate :: Term Constant -> Term Constant
 instantiate s = build (evalState (aux s) Map.empty)
   where
@@ -162,8 +162,10 @@ instantiate s = build (evalState (aux s) Map.empty)
       return (fun (toFun (Id ty)) [var (MkVar n)])
     aux (Fun f xs) = fmap (fun f) (mapM aux (fromTermList xs))
 
--- Take a term and unify all type variables,
+-- | Take a term and unify all type variables,
 -- and then all variables of the same type.
+-- For example, the skeleton of @x + (y + z)@
+-- is @x + (x + x)@.
 skeleton :: Term Constant -> Term Constant
 skeleton = unifyTermVars . unifyTypeVars
   where

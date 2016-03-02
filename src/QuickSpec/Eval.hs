@@ -1,3 +1,4 @@
+-- | The main 'quickSpec' function lives here.
 {-# LANGUAGE CPP, TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables, TupleSections, FlexibleContexts #-}
 module QuickSpec.Eval where
 
@@ -52,6 +53,7 @@ data S = S {
   kind          :: Type -> TypeKind,
   terminal      :: Terminal }
 
+-- | Internal QuickSpec event.
 data Event =
     Schema Origin (Poly (Term Constant)) (KindOf (Term Constant))
   | Term   TermFrom      (KindOf TermFrom)
@@ -178,6 +180,10 @@ choppyQuickSpec cs sig =
   where
    (sig', sigs) = chopUpSignature cs sig
 
+-- | Run QuickSpec. The returned signature contains the discovered
+-- equations. By using |mappend| to combine the returned signature
+-- and a new signature, you can use the discovered equations as
+-- background theory in a later run of QuickSpec.
 quickSpec :: Signature -> IO Signature
 quickSpec sig = do
   putStrLn "== Signature =="
@@ -208,6 +214,7 @@ onTerm f s = do
   term <- lift (gets terminal)
   liftIO (f term s)
 
+-- | Explore each size up to the maximum term size.
 quickSpecLoop :: Signature -> M ()
 quickSpecLoop sig = do
   createRules sig
@@ -226,8 +233,8 @@ exploreSize sig n = do
   del <- lift $ gets delayed
   lift $ modify (\s -> s { delayed = [] })
   forM_ (sortBy (comparing measureEquation) del) $ \(t, u) -> do
-    t' <- fmap (fromMaybe t) (lift (lift (rep t)))
-    u' <- fmap (fromMaybe u) (lift (lift (rep u)))
+    t' <- normalise t
+    u' <- normalise u
     unless (t' == u') $ do
       generate (Found ([] :=>: t' :=: u'))
     newTerm u'
@@ -277,8 +284,16 @@ allUnifications t = map f ss
       | isDictionary ty = 1
       | otherwise = 4
 
+-- | Create the rules for processing QuickSpec events.
 createRules :: Signature -> M ()
 createRules sig = do
+  -- NOTES:
+  --  * Rules use event to signal which event they want to match.
+  --  * Rules can overlap, so multiple rules can match different events.
+  --    They will be executed in order of declaration.
+  --  * An event can be generated repeatedly but will be ignored after the first time.
+
+  -- A new schema was discovered.
   rule $ do
     Schema o s k <- event
     execute $ do
@@ -296,6 +311,10 @@ createRules sig = do
           when (size ms <= maxCommutativeSize_ sig) $
             generate (InstantiateSchema ms ms)
 
+  -- Instantiate a Schema
+  -- Creates events for considering terms of that schema:
+  --   for schema _ + _
+  --   terms:     x + x, x + y, y + x, ...
   rule $ do
     InstantiateSchema s s' <- event
     execute $
@@ -305,7 +324,7 @@ createRules sig = do
     Term (From s t) k <- event
     execute $ do
       let add = do
-            u <- fmap (fromMaybe t) (lift (lift (rep t)))
+            u <- normalise t
             newTerm u
       case k of
         TimedOut -> do
@@ -316,7 +335,7 @@ createRules sig = do
         EqualTo (From _ u) _ -> do
           --t' <- fmap (fromMaybe t) (lift (lift (rep t)))
           let t' = t
-          u' <- fmap (fromMaybe u) (lift (lift (rep u)))
+          u' <- normalise u
           del <- lift $ gets delayed
           let wait = or [ isJust (matchList (buildList [x, y]) (buildList [t, u])) | (x, y) <- del ]
               f = head (funs t ++ funs u)
@@ -389,6 +408,7 @@ createRules sig = do
       liftIO $ putStrLn $
         "Warning: generated term of untestable type " ++ prettyShow ty
 
+  -- An equation was found, we should (possibly) print it.
   rule $ do
     Found prop <- event
     execute $
@@ -396,6 +416,8 @@ createRules sig = do
 
   let printing _ = False
 
+  -- Debug: print the received event, if the
+  -- function 'printing' (defined above) returns True
   rule $ do
     x <- event
     require (printing x)
@@ -408,17 +430,39 @@ considerRenamings s s' = do
     ts = sortBy (comparing measure) (allUnifications (instantiate s'))
 
 class (Eq a, Typed a, Pretty a) => Considerable a where
+  -- | Returns the most general version, e.g.:
+  --
+  --   * Given the schema @_ + _@, returns @x + y@
+  --   * Given the term   @x + x@, returns @x + x@
   generalise   :: a -> Term Constant
+
+
+  -- | Returns the most specific version, e.g.:
+  --
+  --   * Given the schema @_ + _@, returns @x + x@
+  --   * Given the term   @x + y@, returns @x + y@
   specialise   :: a -> Term Constant
+
   unspecialise :: a -> Term Constant -> a
   getTestSet   :: a -> M (TestSet a)
   putTestSet   :: a -> TestSet a -> M ()
   findAll      :: a -> M (Set (Term Constant))
 
+-- | Tries to normalise a term using the current rewrite rules.
+-- If the term is already in normal form, returns Nothing.
+maybeNormalise :: Term Constant -> M (Maybe (Term Constant))
+maybeNormalise = lift . lift . rep
+
+-- | Normalises a term using the current rewrite rules.
+normalise :: Term Constant -> M (Term Constant)
+normalise t = fmap (fromMaybe t) (maybeNormalise t)
+
+-- | Considers a Schema (@_ + _@) or a Term (@x + y@) and either
+-- discards it or creates the relevant events.
 consider :: Considerable a => Signature -> (KindOf a -> Event) -> a -> M ()
 consider sig makeEvent x = do
   let t = generalise x
-  res   <- lift (lift (rep t))
+  res   <- maybeNormalise t
   terms <- lift (gets terms)
   allSchemas <- findAll x
   case res of
@@ -428,14 +472,10 @@ consider sig makeEvent x = do
       case res of
         Just u -> generate (Ignoring (Rule Rule.Oriented t u))
         _ -> return ()
-      let t' = specialise x
-      res' <- lift (lift (rep t'))
-      case res' of
-        Just u' | u' `Set.member` allSchemas ->
-          generate (makeEvent (EqualTo (unspecialise x u') Pruning))
-        Nothing | t' `Set.member` allSchemas ->
-          generate (makeEvent (EqualTo (unspecialise x t') Pruning))
-        _ -> do
+      u' <- normalise (specialise x)
+      if u' `Set.member` allSchemas
+        then generate (makeEvent (EqualTo (unspecialise x u') Pruning))
+        else do
           ts <- getTestSet x
           res <-
             liftIO . testTimeout_ sig $
@@ -522,7 +562,7 @@ found sig prop0 = do
   onTerm putTemp "[completing theory...]"
   lift (lift (axiom Normal prop'))
   let _ :=>: _ :=: t = canonicalise prop'
-  u <- fmap (fromMaybe t) (lift (lift (rep (oneTypeVar t))))
+  u <- normalise t
   newTerm u
   onTerm putTemp "[renormalising existing terms...]"
   let norm s = do
@@ -553,7 +593,7 @@ pruner None = \_ _ -> return False
 accept :: Poly (Term Constant) -> M ()
 accept s = do
   let t = skeleton (instantiate (unPoly s))
-  u <- fmap (fromMaybe t) (lift . lift . rep $ t)
+  u <- normalise t
   lift $ modify (\st -> st { schemas = Map.adjust f (size (unPoly s)) (schemas st),
                              allSchemas = Set.insert u (allSchemas st) })
   where

@@ -153,6 +153,7 @@ constrain :: [Type] -> Term Constant -> [Map Var Type]
 constrain univ t =
   usort [ Map.fromList (listSubst sub) | u <- univ, Just sub <- [match (typ t) u] ]
 
+-- | Normalises a term using the current rewrite rules
 rep :: Pruner s => Term Constant -> PrunerM s (Maybe (Term Constant))
 rep t = liftM (check . liftM (build . inferTypes . build . unextended . singleton)) $ do
   let u = build (subst (con . skolem) (build (extended (singleton t))))
