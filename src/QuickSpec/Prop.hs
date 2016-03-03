@@ -114,8 +114,10 @@ regeneralise = restrict . unPoly . generalise . canonicalise
     -- variable on both sides, but may break with smarter schema instantiation
     genTerm x@Var{} =
       poly (app (Id (typeOf (undefined :: A))) [x])
-    genTerm (App (Id _) [x@Var{}]) =
-      poly (app (Id (typeOf (undefined :: A))) [x])
+    genTerm (App (Id _) [t]) =
+      polyMap (\u -> app (Id (typ u)) [u]) (genTerm t)
+    genTerm (App (Apply _) [t]) =
+      polyMap (\u -> app (Id (typ u)) [u]) (genTerm t)
     genTerm (App f []) = polyMap (\f -> app f []) (genCon f)
     genTerm (App f ts) = apply (genTerm (app f (init ts))) (genTerm (last ts))
 
@@ -126,7 +128,7 @@ regeneralise = restrict . unPoly . generalise . canonicalise
       where
         Just sub = unifyList (buildList (map fst cs)) (buildList (map snd cs))
         cs = [(fst x, fst y) | x:xs <- vs, y <- xs] ++ concatMap litCs (lhs prop) ++ litCs (rhs prop)
-        vs = partitionBy fst (concatMap typedVars (propTerms prop))
+        vs = partitionBy (subst (const (var (MkVar 0))) . fst) (concatMap typedVars (propTerms prop))
     litCs (t :=: u) = [(typ t, typ u)] ++ termCs t ++ termCs u
     litCs (p :@: ts) = [(typ p, arrowType (map typ ts) (typeOf True))] ++ concatMap termCs ts
     termCs Var{} = []

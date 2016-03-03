@@ -101,8 +101,8 @@ instance Pretty Constant where
   pPrint (Id ty) = text "id[" <> pPrint ty <> text "]"
   pPrint con = text (conName con)
 instance PrettyTerm Constant where
-  termStyle (Apply _) = curried --invisible
-  termStyle (Id _) = curried --invisible
+  termStyle (Apply _) = invisible
+  termStyle (Id _) = invisible
   termStyle f = implicitArguments n (conStyle f)
     where
       n = implicitArity (typ (conGeneralValue f))

@@ -560,8 +560,8 @@ found sig prop0 = do
         onTerm putLine (prettyShow (rename (canonicalise prop')))
 
   onTerm putTemp "[completing theory...]"
-  lift (lift (axiom Normal prop'))
-  let _ :=>: _ :=: t = canonicalise prop'
+  lift (lift (axiom Normal prop))
+  let _ :=>: _ :=: t = canonicalise prop
   u <- normalise t
   newTerm u
   onTerm putTemp "[renormalising existing terms...]"

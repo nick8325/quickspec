@@ -74,35 +74,28 @@ runPruner sig theory m =
 createRules :: Pruner s => PrunerM s ()
 createRules = PrunerM $ do
   rule $ do
-    con@Constant{} <- event
-    let arity = conArity con
+    con <- event
+    let ar = arity con
     execute $ do
-      let ty = typ (app con (replicate arity (build (var (MkVar 0)) :: Term Constant)))
-          t = app (Function con) (take arity (map (build . var . MkVar) [0..]))
-          args = take arity (typeArgs (typ con))
+      let ty = typ (app con (replicate ar (build (var (MkVar 0)) :: Term Constant)))
+          t = app (Function con) (take ar (map (build . var . MkVar) [0..]))
+          args = take ar (typeArgs (typ con))
       generate (Id ty)
       unPrunerM $ liftPruner $
         untypedAxiom Normal ([] :=>: app (Function (Id ty)) [t] :=: t)
       forM_ (zip [0..] args) $ \(i, ty) -> do
-        let vs = map (build . var . MkVar) [0..arity-1]
+        let vs = map (build . var . MkVar) [0..ar-1]
             tm f = app (Function con) (take i vs ++ [f (vs !! i)] ++ drop (i+1) vs)
         generate (Id ty)
         unPrunerM $ liftPruner $
           untypedAxiom Normal ([] :=>: tm (\t -> app (Function (Id ty)) [t]) :=: tm id)
       unPrunerM $ liftPruner $
-        let u = app con (take arity (map (build . var . MkVar) [0..]))
-            x = build (var (MkVar arity)) in
+        let u = app con (take ar (map (build . var . MkVar) [0..]))
+            x = build (fun (toFun (Id (head (typeArgs (typ u) ++ [typeOf ()])))) [var (MkVar ar)]) in
         case tryApply' u x of
           Nothing -> return ()
           Just v ->
-            untypedAxiom Normal ([] :=>: build (extended (singleton v)) :=: app (Function (Apply ty)) [t, build (var (MkVar arity))])
-
-  rule $ do
-    fun@Id{} <- event
-    let x = build (var (MkVar 0))
-    execute $
-      unPrunerM $ liftPruner $
-        untypedAxiom Normal ([] :=>: app (Function fun) [app (Function fun) [x]] :=: app (Function fun) [x])
+            untypedAxiom Normal ([] :=>: build (extended (singleton v)) :=: app (Function (Apply ty)) [t, build (var (MkVar ar))])
 
 axiom :: Pruner s => AxiomMode -> Prop -> PrunerM s ()
 axiom mode p = do
@@ -157,7 +150,7 @@ constrain univ t =
 rep :: Pruner s => Term Constant -> PrunerM s (Maybe (Term Constant))
 rep t = liftM (check . liftM (build . inferTypes . build . unextended . singleton)) $ do
   let u = build (subst (con . skolem) (build (extended (singleton t))))
-  --sequence_ [ PrunerM (generate (fromFun con)) | con <- funs t ]
+  sequence_ [ PrunerM (generate (fromFun con)) | con <- funs t ]
   liftPruner (untypedRep [] u)
   where
     check (Just u) | t == u = Nothing
