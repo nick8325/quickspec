@@ -128,7 +128,8 @@ regeneralise = restrict . unPoly . generalise . canonicalise
       where
         Just sub = unifyList (buildList (map fst cs)) (buildList (map snd cs))
         cs = [(fst x, fst y) | x:xs <- vs, y <- xs] ++ concatMap litCs (lhs prop) ++ litCs (rhs prop)
-        vs = partitionBy (subst (const (var (MkVar 0))) . fst) (concatMap typedVars (propTerms prop))
+        vs = partitionBy skel (concatMap typedVars (propTerms prop))
+        skel (ty, x) = (subst (const (var (MkVar 0))) ty, x)
     litCs (t :=: u) = [(typ t, typ u)] ++ termCs t ++ termCs u
     litCs (p :@: ts) = [(typ p, arrowType (map typ ts) (typeOf True))] ++ concatMap termCs ts
     termCs Var{} = []
