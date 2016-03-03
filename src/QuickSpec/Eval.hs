@@ -192,8 +192,9 @@ quickSpec sig = do
   putStrLn "== Laws =="
   runM sig $ do
     quickSpecLoop sig
-    liftIO $ putStrLn "== Statistics =="
-    summarise
+    when (printStatistics sig) $ do
+      liftIO $ putStrLn "== Statistics =="
+      summarise
     props <- lift (gets (reverse . discovered))
     theory <- lift (lift (liftPruner get))
     return sig {
