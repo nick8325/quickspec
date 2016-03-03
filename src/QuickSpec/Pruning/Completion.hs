@@ -19,7 +19,7 @@ newtype Completion =
 initialState :: Int -> Completion
 initialState n =
   Completion {
-    twee       = (Twee.initialState 0 1) { Twee.maxSize = Just n, Twee.tracing = False } }
+    twee       = (Twee.initialState 0 1) { Twee.maxSize = Just n, Twee.tracing = False, Twee.maxCancellationSize = Just 0 } }
 
 liftTwee :: State (Twee PruningConstant) a -> StateT Completion IO a
 liftTwee m = do
