@@ -81,11 +81,19 @@ data Signature =
 instance Pretty Signature where
   pPrint sig = vcat (map prettyDecl decls)
     where
-      decls = [(show (pPrint (app c [])), pPrint (typeDrop (implicitArity (typ (conGeneralValue c))) (typ c))) | c <- constants sig, not (conIsBackground c)]
+      decls = [(show (pPrint (app c [])), pPrint (prettyType (typeDrop (implicitArity (typ (conGeneralValue c))) (typ c)))) | c <- constants sig, not (conIsBackground c)]
       maxWidth = maximum (0:map (length . fst) decls)
       pad xs = replicate (maxWidth - length xs) ' ' ++ xs
       prettyDecl (name, ty) =
         hang (text (pad name) <+> text "::") 2 ty
+
+      as = supply [[x] | x <- ['a'..'z']]
+      prettyType ty = build (aux (singleton (canonicalise ty)))
+      aux Empty = mempty
+      aux (Cons (Var (MkVar x)) ts) =
+        con (toFun (L (Name (as !! x)))) `mappend` aux ts
+      aux (Cons (Fun f ts) us) =
+        fun (toFun (R (fromFun f))) (aux ts) `mappend` aux us
 
 defaultTo_ :: Signature -> Type
 defaultTo_ sig =

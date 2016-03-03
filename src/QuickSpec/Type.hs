@@ -62,7 +62,13 @@ instance Pretty TyCon where
   pPrint Arrow = text "->"
   pPrint (TyCon x) = text (show x)
 instance PrettyTerm TyCon where
-  termStyle Arrow = infixStyle 8
+  termStyle Arrow =
+    fixedArity 2 $
+    TermStyle $ \l p d [x, y] ->
+      pPrintParen (p > 10) $
+        pPrintPrec l 11 x <+> d <+>
+        pPrintPrec l 0 y
+
   termStyle (TyCon con)
     | con == listTyCon =
       fixedArity 1 $
