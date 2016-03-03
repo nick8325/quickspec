@@ -68,7 +68,7 @@ instance PrettyTerm TyCon where
       fixedArity 1 $
       TermStyle $ \l _ _ [x] -> brackets (pPrintPrec l 0 x)
     | take 2 (show con) == "(," =
-      fixedArity (length (filter (== ',') (show con))) tupleStyle
+      fixedArity (1+length (filter (== ',') (show con))) tupleStyle
   termStyle _ = curried
 
 -- Type variables.

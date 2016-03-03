@@ -223,8 +223,8 @@ constant name x = Constant name value (poly value) 0 style 1 False
     ar = typeArity (typeOf x)
     style
       | name == "()" = curried
-      | take 1 name == "," = fixedArity (length name) tupleStyle
-      | take 2 name == "(," = fixedArity (length name-2) tupleStyle
+      | take 1 name == "," = fixedArity (length name+1) tupleStyle
+      | take 2 name == "(," = fixedArity (length name-1) tupleStyle
       | isOp name && ar >= 2 = infixStyle 5
       | isOp name = prefix
       | otherwise = curried
