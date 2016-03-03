@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveFunctor, CPP, TypeFamilies, FlexibleContexts #-}
+{-# LANGUAGE DeriveFunctor, CPP, TypeFamilies, FlexibleContexts, BangPatterns #-}
 module QuickSpec.Prop where
 
 #include "errors.h"
@@ -99,35 +99,56 @@ instance Typed Predicate where
 boolType :: Type
 boolType = typeOf (undefined :: Bool)
 
+-- Given a property which only contains one type variable,
+-- add as much polymorphism to the property as possible.
+-- e.g.    map (f :: a -> a) (xs++ys) = map f xs++map f ys
+-- becomes map (f :: a -> b) (xs++ys) = map f xs++map f ys.
 regeneralise :: Prop -> Prop
-regeneralise = restrict . unPoly . generalise . canonicalise
+regeneralise =
+  -- First replace each type variable occurrence with a fresh
+  -- type variable (generalise), then unify type variables
+  -- where necessary to preserve well-typedness (restrict).
+  restrict . unPoly . generalise . canonicalise
   where
     generalise (lhs :=>: rhs) =
       polyApply (:=>:) (polyList (map genLit lhs)) (genLit rhs)
     genLit (p :@: ts) =
       polyApply (:@:) (genPred p) (polyList (map genTerm ts))
     genLit (t :=: u) = polyApply (:=:) (genTerm t) (genTerm u)
-    -- FIXME if we discover a unit law x = y :: (), won't it be falsely
-    -- generalised to x = y :: a? Instead of using A here, need to freshen
-    -- all type variables in type of var.
-    -- Currently this isn't a problem since we can't get a law with a
-    -- variable on both sides, but may break with smarter schema instantiation
-    genTerm x@Var{} =
-      poly (app (Id (typeOf (undefined :: A))) [x])
-    genTerm (App (Id _) [t]) =
-      polyMap (\u -> app (Id (typ u)) [u]) (genTerm t)
-    genTerm (App (Apply _) [t]) =
-      polyMap (\u -> app (Id (typ u)) [u]) (genTerm t)
-    genTerm (App f []) = polyMap (\f -> app f []) (genCon f)
-    genTerm (App f ts) = apply (genTerm (app f (init ts))) (genTerm (last ts))
+    genTerm (App (Id ty) [x@Var{}]) =
+      polyMap (\ty -> app (Id ty) [x]) (genType ty)
+    genTerm (App f ts) =
+      polyApply app (genCon f) (polyList (map genTerm ts))
 
-    genPred p = poly (p { predType = unPoly (predGeneralType p) })
-    genCon  f = poly (f { conValue = unPoly (conGeneralValue f), conArity = 0 })
+    -- We change the type of a constant f to the mgu of:
+    --   * f's most polymorphic type, and
+    --   * f's type with all type variables replaced by fresh ones
+    genPred p = poly (genTyped (typ p) p { predType = unPoly (predGeneralType p) })
+    genCon f@(Apply _) = poly (genTyped (typ f) (Apply (build (var (MkVar 0)))))
+    genCon f = poly (genTyped (typ f) f { conValue = unPoly (conGeneralValue f) })
+
+    genTyped :: Typed a => Type -> a -> a
+    genTyped ty x =
+      let
+        (ty', x') = unPoly (polyPair (genType ty) (poly x))
+        Just sub = unify ty' (typ x')
+      in typeSubst sub x'
+
+    genType = poly . build . aux 0 . singleton
+      where
+        aux !_ Empty = mempty
+        aux n (Cons (Var _) ts) =
+          var (MkVar n) `mappend` aux (n+1) ts
+        aux n (Cons (Fun f ts) us) =
+          fun f (aux n ts) `mappend`
+          aux (n+lenList ts) us
 
     restrict prop = typeSubst sub prop
       where
         Just sub = unifyList (buildList (map fst cs)) (buildList (map snd cs))
         cs = [(fst x, fst y) | x:xs <- vs, y <- xs] ++ concatMap litCs (lhs prop) ++ litCs (rhs prop)
+        -- Two variables that were equal before generalisation must have the
+        -- same type afterwards
         vs = partitionBy skel (concatMap typedVars (propTerms prop))
         skel (ty, x) = (subst (const (var (MkVar 0))) ty, x)
     litCs (t :=: u) = [(typ t, typ u)] ++ termCs t ++ termCs u
