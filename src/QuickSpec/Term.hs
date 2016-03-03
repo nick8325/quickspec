@@ -184,15 +184,14 @@ typedSubst sub x = replace aux x
 typedVars :: Term Constant -> [(Type, Var)]
 typedVars t = [(ty, x) | App (Id ty) [Var x] <- subterms t]
 
-evaluateTm :: Applicative f => (Type -> Var -> Value f) -> Term Constant -> Value f
-evaluateTm env (App (Id ty) [Var v]) = env ty v
-evaluateTm env (App (Id _) [t]) = evaluateTm env t
-evaluateTm env (App (Apply _) [t, u]) =
-  apply (evaluateTm env t) (evaluateTm env u)
-evaluateTm env (App f xs) =
-  foldl apply x (map (evaluateTm env) xs)
+evaluateTm :: Applicative f => (Value Identity -> Value Identity) -> (Type -> Var -> Value f) -> Term Constant -> Value f
+evaluateTm def env (App (Id ty) [Var v]) = env ty v
+evaluateTm def env (App (Apply _) [t, u]) =
+  apply (evaluateTm def env t) (evaluateTm def env u)
+evaluateTm def env (App f xs) =
+  foldl apply x (map (evaluateTm def env) xs)
   where
-    x = mapValue (pure . runIdentity) (conValue f)
+    x = mapValue (pure . runIdentity) (def (conValue f))
 
 instance CoArbitrary Var where
   coarbitrary (MkVar x) = coarbitrary x

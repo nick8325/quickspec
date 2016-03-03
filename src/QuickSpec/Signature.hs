@@ -95,6 +95,9 @@ instance Pretty Signature where
       aux (Cons (Fun f ts) us) =
         fun (toFun (R (fromFun f))) (aux ts) `mappend` aux us
 
+defaultTypes :: Typed a => Signature -> a -> a
+defaultTypes sig = typeSubst (const (defaultTo_ sig))
+
 defaultTo_ :: Signature -> Type
 defaultTo_ sig =
   case defaultTo sig of
