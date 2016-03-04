@@ -5,6 +5,7 @@ module QuickSpec.Test where
 import Data.Constraint
 import Data.Maybe
 import QuickSpec.Signature
+import QuickSpec.Instances
 import QuickSpec.Term
 import QuickSpec.TestSet
 import QuickSpec.Type
@@ -23,7 +24,7 @@ makeTester :: (a -> Term Constant)
            -> Type
            -> Maybe (Value (TypedTestSet a))
 makeTester toTerm vals tests sig ty = do
-  i <- listToMaybe (findInstanceOf sig (defaultTypes sig ty))
+  i <- listToMaybe (findInstance (instances sig) (defaultTypes sig ty))
   case unwrap (i :: Value Observe1) of
     Observe1 obs `In` w ->
       case unwrap obs of
@@ -44,7 +45,7 @@ tester sig toTerm vals tests eval t =
 
 env :: Signature -> Type -> Value Gen
 env sig ty =
-  case findInstanceOf sig (defaultTypes sig ty) of
+  case findInstance (instances sig) (defaultTypes sig ty) of
     [] ->
       fromMaybe __ $
       cast ty $

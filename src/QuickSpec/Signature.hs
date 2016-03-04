@@ -43,7 +43,7 @@ type PrunerType = Completion
 data Signature =
   Signature {
     constants           :: [Constant],
-    instances           :: [[Instance]],
+    instances           :: Instances,
     background          :: [Prop],
     theory              :: Maybe PrunerType,
     defaultTo           :: Maybe Type,
@@ -132,36 +132,33 @@ data ExtraPruner = E Int | SPASS Int | Z3 Int | Waldmeister Int | None deriving 
 extraPruner_ :: Signature -> ExtraPruner
 extraPruner_ = fromMaybe None . extraPruner
 
-instances_ :: Signature -> [Instance]
-instances_ sig = concat (instances sig ++ defaultInstances)
-
-defaultInstances :: [[Instance]]
-defaultInstances = [
-  inst (Sub Dict :: Arbitrary A :- Arbitrary [A]),
-  inst (Sub Dict :: Ord A :- Ord [A]),
-  inst (Sub Dict :: CoArbitrary A :- CoArbitrary [A]),
-  inst (Sub Dict :: Arbitrary A :- Arbitrary (Maybe A)),
-  inst (Sub Dict :: Ord A :- Ord (Maybe A)),
-  inst (Sub Dict :: CoArbitrary A :- CoArbitrary (Maybe A)),
+defaultInstances :: Instances
+defaultInstances = mconcat [
+  inst (\(Dict :: Dict (Arbitrary A)) -> Dict :: Dict (Arbitrary [A])),
+  inst (\(Dict :: Dict (Ord A)) -> Dict :: Dict (Ord [A])),
+  inst (\(Dict :: Dict (CoArbitrary A)) -> Dict :: Dict (CoArbitrary [A])),
+  inst (\(Dict :: Dict (Arbitrary A)) -> Dict :: Dict (Arbitrary (Maybe A))),
+  inst (\(Dict :: Dict (Ord A)) -> Dict :: Dict (Ord (Maybe A))),
+  inst (\(Dict :: Dict (CoArbitrary A)) -> Dict :: Dict (CoArbitrary (Maybe A))),
   baseType (undefined :: ()),
   baseType (undefined :: Int),
   baseType (undefined :: Integer),
   baseType (undefined :: Bool),
   baseType (undefined :: Char),
-  inst (Sub Dict :: () :- CoArbitrary Int),
-  inst (Sub Dict :: () :- CoArbitrary Integer),
-  inst (Sub Dict :: () :- CoArbitrary Bool),
-  inst (Sub Dict :: () :- CoArbitrary Char),
-  inst2 (Sub Dict :: (CoArbitrary A, Arbitrary B) :- Arbitrary (A -> B)),
-  inst2 (Sub Dict :: (Arbitrary A, CoArbitrary B) :- CoArbitrary (A -> B)),
-  inst2 (Sub Dict :: (Ord A, Ord B) :- Ord (A, B)),
-  inst2 (Sub Dict :: (Arbitrary A, Arbitrary B) :- Arbitrary (A, B)),
-  inst2 (Sub Dict :: (CoArbitrary A, CoArbitrary B) :- CoArbitrary (A, B)),
-  makeInstance (\(x :: A, (y :: B, z :: C)) -> (x, y, z)),
-  makeInstance (\(x :: A, (y :: B, (z :: C, w :: D))) -> (x, y, z, w)),
-  makeInstance (\(x :: A, (y :: B, (z :: C, (w :: D, v :: E)))) -> (x, y, z, w, v)),
-  makeInstance (\() -> Dict :: Dict ()),
-  makeInstance (\(dict :: Dict (Arbitrary A)) -> DictOf dict),
+  inst (Dict :: Dict (CoArbitrary Int)),
+  inst (Dict :: Dict (CoArbitrary Integer)),
+  inst (Dict :: Dict (CoArbitrary Bool)),
+  inst (Dict :: Dict (CoArbitrary Char)),
+  inst (\(Dict :: Dict (CoArbitrary A)) (Dict :: Dict (Arbitrary B)) -> Dict :: Dict (Arbitrary (A -> B))),
+  inst (\(Dict :: Dict (Arbitrary A)) (Dict :: Dict (CoArbitrary B)) -> Dict :: Dict (CoArbitrary (A -> B))),
+  inst (\(Dict :: Dict (Ord A)) (Dict :: Dict (Ord B)) -> Dict :: Dict (Ord (A, B))),
+  inst (\(Dict :: Dict (Arbitrary A)) (Dict :: Dict (Arbitrary B)) -> Dict :: Dict (Arbitrary (A, B))),
+  inst (\(Dict :: Dict (CoArbitrary A)) (Dict :: Dict (CoArbitrary B)) -> Dict :: Dict (CoArbitrary (A, B))),
+  inst (\(x :: A, (y :: B, z :: C)) -> (x, y, z)),
+  inst (\(x :: A, (y :: B, (z :: C, w :: D))) -> (x, y, z, w)),
+  inst (\(x :: A, (y :: B, (z :: C, (w :: D, v :: E)))) -> (x, y, z, w, v)),
+  inst (\() -> Dict :: Dict ()),
+  inst (\(dict :: Dict (Arbitrary A)) -> DictOf dict),
   names1 (\(NamesFor names :: NamesFor A) ->
             NamesFor (map (++ "s") names) :: NamesFor [A]),
   names (NamesFor ["x", "y", "z"] :: NamesFor Int),
@@ -169,15 +166,15 @@ defaultInstances = [
   names (NamesFor ["p", "q", "r"] :: NamesFor (A -> Bool)),
   names (NamesFor ["f", "g", "h"] :: NamesFor (A -> B)),
   names (NamesFor ["x", "y", "z"] :: NamesFor A),
-  makeInstance (\(dict :: Dict (Ord A)) -> return dict :: Gen (Dict (Ord A))),
-  makeInstance (\(dict :: Dict (Arbitrary A)) -> return dict :: Gen (Dict (Arbitrary A))),
-  makeInstance (\(dict :: Dict (CoArbitrary A)) -> return dict :: Gen (Dict (CoArbitrary A))),
-  makeInstance (\(Dict :: Dict (Arbitrary A)) -> arbitrary :: Gen A),
-  makeInstance (\(dict :: Dict (Ord A)) -> Observe dict return),
-  makeInstance (\(obs :: Observe A B) -> observeTraversable ins obs :: Observe [A] [B]),
-  makeInstance (\(Dict :: Dict (Arbitrary A),
-                 obs :: Observe B C) -> observeFunction obs :: Observe (A -> B) C ),
-  makeInstance (\(obs :: Observe A B) -> Observe1 (toValue obs))]
+  inst (\(dict :: Dict (Ord A)) -> return dict :: Gen (Dict (Ord A))),
+  inst (\(dict :: Dict (Arbitrary A)) -> return dict :: Gen (Dict (Arbitrary A))),
+  inst (\(dict :: Dict (CoArbitrary A)) -> return dict :: Gen (Dict (CoArbitrary A))),
+  inst (\(Dict :: Dict (Arbitrary A)) -> arbitrary :: Gen A),
+  inst (\(dict :: Dict (Ord A)) -> Observe dict return),
+  inst (\(obs :: Observe A B) -> observeTraversable ins obs :: Observe [A] [B]),
+  inst (\(Dict :: Dict (Arbitrary A),
+          obs :: Observe B C) -> observeFunction obs :: Observe (A -> B) C ),
+  inst (\(obs :: Observe A B) -> Observe1 (toValue obs))]
 
 data Observe a b = Observe (Dict (Ord b)) (a -> Gen b) deriving Typeable
 newtype Observe1 a = Observe1 (Value (Observe a)) deriving Typeable
@@ -198,15 +195,15 @@ observeFunction (Observe dict f) =
 
 namesFor_ :: Signature -> Type -> [String]
 namesFor_ sig ty =
-  case findInstanceOf sig (skolemiseTypeVars ty) of
+  case findInstance (instances sig) (skolemiseTypeVars ty) of
     (x:_) -> ofValue unNamesFor x
 
 newtype DictOf c a = DictOf { unDictOf :: Dict (c a) } deriving Typeable
 
 instance Monoid Signature where
-  mempty = Signature [] [] [] Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing False Nothing Nothing [] [] False
+  mempty = Signature [] mempty [] Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing False Nothing Nothing [] [] False
   Signature cs is b th d s ps dp s1 t tim pr simp p pctxs prds sil `mappend` Signature cs' is' b' th' d' s' ps' dp' s1' t' tim' pr' simp' p' pctxs' prds' sil' =
-    Signature (cs++cs') (is++is') (b++b')
+    Signature (cs++cs') (is `mappend` is') (b++b')
       (th `mplus` th')
       (d `mplus` d')
       (s `mplus` s')
@@ -251,37 +248,6 @@ typeKind sig ty
     suffixes t = [t]
     occurs t = or [ isJust (match t u) | u <- Set.toList u ]
     u = typeUniverse sig
-
-findInstanceOf :: forall f. Typeable f => Signature -> Type -> [Value f]
-findInstanceOf sig ty =
-  map (unwrapFunctor runIdentity) (findInstance sig ty')
-  where
-    ty' = typeRep (undefined :: proxy f) `applyType` ty
-
-findInstance :: Signature -> Type -> [Value Identity]
-findInstance sig (App unit [])
-  | unit == tyCon () =
-    return (toValue (Identity ()))
-findInstance sig (App pair [ty1, ty2])
-  | pair == tyCon ((),()) = do
-    x <- findInstance sig ty1
-    y <- findInstance sig ty2
-    return (pairValues (liftA2 (,)) x y)
-findInstance sig ty = do
-  i <- instances_ sig
-  let (i', ty') = unPoly (polyPair (poly i) (poly ty))
-  sub <- maybeToList (unify (typ i') ty')
-  let Instance i0 = typeSubst (evalSubst sub) i'
-  withValue i0 $ \(Instance1 i1) -> do
-    withValue i1 $ \(Instance2 f) -> do
-      i2 <- findInstance sig (typ i1)
-      sub <- maybeToList (match (typ i1) (typ i2))
-      let Instance i0' = typeSubst (evalSubst sub) (Instance i0)
-      case unwrap i0' of
-        Instance1 i1' `In` w1 ->
-          case unwrap i1' of
-            Instance2 f `In` w2 ->
-              return $! wrap w1 $! fmap f $! reunwrap w2 $! i2
 
 newtype Name = Name String deriving (Eq, Ord)
 instance Pretty Name where
