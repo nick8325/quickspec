@@ -28,7 +28,7 @@ import Data.Ord
 import {-# SOURCE #-} QuickSpec.Pruning.Completion(Completion)
 import {-# SOURCE #-} QuickSpec.Pruning.Simple(SimplePruner)
 import Twee.Base
-import qualified QuickSpec.Label as Label
+import qualified Twee.Label as Label
 
 newtype Instance = Instance (Value Instance1) deriving Show
 newtype Instance1 a = Instance1 (Value (Instance2 a))

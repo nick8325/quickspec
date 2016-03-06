@@ -34,7 +34,7 @@ import Unsafe.Coerce
 import Data.Constraint
 import Twee.Base
 import qualified Twee.Term as Term
-import qualified QuickSpec.Label as Label
+import qualified Twee.Label as Label
 import Data.Ord
 
 deriving instance Typeable (() :: Constraint)

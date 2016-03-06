@@ -21,7 +21,7 @@ import Control.Applicative
 import Data.Ord
 import Twee.Base
 import qualified Twee.KBO as KBO
-import qualified QuickSpec.Label as Label
+import qualified Twee.Label as Label
 
 instance Label.Labelled (Type, Var) where
   cache = typedVarCache

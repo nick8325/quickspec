@@ -16,7 +16,7 @@ import Test.QuickCheck hiding (subterms)
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Random
 import Twee.Base
-import qualified QuickSpec.Label as Label
+import qualified Twee.Label as Label
 import Data.Maybe
 import qualified Data.DList as DList
 

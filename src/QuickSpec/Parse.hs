@@ -10,7 +10,7 @@ import QuickSpec.Prop
 import QuickSpec.Term
 import QuickSpec.Type
 import QuickSpec.Utils
-import qualified QuickSpec.Label as Label
+import qualified Twee.Label as Label
 import Text.ParserCombinators.ReadP
 import Data.List
 import Twee.Base hiding (char)

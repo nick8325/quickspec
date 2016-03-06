@@ -14,7 +14,7 @@ import Data.Char
 import Data.List
 import Data.Maybe
 import Twee.Base
-import qualified QuickSpec.Label as Label
+import qualified Twee.Label as Label
 
 wmUnify :: Int -> [PruningProp] -> PruningProp -> IO Bool
 wmUnify timeout bg prop = do
