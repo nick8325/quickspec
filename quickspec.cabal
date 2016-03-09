@@ -68,7 +68,6 @@ library
     Paths_quickspec
     QuickSpec
     QuickSpec.Eval
-    QuickSpec.Label
     QuickSpec.Parse
     QuickSpec.Prop
     QuickSpec.Pruning
