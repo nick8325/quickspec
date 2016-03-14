@@ -71,9 +71,6 @@ instance Arbitrary Drawing where
     where
       one = (Rat 1 0, Rat 1 0)
 
-instance (Ord a, Arbitrary a) => Arbitrary (Set a) where
-  arbitrary = fmap Set.fromList arbitrary
-
 blank :: Drawing
 blank = Drawing (\_ _ _ -> objs Set.empty)
 
