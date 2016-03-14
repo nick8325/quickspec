@@ -8,7 +8,7 @@ module QuickSpec.Type(
   Type, TyCon(..), tyCon, toTyCon, fromTyCon, A, B, C, D, E,
   typeOf, typeRep, applyType, toTypeRep, fromTypeRep,
   arrowType, typeArgs, typeRes, typeDrop, typeArity, oneTypeVar, skolemiseTypeVars,
-  isDictionary,
+  isDictionary, getDictionary,
   -- Things that have types.
   Typed(..), typeSubst, typesDL, tyVars, cast,
   TypeView(..),
@@ -65,8 +65,8 @@ instance PrettyTerm TyCon where
   termStyle Arrow =
     fixedArity 2 $
     TermStyle $ \l p d [x, y] ->
-      pPrintParen (p > 10) $
-        pPrintPrec l 11 x <+> d <+>
+      pPrintParen (p > 8) $
+        pPrintPrec l 9 x <+> d <+>
         pPrintPrec l 0 y
 
   termStyle (TyCon con)
@@ -167,9 +167,12 @@ toTyCon :: TyCon -> Ty.TyCon
 toTyCon Arrow = arrowTyCon
 toTyCon (TyCon tyCon) = tyCon
 
+getDictionary :: Type -> Maybe Type
+getDictionary (App (TyCon tc) [ty]) | tc == dictTyCon = Just ty
+getDictionary _ = Nothing
+
 isDictionary :: Type -> Bool
-isDictionary (App (TyCon tc) _) | tc == dictTyCon = True
-isDictionary _ = False
+isDictionary = isJust . getDictionary
 
 -- CoArbitrary instances.
 instance CoArbitrary Ty.TypeRep where

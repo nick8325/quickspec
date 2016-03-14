@@ -81,19 +81,31 @@ data Signature =
 instance Pretty Signature where
   pPrint sig = vcat (map prettyDecl decls)
     where
-      decls = [(show (pPrint (app c [])), pPrint (prettyType (typeDrop (implicitArity (typ (conGeneralValue c))) (typ c)))) | c <- constants sig, not (conIsBackground c)]
+      decls = [(show (pPrint (app c [])), pPrintType (canonicalise (typ c))) | c <- constants sig, not (conIsBackground c)]
       maxWidth = maximum (0:map (length . fst) decls)
       pad xs = replicate (maxWidth - length xs) ' ' ++ xs
       prettyDecl (name, ty) =
         hang (text (pad name) <+> text "::") 2 ty
 
       as = supply [[x] | x <- ['a'..'z']]
-      prettyType ty = build (aux (singleton (canonicalise ty)))
+      prettyType ty = build (aux (singleton ty))
       aux Empty = mempty
       aux (Cons (Var (MkVar x)) ts) =
         con (toFun (L (Name (as !! x)))) `mappend` aux ts
       aux (Cons (Fun f ts) us) =
         fun (toFun (R (fromFun f))) (aux ts) `mappend` aux us
+
+      pPrintType ty =
+        case cs of
+          []  -> pPrint (prettyType ty')
+          [c] -> pPrint (prettyType c) <+> text "=>" <+> pPrint (prettyType ty')
+          _   -> parens (hsep (punctuate comma (map (pPrint . prettyType) cs))) <+> pPrint (prettyType ty')
+        where
+          (cs, ty') = loop [] ty
+          loop cs (App Arrow [arg, res])
+            | Just c <- getDictionary arg =
+              loop (cs ++ [c]) res
+          loop cs ty = (cs, ty)
 
 defaultTypes :: Typed a => Signature -> a -> a
 defaultTypes sig = typeSubst (const (defaultTo_ sig))
