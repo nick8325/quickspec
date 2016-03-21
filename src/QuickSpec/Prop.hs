@@ -80,21 +80,36 @@ propType (_ :=>: p :@: ts) = typ p
 propType (_ :=>: t :=: u) = typ t
 
 instance Pretty a => Pretty (Literal a) where
-  pPrint (x :=: y) = hang (pPrint x <+> text "=") 2 (pPrint y)
-  pPrint (p :@: xs) = pPrint p <> parens (sep (punctuate comma (map pPrint xs)))
+  pPrintPrec _ _ (x :=: y) = hang (pPrint x <+> text "=") 2 (pPrint y)
+  pPrintPrec l p (pred :@: xs) =
+    pPrintTerm (termStyle pred) l p (pPrint pred) xs
 
 data Predicate = Predicate {
-  predName :: String,
-  predType :: Type,
+  predName  :: String,
+  predStyle :: TermStyle,
+  predType  :: Type,
   predGeneralType :: Poly Type }
-  deriving (Eq, Ord, Show)
+
+instance Eq Predicate where
+  p == q = p `compare` q == EQ
+
+instance Ord Predicate where
+  compare = comparing f
+    where
+      f p = (predName p, predType p, predGeneralType p)
+
+instance Show Predicate where
+  show = prettyShow
 
 instance Pretty Predicate where
   pPrint = text . predName
 
+instance PrettyTerm Predicate where
+  termStyle = predStyle
+
 instance Typed Predicate where
   typ = predType
-  typeReplace sub (Predicate x ty pty) = Predicate x (typeReplace sub ty) pty
+  typeReplace sub (Predicate x style ty pty) = Predicate x style (typeReplace sub ty) pty
 
 boolType :: Type
 boolType = typeOf (undefined :: Bool)

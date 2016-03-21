@@ -66,7 +66,7 @@ instance Parse (Literal (Term Constant)) where
       predicate = do
         t@(App f ts) <- parse cs
         guard (typ t == typeOf (undefined :: Bool))
-        let p = Predicate (conName f) (typ f) (polyTyp (conGeneralValue f))
+        let p = Predicate (conName f) (termStyle f) (typ f) (polyTyp (conGeneralValue f))
         return (p :@: ts)
 
 instance Parse (PropOf (Term Constant)) where

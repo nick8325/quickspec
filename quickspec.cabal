@@ -69,6 +69,7 @@ library
     QuickSpec
     QuickSpec.Eval
     QuickSpec.Parse
+    QuickSpec.PrintConditionally
     QuickSpec.Prop
     QuickSpec.Pruning
     QuickSpec.Pruning.E
