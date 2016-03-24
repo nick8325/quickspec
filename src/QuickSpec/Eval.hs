@@ -332,7 +332,7 @@ createRules sig = do
           liftIO $ print (text "Term" <+> pPrint t <+> text "timed out")
           add
         Untestable ->
-          ERROR ("Untestable instance " ++ prettyShow t ++ " of testable schema " ++ prettyShow s)
+          ERROR("Untestable instance " ++ prettyShow t ++ " of testable schema " ++ prettyShow s)
         EqualTo (From _ u) _ -> do
           --t' <- fmap (fromMaybe t) (lift (lift (rep t)))
           let t' = t
