@@ -63,7 +63,11 @@ insert1 x ts =
       aux k x ts (TestCase (Map.singleton t' (Singleton (Tested y ts'))))
     aux k x (t:ts) (TestCase res) =
       case Map.lookup t res of
-        Nothing -> New1 (k (TestCase (Map.insert t (Singleton (Tested x ts)) res)))
+        Nothing ->
+          -- XXX things start go very badly for us if a partial term ends
+          -- up in the testing tree. Fix this properly!
+          take 10 ts == take 10 ts `seq`
+          New1 (k (TestCase (Map.insert t (Singleton (Tested x ts)) res)))
         Just res' ->
           let k' r = k (TestCase (Map.insert t r res)) in
           aux k' x ts res'
