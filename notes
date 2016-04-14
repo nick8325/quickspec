@@ -1,0 +1,50 @@
+Things which should be expressed as single modules or whatever:
+  * term-based exploration
+  * schema-based exploration
+    - instantiate schemas
+	- possibly do smart instantiation
+  * polymorphism
+    - regeneralise monomorphic laws
+	- generate mgus of terms of unifiable types
+	- (do this at the term or the schema level?)
+  * the term generation loop
+  * conditional laws
+    - a post-filter on discovered laws to instantiate conditional axioms
+  * quickcheck
+  * exception catching?
+  * higher-order functions and partial application?
+    - generate partially-applied terms?
+	- what to do about type universe for polymorphism?
+	- eta-expand discovered laws
+	- maybe can incrementally expand type universe as new functions appear
+  * delaying non-orientable laws
+    - generate terms as usual
+	- filter equations that come out
+	- when we spot a bigger term, stop delaying
+  * lambda terms?
+  * timeouts? in general, "opting out" of a particular test case?
+    [this term is not defined on this test case, e.g. partial models]
+  * discovering inconsistent laws
+    (when two representative terms get the same normal form)
+
+Pipeline: in goes term ---> out comes set of laws - this is compatible with schemas going in
+Term generation loop: maintain set of terms, keep them normalised wrt rules rather than remembering which ones are representatives?
+
+Delaying is interesting. Delaying says:
+  * I generate a term
+  * Out comes a law
+  * Oops I shouldn't have generated this term, wait a bit
+  * Generate it again later
+It should perhaps be part of the main term generation loop?
+
+Schema generation maintains lots of different little test sets.
+
+Bug: discover elem x xs = any (== x) xs
+
+From TODO file:
+Instead of conGeneralValue/regeneralise nonsense, have a type
+constructor "Mono a" which wraps its argument while having its Typed
+instance unify all types.
+
+Model delaying as a function taking list of terms and only delaying
+inside that list
