@@ -54,7 +54,7 @@ source-repository head
 
 flag z3
   Description: Use the Z3 prover for pruning.
-  Default: True
+  Default: False
 
 flag jukebox
   Description: Use the E and SPASS provers for pruning.
