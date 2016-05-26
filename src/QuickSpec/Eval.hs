@@ -159,26 +159,19 @@ incrementalQuickSpec sig = do
   quickSpec sig { background = background thy,
                   constants = constants thy ++ [last (constants sig)] }
 
-chopUpSignature :: [(Constant, [Int])] -> Signature -> (Signature, [Signature -> Signature])
-chopUpSignature cs sig =
-  (sig', id:map phase phases)
+chopUpSignature :: [(Constant, [Int])] -> Signature -> [Signature -> Signature]
+chopUpSignature cs sig = id:map phase phases
   where
     phase n sig =
-      sig' {
-        background = background sig,
-        constants = constants sig' ++ [ c | (c, ns) <- cs', n `elem` ns ] }
+      sig {
+        constants = constants sig ++ [ c | (c, ns) <- cs, n `elem` ns ] }
     phases = usort (concatMap snd cs)
-    cs1 = constants sig
-    cs2 = map fst cs
-    (cs1', cs2') = splitAt (length cs1) (constants sig)
-    sig' = sig { constants = cs1' }
-    cs' = zip cs2' (map snd cs)
 
 choppyQuickSpec :: [(Constant, [Int])] -> Signature -> IO Signature
-choppyQuickSpec cs sig =
-  foldr (>=>) return (map (quickSpec .) sigs) sig'
+choppyQuickSpec cs sig = do
+  foldr (>=>) return (map (quickSpec .) sigs) sig
   where
-   (sig', sigs) = chopUpSignature cs sig
+   sigs = chopUpSignature cs sig
 
 -- | Run QuickSpec. The returned signature contains the discovered
 -- equations. By using |mappend| to combine the returned signature
