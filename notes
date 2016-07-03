@@ -1,3 +1,8 @@
+NOTE:
+schema layer should somehow be the same, whether we're discovering
+equations or something else. maybe this means splitting lower layers
+into "conjecture-by-testing" and "discard-by-pruning" parts?
+
 Things which should be expressed as single modules or whatever:
   * term-based exploration
   * schema-based exploration

@@ -1,51 +1,36 @@
--- New plan:
--- simple type of terms like in pre-twee QS.
--- Parametrised on constants and variables.
--- On second thoughts, just introduce term type first.
--- Then reintroduce schemas, then proper parametrisation
--- (and maybe not just on constant type - on term type).
-
 -- Typed terms.
-{-# LANGUAGE RecordWildCards, PatternSynonyms, CPP #-}
-module QuickSpec.Term where
+{-# LANGUAGE PatternSynonyms, ViewPatterns, TypeSynonymInstances, FlexibleInstances #-}
+module QuickSpec.Term(module QuickSpec.Term, module Twee.Term) where
 
-#include "errors.h"
-import qualified Data.IntMap.Strict as Map
-import Data.IntMap(IntMap)
 import QuickSpec.Type
-import qualified Twee.Base as Twee
-import Twee.Base hiding (Term)
+import qualified Twee.Term as Term
 import Control.Monad
+import Twee.Term(Numbered(..), build)
+import Twee.Label
 
--- Twee terms are untyped.
--- So we pair a Twee term with a context, a map from variable to type.
-data Term f =
-  Term {
-    tm_term :: Twee.Term f,
-    tm_ctx  :: IntMap Type }
+type Term f = Term.Term (Either f Type)
 
-instance (Typed f, Numbered f) => Typed (Term f) where
-  typ Term{..} =
-    case tm_term of
-      Var (MkVar x) ->
-        Map.findWithDefault __ x tm_ctx
-      App f _ -> typ f
+instance Numbered Type where toInt = label
+instance Labelled Type where cache = typeCache
+{-# NOINLINE typeCache #-}
+typeCache :: Cache Type
+typeCache = mkCache
 
-  otherTypesDL Term{..} =
-    msum [return (typ (Term t tm_ctx)) | t <- properSubterms tm_term] `mplus`
-    msum (map return (Map.elems tm_ctx))
+data Var = V { var_ty :: Type, var_idx :: {-# UNPACK #-} !Int }
+  deriving (Eq, Ord, Show)
 
-  typeReplace sub Term{..} =
-    Term {
-      term    = build (mapFun (toFun . typeReplace sub . fromFun) tm_term),
-      context = fmap (typeReplace sub) tm_ctx }
+instance Typed Var where
+  typ x = var_ty x
+  otherTypesDL _ = mzero
+  typeReplace sub (V ty x) = V (typeReplace sub ty) x
 
-instance Symbolic (Term f) where
-  type ConstantOf (Term f) = f
-  term Term{..} = tm_term
-  termsDL = return . tm_term
-  replace sub (Term t ctx) = Term (replace sub t) ctx
-  -- XXXXX oh no!
-  -- substitution doesn't respect types!
-  -- Need our own QuickSpec-symbolic class.
-  -- Or just have our own typed-term type without twee.
+pattern Var :: Numbered f => () => Var -> Term f
+pattern Var x <- (patVar -> Just x) where
+  Var (V ty x) = Term.App (Right ty) [build (Term.var (Term.V x))]
+
+pattern App :: Numbered f => () => f -> [Term f] -> Term f
+pattern App f ts = Term.App (Left f) ts
+
+patVar :: Numbered f => Term f -> Maybe Var
+patVar (Term.App (Right ty) [Term.Var (Term.V x)]) = Just (V ty x)
+patVar _ = Nothing

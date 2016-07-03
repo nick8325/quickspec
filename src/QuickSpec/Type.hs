@@ -57,9 +57,6 @@ instance Numbered TyCon where
   toInt Arrow = 0
   toInt (TyCon ty) = Label.label ty + 1
 
-  fromInt 0 = Arrow
-  fromInt n = TyCon (fromMaybe __ (Label.find (n-1)))
-
 instance Pretty TyCon where
   pPrint Arrow = text "->"
   pPrint (TyCon x) = text (show x)
@@ -102,7 +99,7 @@ applyType _ _ = ERROR("tried to apply type variable")
 
 arrowType :: [Type] -> Type -> Type
 arrowType [] res = res
-arrowType (arg:args) res = app Arrow [arg, arrowType args res]
+arrowType (arg:args) res = App Arrow [arg, arrowType args res]
 
 typeArgs :: Type -> [Type]
 typeArgs (App Arrow [arg, res]) = arg:typeArgs res
@@ -120,18 +117,18 @@ typeArity :: Type -> Int
 typeArity = length . typeArgs
 
 oneTypeVar :: Typed a => a -> a
-oneTypeVar = typeSubst (const (var (MkVar 0)))
+oneTypeVar = typeSubst (const (var (V 0)))
 
 skolemiseTypeVars :: Typed a => a -> a
 skolemiseTypeVars = typeSubst (const aTy)
   where
-    aTy = app (fromTyCon (mkCon (__ :: A))) []
+    aTy = App (fromTyCon (mkCon (__ :: A))) []
 
 fromTypeRep :: Ty.TypeRep -> Type
 fromTypeRep ty =
   case Ty.splitTyConApp ty of
-    (tyVar, [ty]) | tyVar == varTyCon -> build (var (MkVar (fromTyVar ty)))
-    (tyCon, tys) -> app (fromTyCon tyCon) (map fromTypeRep tys)
+    (tyVar, [ty]) | tyVar == varTyCon -> build (var (V (fromTyVar ty)))
+    (tyCon, tys) -> App (fromTyCon tyCon) (map fromTypeRep tys)
   where
     fromTyVar ty =
       case Ty.splitTyConApp ty of
@@ -161,7 +158,7 @@ tyCon = fromTyCon . mkCon
 -- For showing types.
 toTypeRep :: Type -> Ty.TypeRep
 toTypeRep (App tyCon tys) = Ty.mkTyConApp (toTyCon tyCon) (map toTypeRep tys)
-toTypeRep (Var (MkVar n)) = Ty.mkTyConApp varTyCon [toTyVar n]
+toTypeRep (Var (V n)) = Ty.mkTyConApp varTyCon [toTyVar n]
   where
     toTyVar 0 = Ty.mkTyConApp zeroTyCon []
     toTyVar n = Ty.mkTyConApp succTyCon [toTyVar (n-1)]
@@ -202,16 +199,17 @@ class Typed a where
   typeReplace :: (TermListOf Type -> Builder TyCon) -> a -> a
 
 {-# INLINE typeSubst #-}
-typeSubst :: (Typed a, Substitution TyCon s) => s -> a -> a
+typeSubst :: (Typed a, Substitution s, SubstFun s ~ TyCon) => s -> a -> a
 typeSubst s x = typeReplace (Term.substList s) x
 
 -- Using the normal term machinery on types.
 newtype TypeView a = TypeView { unTypeView :: a }
 instance Typed a => Symbolic (TypeView a) where
   type ConstantOf (TypeView a) = TyCon
-  term = typ . unTypeView
   termsDL = fmap singleton . typesDL . unTypeView
   replace f = TypeView . typeReplace f . unTypeView
+instance Typed a => Singular (TypeView a) where
+  term = typ . unTypeView
 
 typesDL :: Typed a => a -> DList Type
 typesDL ty = return (typ ty) `mplus` otherTypesDL ty
@@ -251,14 +249,15 @@ instance Apply Type where
   tryApply _ _ = Nothing
 
 instance (Typed a, Typed b) => Typed (a, b) where
-  typ (x, y) = app (TyCon commaTyCon) [typ x, typ y]
+  typ (x, y) = App (TyCon commaTyCon) [typ x, typ y]
   otherTypesDL (x, y) = otherTypesDL x `mplus` otherTypesDL y
   typeReplace f (x, y) = (typeReplace f x, typeReplace f y)
 
 instance Typed a => Typed [a] where
   typ [] = typeOf ()
-  typ (x:xs) = typ (x, xs)
-  otherTypesDL = msum . map otherTypesDL
+  typ (x:xs) = typ x
+  otherTypesDL [] = mzero
+  otherTypesDL (x:xs) = otherTypesDL x `mplus` msum (map typesDL xs)
   typeReplace f xs = map (typeReplace f) xs
 
 -- Represents a forall-quantifier over all the type variables in a type.
@@ -281,9 +280,9 @@ polyMap f (Poly x) = poly (f x)
 
 polyRename :: (Typed a, Typed b) => a -> Poly b -> b
 polyRename x (Poly y) =
-  typeSubst (\(MkVar n) -> var (MkVar (k+n))) y
+  typeSubst (\(V n) -> var (V (k+n))) y
   where
-    k  = maximum (fmap bound (typesDL x))
+    V k = maximum (fmap bound (typesDL x))
 
 polyApply :: (Typed a, Typed b, Typed c) => (a -> b -> c) -> Poly a -> Poly b -> Poly c
 polyApply f (Poly x) y = poly (f x (polyRename x y))
@@ -308,7 +307,7 @@ instance Typed a => Typed (Poly a) where
 
 instance Apply a => Apply (Poly a) where
   tryApply f x = do
-    let (f', (x', resType)) = unPoly (polyPair f (polyPair x (poly (build (var (MkVar 0))))))
+    let (f', (x', resType)) = unPoly (polyPair f (polyPair x (poly (build (var (V 0))))))
     s <- unify (typ f') (arrowType [typ x'] resType)
     let (f'', x'') = typeSubst s (f', x')
     fmap poly (tryApply f'' x'')
