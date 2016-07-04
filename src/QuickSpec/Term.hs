@@ -1,14 +1,15 @@
 -- Typed terms.
-{-# LANGUAGE PatternSynonyms, ViewPatterns, TypeSynonymInstances, FlexibleInstances #-}
-module QuickSpec.Term(module QuickSpec.Term, module Twee.Term) where
+{-# LANGUAGE PatternSynonyms, ViewPatterns, TypeSynonymInstances, FlexibleInstances, TypeFamilies, ConstraintKinds #-}
+module QuickSpec.Term(module QuickSpec.Term, module Twee.Base) where
 
 import QuickSpec.Type
-import qualified Twee.Term as Term
+import qualified Twee.Base as Base
 import Control.Monad
-import Twee.Term(Numbered(..), build)
+import Twee.Base hiding (Term, pattern App, pattern Var, Var(..), vars, occVar)
 import Twee.Label
 
-type Term f = Term.Term (Either f Type)
+type Symb f a = (Symbolic a, ConstantOf a ~ ConstantOf (Term f), Numbered f)
+type Term f = Base.Term (Either f Type)
 
 instance Numbered Type where toInt = label
 instance Labelled Type where cache = typeCache
@@ -26,11 +27,17 @@ instance Typed Var where
 
 pattern Var :: Numbered f => () => Var -> Term f
 pattern Var x <- (patVar -> Just x) where
-  Var (V ty x) = Term.App (Right ty) [build (Term.var (Term.V x))]
+  Var (V ty x) = Base.App (Right ty) [build (Base.var (Base.V x))]
 
 pattern App :: Numbered f => () => f -> [Term f] -> Term f
-pattern App f ts = Term.App (Left f) ts
+pattern App f ts = Base.App (Left f) ts
 
 patVar :: Numbered f => Term f -> Maybe Var
-patVar (Term.App (Right ty) [Term.Var (Term.V x)]) = Just (V ty x)
+patVar (Base.App (Right ty) [Base.Var (Base.V x)]) = Just (V ty x)
 patVar _ = Nothing
+
+vars :: Symb f a => a -> [Var]
+vars x = [ v | t <- terms x, Var v <- subtermsList t ]
+
+occVar :: Symb f a => Var -> a -> Int
+occVar x t = length (filter (== x) (vars t))
