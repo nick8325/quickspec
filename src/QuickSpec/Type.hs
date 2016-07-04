@@ -253,6 +253,14 @@ instance (Typed a, Typed b) => Typed (a, b) where
   otherTypesDL (x, y) = otherTypesDL x `mplus` otherTypesDL y
   typeReplace f (x, y) = (typeReplace f x, typeReplace f y)
 
+instance (Typed a, Typed b) => Typed (Either a b) where
+  typ (Left x)  = typ x
+  typ (Right x) = typ x
+  otherTypesDL (Left x)  = otherTypesDL x
+  otherTypesDL (Right x) = otherTypesDL x
+  typeReplace sub (Left x)  = Left  (typeReplace sub x)
+  typeReplace sub (Right x) = Right (typeReplace sub x)
+
 instance Typed a => Typed [a] where
   typ [] = typeOf ()
   typ (x:xs) = typ x
