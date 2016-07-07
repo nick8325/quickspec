@@ -53,7 +53,7 @@ compareFuns (App f ts) (App g us) =
 
 depth :: Term f -> Int
 depth Var{} = 1
-depth (Fun _ ts) = 1 + maximum (0:map (succ . depth) (fromTermList ts))
+depth (Fun _ ts) = 1 + maximum (0:map depth (fromTermList ts))
 
 -- Constants have values, while variables do not (as only monomorphic
 -- variables have generators, so we need a separate defaulting phase).
