@@ -1,7 +1,19 @@
 {-# LANGUAGE FlexibleContexts #-}
 module QuickSpec.PrintConditionally where
 
-import QuickSpec
+import QuickSpec.Parse
+import QuickSpec.Prop
+import QuickSpec.Pruning hiding (createRules, instances)
+import QuickSpec.Pruning.E
+import QuickSpec.Pruning.Simple hiding (S)
+import QuickSpec.Rules
+import QuickSpec.Signature
+import QuickSpec.Term
+import QuickSpec.Test
+import QuickSpec.TestSet
+import QuickSpec.Type
+import QuickSpec.Utils
+import Data.Constraint
 import Twee.Term hiding (lookup)
 import Twee.Pretty
 import Data.List
@@ -49,4 +61,3 @@ conditionalise preds ([] :=>: t :=: u) =
 
     generalise f@Constant{} = f { conValue = unPoly (conGeneralValue f), conArity = 0 }
     generalise f = f
-

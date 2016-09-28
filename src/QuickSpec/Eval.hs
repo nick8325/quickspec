@@ -30,6 +30,7 @@ import QuickSpec.Test
 import QuickSpec.TestSet
 import QuickSpec.Type
 import QuickSpec.Utils
+import QuickSpec.PrintConditionally
 import Test.QuickCheck.Random
 import Test.QuickCheck.Text
 import System.Random
@@ -551,7 +552,8 @@ found sig prop0 = do
           conIsBackground_ (Apply _) = True
           conIsBackground_ con = conIsBackground con
       when (null (funs prop') || not (null (filter (not . conIsBackground_ . fromFun) (funs prop')))) $
-        onTerm putLine (prettyShow (rename (canonicalise prop')))
+        onTerm putLine
+            (prettyShow (rename (canonicalise (conditionalise (conditionalsContext sig)  prop'))))
 
   onTerm putTemp "[completing theory...]"
   lift (lift (axiom Normal prop))

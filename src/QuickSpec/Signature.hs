@@ -75,7 +75,8 @@ data Signature =
     testTimeout        :: Maybe Int,
     printStatistics    :: Bool,
     simplify           :: Maybe (Signature -> Prop -> Prop),
-    extraPruner        :: Maybe ExtraPruner }
+    extraPruner        :: Maybe ExtraPruner,
+    conditionalsContext :: [(Constant, [Constant])]}
   deriving Typeable
 
 instance Pretty Signature where
@@ -221,8 +222,8 @@ newtype NamesFor a = NamesFor { unNamesFor :: [String] } deriving Typeable
 newtype DictOf c a = DictOf { unDictOf :: Dict (c a) } deriving Typeable
 
 instance Monoid Signature where
-  mempty = Signature [] [] [] Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing False Nothing Nothing
-  Signature cs is b th d s ps dp s1 t tim pr simp p `mappend` Signature cs' is' b' th' d' s' ps' dp' s1' t' tim' pr' simp' p' =
+  mempty = Signature [] [] [] Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing False Nothing Nothing []
+  Signature cs is b th d s ps dp s1 t tim pr simp p pctxs `mappend` Signature cs' is' b' th' d' s' ps' dp' s1' t' tim' pr' simp' p' pctxs' =
     Signature (cs++cs') (is++is') (b++b')
       (th `mplus` th')
       (d `mplus` d')
@@ -235,6 +236,7 @@ instance Monoid Signature where
       (pr || pr')
       (simp `mplus` simp')
       (p `mplus` p')
+      (pctxs `mplus` pctxs')
 
 signature :: Signature
 signature = mempty
