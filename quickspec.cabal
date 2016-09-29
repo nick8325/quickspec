@@ -67,6 +67,7 @@ library
   Exposed-modules:
     Paths_quickspec
     QuickSpec
+    QuickSpec.PredicatesInterface
     QuickSpec.Eval
     QuickSpec.Parse
     QuickSpec.PrintConditionally

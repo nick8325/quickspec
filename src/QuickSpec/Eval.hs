@@ -179,7 +179,8 @@ choppyQuickSpec cs sig = do
 -- and a new signature, you can use the discovered equations as
 -- background theory in a later run of QuickSpec.
 quickSpec :: Signature -> IO Signature
-quickSpec sig = do
+quickSpec sigin = do
+  let sig = predicateSig sigin 
   putStrLn "== Signature =="
   prettyPrint sig
   putStrLn ""

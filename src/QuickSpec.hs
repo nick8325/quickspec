@@ -2,6 +2,7 @@
 --
 -- This is typically the only module you need when using QuickSpec.
 module QuickSpec(
+  module QuickSpec.PredicatesInterface,
   module QuickSpec.Eval,
   module QuickSpec.Parse,
   module QuickSpec.Prop,
@@ -30,4 +31,5 @@ import QuickSpec.Test
 import QuickSpec.TestSet
 import QuickSpec.Type
 import QuickSpec.Utils
+import QuickSpec.PredicatesInterface
 import Data.Constraint
