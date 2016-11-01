@@ -136,12 +136,12 @@ schemasOfSize n sig = do
     [ vartm | n == 1 ] ++
     [ app c [] | c <- constants sig, n == conSize c ] ++
     [ unPoly (apply f x)
-    | i <- [1..n-1],
+    | i <- [0..n-1],
       let j = n-i,
       (fty, fs) <- Map.toList =<< maybeToList (Map.lookup i ss),
       canApply fty (poly varty),
       or [ canApply f (poly vartm) | f <- fs ],
-      (xty, xs) <- Map.toList =<< maybeToList (Map.lookup j ss),
+      (xty, xs) <- (Map.toList =<< maybeToList (Map.lookup j ss)) ++ [ (poly varty, [poly vartm]) | n == 1 ],
       canApply fty xty,
       f <- fs,
       canApply f (poly vartm),
@@ -214,8 +214,12 @@ onTerm f s = do
 quickSpecLoop :: Signature -> M ()
 quickSpecLoop sig = do
   createRules sig
-  mapM_ (exploreSize sig) [1..maxTermSize_ sig]
+  mapM_ (exploreSize sig) [minTermSize sig..maxTermSize_ sig]
   onTerm putLine ""
+
+minTermSize :: Signature -> Int
+minTermSize sig =
+  minimum (1:map conSize (constants sig))
 
 exploreSize sig n = do
   lift $ modify (\s -> s { schemas = Map.insert n Map.empty (schemas s), delayed = [] })
