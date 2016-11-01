@@ -35,6 +35,16 @@ instance Arbitrary Music where
                        where submusic = arb' (n-1)
                              submusic2 = arb' (n `div` 2)
 
+data Mp = Mp {x :: Music, y :: Music}
+
+arb = do
+        m <- arbitrary
+        n <- arbitrary
+        if dur m < dur n then
+            return $ Mp n (m :+: Rest (dur n - dur m))
+        else
+            return $ Mp m (n :+: Rest (dur m - dur n))
+
 instance Arbitrary Context where
          shrink = genericShrink
          arbitrary = liftM4 Context arbitrary arbitrary (arbitrary `suchThat` (> 0)) arbitrary
@@ -71,9 +81,13 @@ bg =
       baseTypeNames ["p"] (undefined :: PitchClass),
       baseType (undefined :: Rational),
       baseType (undefined :: Positive Rational),
-      names (NamesFor ["m"] :: NamesFor Music)
+      names (NamesFor ["m"] :: NamesFor Music),
+      names (NamesFor ["p"] :: NamesFor Mp),
+      makeInstance (\() -> arb)
       ],
     constants = [
+      constant "x" x,
+      constant "y" y,
       constant "+" (\(Positive x) (Positive y) -> Positive (x+y) :: Positive Rational),
       constant "+'" ((+) :: Int -> Int -> Int),
       constant "max" (\(Positive x) (Positive y) -> Positive (max x y) :: Positive Rational),

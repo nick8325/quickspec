@@ -3,6 +3,7 @@
 module QuickSpec.Term where
 
 #include "errors.h"
+import Data.Char
 import Control.Applicative
 import Control.Monad
 import Control.Monad.Trans.State.Strict
@@ -199,3 +200,23 @@ instance CoArbitrary Var where
 makeValuation :: (Type -> Value Gen) -> QCGen -> Int -> Type -> Var -> Value Identity
 makeValuation env g n ty x =
   mapValue (\gen -> Identity (unGen (coarbitrary (ty, x) gen) g n)) (env ty)
+
+isOp :: String -> Bool
+isOp "[]" = False
+isOp xs | all (== '.') xs = True
+isOp xs = not (all isIdent xs)
+  where
+    isIdent x = isAlphaNum x || x == '\'' || x == '_' || x == '.'
+
+constant :: Typeable a => String -> a -> Constant
+constant name x = Constant name value (poly value) 0 style 1 False
+  where
+    value = toValue (Identity x)
+    ar = typeArity (typeOf x)
+    style
+      | name == "()" = curried
+      | take 1 name == "," = fixedArity (length name+1) tupleStyle
+      | take 2 name == "(," = fixedArity (length name-1) tupleStyle
+      | isOp name && ar >= 2 = infixStyle 5
+      | isOp name = prefix
+      | otherwise = curried

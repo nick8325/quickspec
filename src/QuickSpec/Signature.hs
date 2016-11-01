@@ -4,6 +4,7 @@
 module QuickSpec.Signature where
 
 #include "errors.h"
+import QuickSpec.PredicatesInterface
 import Control.Applicative
 import Control.Monad hiding (sequence)
 import Control.Monad.Trans.State.Strict
@@ -62,20 +63,23 @@ type PrunerType = Completion
 
 data Signature =
   Signature {
-    constants          :: [Constant],
-    instances          :: [[Instance]],
-    background         :: [Prop],
-    theory             :: Maybe PrunerType,
-    defaultTo          :: Maybe Type,
-    maxTermSize        :: Maybe Int,
-    maxPruningSize     :: Maybe Int,
-    maxTermDepth       :: Maybe Int,
-    maxCommutativeSize :: Maybe Int,
-    maxTests           :: Maybe Int,
-    testTimeout        :: Maybe Int,
-    printStatistics    :: Bool,
-    simplify           :: Maybe (Signature -> Prop -> Prop),
-    extraPruner        :: Maybe ExtraPruner }
+    constants           :: [Constant],
+    instances           :: [[Instance]],
+    background          :: [Prop],
+    theory              :: Maybe PrunerType,
+    defaultTo           :: Maybe Type,
+    maxTermSize         :: Maybe Int,
+    maxPruningSize      :: Maybe Int,
+    maxTermDepth        :: Maybe Int,
+    maxCommutativeSize  :: Maybe Int,
+    maxTests            :: Maybe Int,
+    testTimeout         :: Maybe Int,
+    printStatistics     :: Bool,
+    simplify            :: Maybe (Signature -> Prop -> Prop),
+    extraPruner         :: Maybe ExtraPruner,
+    conditionalsContext :: [(Constant, [Constant])],
+    predicates          :: [PredicateRep]
+  }
   deriving Typeable
 
 instance Pretty Signature where
@@ -221,8 +225,8 @@ newtype NamesFor a = NamesFor { unNamesFor :: [String] } deriving Typeable
 newtype DictOf c a = DictOf { unDictOf :: Dict (c a) } deriving Typeable
 
 instance Monoid Signature where
-  mempty = Signature [] [] [] Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing False Nothing Nothing
-  Signature cs is b th d s ps dp s1 t tim pr simp p `mappend` Signature cs' is' b' th' d' s' ps' dp' s1' t' tim' pr' simp' p' =
+  mempty = Signature [] [] [] Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing False Nothing Nothing [] []
+  Signature cs is b th d s ps dp s1 t tim pr simp p pctxs prds `mappend` Signature cs' is' b' th' d' s' ps' dp' s1' t' tim' pr' simp' p' pctxs' prds' =
     Signature (cs++cs') (is++is') (b++b')
       (th `mplus` th')
       (d `mplus` d')
@@ -235,29 +239,11 @@ instance Monoid Signature where
       (pr || pr')
       (simp `mplus` simp')
       (p `mplus` p')
+      (pctxs `mplus` pctxs')
+      (prds `mplus` prds')
 
 signature :: Signature
 signature = mempty
-
-constant :: Typeable a => String -> a -> Constant
-constant name x = Constant name value (poly value) 0 style 1 False
-  where
-    value = toValue (Identity x)
-    ar = typeArity (typeOf x)
-    style
-      | name == "()" = curried
-      | take 1 name == "," = fixedArity (length name+1) tupleStyle
-      | take 2 name == "(," = fixedArity (length name-1) tupleStyle
-      | isOp name && ar >= 2 = infixStyle 5
-      | isOp name = prefix
-      | otherwise = curried
-
-isOp :: String -> Bool
-isOp "[]" = False
-isOp xs | all (== '.') xs = True
-isOp xs = not (all isIdent xs)
-  where
-    isIdent x = isAlphaNum x || x == '\'' || x == '_' || x == '.'
 
 baseType :: forall a. (Ord a, Arbitrary a, Typeable a) => a -> [Instance]
 baseType _ =
@@ -417,3 +403,14 @@ addBackground props sig =
 
 printTheory :: Signature -> IO ()
 printTheory sig = putStrLn (showTheory (background sig))
+
+predicateSig :: Signature -> Signature
+predicateSig sig = let ps             = predicates sig 
+                       (gen, consts)  = preds ps in
+                       sig {constants = constants sig ++ consts,
+                            instances =
+                               instances sig ++ [makeInstance (\() -> gen :: Gen Predicates),
+                                                 names (NamesFor ["p"] :: NamesFor Predicates)
+                                                ],
+                            conditionalsContext = makeContexts ps
+                           }
