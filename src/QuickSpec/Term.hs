@@ -159,7 +159,7 @@ instantiate s = build (evalState (aux s) Map.empty)
     aux (App (Id ty) [Var _]) = do
       m <- get
       let n = Map.findWithDefault 0 ty m
-      put $! Map.insert ty (n+1) m
+      put $! Map.insert ty (n+if isDictionary ty then 0 else 1) m
       return (fun (toFun (Id ty)) [var (MkVar n)])
     aux (Fun f xs) = fmap (fun f) (mapM aux (fromTermList xs))
 

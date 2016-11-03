@@ -280,9 +280,7 @@ allUnifications t = map f ss
     go s x = Map.findWithDefault __ x s
     f s = typedSubst (curry (typedVar . go s)) t
     typedVar (ty, x) = fun (toFun (Id ty)) [var x]
-    varCount (ty, _)
-      | isDictionary ty = 1
-      | otherwise = 4
+    varCount (ty, _) = 4
 
 -- | Create the rules for processing QuickSpec events.
 createRules :: Signature -> M ()
