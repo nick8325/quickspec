@@ -27,10 +27,11 @@ import qualified Data.DList as DList
 type Measure = (Int, Int, MeasureFuns (Extended Constant), Int, [Var])
 measure :: Term Constant -> Measure
 measure t =
-  (size t, -length (vars t),
+  (size t, -length (vars' t),
    MeasureFuns (build (skel (buildList (extended (singleton t))))),
-   -length (usort (vars t)), vars t)
+   -length (usort (vars' t)), vars' t)
   where
+    vars' = map snd . filter (not . isDictionary . fst) . typedVars
     skel Empty = mempty
     skel (Cons (Var x) ts) = con minimal `mappend` skel ts
     skel (Cons (Fun f ts) us) =
@@ -90,7 +91,7 @@ instance Eq Constant where x == y = x `compare` y == EQ
 instance Ord Constant where
   compare = comparing f
     where
-      f con@Constant{..} = Left (twiddle conArity, conName, typ conGeneralValue, typ conValue)
+      f con@Constant{..} = Left (twiddle (conArity - implicitArity (typ conGeneralValue)), conName, typ conGeneralValue, typ conValue)
       f (Apply ty) = Right (Left ty)
       f (Id ty) = Right (Right ty)
       -- This tweak is taken from Prover9
