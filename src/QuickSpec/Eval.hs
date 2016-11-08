@@ -517,6 +517,14 @@ instance Considerable TermFrom where
     lift $ modify (\st -> st { termTestSet = Map.insert s ts (termTestSet st) })
   findAll _ = return Set.empty
 
+shouldPrint :: Prop -> Bool
+shouldPrint prop =
+  null (funs prop) || not (null (filter (not . conIsBackground_ . fromFun) (funs prop)))
+  where
+    conIsBackground_ (Id _) = True
+    conIsBackground_ (Apply _) = True
+    conIsBackground_ con = conIsBackground con
+
 found :: Signature -> Prop -> M ()
 found sig prop0 = do
   let reorder (lhs :=>: t :=: u)
@@ -551,10 +559,7 @@ found sig prop0 = do
             | otherwise = prettyRename sig prop
             where
               lhs' :=>: t' :=: u' = prettyRename sig prop
-      let conIsBackground_ (Id _) = True
-          conIsBackground_ (Apply _) = True
-          conIsBackground_ con = conIsBackground con
-      when (null (funs prop') || not (null (filter (not . conIsBackground_ . fromFun) (funs prop')))) $
+      when (shouldPrint prop') $
         onTerm putLine
             (prettyShow (rename (canonicalise (conditionalise (conditionalsContext sig)  prop'))))
 
