@@ -38,6 +38,7 @@ import Control.Spoon
 import Twee.Base hiding (terms)
 import Twee.Rule(Rule(Rule))
 import qualified Twee.Rule as Rule
+import Text.Printf
 
 type M = RulesT Event (StateT S (PrunerM PrunerType))
 
@@ -50,6 +51,7 @@ data S = S {
   freshTestSet  :: TestSet TermFrom,
   proved        :: Set PruningProp,
   discovered    :: [Prop],
+  howMany       :: Int,
   delayed       :: [(Term Constant, Term Constant)],
   kind          :: Type -> TypeKind,
   terminal      :: Terminal }
@@ -113,6 +115,7 @@ initialState sig seeds terminal =
       freshTestSet  = emptyTestSet (memo (makeTester specialise v seeds2 sig)),
       proved        = Set.empty,
       discovered    = background sig,
+      howMany       = 0,
       delayed       = [],
       kind          = memo (typeKind sig),
       terminal      = terminal }
@@ -559,9 +562,11 @@ found sig prop0 = do
             | otherwise = prettyRename sig prop
             where
               lhs' :=>: t' :=: u' = prettyRename sig prop
-      when (shouldPrint prop') $
+      when (shouldPrint prop') $ do
+        lift $ modify (\s -> s { howMany = howMany s + 1 })
+        n <- lift $ gets howMany
         onTerm putLine
-            (prettyShow (rename (canonicalise (conditionalise (conditionalsContext sig)  prop'))))
+            (printf "%3d. " n ++ prettyShow (rename (canonicalise (conditionalise (conditionalsContext sig)  prop'))))
 
   onTerm putTemp "[completing theory...]"
   lift (lift (axiom Normal prop))
