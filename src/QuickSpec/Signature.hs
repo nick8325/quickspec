@@ -407,7 +407,7 @@ printTheory sig = putStrLn (showTheory (background sig))
 predicateSig :: Signature -> Signature
 predicateSig sig = let ps             = predicates sig 
                        (gen, consts)  = preds ps in
-                       sig {constants = constants sig ++ consts,
+                       sig {constants = constants sig ++ consts ++ map snd ps,
                             instances =
                                instances sig ++ [makeInstance (\() -> gen :: Gen Predicates),
                                                  names (NamesFor ["p"] :: NamesFor Predicates)
