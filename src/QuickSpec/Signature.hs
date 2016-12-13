@@ -184,8 +184,8 @@ defaultInstances = [
   makeInstance (\(dict :: Dict (Arbitrary A)) -> DictOf dict),
   names1 (\(NamesFor names :: NamesFor A) ->
             NamesFor (map (++ "s") names) :: NamesFor [A]),
-  names (NamesFor ["i", "j", "k"] :: NamesFor Int),
-  names (NamesFor ["i", "j", "k"] :: NamesFor Integer),
+  names (NamesFor ["x", "y", "z"] :: NamesFor Int),
+  names (NamesFor ["x", "y", "z"] :: NamesFor Integer),
   names (NamesFor ["p", "q", "r"] :: NamesFor (A -> Bool)),
   names (NamesFor ["f", "g", "h"] :: NamesFor (A -> B)),
   names (NamesFor ["x", "y", "z"] :: NamesFor A),
@@ -407,7 +407,7 @@ printTheory sig = putStrLn (showTheory (background sig))
 predicateSig :: Signature -> Signature
 predicateSig sig = let ps             = predicates sig 
                        (gen, consts)  = preds ps in
-                       sig {constants = constants sig ++ consts,
+                       sig {constants = constants sig ++ consts ++ map snd ps,
                             instances =
                                instances sig ++ [makeInstance (\() -> gen :: Gen Predicates),
                                                  names (NamesFor ["p"] :: NamesFor Predicates)

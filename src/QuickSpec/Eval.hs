@@ -38,6 +38,7 @@ import Control.Spoon
 import Twee.Base hiding (terms)
 import Twee.Rule(Rule(Rule))
 import qualified Twee.Rule as Rule
+import Text.Printf
 
 type M = RulesT Event (StateT S (PrunerM PrunerType))
 
@@ -50,6 +51,7 @@ data S = S {
   freshTestSet  :: TestSet TermFrom,
   proved        :: Set PruningProp,
   discovered    :: [Prop],
+  howMany       :: Int,
   delayed       :: [(Term Constant, Term Constant)],
   kind          :: Type -> TypeKind,
   terminal      :: Terminal }
@@ -113,6 +115,7 @@ initialState sig seeds terminal =
       freshTestSet  = emptyTestSet (memo (makeTester specialise v seeds2 sig)),
       proved        = Set.empty,
       discovered    = background sig,
+      howMany       = 0,
       delayed       = [],
       kind          = memo (typeKind sig),
       terminal      = terminal }
@@ -136,12 +139,12 @@ schemasOfSize n sig = do
     [ vartm | n == 1 ] ++
     [ app c [] | c <- constants sig, n == conSize c ] ++
     [ unPoly (apply f x)
-    | i <- [1..n-1],
+    | i <- [0..n-1],
       let j = n-i,
       (fty, fs) <- Map.toList =<< maybeToList (Map.lookup i ss),
       canApply fty (poly varty),
       or [ canApply f (poly vartm) | f <- fs ],
-      (xty, xs) <- Map.toList =<< maybeToList (Map.lookup j ss),
+      (xty, xs) <- (Map.toList =<< maybeToList (Map.lookup j ss)) ++ [ (poly varty, [poly vartm]) | n == 1 ],
       canApply fty xty,
       f <- fs,
       canApply f (poly vartm),
@@ -214,8 +217,12 @@ onTerm f s = do
 quickSpecLoop :: Signature -> M ()
 quickSpecLoop sig = do
   createRules sig
-  mapM_ (exploreSize sig) [1..maxTermSize_ sig]
+  mapM_ (exploreSize sig) [minTermSize sig..maxTermSize_ sig]
   onTerm putLine ""
+
+minTermSize :: Signature -> Int
+minTermSize sig =
+  minimum (1:map conSize (constants sig))
 
 exploreSize sig n = do
   lift $ modify (\s -> s { schemas = Map.insert n Map.empty (schemas s), delayed = [] })
@@ -276,9 +283,7 @@ allUnifications t = map f ss
     go s x = Map.findWithDefault __ x s
     f s = typedSubst (curry (typedVar . go s)) t
     typedVar (ty, x) = fun (toFun (Id ty)) [var x]
-    varCount (ty, _)
-      | isDictionary ty = 1
-      | otherwise = 4
+    varCount (ty, _) = 4
 
 -- | Create the rules for processing QuickSpec events.
 createRules :: Signature -> M ()
@@ -515,6 +520,14 @@ instance Considerable TermFrom where
     lift $ modify (\st -> st { termTestSet = Map.insert s ts (termTestSet st) })
   findAll _ = return Set.empty
 
+shouldPrint :: Prop -> Bool
+shouldPrint prop =
+  null (funs prop) || not (null (filter (not . conIsBackground_ . fromFun) (funs prop)))
+  where
+    conIsBackground_ (Id _) = True
+    conIsBackground_ (Apply _) = True
+    conIsBackground_ con = conIsBackground con
+
 found :: Signature -> Prop -> M ()
 found sig prop0 = do
   let reorder (lhs :=>: t :=: u)
@@ -549,12 +562,11 @@ found sig prop0 = do
             | otherwise = prettyRename sig prop
             where
               lhs' :=>: t' :=: u' = prettyRename sig prop
-      let conIsBackground_ (Id _) = True
-          conIsBackground_ (Apply _) = True
-          conIsBackground_ con = conIsBackground con
-      when (null (funs prop') || not (null (filter (not . conIsBackground_ . fromFun) (funs prop')))) $
+      when (shouldPrint prop') $ do
+        lift $ modify (\s -> s { howMany = howMany s + 1 })
+        n <- lift $ gets howMany
         onTerm putLine
-            (prettyShow (rename (canonicalise (conditionalise (conditionalsContext sig)  prop'))))
+            (printf "%3d. " n ++ prettyShow (rename (canonicalise (conditionalise (conditionalsContext sig)  prop'))))
 
   onTerm putTemp "[completing theory...]"
   lift (lift (axiom Normal prop))
