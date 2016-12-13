@@ -7,11 +7,8 @@ import Data.Dynamic
 fromJust (Just x) = x
 
 class Predicateable a where
-    toPredicates :: a -> Gen (Maybe [Dynamic]) -- This becomes really problematic
-                                               -- when we have a lot of predicates
-                                               -- because we have to do backtracking many times
+    toPredicates :: a -> Gen (Maybe [Dynamic]) 
     getters      :: Int -> String -> a -> [Int -> Constant]
-
     size         :: a -> Int
 
 instance Predicateable Bool where
@@ -33,9 +30,7 @@ instance (Predicateable b, Typeable a, Arbitrary a) => Predicateable (a -> b) wh
     toPredicates predicate = do
                                 a <- arbitrary
                                 dyns <- toPredicates (predicate a)
-                                case dyns of
-                                    Nothing -> return Nothing
-                                    Just xs -> return $ Just $ (toDyn a):xs
+                                return $ fmap ((toDyn a):) dyns
 
     size _ = 1 + size (undefined :: b)
 
@@ -65,6 +60,9 @@ type PredicateRep = (((Int, Gen (Maybe [Dynamic])), [Int -> Constant]), Constant
 
 predicate :: (Predicateable a, Typeable a) => String -> a -> PredicateRep
 predicate name p = (((size p, toPredicates p), getters 0 name p), constant name p)
+
+predicateGen :: (Predicateable a, Typeable a) => String -> a -> Gen [Dynamic] -> PredicateRep
+predicateGen name p g = (((size p, fmap Just g), getters 0 name p), constant name p)
 
 preds :: [PredicateRep] -> (Gen Predicates, [Constant])
 preds xs = resolvePredicates $ unzip (map fst xs)

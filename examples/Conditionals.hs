@@ -1,3 +1,4 @@
+import Control.Monad
 import Test.QuickCheck
 import QuickSpec
 import Data.Dynamic
@@ -15,7 +16,15 @@ sig =
        constant "reverse" (reverse :: [A] -> [A])
     ],
     predicates = [predicate "notNull" ((not . null) :: [Int] -> Bool),
-                  predicate "eqLen" ((\xs ys -> length xs == length ys) :: [Int] -> [Int] -> Bool)]
+                  predicateGen "eqLen"
+                  ((\xs ys -> length xs == length ys) :: [Int] -> [Int] -> Bool) eqLenGen]
    }
+
+eqLenGen :: Gen [Dynamic]
+eqLenGen = do
+  len <- arbitrary
+  xs1 <- (replicateM len arbitrary :: Gen [Int])
+  xs2 <- (replicateM len arbitrary :: Gen [Int])
+  return [toDyn xs1, toDyn xs2]
 
 main = quickSpec sig
