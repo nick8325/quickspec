@@ -151,6 +151,6 @@ main = do
   thy3 <- quickSpec (thy2 `mappend` sig3)
   thy4 <- quickSpec (thy3 `mappend` sig4)
   thy5 <- quickSpec (thy4 `mappend` sig5)
-  thy6 <- quickSpec (thy5 `mappend` sig6)
-  quickSpec (thy6 `mappend` sig7)
+  {-thy6 <- quickSpec (thy5 `mappend` sig6)
+  quickSpec (thy6 `mappend` sig7)-}
   return ()
