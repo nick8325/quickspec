@@ -204,6 +204,7 @@ makeValuation env g n ty x =
 
 isOp :: String -> Bool
 isOp "[]" = False
+isOp ('"':_) = False
 isOp xs | all (== '.') xs = True
 isOp xs = not (all isIdent xs)
   where

@@ -565,8 +565,9 @@ found sig prop0 = do
       when (shouldPrint prop') $ do
         lift $ modify (\s -> s { howMany = howMany s + 1 })
         n <- lift $ gets howMany
-        onTerm putLine
-            (printf "%3d. " n ++ prettyShow (rename (canonicalise (conditionalise (conditionalsContext sig)  prop'))))
+        onTerm putLine $ show $
+          text (printf "%3d." n) <+>
+          pPrint (rename (canonicalise (conditionalise (conditionalsContext sig)  prop')))
 
   onTerm putTemp "[completing theory...]"
   lift (lift (axiom Normal prop))
