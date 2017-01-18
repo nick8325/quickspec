@@ -34,7 +34,7 @@ background =
   signature {
     maxTermSize = Just 9,
     constants = [
-      constant "\"\"" ("" :: String),
+      constant "\"\"" "",
       constant "++" ((++) :: String -> String -> String),
       constant "0" (0 :: Int),
       constant "+" ((+) :: Int -> Int -> Int),
@@ -43,16 +43,16 @@ background =
 sig =
   signature {
     constants = [
-      constant "text" (text :: String -> Layout),
-      constant "nest" (nest :: Int -> Layout -> Layout),
-      constant "$$" (($$) :: Layout -> Layout -> Layout),
-      constant "<>" ((<>) :: Layout -> Layout -> Layout) ],
+      constant "text" text,
+      constant "nest" nest,
+      constant "$$" ($$),
+      constant "<>" (<>) ],
     instances = [baseType (undefined :: Layout) ]}
 
 sig' =
   signature {
     constants = [
-      constant "nesting" (nesting :: Layout -> Int) ]}
+      constant "nesting" nesting ]}
 
 main = do
   backgroundThy <- quickSpec background
