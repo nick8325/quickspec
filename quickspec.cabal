@@ -9,7 +9,7 @@ Maintainer:          nicsma@chalmers.se
 
 License:             BSD3
 License-file:        LICENSE
-Copyright:           2009-2013 Nick Smallbone
+Copyright:           2009-2016 Nick Smallbone
 
 Category:            Testing
 
@@ -30,7 +30,7 @@ Description:
   > reverse xs++reverse ys == reverse (ys++xs)
   .
   The laws that QuickSpec generates are not proved correct, but have
-  passed at least 200 QuickCheck tests.
+  passed at least 1000 QuickCheck tests.
   .
   For more information, see the @README@ file at
   https://github.com/nick8325/quickspec/blob/master/README.asciidoc.
@@ -38,9 +38,9 @@ Description:
 Extra-source-files:
   README.asciidoc
   examples/Arith.hs
-  examples/Arrays.hs
   examples/Bools.hs
   examples/Composition.hs
+  examples/Geometry.hs
   examples/Heaps.hs
   examples/Lists.hs
   examples/PrettyPrinting.hs
