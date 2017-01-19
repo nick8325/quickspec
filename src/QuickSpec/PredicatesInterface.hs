@@ -28,7 +28,7 @@ instance (Predicateable b, Typeable a, Arbitrary a) => Predicateable (a -> b) wh
 
     -- here is where we could do the lazy predicate stuff for an instance
     toPredicates predicate = do
-                                a <- arbitrary
+                                a    <- arbitrary
                                 dyns <- toPredicates (predicate a)
                                 return $ fmap ((toDyn a):) dyns
 
