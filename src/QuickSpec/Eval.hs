@@ -534,6 +534,23 @@ found sig prop0 = do
         | measure t >= measure u = lhs :=>: t :=: u
         | otherwise = lhs :=>: u :=: t
       prop = regeneralise (reorder prop0)
+
+  -- Here, if we have discovered that "somePredicate x = True"
+  -- we should add the axiom "x_n (toSomePredicate x) = x"
+  -- to the set of known equations
+  let trueConstant = constant "True" True
+      trueFun      = toFun (trueConstant)
+      trueTerm     = build (con trueFun)
+      isTrue x     = x == trueTerm
+  case prop of -- This code works! (It's not _nice_ but it works!)
+    (lhs :=>: t :=: u) -> if isTrue u then
+                            return () --liftIO $ putStrLn "found something true"
+                          else
+                            return ()
+    _ -> return ()
+
+  
+
   props <- lift (gets discovered)
   (_, props') <- liftIO $ runPruner sig [] $ mapM_ (axiom Normal) (map (simplify_ sig) props)
 
