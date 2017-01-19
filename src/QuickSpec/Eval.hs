@@ -535,8 +535,8 @@ found sig prop0 = do
         | otherwise = lhs :=>: u :=: t
       prop = regeneralise (reorder prop0)
 
-  -- Here, if we have discovered that "somePredicate x = True"
-  -- we should add the axiom "x_n (toSomePredicate x) = x"
+  -- Here, if we have discovered that "somePredicate x_1 x_2 x_3 = True"
+  -- we should add the axiom "get_x_n (toSomePredicate x_n) = x_n"
   -- to the set of known equations
   let trueConstant = constant "True" True
       trueFun      = toFun (trueConstant)
