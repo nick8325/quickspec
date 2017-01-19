@@ -44,7 +44,6 @@ Extra-source-files:
   examples/Heaps.hs
   examples/Lists.hs
   examples/PrettyPrinting.hs
-  examples/TinyWM.hs
   src/errors.h
 
 source-repository head
