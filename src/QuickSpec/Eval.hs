@@ -558,7 +558,7 @@ found sig prop0 = do
                                                 -- We need to tell the pruner that all the equations above are true.
                                             return () -- Before it is safe to do this we need to make sure
                                                       -- each "predicate type" is unique, currently they all have
-                                                      -- the same type (which would mean that this technique can't work!)
+                                                      -- the same type (which means this technique is not _yet_ safe to implement)
                                 _             -> return () -- It's not an interesting predicate, discard it.
                               _        -> return () -- It's something isomorphic to `True`
                                                     -- We should add it to things we consider
