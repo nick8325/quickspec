@@ -560,11 +560,11 @@ found sig prop0 = do
                 
                 -- The line below is only safe if we fix the problem in the comment below
                 -- lift $ lift $ sequence_ [axiom Normal eq | eq <- equations]
-
+                -- liftIO $ sequence $ [print eq | eq <- equations]
                 return () -- Before it is safe to do this we need to make sure
                           -- each "predicate type" is unique, currently they all have
                           -- the same type (which means this technique is not _yet_ safe to implement)
-              _ -> return () -- It's not an interesting predicate, discard it.
+              _ -> return ()
             _ -> return () -- It's something isomorphic to `True`
                            -- We should add it to things we consider
                            -- equal to True, so that we can use it in
@@ -618,9 +618,9 @@ found sig prop0 = do
   newTerm u
   onTerm putTemp "[renormalising existing terms...]"
   let norm s = do
-    ts <- filterM (fmap isJust . rep) (Set.toList s)
-    us <- mapM (fmap (fromMaybe __) . rep) ts
-    return ((s Set.\\ Set.fromList ts) `Set.union` Set.fromList us)
+                 ts <- filterM (fmap isJust . rep) (Set.toList s)
+                 us <- mapM (fmap (fromMaybe __) . rep) ts
+                 return ((s Set.\\ Set.fromList ts) `Set.union` Set.fromList us)
   terms <- lift (gets terms) >>= lift . lift . norm
   allSchemas <- lift (gets allSchemas) >>= lift . lift . norm
   lift $ modify (\s -> s { terms = terms, allSchemas = allSchemas })

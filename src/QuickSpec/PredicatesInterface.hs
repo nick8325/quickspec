@@ -105,5 +105,6 @@ backtracking g = do
 
 makeContexts reps = zipWith (\p i -> (predCons p, map ($i) (selectors p))) reps [0..]
 
+-- VERY DANGEROUS HACK, lookup a predicate by looking up the name...
 lookupPredicate :: Constant -> [PredicateRep] -> Maybe (PredicateRep, Int)
-lookupPredicate cons preds = find ((cons ==) . predCons . fst) $ zip preds [0..]
+lookupPredicate cons preds = find (((conName cons) ==) . conName . predCons . fst) $ zip preds [0..]
