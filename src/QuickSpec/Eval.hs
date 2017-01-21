@@ -565,6 +565,8 @@ found sig prop0 = do
                                                 -- The "pn (to_p x1 x2 ... xn ... xm) = xn"
                                                 -- equations
                                                 equations = [lhs :=>: app (selector i) construction :=: x | (x, i) <- zip ts [0..]]
+                                                -- We need to tell the pruner that all these
+                                                -- are true.
                                             return ()
                               _        -> return () -- It's something isomorphic to `True`
                                                     -- We should add it to things we consider
