@@ -538,18 +538,30 @@ found sig prop0 = do
   -- Here, if we have discovered that "somePredicate x_1 x_2 x_3 = True"
   -- we should add the axiom "get_x_n (toSomePredicate x_n) = x_n"
   -- to the set of known equations
-  let trueConstant = constant "True" True
+  let trueConstant = constant "True" True -- We should make sure to always have this
+                                          -- constant in the signature if we are using
+                                          -- predicates.
       trueFun      = toFun (trueConstant)
       trueTerm     = build (con trueFun)
       isTrue x     = x == trueTerm
   case prop of -- This code works! (It's not _nice_ but it works!)
     (lhs :=>: t :=: u) -> if isTrue u then
-                            return () --liftIO $ putStrLn "found something true"
+                            case t of
+                              App f ts -> do
+                                            -- f is a `Constant`, defined in the file Term.hs
+                                            -- We can get a lot of information from it.
+                                            -- f is our predicate.
+                                            return ()
+                              _        -> return () -- It's something isomorphic to `True`
+                                                    -- We should add it to things we consider
+                                                    -- equal to True, so that we can use it in
+                                                    -- `isTrue x`.
+                                                    --
+                                                    -- This will be useful if the user has supplied,
+                                                    -- say, `constant "T" True`.
                           else
                             return ()
     _ -> return ()
-
-  
 
   props <- lift (gets discovered)
   (_, props') <- liftIO $ runPruner sig [] $ mapM_ (axiom Normal) (map (simplify_ sig) props)
