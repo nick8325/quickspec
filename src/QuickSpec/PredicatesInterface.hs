@@ -1,9 +1,11 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts #-}
 module QuickSpec.PredicatesInterface where
 import QuickSpec.Term
 import Test.QuickCheck
 import Data.Dynamic
+import Data.List
 
 fromJust (Just x) = x
 
@@ -64,16 +66,22 @@ instance Eq Predicates where
 instance Ord Predicates where
   compare p q = LT
 
-type PredicateRep = (((Int, Gen (Maybe [Dynamic])), [Int -> Constant]), Constant)
+data PredicateRep = PredRep {predSize :: Int, predGen :: Gen (Maybe [Dynamic]), selectors :: [Int -> Constant], predCons :: Constant, embedder :: Constant}
 
-predicate :: (Predicateable a, Typeable a) => String -> a -> PredicateRep
-predicate name p = (((size p, toPredicates p), getters 0 name p), constant name p)
+predicate :: (Predicateable a, Typeable a, Typeable (EmbType a)) => String -> a -> PredicateRep
+predicate = makePred undefined
+  where
+    makePred :: (Predicateable a, Typeable a, Typeable (EmbType a)) => EmbType a -> String -> a -> PredicateRep
+    makePred emb name p = PredRep (size p) (toPredicates p) (getters 0 name p) (constant name p) (constant ("emb" ++ name) emb)
 
-predicateGen :: (Predicateable a, Typeable a) => String -> a -> Gen [Dynamic] -> PredicateRep
-predicateGen name p g = (((size p, fmap Just g), getters 0 name p), constant name p)
+predicateGen :: (Predicateable a, Typeable a, Typeable (EmbType a)) => String -> a -> Gen [Dynamic] -> PredicateRep
+predicateGen = makePred undefined
+  where
+    makePred :: (Predicateable a, Typeable a, Typeable (EmbType a)) => EmbType a -> String -> a -> Gen [Dynamic] -> PredicateRep
+    makePred emb name p g = PredRep (size p) (fmap Just g) (getters 0 name p) (constant name p) (constant ("emb" ++ name) emb)
 
 preds :: [PredicateRep] -> (Gen Predicates, [Constant])
-preds xs = resolvePredicates $ unzip (map fst xs)
+preds xs = resolvePredicates $ unzip (map (\p -> ((predSize p, predGen p), selectors p)) xs)
 
 resolvePredicates :: ([(Int, Gen (Maybe [Dynamic]))], [[Int -> Constant]]) -> (Gen Predicates, [Constant])
 resolvePredicates (gen, getters) = (makeGen, concat $ zipWith (\fs i -> map ($i) fs) getters [0..])
@@ -95,4 +103,7 @@ backtracking g = do
                                                           -- which is probably a bad idea in general
     Just y  -> return y
 
-makeContexts reps = zipWith (\((_, fns), p) i -> (p, map ($i) fns)) reps [0..]
+makeContexts reps = zipWith (\p i -> (predCons p, map ($i) (selectors p))) reps [0..]
+
+lookupPredicate :: Constant -> [PredicateRep] -> Maybe (PredicateRep, Int)
+lookupPredicate cons preds = find ((cons ==) . predCons . fst) $ zip preds [0..]

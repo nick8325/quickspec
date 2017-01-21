@@ -31,6 +31,7 @@ import QuickSpec.TestSet
 import QuickSpec.Type
 import QuickSpec.Utils
 import QuickSpec.PrintConditionally
+import QuickSpec.PredicatesInterface hiding (size)
 import Test.QuickCheck.Random
 import Test.QuickCheck.Text
 import System.Random
@@ -535,39 +536,30 @@ found sig prop0 = do
         | otherwise = lhs :=>: u :=: t
       prop = regeneralise (reorder prop0)
 
-  -- Here, if we have discovered that "somePredicate x_1 x_2 x_3 = True"
+  -- If we have discovered that "somePredicate x_1 x_2 x_3 = True"
   -- we should add the axiom "get_x_n (toSomePredicate x_n) = x_n"
   -- to the set of known equations
   let trueConstant = constant "True" True
       trueFun      = toFun (trueConstant)
       trueTerm     = build (con trueFun)
       isTrue x     = x == trueTerm
-  case prop of -- This code works! (It's not _nice_ but it works!)
+  case prop of
     (lhs :=>: t :=: u) -> if isTrue u then
                             case t of
-                              App f ts -> do
-                                            -- f is a `Constant`, defined in the file Term.hs
-                                            -- We can get a lot of information from it.
-                                            -- f is our predicate.
-
-                                            -- To get the following bit right we have to change
-                                            -- the definition of "PredicateRep" and what we acutally
-                                            -- store in the signature. We will also need to augment
-                                            -- the signature with the "to_p :: EmbType p" function
-                                            let selector i = undefined -- We have to look up the constant
-                                                                       -- corresponding to this selector
-                                                                       -- in the signature
+                              App f ts -> case lookupPredicate f (predicates sig) of -- It is an interesting predicate
+                                Just (prd, n) -> do
+                                                -- Get the `p_n` selector
+                                            let selector i = ((selectors prd) !! i) n 
                                                 -- The "to_p x1 x2 ... xm" term
-                                                construction = undefined -- We get this by applying the "embedder constant",
-                                                                         -- the uninterpreted function with type "EmbType p",
-                                                                         -- to `ts`, the "EmbType p" function corresponds
-                                                                         -- to "to_p"
-                                                -- The "pn (to_p x1 x2 ... xn ... xm) = xn"
+                                                construction = app (embedder prd) ts
+                                                -- The "p_n (to_p x1 x2 ... xn ... xm) = xn"
                                                 -- equations
-                                                equations = [lhs :=>: app (selector i) construction :=: x | (x, i) <- zip ts [0..]]
-                                                -- We need to tell the pruner that all these
-                                                -- are true.
-                                            return ()
+                                                equations = [lhs :=>: (app (selector i) [construction]) :=: x | (x, i) <- zip ts [0..]]
+                                                -- We need to tell the pruner that all the equations above are true.
+                                            return () -- Before it is safe to do this we need to make sure
+                                                      -- each "predicate type" is unique, currently they all have
+                                                      -- the same type (which would mean that this technique can't work!)
+                                _             -> return () -- It's not an interesting predicate, discard it.
                               _        -> return () -- It's something isomorphic to `True`
                                                     -- We should add it to things we consider
                                                     -- equal to True, so that we can use it in
