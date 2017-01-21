@@ -538,9 +538,7 @@ found sig prop0 = do
   -- Here, if we have discovered that "somePredicate x_1 x_2 x_3 = True"
   -- we should add the axiom "get_x_n (toSomePredicate x_n) = x_n"
   -- to the set of known equations
-  let trueConstant = constant "True" True -- We should make sure to always have this
-                                          -- constant in the signature if we are using
-                                          -- predicates.
+  let trueConstant = constant "True" True
       trueFun      = toFun (trueConstant)
       trueTerm     = build (con trueFun)
       isTrue x     = x == trueTerm
@@ -551,6 +549,22 @@ found sig prop0 = do
                                             -- f is a `Constant`, defined in the file Term.hs
                                             -- We can get a lot of information from it.
                                             -- f is our predicate.
+
+                                            -- To get the following bit right we have to change
+                                            -- the definition of "PredicateRep" and what we acutally
+                                            -- store in the signature. We will also need to augment
+                                            -- the signature with the "to_p :: EmbType p" function
+                                            let selector i = undefined -- We have to look up the constant
+                                                                       -- corresponding to this selector
+                                                                       -- in the signature
+                                                -- The "to_p x1 x2 ... xm" term
+                                                construction = undefined -- We get this by applying the "embedder constant",
+                                                                         -- the uninterpreted function with type "EmbType p",
+                                                                         -- to `ts`, the "EmbType p" function corresponds
+                                                                         -- to "to_p"
+                                                -- The "pn (to_p x1 x2 ... xn ... xm) = xn"
+                                                -- equations
+                                                equations = [lhs :=>: app (selector i) construction :=: x | (x, i) <- zip ts [0..]]
                                             return ()
                               _        -> return () -- It's something isomorphic to `True`
                                                     -- We should add it to things we consider

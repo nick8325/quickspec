@@ -1,4 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 module QuickSpec.PredicatesInterface where
 import QuickSpec.Term
 import Test.QuickCheck
@@ -7,32 +8,39 @@ import Data.Dynamic
 fromJust (Just x) = x
 
 class Predicateable a where
-    toPredicates :: a -> Gen (Maybe [Dynamic]) 
-    getters      :: Int -> String -> a -> [Int -> Constant]
-    size         :: a -> Int
+  toPredicates :: a -> Gen (Maybe [Dynamic]) 
+  getters      :: Int -> String -> a -> [Int -> Constant]
+  size         :: a -> Int
 
 instance Predicateable Bool where
-    toPredicates True  = return (Just [])
-    toPredicates False = return Nothing
-    getters _ _ _ = []
-    size _ = 0
+  toPredicates True  = return (Just [])
+  toPredicates False = return Nothing
+  getters _ _ _ = []
+  size _ = 0
 
 instance (Predicateable b, Typeable a, Arbitrary a) => Predicateable (a -> b) where
-    getters indx name _ =
-        (:)
-        (\i ->
-            constant
-                (name++show indx)
-                (extract i :: Predicates -> a))
-        (map (\f -> f . (1+)) (getters (indx+1) name (undefined :: b)))
+  getters indx name _ =
+      (:)
+      (\i ->
+        constant
+          (name++show indx)
+          (extract i :: Predicates -> a))
+      (map (\f -> f . (1+)) (getters (indx+1) name (undefined :: b)))
 
-    -- here is where we could do the lazy predicate stuff for an instance
-    toPredicates predicate = do
-                                a    <- arbitrary
-                                dyns <- toPredicates (predicate a)
-                                return $ fmap ((toDyn a):) dyns
+  -- here is where we could do the lazy predicate stuff for an instance
+  toPredicates predicate = do
+    a    <- arbitrary
+    dyns <- toPredicates (predicate a)
+    return $ fmap ((toDyn a):) dyns
 
-    size _ = 1 + size (undefined :: b)
+  size _ = 1 + size (undefined :: b)
+
+-- Calculate the type of the "embedding" function,
+-- the _uninterpreted_ function which we add when pruning
+-- in the "(extract n) (toP x1 x2 ... xn ... xm) = xn" step
+type family (EmbType a) :: * where
+  EmbType Bool = Predicates
+  EmbType (a -> b) = a -> (EmbType b)
 
 extract :: (Typeable a) => Int -> Predicates -> a
 extract i (P preds) = fromJust $ fromDynamic $ preds `at` i
@@ -40,8 +48,8 @@ extract i (P preds) = fromJust $ fromDynamic $ preds `at` i
 at :: [(Int, [a])] -> Int -> a
 at [] _ = undefined
 at ((j, xs):tl) i
-    | i < j     = xs !! i
-    | otherwise = tl `at` (i-j)
+  | i < j     = xs !! i
+  | otherwise = tl `at` (i-j)
 
 -- A type to hold _all_ predicates,
 -- I imagine we will keep this type
@@ -51,10 +59,10 @@ data Predicates = P {unP :: [(Int, [Dynamic])]} deriving(Show)-- Arity + argumen
 -- Dummy instances, don't matter since we never inspect
 -- the type (only it's projections)
 instance Eq Predicates where
-    p == q = False
+  p == q = False
 
 instance Ord Predicates where
-    compare p q = LT
+  compare p q = LT
 
 type PredicateRep = (((Int, Gen (Maybe [Dynamic])), [Int -> Constant]), Constant)
 
@@ -69,22 +77,22 @@ preds xs = resolvePredicates $ unzip (map fst xs)
 
 resolvePredicates :: ([(Int, Gen (Maybe [Dynamic]))], [[Int -> Constant]]) -> (Gen Predicates, [Constant])
 resolvePredicates (gen, getters) = (makeGen, concat $ zipWith (\fs i -> map ($i) fs) getters [0..])
-    where
-        makeOneGen :: (Int, Gen (Maybe [Dynamic])) -> Gen (Int, [Dynamic])
-        makeOneGen (i, generator) = do
-                                     v <- backtracking generator
-                                     return (i, v)
-        
-        makeGen = fmap P $ sequence $ map makeOneGen gen
+  where
+    makeOneGen :: (Int, Gen (Maybe [Dynamic])) -> Gen (Int, [Dynamic])
+    makeOneGen (i, generator) = do
+      v <- backtracking generator
+      return (i, v)
+    
+    makeGen = fmap P $ sequence $ map makeOneGen gen
 
 backtracking :: Gen (Maybe a) -> Gen a
 backtracking g = do
-                    x <- g
-                    i <- resize 10 arbitrary
-                    case x of
-                        Nothing -> backtracking (scale (\j -> max (j+i) 0) g) -- We failed
-                                                                              -- so we arbitrarily increase the size
-                                                                              -- which is probably a bad idea in general
-                        Just y  -> return y
+  x <- g
+  i <- resize 10 arbitrary
+  case x of
+    Nothing -> backtracking (scale (\j -> max (j+i) 0) g) -- We failed
+                                                          -- so we arbitrarily increase the size
+                                                          -- which is probably a bad idea in general
+    Just y  -> return y
 
 makeContexts reps = zipWith (\((_, fns), p) i -> (p, map ($i) fns)) reps [0..]
