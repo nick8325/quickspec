@@ -544,35 +544,36 @@ found sig prop0 = do
       trueTerm     = build (con trueFun)
       isTrue x     = x == trueTerm
   case prop of
-    (lhs :=>: t :=: u) -> if isTrue u then
-                            case t of
-                              App f ts -> case lookupPredicate f (predicates sig) of -- It is an interesting predicate
-                                Just (prd, n) -> do
-                                                -- Get the `p_n` selector
-                                            let selector i = ((selectors prd) !! i) n 
-                                                -- The "to_p x1 x2 ... xm" term
-                                                construction = app (embedder prd) ts
-                                                -- The "p_n (to_p x1 x2 ... xn ... xm) = xn"
-                                                -- equations
-                                                equations = [lhs :=>: (app (selector i) [construction]) :=: x | (x, i) <- zip ts [0..]]
-                                                -- We need to tell the pruner that all the equations above are true.
-                                            
-                                            -- The line below is only safe if we fix the problem in the comment below
-                                            -- lift $ lift $ sequence_ [axiom Normal eq | eq <- equations]
+    (lhs :=>: t :=: u) ->
+      if isTrue u then
+          case t of
+            App f ts -> case lookupPredicate f (predicates sig) of -- It is an interesting predicate
+              Just (prd, n) -> do
+                    -- Get the `p_n` selector
+                let selector i = ((selectors prd) !! i) n 
+                    -- The "to_p x1 x2 ... xm" term
+                    construction = app (embedder prd) ts
+                    -- The "p_n (to_p x1 x2 ... xn ... xm) = xn"
+                    -- equations
+                    equations = [lhs :=>: (app (selector i) [construction]) :=: x | (x, i) <- zip ts [0..]]
+                    -- We need to tell the pruner that all the equations above are true.
+                
+                -- The line below is only safe if we fix the problem in the comment below
+                -- lift $ lift $ sequence_ [axiom Normal eq | eq <- equations]
 
-                                            return () -- Before it is safe to do this we need to make sure
-                                                      -- each "predicate type" is unique, currently they all have
-                                                      -- the same type (which means this technique is not _yet_ safe to implement)
-                                _             -> return () -- It's not an interesting predicate, discard it.
-                              _        -> return () -- It's something isomorphic to `True`
-                                                    -- We should add it to things we consider
-                                                    -- equal to True, so that we can use it in
-                                                    -- `isTrue x`.
-                                                    --
-                                                    -- This will be useful if the user has supplied,
-                                                    -- say, `constant "T" True`.
-                          else
-                            return ()
+                return () -- Before it is safe to do this we need to make sure
+                          -- each "predicate type" is unique, currently they all have
+                          -- the same type (which means this technique is not _yet_ safe to implement)
+              _             -> return () -- It's not an interesting predicate, discard it.
+            _        -> return () -- It's something isomorphic to `True`
+                                  -- We should add it to things we consider
+                                  -- equal to True, so that we can use it in
+                                  -- `isTrue x`.
+                                  --
+                                  -- This will be useful if the user has supplied,
+                                  -- say, `constant "T" True`.
+        else
+          return ()
     _ -> return ()
 
   props <- lift (gets discovered)
@@ -617,9 +618,9 @@ found sig prop0 = do
   newTerm u
   onTerm putTemp "[renormalising existing terms...]"
   let norm s = do
-        ts <- filterM (fmap isJust . rep) (Set.toList s)
-        us <- mapM (fmap (fromMaybe __) . rep) ts
-        return ((s Set.\\ Set.fromList ts) `Set.union` Set.fromList us)
+    ts <- filterM (fmap isJust . rep) (Set.toList s)
+    us <- mapM (fmap (fromMaybe __) . rep) ts
+    return ((s Set.\\ Set.fromList ts) `Set.union` Set.fromList us)
   terms <- lift (gets terms) >>= lift . lift . norm
   allSchemas <- lift (gets allSchemas) >>= lift . lift . norm
   lift $ modify (\s -> s { terms = terms, allSchemas = allSchemas })
