@@ -29,6 +29,6 @@ baz :: Int -> Int -> Int
 baz _ _ = 1
 
 p :: Int -> Bool
-p x = True
+p x = (x == 0) || (x == 1)
 
 main = quickSpec sig

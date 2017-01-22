@@ -557,6 +557,9 @@ found sig prop0 = do
                     -- equations
                     equations = [lhs :=>: (app (selector i) [construction]) :=: x | (x, i) <- zip ts [0..]]
                     -- We need to tell the pruner that all the equations above are true.
+
+                -- Why the f__k isn't this working?
+                lift $ lift $ sequence_ [axiom Normal eq | eq <- equations]
                  
                 return () -- Before it is safe to do this we need to make sure
                           -- each "predicate type" is unique, currently they all have
