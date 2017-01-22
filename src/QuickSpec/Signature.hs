@@ -133,7 +133,7 @@ maxPruningSize_ sig =
 maxCommutativeSize_ = fromMaybe 5 . maxCommutativeSize
 
 maxTests_ :: Signature -> Int
-maxTests_ = fromMaybe 500 . maxTests
+maxTests_ = fromMaybe 1000 . maxTests
 
 testTimeout_ :: Signature -> IO a -> IO (Maybe a)
 testTimeout_ sig =
