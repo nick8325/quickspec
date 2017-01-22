@@ -557,12 +557,7 @@ found sig prop0 = do
                     -- equations
                     equations = [lhs :=>: (app (selector i) [construction]) :=: x | (x, i) <- zip ts [0..]]
                     -- We need to tell the pruner that all the equations above are true.
-                
-                -- The line below is only safe if we fix the problem in the comment below
-                -- (we also need to figure out where to actually add our equations to -.-)
-                -- lift $ modify $ \st -> st {discovered = (discovered st) ++ equations}
-
-                -- liftIO $ sequence $ [print eq | eq <- equations]
+                 
                 return () -- Before it is safe to do this we need to make sure
                           -- each "predicate type" is unique, currently they all have
                           -- the same type (which means this technique is not _yet_ safe to implement)
@@ -579,6 +574,7 @@ found sig prop0 = do
     _ -> return ()
 
   props <- lift (gets discovered)
+  -- liftIO $ sequence_ $ map (putStrLn . show . pPrint) props
   (_, props') <- liftIO $ runPruner sig [] $ mapM_ (axiom Normal) (map (simplify_ sig) props)
 
   let prop' = etaExpand prop

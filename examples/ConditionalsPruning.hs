@@ -12,8 +12,8 @@ sig =
        constant "bar" bar,
        constant "baz" baz
     ],
-    predicates = [-- predicateGen "notNull" ((not . null) :: [Int] -> Bool) notNullGen,
-                  predicateGen "p" p genP
+    predicates = [
+                  predicate "p" p
                  ]
    }
 
@@ -29,9 +29,6 @@ baz :: Int -> Int -> Int
 baz _ _ = 1
 
 p :: Int -> Bool
-p x = (x == 0) || (x == 1)
-
-genP :: Gen [Dynamic]
-genP = elements [[toDyn (0 :: Int)], [toDyn (1 :: Int)]]
+p x = True
 
 main = quickSpec sig
