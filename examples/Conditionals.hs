@@ -17,7 +17,7 @@ sig =
        constant "length" (length :: [A] -> Int),
        constant "reverse" (reverse :: [A] -> [A])
     ],
-    predicates = [predicateGen "notNull" ((not . null) :: [Int] -> Bool) notNullGen,
+    predicates = [-- predicateGen "notNull" ((not . null) :: [Int] -> Bool) notNullGen,
                   predicateGen "eqLen"
                   ((\xs ys -> length xs == length ys) :: [Int] -> [Int] -> Bool) eqLenGen]
    }

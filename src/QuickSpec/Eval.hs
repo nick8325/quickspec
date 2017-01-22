@@ -559,7 +559,9 @@ found sig prop0 = do
                     -- We need to tell the pruner that all the equations above are true.
                 
                 -- The line below is only safe if we fix the problem in the comment below
-                -- lift $ lift $ sequence_ [axiom Normal eq | eq <- equations]
+                -- (we also need to figure out where to actually add our equations to -.-)
+                -- lift $ modify $ \st -> st {discovered = (discovered st) ++ equations}
+
                 -- liftIO $ sequence $ [print eq | eq <- equations]
                 return () -- Before it is safe to do this we need to make sure
                           -- each "predicate type" is unique, currently they all have
@@ -569,7 +571,7 @@ found sig prop0 = do
                            -- We should add it to things we consider
                            -- equal to True, so that we can use it in
                            -- `isTrue x`.
-                           --
+
                            -- This will be useful if the user has supplied,
                            -- say, `constant "T" True`.
         else
