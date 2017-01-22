@@ -560,6 +560,8 @@ found sig prop0 = do
 
                 -- Why the f__k isn't this working?
                 lift $ lift $ sequence_ [axiom Normal eq | eq <- equations]
+
+                liftIO $ print $ map (show . pPrint) equations
                  
                 return () -- Before it is safe to do this we need to make sure
                           -- each "predicate type" is unique, currently they all have
@@ -577,7 +579,6 @@ found sig prop0 = do
     _ -> return ()
 
   props <- lift (gets discovered)
-  -- liftIO $ sequence_ $ map (putStrLn . show . pPrint) props
   (_, props') <- liftIO $ runPruner sig [] $ mapM_ (axiom Normal) (map (simplify_ sig) props)
 
   let prop' = etaExpand prop

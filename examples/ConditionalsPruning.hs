@@ -8,7 +8,7 @@ sig =
   signature {
     maxTermSize = Just 8,
     constants = [
-       constant "poo" foo,
+       constant "poh" foo,
        constant "bar" bar,
        constant "baz" baz
     ],
