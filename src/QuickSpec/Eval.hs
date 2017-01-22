@@ -558,7 +558,7 @@ found sig prop0 = do
                     equations = [lhs :=>: (app (selector i) [construction]) :=: x | (x, i) <- zip ts [0..]]
                     -- We need to tell the pruner that all the equations above are true.
 
-                -- Why the f__k isn't this working?
+                -- Declare as axioms?
                 lift $ lift $ sequence_ [axiom Normal eq | eq <- equations]
 
                 liftIO $ print $ map (show . pPrint) equations
