@@ -561,6 +561,7 @@ found sig prop0 = do
                 -- Declare as axioms?
                 lift $ lift $ sequence_ [axiom Normal eq | eq <- equations]
 
+                -- Print the things we wanted to add, for debugging pruposes
                 liftIO $ print $ map (show . pPrint) equations
                  
                 return () -- Before it is safe to do this we need to make sure
