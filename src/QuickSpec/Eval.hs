@@ -552,10 +552,10 @@ found sig prop0 = do
                     -- Get the `p_n` selector
                 let selector i = ((selectors prd) !! i) n 
                     -- The "to_p x1 x2 ... xm" term
-                    construction = app (embedder prd) ts
+                    construction = foldl apply (app (embedder prd) []) ts
                     -- The "p_n (to_p x1 x2 ... xn ... xm) = xn"
                     -- equations
-                    equations = [lhs :=>: (app (selector i) [construction]) :=: x | (x, i) <- zip ts [0..]]
+                    equations = [lhs :=>: (apply (app (selector i) []) construction) :=: x | (x, i) <- zip ts [0..]]
                     -- We need to tell the pruner that all the equations above are true.
 
                 -- Declare as axioms?

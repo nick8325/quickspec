@@ -40,11 +40,8 @@ newAxiom _ ([] :=>: (t :=: u)) = do
     s <- get
     let norm = Rule.result . Twee.normalise s
     unless (norm t == norm u) $ do
-      traceShowM (text "Axiom:" <+> pPrint (t :=: u))
       Twee.newEquation (t Rule.:=: u)
       Twee.complete
-  findRep [] t
-  findRep [] u
   return ()
 newAxiom _ _ = return ()
 
@@ -61,7 +58,6 @@ findRep axioms t =
     sequence_ [ Twee.newEquation (t Rule.:=: u) | [] :=>: t :=: u <- axioms ]
     s <- get
     let u = Rule.result (Twee.normalise s t)
-    traceShowM (text "Reduction:" <+> pPrint t <+> text "->" <+> pPrint u)
     if t == u then return Nothing else return (Just u)
 
 instance Pruner Completion where

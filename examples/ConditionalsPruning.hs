@@ -6,7 +6,8 @@ import Data.Dynamic
 
 sig =
   signature {
-    maxTermSize = Just 8,
+    maxTermSize = Just 4,
+    maxPruningSize = Just 10,
     constants = [
        constant "poh" foo,
        constant "bar" bar,
