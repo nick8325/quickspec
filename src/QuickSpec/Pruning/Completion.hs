@@ -11,6 +11,7 @@ import Twee.Base
 import qualified Twee.Rule as Rule
 import qualified Twee as Twee
 import Twee(Twee)
+import Debug.Trace
 
 newtype Completion =
   Completion {
@@ -35,6 +36,7 @@ localTwee m = do
 
 newAxiom :: AxiomMode -> PropOf PruningTerm -> StateT Completion IO ()
 newAxiom _ ([] :=>: (t :=: u)) = do
+  traceShowM (text "Axiom:" <+> pPrint (t :=: u))
   liftTwee $ do
     s <- get
     let norm = Rule.result . Twee.normalise s
@@ -56,6 +58,7 @@ findRep axioms t =
     sequence_ [ Twee.newEquation (t Rule.:=: u) | [] :=>: t :=: u <- axioms ]
     s <- get
     let u = Rule.result (Twee.normalise s t)
+    traceShowM (text "Reduction:" <+> pPrint t <+> text "->" <+> pPrint u)
     if t == u then return Nothing else return (Just u)
 
 instance Pruner Completion where
