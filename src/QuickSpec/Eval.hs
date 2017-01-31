@@ -467,10 +467,14 @@ consider :: Considerable a => Signature -> (KindOf a -> Event) -> a -> M ()
 consider sig makeEvent x = do
   let t = generalise x
   res   <- maybeNormalise t
+  res'  <- normalise t
+  considerConditionalising sig ([] :=>: t :=: res')
+  res'' <- normalise (specialise x)
+  considerConditionalising sig ([] :=>: (specialise x) :=: res'')
   terms <- lift (gets terms)
   allSchemas <- findAll x
   case res of
-    Just u | u `Set.member` terms -> return ()
+    Just u  | u `Set.member` terms -> return ()
     Nothing | t `Set.member` terms -> return ()
     _ -> do
       case res of
@@ -531,8 +535,8 @@ shouldPrint prop =
     conIsBackground_ (Apply _) = True
     conIsBackground_ con = conIsBackground con
 
-found :: Signature -> Prop -> M ()
-found sig prop0 = do
+considerConditionalising :: Signature -> Prop -> M ()
+considerConditionalising sig prop0 = do
   let reorder (lhs :=>: t :=: u)
         | measure t >= measure u = lhs :=>: t :=: u
         | otherwise = lhs :=>: u :=: t
@@ -562,7 +566,7 @@ found sig prop0 = do
                 lift $ lift $ sequence_ [axiom Normal eq | eq <- equations]
 
                 -- Print the things we wanted to add, for debugging pruposes
-                liftIO $ print $ map (show . pPrint) equations
+                --liftIO $ print $ map (show . pPrint) equations
                  
                 return () -- Before it is safe to do this we need to make sure
                           -- each "predicate type" is unique, currently they all have
@@ -579,6 +583,14 @@ found sig prop0 = do
         else
           return ()
     _ -> return ()
+
+found :: Signature -> Prop -> M ()
+found sig prop0 =  do
+  considerConditionalising sig prop0
+  let reorder (lhs :=>: t :=: u)
+        | measure t >= measure u = lhs :=>: t :=: u
+        | otherwise = lhs :=>: u :=: t
+      prop = regeneralise (reorder prop0)
 
   props <- lift (gets discovered)
   (_, props') <- liftIO $ runPruner sig [] $ mapM_ (axiom Normal) (map (simplify_ sig) props)
