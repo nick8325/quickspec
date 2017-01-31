@@ -613,7 +613,7 @@ found sig prop0 = do
         n <- lift $ gets howMany
         onTerm putLine $ show $
           text (printf "%3d." n) <+>
-          pPrint (rename (canonicalise ({-conditionalise (conditionalsContext sig)-}  prop')))
+          pPrint (rename (canonicalise (conditionalise (conditionalsContext sig)  prop')))
 
   onTerm putTemp "[completing theory...]"
   lift (lift (axiom Normal prop))

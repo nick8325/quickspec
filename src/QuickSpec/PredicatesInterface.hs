@@ -87,13 +87,10 @@ resolvePredicates (gen, getters) = (makeGen, concat $ zipWith (\fs i -> map ($i)
   where
     makeOneGen :: (Int, Gen (Maybe [Dynamic])) -> Gen (Int, [Dynamic])
     makeOneGen (i, generator) = do
-      v <- backtracking generator
+      v <- fromJust <$> (generator `suchThat` isJust)
       return (i, v)
     
     makeGen = fmap P $ sequence $ map makeOneGen gen
-
-backtracking :: Gen (Maybe a) -> Gen a
-backtracking g = fromJust <$> (g `suchThat` isJust)
 
 makeContexts reps = zipWith (\p i -> (predCons p, map ($i) (selectors p))) reps [0..]
 
