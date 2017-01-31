@@ -2,12 +2,11 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
 module QuickSpec.PredicatesInterface where
+import Data.Maybe
 import QuickSpec.Term
 import Test.QuickCheck
 import Data.Dynamic
 import Data.List
-
-fromJust (Just x) = x
 
 class Predicateable a where
   toPredicates :: a -> Gen (Maybe [Dynamic]) 
@@ -94,14 +93,7 @@ resolvePredicates (gen, getters) = (makeGen, concat $ zipWith (\fs i -> map ($i)
     makeGen = fmap P $ sequence $ map makeOneGen gen
 
 backtracking :: Gen (Maybe a) -> Gen a
-backtracking g = do
-  x <- g
-  i <- resize 10 arbitrary
-  case x of
-    Nothing -> backtracking (scale (\j -> max (j+i) 0) g) -- We failed
-                                                          -- so we arbitrarily increase the size
-                                                          -- which is probably a bad idea in general
-    Just y  -> return y
+backtracking g = fromJust <$> (g `suchThat` isJust)
 
 makeContexts reps = zipWith (\p i -> (predCons p, map ($i) (selectors p))) reps [0..]
 
