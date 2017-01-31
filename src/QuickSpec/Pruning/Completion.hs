@@ -36,13 +36,16 @@ localTwee m = do
 
 newAxiom :: AxiomMode -> PropOf PruningTerm -> StateT Completion IO ()
 newAxiom _ ([] :=>: (t :=: u)) = do
-  traceShowM (text "Axiom:" <+> pPrint (t :=: u))
   liftTwee $ do
     s <- get
     let norm = Rule.result . Twee.normalise s
     unless (norm t == norm u) $ do
+      traceShowM (text "Axiom:" <+> pPrint (t :=: u))
       Twee.newEquation (t Rule.:=: u)
       Twee.complete
+  findRep [] t
+  findRep [] u
+  return ()
 newAxiom _ _ = return ()
 
 while :: IO Bool -> IO () -> IO ()
