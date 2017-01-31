@@ -32,7 +32,7 @@ liftTwee m = do
 localTwee :: State (Twee PruningConstant) a -> StateT Completion IO a
 localTwee m = do
   ks <- gets twee
-  return (evalState m ks)
+  return $! evalState m ks
 
 newAxiom :: AxiomMode -> PropOf PruningTerm -> StateT Completion IO ()
 newAxiom _ ([] :=>: (t :=: u)) = do
