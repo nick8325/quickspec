@@ -101,9 +101,13 @@ instance Ord Constant where
 instance Pretty Constant where
   pPrint (Apply ty) = text "apply[" <> pPrint ty <> text "]"
   pPrint (Id ty) = text "id[" <> pPrint ty <> text "]"
-  pPrint con = text (conName con) <> text "[" <> pPrint (typ con) <> text "]"
+  pPrint con = text (conName con)
 instance PrettyTerm Constant where
-  termStyle _ = curried
+  termStyle (Apply _) = invisible
+  termStyle (Id _) = invisible
+  termStyle f = implicitArguments n (conStyle f)
+    where
+      n = implicitArity (typ (conGeneralValue f))
 instance Typed Constant where
   typ (Apply ty) = app Arrow [ty, ty]
   typ (Id ty) = app Arrow [ty, ty]
