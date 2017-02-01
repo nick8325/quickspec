@@ -8,14 +8,15 @@ import Data.Dynamic
 sig =
   signature {
     maxTermSize = Just 8,
+    maxTests    = Just 10000,
     constants = [
-       constant "[]" ([] :: [Int]),
-       constant ":"  ((:) :: Int -> [Int] -> [Int]),
+       --constant "[]" ([] :: [Int]),
+       --constant ":"  ((:) :: Int -> [Int] -> [Int]),
        constant "++" ((++) :: [A] -> [A] -> [A]),
-       constant "head" (head :: [A] -> A),
-       constant "zip" (zip :: [Int] -> [Int] -> [(Int,Int)]),
-       constant "length" (length :: [A] -> Int),
-       constant "reverse" (reverse :: [A] -> [A])
+       --constant "head" (head :: [A] -> A),
+       constant "zip" (zip :: [Int] -> [Int] -> [(Int,Int)])
+       --constant "length" (length :: [A] -> Int),
+       --constant "reverse" (reverse :: [A] -> [A])
     ],
     predicates = [-- predicateGen "notNull" ((not . null) :: [Int] -> Bool) notNullGen,
                   predicateGen "eqLen"

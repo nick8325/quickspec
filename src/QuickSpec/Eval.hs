@@ -1,5 +1,5 @@
 -- | The main 'quickSpec' function lives here.
-{-# LANGUAGE CPP, TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables, TupleSections, FlexibleContexts #-}
+{-# LANGUAGE CPP, TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables, TupleSections, FlexibleContexts, DoAndIfThenElse #-}
 module QuickSpec.Eval where
 
 #include "errors.h"
@@ -467,10 +467,17 @@ consider :: Considerable a => Signature -> (KindOf a -> Event) -> a -> M ()
 consider sig makeEvent x = do
   let t = generalise x
   res   <- maybeNormalise t
-  res'  <- normalise t
-  considerConditionalising sig ([] :=>: t :=: res')
-  res'' <- normalise (specialise x)
-  considerConditionalising sig ([] :=>: (specialise x) :=: res'')
+  conditionalised <- case res of -- Crazy hack, why does this save 3 seconds on the list example?
+                      Nothing -> return True
+                      Just u  -> considerConditionalising sig ([] :=>: t :=: u)
+  if not conditionalised then
+    do
+      let specx = specialise x
+      res'' <- normalise specx
+      considerConditionalising sig ([] :=>: specx :=: res'')
+      return ()
+  else
+    return ()
   terms <- lift (gets terms)
   allSchemas <- findAll x
   case res of
@@ -535,7 +542,7 @@ shouldPrint prop =
     conIsBackground_ (Apply _) = True
     conIsBackground_ con = conIsBackground con
 
-considerConditionalising :: Signature -> Prop -> M ()
+considerConditionalising :: Signature -> Prop -> M Bool
 considerConditionalising sig prop0 = do
   let reorder (lhs :=>: t :=: u)
         | measure t >= measure u = lhs :=>: t :=: u
@@ -568,21 +575,22 @@ considerConditionalising sig prop0 = do
                 -- Print the things we wanted to add, for debugging pruposes
                 --liftIO $ print $ map (show . pPrint) equations
                  
-                return () -- Before it is safe to do this we need to make sure
-                          -- each "predicate type" is unique, currently they all have
-                          -- the same type (which means this technique is not _yet_ safe to implement)
-              _ -> return ()
-            _ -> lift $ modify $ \st -> st {trueTerms = t:trueTerms st}
-                           -- It's something isomorphic to `True`
-                           -- We should add it to things we consider
-                           -- equal to True, so that we can use it in
-                           -- `isTrue x`.
+                return True -- Before it is safe to do this we need to make sure
+                            -- each "predicate type" is unique, currently they all have
+                            -- the same type (which means this technique is not _yet_ safe to implement)
+              _ -> return False
+            _ -> do
+              lift $ modify $ \st -> st {trueTerms = t:trueTerms st}
+              return True -- It's something isomorphic to `True`
+                          -- We should add it to things we consider
+                          -- equal to True, so that we can use it in
+                          -- `isTrue x`.
 
-                           -- This will be useful if the user has supplied,
-                           -- say, `constant "T" True`, maybe..?
+                          -- This will be useful if the user has supplied,
+                          -- say, `constant "T" True`, maybe..?
         else
-          return ()
-    _ -> return ()
+          return False
+    _ -> return False
 
 found :: Signature -> Prop -> M ()
 found sig prop0 =  do
