@@ -8,7 +8,7 @@ import Data.Dynamic
 sig =
   signature {
     maxTermSize = Just 8,
-    maxTests    = Just 10000,
+    --maxTests    = Just 10000,
     constants = [
        --constant "[]" ([] :: [Int]),
        --constant ":"  ((:) :: Int -> [Int] -> [Int]),

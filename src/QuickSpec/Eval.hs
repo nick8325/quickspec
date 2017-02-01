@@ -469,12 +469,14 @@ consider sig makeEvent x = do
   res   <- maybeNormalise t
   conditionalised <- case res of -- Crazy hack, why does this save 3 seconds on the list example?
                       Nothing -> return True
-                      Just u  -> considerConditionalising sig ([] :=>: t :=: u)
+                      Just u  -> considerConditionalising False sig ([] :=>: t :=: u)
   if not conditionalised then
     do
       let specx = specialise x
-      res'' <- normalise specx
-      considerConditionalising sig ([] :=>: specx :=: res'')
+      res'' <- maybeNormalise specx
+      case res'' of
+        Nothing -> return True
+        Just u  -> considerConditionalising False sig ([] :=>: specx :=: u)
       return ()
   else
     return ()
@@ -542,12 +544,12 @@ shouldPrint prop =
     conIsBackground_ (Apply _) = True
     conIsBackground_ con = conIsBackground con
 
-considerConditionalising :: Signature -> Prop -> M Bool
-considerConditionalising sig prop0 = do
+considerConditionalising :: Bool -> Signature -> Prop -> M Bool
+considerConditionalising regeneralised sig prop0 = do
   let reorder (lhs :=>: t :=: u)
         | measure t >= measure u = lhs :=>: t :=: u
         | otherwise = lhs :=>: u :=: t
-      prop = regeneralise (reorder prop0)
+      prop = if regeneralised then prop0 else regeneralise (reorder prop0)
 
   -- If we have discovered that "somePredicate x_1 x_2 x_3 = True"
   -- we should add the axiom "get_x_n (toSomePredicate x_n) = x_n"
@@ -594,11 +596,11 @@ considerConditionalising sig prop0 = do
 
 found :: Signature -> Prop -> M ()
 found sig prop0 =  do
-  considerConditionalising sig prop0
   let reorder (lhs :=>: t :=: u)
         | measure t >= measure u = lhs :=>: t :=: u
         | otherwise = lhs :=>: u :=: t
       prop = regeneralise (reorder prop0)
+  considerConditionalising True sig prop
 
   props <- lift (gets discovered)
   (_, props') <- liftIO $ runPruner sig [] $ mapM_ (axiom Normal) (map (simplify_ sig) props)
