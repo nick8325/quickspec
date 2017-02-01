@@ -550,10 +550,9 @@ considerConditionalising regeneralised sig prop0 = do
   -- we should add the axiom "get_x_n (toSomePredicate x_n) = x_n"
   -- to the set of known equations
   truth <- lift $ gets trueTerm 
-  let isTrue x = x == truth
   case prop of
     (lhs :=>: t :=: u) ->
-      if isTrue u then
+      if u == truth then
           case t of
             App f ts -> case lookupPredicate f (predicates sig) of -- It is an interesting predicate
               Just (prd, n) -> do
@@ -572,19 +571,11 @@ considerConditionalising regeneralised sig prop0 = do
                 -- Print the things we wanted to add, for debugging pruposes
                 --liftIO $ print $ map (show . pPrint) equations
                  
-                return True -- Before it is safe to do this we need to make sure
-                            -- each "predicate type" is unique, currently they all have
-                            -- the same type (which means this technique is not _yet_ safe to implement)
+                return True 
               _ -> return True 
             _ -> do
-              lift $ modify $ \st -> st {trueTerm = t}
-              return True -- It's something isomorphic to `True`
-                          -- We should add it to things we consider
-                          -- equal to True, so that we can use it in
-                          -- `isTrue x`.
-
-                          -- This will be useful if the user has supplied,
-                          -- say, `constant "T" True`, maybe..?
+              lift $ modify $ \st -> st {trueTerm = t} -- This is the smallest term equal to `True`
+              return True 
         else
           return False
     _ -> return False
