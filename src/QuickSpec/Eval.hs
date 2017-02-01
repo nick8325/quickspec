@@ -586,7 +586,6 @@ found sig prop0 =  do
         | measure t >= measure u = lhs :=>: t :=: u
         | otherwise = lhs :=>: u :=: t
       prop = regeneralise (reorder prop0)
-  considerConditionalising True sig prop
 
   props <- lift (gets discovered)
   (_, props') <- liftIO $ runPruner sig [] $ mapM_ (axiom Normal) (map (simplify_ sig) props)
@@ -636,6 +635,7 @@ found sig prop0 =  do
   terms <- lift (gets terms) >>= lift . lift . norm
   allSchemas <- lift (gets allSchemas) >>= lift . lift . norm
   lift $ modify (\s -> s { terms = terms, allSchemas = allSchemas })
+  considerConditionalising True sig prop
   onTerm putPart ""
 
 etaExpand :: Prop -> Prop
