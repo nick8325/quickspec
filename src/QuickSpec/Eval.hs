@@ -49,10 +49,10 @@ data S = S {
   terms         :: Set (Term Constant),
   schemaTestSet :: TestSet (Term Constant),
   termTestSet   :: Map (Term Constant) (TestSet TermFrom),
-  trueTerms     :: [Term Constant],
+  trueTerm      :: !(Term Constant),
   freshTestSet  :: TestSet TermFrom,
-  proved        :: Set PruningProp,
-  discovered    :: [Prop],
+  proved        :: (Set PruningProp),
+  discovered    :: ([Prop]),
   howMany       :: Int,
   delayed       :: [(Term Constant, Term Constant)],
   kind          :: Type -> TypeKind,
@@ -114,7 +114,7 @@ initialState sig seeds terminal =
       allSchemas    = Set.empty,
       schemaTestSet = emptyTestSet (memo (makeTester specialise v seeds2 sig)),
       termTestSet   = Map.empty,
-      trueTerms     = [build (con (toFun (constant "True" True)))],
+      trueTerm      = build (con (toFun (constant "True" True))),
       freshTestSet  = emptyTestSet (memo (makeTester specialise v seeds2 sig)),
       proved        = Set.empty,
       discovered    = background sig,
@@ -467,23 +467,21 @@ consider :: Considerable a => Signature -> (KindOf a -> Event) -> a -> M ()
 consider sig makeEvent x = do
   let t = generalise x
   res   <- maybeNormalise t
-  conditionalised <- case res of -- Crazy hack, why does this save 3 seconds on the list example?
-                      Nothing -> return True
-                      Just u  -> considerConditionalising False sig ([] :=>: t :=: u)
-  if not conditionalised then
-    do
-      let specx = specialise x
-      res'' <- maybeNormalise specx
-      case res'' of
-        Nothing -> return True
-        Just u  -> considerConditionalising False sig ([] :=>: specx :=: u)
-      return ()
-  else
-    return ()
   terms <- lift (gets terms)
   allSchemas <- findAll x
   case res of
-    Just u  | u `Set.member` terms -> return ()
+    Just u  | u `Set.member` terms -> do
+      conditionalised <- considerConditionalising False sig ([] :=>: t :=: u)
+      if not conditionalised then
+        do
+          let specx = specialise x
+          res' <- maybeNormalise specx
+          case res' of
+            Nothing -> return True
+            Just u  -> considerConditionalising False sig ([] :=>: specx :=: u)
+      else
+        return True
+      return ()
     Nothing | t `Set.member` terms -> return ()
     _ -> do
       case res of
@@ -546,16 +544,13 @@ shouldPrint prop =
 
 considerConditionalising :: Bool -> Signature -> Prop -> M Bool
 considerConditionalising regeneralised sig prop0 = do
-  let reorder (lhs :=>: t :=: u)
-        | measure t >= measure u = lhs :=>: t :=: u
-        | otherwise = lhs :=>: u :=: t
-      prop = if regeneralised then prop0 else regeneralise (reorder prop0)
+  let prop = if regeneralised then prop0 else regeneralise prop0
 
   -- If we have discovered that "somePredicate x_1 x_2 x_3 = True"
   -- we should add the axiom "get_x_n (toSomePredicate x_n) = x_n"
   -- to the set of known equations
-  truths <- lift $ gets trueTerms
-  let isTrue x = x `elem` truths
+  truth <- lift $ gets trueTerm 
+  let isTrue x = x == truth
   case prop of
     (lhs :=>: t :=: u) ->
       if isTrue u then
@@ -580,9 +575,9 @@ considerConditionalising regeneralised sig prop0 = do
                 return True -- Before it is safe to do this we need to make sure
                             -- each "predicate type" is unique, currently they all have
                             -- the same type (which means this technique is not _yet_ safe to implement)
-              _ -> return False
+              _ -> return True 
             _ -> do
-              lift $ modify $ \st -> st {trueTerms = t:trueTerms st}
+              lift $ modify $ \st -> st {trueTerm = t}
               return True -- It's something isomorphic to `True`
                           -- We should add it to things we consider
                           -- equal to True, so that we can use it in
