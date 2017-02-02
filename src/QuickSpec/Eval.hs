@@ -477,11 +477,10 @@ consider sig makeEvent x = do
           let specx = specialise x
           res' <- maybeNormalise specx
           case res' of
-            Nothing -> return True
-            Just u  -> considerConditionalising False sig ([] :=>: specx :=: u)
+            Nothing -> return ()
+            Just u  -> void $ considerConditionalising False sig ([] :=>: specx :=: u)
       else
-        return True
-      return ()
+        return ()
     Nothing | t `Set.member` terms -> return ()
     _ -> do
       case res of

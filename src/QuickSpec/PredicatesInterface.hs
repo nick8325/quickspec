@@ -13,11 +13,17 @@ class Predicateable a where
   getters      :: Int -> String -> a -> [Int -> Constant]
   size         :: a -> Int
 
+  -- New stuff
+  uncrry       :: a -> Uncurry a
+
 instance Predicateable Bool where
   toPredicates True  = return (Just [])
   toPredicates False = return Nothing
   getters _ _ _ = []
   size _ = 0
+
+  -- New stuff
+  uncrry       = const 
 
 instance (Predicateable b, Typeable a, Arbitrary a) => Predicateable (a -> b) where
   getters indx name _ =
@@ -36,12 +42,28 @@ instance (Predicateable b, Typeable a, Arbitrary a) => Predicateable (a -> b) wh
 
   size _ = 1 + size (undefined :: b)
 
+  -- New stuff
+  uncrry f (a, b) = uncrry (f a) b
+
+-- Foldr over functions
+type family (Foldr f b fun) :: * where
+  Foldr f def (a -> b) = f a (Foldr f def b)
+  Foldr f def b        = def
+
 -- Calculate the type of the "embedding" function,
 -- the _uninterpreted_ function which we add when pruning
 -- in the "(extract n) (toP x1 x2 ... xn ... xm) = xn" step
-type family (EmbType a) :: * where
-  EmbType Bool = Predicates
-  EmbType (a -> b) = a -> (EmbType b)
+type EmbType a  = Foldr (->) Predicates a
+
+-- A test case for predicates of type a
+type TestCase a = Foldr (,) () a
+
+-- Extreme uncurry of predicates
+type Uncurry a  = TestCase a -> Bool
+
+-- A `suchThat` generator for a predicate
+genSuchThat :: (Predicateable a, Arbitrary (TestCase a)) => a -> Gen (TestCase a)
+genSuchThat p = arbitrary `suchThat` uncrry p
 
 extract :: (Typeable a) => Int -> Predicates -> a
 extract i (P preds) = fromJust $ fromDynamic $ preds `at` i
