@@ -1,12 +1,15 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE DataKinds #-}
 module QuickSpec.PredicatesInterface where
 import Data.Maybe
 import QuickSpec.Term
+import QuickSpec.Instance
 import Test.QuickCheck
 import Data.Dynamic
 import Data.List
+import GHC.TypeLits
 
 class Predicateable a where
   toPredicates :: a -> Gen (Maybe [Dynamic]) 
@@ -46,7 +49,7 @@ instance forall a b. (Predicateable b, Typeable a, Arbitrary a, TestCase (a -> b
 
   -- New stuff
   uncrry f (a, b) = uncrry (f a) b
-  getrs  _ (foo :: x -> (a, TestCase b)) = constant "" (fst . foo :: x -> a) : getrs (undefined :: b) (snd . foo :: x -> TestCase b)
+  getrs _ (foo :: x -> (a, TestCase b)) = constant "" (fst . foo :: x -> a) : getrs (undefined :: b) (snd . foo :: x -> TestCase b)
 
 -- Foldr over functions
 type family (Foldr f b fun) :: * where
@@ -62,9 +65,24 @@ type EmbType a  = Foldr (->) Predicates a
 -- if `a ~ A -> B -> C -> Bool` we get `TestCase a ~ (A, (B, (C, ())))`
 type TestCase a = Foldr (,) () a
 
+data TestCaseWrapped (str :: Symbol) a = TestCaseWrapped { unTestCaseWrapped :: (TestCase a) }
+
+instance Eq (TestCaseWrapped str a) where
+  p == q = False
+
+instance Ord (TestCaseWrapped str a) where
+  compare p q = LT
+
 -- A `suchThat` generator for a predicate
-genSuchThat :: (Predicateable a, Arbitrary (TestCase a)) => a -> Gen (TestCase a)
-genSuchThat p = arbitrary `suchThat` uncrry p
+genSuchThat :: (Predicateable a, Arbitrary (TestCase a)) => a -> Gen (TestCaseWrapped x a)
+genSuchThat p = TestCaseWrapped <$> arbitrary `suchThat` uncrry p
+
+data PredRepNew = PredRepNew {predInstances :: [Instance], predSelectors :: [Constant], predConstant :: Constant, embedderConstant :: Constant}
+
+makePredRepNew :: forall a str. (KnownSymbol str, Predicateable a, Typeable a, Typeable (EmbType a), Arbitrary (TestCase a)) => (Proxy (str :: Symbol)) -> a -> PredRepNew
+makePredRepNew proxy pred = PredRepNew (makeInstance (\() -> genSuchThat pred :: Gen (TestCaseWrapped str a)))
+                                       (getrs pred (unTestCaseWrapped :: TestCaseWrapped str a -> TestCase a))
+                                       (constant (symbolVal proxy) pred) (constant "" (undefined :: EmbType a))
 
 extract :: (Typeable a) => Int -> Predicates -> a
 extract i (P preds) = fromJust $ fromDynamic $ preds `at` i
