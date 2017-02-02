@@ -4,6 +4,7 @@
 module QuickSpec.Instance where
 
 #include "errors.h"
+import Test.QuickCheck
 import Control.Applicative
 import Control.Monad hiding (sequence)
 import Control.Monad.Trans.State.Strict
@@ -50,3 +51,54 @@ makeInstance f =
       ERROR("makeInstance: curried functions not supported")
     _ ->
       [Instance (toValue (Instance1 (toValue (Instance2 f))))]
+
+baseType :: forall a. (Ord a, Arbitrary a, Typeable a) => a -> [Instance]
+baseType _ =
+  mconcat [
+    inst (Sub Dict :: () :- Ord a),
+    inst (Sub Dict :: () :- Arbitrary a)]
+
+baseTypeNames :: forall a. (Ord a, Arbitrary a, Typeable a) => [String] -> a -> [Instance]
+baseTypeNames xs _ =
+  mconcat [
+    inst (Sub Dict :: () :- Ord a),
+    inst (Sub Dict :: () :- Arbitrary a),
+    names (NamesFor xs :: NamesFor a)]
+
+inst :: forall c1 c2. (Typeable c1, Typeable c2) => c1 :- c2 -> [Instance]
+inst ins = makeInstance f
+  where
+    f :: Dict c1 -> Dict c2
+    f Dict = case ins of Sub dict -> dict
+
+inst2 :: forall c1 c2 c3. (Typeable c1, Typeable c2, Typeable c3) => (c1, c2) :- c3 -> [Instance]
+inst2 ins = makeInstance f
+  where
+    f :: (Dict c1, Dict c2) -> Dict c3
+    f (Dict, Dict) = case ins of Sub dict -> dict
+
+inst3 :: forall c1 c2 c3 c4. (Typeable c1, Typeable c2, Typeable c3, Typeable c4) => (c1, c2, c3) :- c4 -> [Instance]
+inst3 ins = makeInstance f
+  where
+    f :: (Dict c1, Dict c2, Dict c3) -> Dict c4
+    f (Dict, Dict, Dict) = case ins of Sub dict -> dict
+
+inst4 :: forall c1 c2 c3 c4 c5. (Typeable c1, Typeable c2, Typeable c3, Typeable c4, Typeable c5) => (c1, c2, c3, c4) :- c5 -> [Instance]
+inst4 ins = makeInstance f
+  where
+    f :: (Dict c1, Dict c2, Dict c3, Dict c4) -> Dict c5
+    f (Dict, Dict, Dict, Dict) = case ins of Sub dict -> dict
+
+inst5 :: forall c1 c2 c3 c4 c5 c6. (Typeable c1, Typeable c2, Typeable c3, Typeable c4, Typeable c5, Typeable c6) => (c1, c2, c3, c4, c5) :- c6 -> [Instance]
+inst5 ins = makeInstance f
+  where
+    f :: (Dict c1, Dict c2, Dict c3, Dict c4, Dict c5) -> Dict c6
+    f (Dict, Dict, Dict, Dict, Dict) = case ins of Sub dict -> dict
+
+newtype NamesFor a = NamesFor { unNamesFor :: [String] } deriving Typeable
+
+names  :: Typeable a => NamesFor a -> [Instance]
+names x = makeInstance (\() -> x)
+
+names1 :: (Typeable a, Typeable b) => (a -> NamesFor b) -> [Instance]
+names1 = makeInstance

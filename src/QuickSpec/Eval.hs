@@ -554,9 +554,9 @@ considerConditionalising regeneralised sig prop0 = do
       if u == truth then
           case t of
             App f ts -> case lookupPredicate f (predicates sig) of -- It is an interesting predicate
-              Just (prd, n) -> do
+              Just prd -> do
                     -- Get the `p_n` selector
-                let selector i = ((selectors prd) !! i) n 
+                let selector i = (selectors prd) !! i
                     -- The "to_p x1 x2 ... xm" term
                     construction = foldl apply (app (embedder prd) []) ts
                     -- The "p_n (to_p x1 x2 ... xn ... xm) = xn"
