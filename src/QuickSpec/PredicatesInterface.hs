@@ -14,7 +14,8 @@ class Predicateable a where
   size         :: a -> Int
 
   -- New stuff
-  uncrry       :: a -> Uncurry a
+  uncrry       :: a -> TestCase a -> Bool
+  getrs        :: (Typeable x) => a -> (x -> TestCase a) -> [Constant]
 
 instance Predicateable Bool where
   toPredicates True  = return (Just [])
@@ -24,8 +25,9 @@ instance Predicateable Bool where
 
   -- New stuff
   uncrry       = const 
+  getrs _ _    = []
 
-instance (Predicateable b, Typeable a, Arbitrary a) => Predicateable (a -> b) where
+instance forall a b. (Predicateable b, Typeable a, Arbitrary a, TestCase (a -> b) ~ (a, TestCase b)) => Predicateable (a -> b) where
   getters indx name _ =
       (:)
       (\i ->
@@ -44,6 +46,7 @@ instance (Predicateable b, Typeable a, Arbitrary a) => Predicateable (a -> b) wh
 
   -- New stuff
   uncrry f (a, b) = uncrry (f a) b
+  getrs  _ (foo :: x -> (a, TestCase b)) = constant "" (fst . foo :: x -> a) : getrs (undefined :: b) (snd . foo :: x -> TestCase b)
 
 -- Foldr over functions
 type family (Foldr f b fun) :: * where
@@ -56,10 +59,8 @@ type family (Foldr f b fun) :: * where
 type EmbType a  = Foldr (->) Predicates a
 
 -- A test case for predicates of type a
+-- if `a ~ A -> B -> C -> Bool` we get `TestCase a ~ (A, (B, (C, ())))`
 type TestCase a = Foldr (,) () a
-
--- Extreme uncurry of predicates
-type Uncurry a  = TestCase a -> Bool
 
 -- A `suchThat` generator for a predicate
 genSuchThat :: (Predicateable a, Arbitrary (TestCase a)) => a -> Gen (TestCase a)
