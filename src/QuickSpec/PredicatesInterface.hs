@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DataKinds #-}
 module QuickSpec.PredicatesInterface where
+import Data.Constraint
 import Data.Maybe
 import QuickSpec.Term
 import QuickSpec.Instance
@@ -52,8 +53,12 @@ genSuchThat p = TestCaseWrapped <$> arbitrary `suchThat` uncrry p
 data PredRep = PredRep {predInstances :: [Instance], selectors :: [Constant], predCons :: Constant, embedder :: Constant}
 
 -- If we can get away from the `Arbitrary (TestCase a)` we should be able to get away with this way of doing it!
-predicate :: forall a str. (KnownSymbol str, Predicateable a, Typeable a, Typeable (EmbType str a), Arbitrary (TestCase a)) => (Proxy (str :: Symbol)) -> a -> PredRep 
-predicate proxy pred = PredRep ((makeInstance (\() -> genSuchThat pred :: Gen (TestCaseWrapped str a)))
+predicate :: forall a str. (KnownSymbol str,
+                            Predicateable a,
+                            Typeable a,
+                            Typeable (EmbType str a),
+                            Typeable (TestCase a)) => (Proxy (str :: Symbol)) -> a -> PredRep 
+predicate proxy pred = PredRep ((makeInstance (\(dict :: (Dict (Arbitrary (TestCase a)))) -> ((withDict dict genSuchThat) pred :: Gen (TestCaseWrapped str a))))
                                 ++ names (NamesFor [symbolVal proxy] :: NamesFor (TestCaseWrapped str a)))
                                (getrs "" pred (unTestCaseWrapped :: TestCaseWrapped str a -> TestCase a))
                                (constant (symbolVal proxy) pred) (constant "" (undefined :: EmbType str a))
