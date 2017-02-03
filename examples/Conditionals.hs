@@ -19,7 +19,7 @@ sig =
        --constant "length" (length :: [A] -> Int),
        --constant "reverse" (reverse :: [A] -> [A])
     ],
-    predicates = [-- predicateGen "notNull" ((not . null) :: [Int] -> Bool) notNullGen,
+    predicates = [--predicate (undefined :: Proxy "notNull") ((not . null) :: [Int] -> Bool),
                   predicate (undefined :: Proxy "eqLen")
                   ((\xs ys -> length xs == length ys) :: [Int] -> [Int] -> Bool)]
    }

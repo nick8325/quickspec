@@ -1,7 +1,8 @@
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE ScopedTypeVariables,
+             TypeFamilies,
+             FlexibleContexts,
+             DataKinds
+#-}
 module QuickSpec.PredicatesInterface where
 import Data.Constraint
 import Data.Maybe
@@ -36,6 +37,8 @@ type EmbType (str :: Symbol) a = Foldr (->) (TestCaseWrapped str a) a
 
 -- A test case for predicates of type a
 -- if `a ~ A -> B -> C -> Bool` we get `TestCase a ~ (A, (B, (C, ())))`
+--
+-- Some speedup should be possible by using unboxed tuples instead...
 type TestCase a = Foldr (,) () a
 
 data TestCaseWrapped (str :: Symbol) a = TestCaseWrapped { unTestCaseWrapped :: (TestCase a) }
@@ -52,13 +55,13 @@ genSuchThat p = TestCaseWrapped <$> arbitrary `suchThat` uncrry p
 
 data PredRep = PredRep {predInstances :: [Instance], selectors :: [Constant], predCons :: Constant, embedder :: Constant}
 
--- If we can get away from the `Arbitrary (TestCase a)` we should be able to get away with this way of doing it!
+-- This is broken, I don't know why :(
 predicate :: forall a str. (KnownSymbol str,
                             Predicateable a,
                             Typeable a,
                             Typeable (EmbType str a),
                             Typeable (TestCase a)) => (Proxy (str :: Symbol)) -> a -> PredRep 
-predicate proxy pred = PredRep ((makeInstance (\(dict :: (Dict (Arbitrary (TestCase a)))) -> ((withDict dict genSuchThat) pred :: Gen (TestCaseWrapped str a))))
+predicate proxy pred = PredRep ((makeInstance (\(dict :: Dict (Arbitrary (TestCase a))) -> (withDict dict genSuchThat) pred :: Gen (TestCaseWrapped str a)))
                                 ++ names (NamesFor [symbolVal proxy] :: NamesFor (TestCaseWrapped str a)))
                                (getrs "" pred (unTestCaseWrapped :: TestCaseWrapped str a -> TestCase a))
                                (constant (symbolVal proxy) pred) (constant "" (undefined :: EmbType str a))
