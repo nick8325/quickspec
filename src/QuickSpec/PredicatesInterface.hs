@@ -61,10 +61,19 @@ predicate :: forall a str. (KnownSymbol str,
                             Typeable a,
                             Typeable (EmbType str a),
                             Typeable (TestCase a)) => (Proxy (str :: Symbol)) -> a -> PredRep 
-predicate proxy pred = PredRep ((makeInstance (\(dict :: Dict (Arbitrary (TestCase a))) -> (withDict dict genSuchThat) pred :: Gen (TestCaseWrapped str a)))
-                                ++ names (NamesFor [symbolVal proxy] :: NamesFor (TestCaseWrapped str a)))
-                               (getrs "" pred (unTestCaseWrapped :: TestCaseWrapped str a -> TestCase a))
-                               (constant (symbolVal proxy) pred) (constant "" (undefined :: EmbType str a))
+predicate proxy pred = PredRep instances
+                               getters
+                               predicateCons
+                               embedder
+  where
+    instances =  makeInstance (\(dict :: Dict (Arbitrary (TestCase a))) -> (withDict dict genSuchThat) pred :: Gen (TestCaseWrapped str a))
+              ++ names (NamesFor [symbolVal proxy] :: NamesFor (TestCaseWrapped str a)))
+
+    getters = getrs "" pred (unTestCaseWrapped :: TestCaseWrapped str a -> TestCase a)
+
+    predicateCons = constant (symbolVal proxy) pred
+
+    embedder = constant "" (undefined :: EmbType str a)
 
 lookupPredicate :: Constant -> [PredRep] -> Maybe PredRep
 lookupPredicate c []     = Nothing
