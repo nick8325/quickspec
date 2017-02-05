@@ -67,7 +67,7 @@ predicate proxy pred = PredRep instances
                                embedder
   where
     instances =  makeInstance (\(dict :: Dict (Arbitrary (TestCase a))) -> (withDict dict genSuchThat) pred :: Gen (TestCaseWrapped str a))
-              ++ names (NamesFor [symbolVal proxy] :: NamesFor (TestCaseWrapped str a)))
+              ++ names (NamesFor [symbolVal proxy] :: NamesFor (TestCaseWrapped str a))
 
     getters = getrs "" pred (unTestCaseWrapped :: TestCaseWrapped str a -> TestCase a)
 

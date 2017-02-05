@@ -15,13 +15,13 @@ sig =
        --constant ":"  ((:) :: Int -> [Int] -> [Int]),
        constant "++" ((++) :: [A] -> [A] -> [A]),
        --constant "head" (head :: [A] -> A),
-       constant "zip" (zip :: [Int] -> [Int] -> [(Int,Int)])
+       constant "zip" (zip :: [A] -> [A] -> [(A,A)])
        --constant "length" (length :: [A] -> Int),
        --constant "reverse" (reverse :: [A] -> [A])
     ],
     predicates = [--predicate (undefined :: Proxy "notNull") ((not . null) :: [Int] -> Bool),
                   predicate (undefined :: Proxy "eqLen")
-                  ((\xs ys -> length xs == length ys) :: [Int] -> [Int] -> Bool)]
+                  ((\xs ys -> length xs == length ys) :: [A] -> [A] -> Bool)]
    }
 
 main = quickSpec sig
