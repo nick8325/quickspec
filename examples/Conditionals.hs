@@ -5,6 +5,7 @@ import Test.QuickCheck
 import QuickSpec
 import Data.Dynamic
 import GHC.TypeLits
+import QuickSpec.Signature
 
 sig =
   signature {
@@ -15,7 +16,7 @@ sig =
        --constant ":"  ((:) :: Int -> [Int] -> [Int]),
        constant "++" ((++) :: [A] -> [A] -> [A]),
        --constant "head" (head :: [A] -> A),
-       constant "zip" (zip :: [A] -> [A] -> [(A,A)])
+       constant "zip" (zip :: [Int] -> [Int] -> [(Int,Int)])
        --constant "length" (length :: [A] -> Int),
        --constant "reverse" (reverse :: [A] -> [A])
     ],
@@ -24,4 +25,6 @@ sig =
                   ((\xs ys -> length xs == length ys) :: [A] -> [A] -> Bool)]
    }
 
-main = quickSpec sig
+main = quickSpec sig --mapM_ print (instances_ (predicateSig sig))
+  
+--quickSpec sig

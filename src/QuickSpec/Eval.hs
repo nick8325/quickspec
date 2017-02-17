@@ -556,15 +556,20 @@ considerConditionalising regeneralised sig prop0 = do
             App f ts -> case lookupPredicate f (predicates sig) of -- It is an interesting predicate
               Just prd -> do
                     -- Get the `p_n` selector
-                let selector i = (selectors prd) !! i
+                let selector i   = app ((selectors prd) !! i) []
+                    selectType   = head $ typeArgs $ typ $ selector 0
+                    emb          = app (embedder prd) []
+                    -- The argument types for to_p
+                    argumentTypes = typeArgs $ typ $ app (embedder prd) [] 
+                    -- coerced ts
+                    ts' = map fromJust $ zipWith cast argumentTypes ts
                     -- The "to_p x1 x2 ... xm" term
-                    construction = foldl apply (app (embedder prd) []) ts
+                    construction = fromJust $ cast selectType $ foldl apply emb ts'
                     -- The "p_n (to_p x1 x2 ... xn ... xm) = xn"
                     -- equations
-                    equations = [lhs :=>: (apply (app (selector i) []) construction) :=: x | (x, i) <- zip ts [0..]]
-                    -- We need to tell the pruner that all the equations above are true.
+                    equations = [ lhs :=>: apply (selector i) construction :=: x | (x, i) <- zip ts' [0..]]
 
-                -- Declare as axioms?
+                -- Declare the relevant equations as axioms
                 lift $ lift $ sequence_ [axiom Normal eq | eq <- equations]
 
                 -- Print the things we wanted to add, for debugging pruposes

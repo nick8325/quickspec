@@ -14,6 +14,7 @@ module QuickSpec.Type(
   TypeView(..),
   Apply(..), apply, canApply,
   -- Polymorphic types.
+  canonicaliseType,
   Poly, poly, unPoly, polyTyp, polyMap, polyApply, polyPair, polyList, polyMgu,
   -- Dynamic values.
   Value, toValue, fromValue,
@@ -231,7 +232,7 @@ infixl `apply`
 apply :: Apply a => a -> a -> a
 apply f x =
   case tryApply f x of
-    Nothing -> ERROR("apply: ill-typed term")
+    Nothing -> ERROR("apply: ill-typed term: (" ++ prettyShow (typ f) ++ ") to  (" ++ prettyShow (typ x) ++ ")")
     Just y -> y
 
 canApply :: Apply a => a -> a -> Bool

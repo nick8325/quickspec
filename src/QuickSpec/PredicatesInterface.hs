@@ -19,7 +19,7 @@ class Predicateable a where
 
 instance Predicateable Bool where
   uncrry       = const 
-  getrs _ _ _    = []
+  getrs _ _ _  = []
 
 instance forall a b. (Predicateable b, Typeable a, TestCase (a -> b) ~ (a, TestCase b)) => Predicateable (a -> b) where
   uncrry f (a, b) = uncrry (f a) b
