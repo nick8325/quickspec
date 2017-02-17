@@ -560,9 +560,9 @@ considerConditionalising regeneralised sig prop0 = do
                     sel i        = app (selectors prd !! i) []
                     emb          = fromJust $ cast (embedderType (head $ typeArgs $ typ $ sel 0)) $ app (embedder prd) []
 
-                    -- Cast a `TestCaseWrapped str ( a -> b -> ...)`
+                    -- Make sure the selector and embedder functions are casted to have the
+                    -- types corresponding to the types in `ts`
                     castTestCase (App x [s, _]) = app x [s, arrowType (map typ ts) (typeOf True)]
-        
                     selType i = app Arrow [castTestCase (head $ typeArgs $ typ $ sel i), typ (ts !! i)]
                     embedderType testCase = arrowType (map typ ts) (castTestCase testCase)
 

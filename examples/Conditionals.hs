@@ -22,7 +22,7 @@ sig =
     ],
     predicates = [--predicate (undefined :: Proxy "notNull") ((not . null) :: [Int] -> Bool),
                   predicate (undefined :: Proxy "eqLen")
-                  ((\xs ys -> length xs == length ys) :: [A] -> [A] -> Bool)]
+                  ((\xs ys -> length xs == length ys) :: [Int] -> [Int] -> Bool)]
    }
 
 main = quickSpec sig --mapM_ print (instances_ (predicateSig sig))
