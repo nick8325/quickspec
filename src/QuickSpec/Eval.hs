@@ -556,18 +556,28 @@ considerConditionalising regeneralised sig prop0 = do
             App f ts -> case lookupPredicate f (predicates sig) of -- It is an interesting predicate
               Just prd -> do
                     -- Get the `p_n` selector
-                let selector i   = app ((selectors prd) !! i) []
-                    selectType   = head $ typeArgs $ typ $ selector 0
-                    emb          = app (embedder prd) []
-                    -- The argument types for to_p
-                    argumentTypes = typeArgs $ typ $ app (embedder prd) [] 
-                    -- coerced ts
-                    ts' = map fromJust $ zipWith cast argumentTypes ts
+                let selector i   = fromJust $ cast (selType i) $ sel i
+                    sel i        = app (selectors prd !! i) []
+                    emb          = fromJust $ cast (embedderType (head $ typeArgs $ typ $ sel 0)) $ app (embedder prd) []
+
+                    -- Cast a `TestCaseWrapped str ( a -> b -> ...)`
+                    castTestCase (App x [s, _]) = app x [s, arrowType (map typ ts) (typeOf True)]
+        
+                    selType i = app Arrow [castTestCase (head $ typeArgs $ typ $ sel i), typ (ts !! i)]
+                    embedderType testCase = arrowType (map typ ts) (castTestCase testCase)
+
                     -- The "to_p x1 x2 ... xm" term
-                    construction = fromJust $ cast selectType $ foldl apply emb ts'
+                    construction = foldl apply emb ts
                     -- The "p_n (to_p x1 x2 ... xn ... xm) = xn"
                     -- equations
-                    equations = [ lhs :=>: apply (selector i) construction :=: x | (x, i) <- zip ts' [0..]]
+                    equations = [ lhs :=>: apply (selector i) construction :=: x | (x, i) <- zip ts [0..]]
+
+                {-
+                liftIO $ print (map (prettyShow . typ) ts)
+                liftIO $ print (prettyShow (typ emb))
+                liftIO $ print (prettyShow (typ (selector 0)))
+                liftIO $ print (prettyShow (typ construction))
+                -}
 
                 -- Declare the relevant equations as axioms
                 lift $ lift $ sequence_ [axiom Normal eq | eq <- equations]
