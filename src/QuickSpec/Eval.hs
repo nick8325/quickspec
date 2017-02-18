@@ -572,13 +572,6 @@ considerConditionalising regeneralised sig prop0 = do
                     -- equations
                     equations = [ lhs :=>: apply (selector i) construction :=: x | (x, i) <- zip ts [0..]]
 
-                {-
-                liftIO $ print (map (prettyShow . typ) ts)
-                liftIO $ print (prettyShow (typ emb))
-                liftIO $ print (prettyShow (typ (selector 0)))
-                liftIO $ print (prettyShow (typ construction))
-                -}
-
                 -- Declare the relevant equations as axioms
                 lift $ lift $ sequence_ [axiom Normal eq | eq <- equations]
 

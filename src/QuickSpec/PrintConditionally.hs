@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 module QuickSpec.PrintConditionally where
 
+import Data.Maybe
 import QuickSpec.Parse
 import QuickSpec.Prop
 import QuickSpec.Pruning hiding (createRules, instances)
@@ -44,7 +45,10 @@ conditionalise preds ([] :=>: t :=: u) =
         go n ((p, sels, x):xs) =
           (p, zipWith (makeSel x) sels [n..], x):go (n+length sels) xs
         makeSel x sel n =
-          (sel, app (Id (typ (apply (app sel []) x))) [build (var (MkVar n))])
+          (sel, app (Id (typ (applyCoerce (app sel []) x))) [build (var (MkVar n))])
+
+    -- Coerce the argument... This is a hack
+    applyCoerce f x = apply f (fromJust $ cast (head $ typeArgs $ typ f) x)
 
     selectorSubst = [((sel, t), x) | (_, sels, t) <- conditionSubst, (sel, x) <- sels]
 
