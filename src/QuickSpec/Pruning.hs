@@ -12,6 +12,7 @@ import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class
 import Control.Monad.IO.Class
+import GHC.Stack
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import Data.Map(Map)
@@ -97,7 +98,7 @@ createRules = PrunerM $ do
           Just v ->
             untypedAxiom Normal ([] :=>: build (extended (singleton v)) :=: app (Function (Apply ty)) [t, build (var (MkVar ar))])
 
-axiom :: Pruner s => AxiomMode -> Prop -> PrunerM s ()
+axiom :: (HasCallStack, Pruner s) => AxiomMode -> Prop -> PrunerM s ()
 axiom mode p = do
   univ <- askUniv
   when (null (instances univ p)) $

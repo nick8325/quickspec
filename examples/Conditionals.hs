@@ -16,7 +16,7 @@ sig =
        --constant ":"  ((:) :: Int -> [Int] -> [Int]),
        constant "++" ((++) :: [A] -> [A] -> [A]),
        --constant "head" (head :: [A] -> A),
-       constant "zip" (zip :: [Int] -> [Int] -> [(Int,Int)])
+       constant "zip" (zip :: [A] -> [A] -> [(A,A)])
        --constant "length" (length :: [A] -> Int),
        --constant "reverse" (reverse :: [A] -> [A])
     ],

@@ -558,13 +558,15 @@ considerConditionalising regeneralised sig prop0 = do
                     -- Get the `p_n` selector
                 let selector i   = fromJust $ cast (selType i) $ sel i
                     sel i        = app (selectors prd !! i) []
-                    emb          = fromJust $ cast (embedderType (head $ typeArgs $ typ $ sel 0)) $ app (embedder prd) []
+                    emb          = fromJust $ cast embedderType $ app (embedder prd) []
+
+                    testCase     = head $ typeArgs $ typ $ sel 0
 
                     -- Make sure the selector and embedder functions are casted to have the
                     -- types corresponding to the types in `ts`
                     castTestCase (App x [s, _]) = app x [s, arrowType (map typ ts) (typeOf True)]
-                    selType i = app Arrow [castTestCase (head $ typeArgs $ typ $ sel i), typ (ts !! i)]
-                    embedderType testCase = arrowType (map typ ts) (castTestCase testCase)
+                    selType i = app Arrow [castTestCase testCase, typ (ts !! i)]
+                    embedderType = arrowType (map typ ts) (castTestCase testCase)
 
                     -- The "to_p x1 x2 ... xm" term
                     construction = foldl apply emb ts
@@ -572,11 +574,25 @@ considerConditionalising regeneralised sig prop0 = do
                     -- equations
                     equations = [ lhs :=>: apply (selector i) construction :=: x | (x, i) <- zip ts [0..]]
 
-                -- Declare the relevant equations as axioms
-                lift $ lift $ sequence_ [axiom Normal eq | eq <- equations]
-
+                {-
                 -- Print the things we wanted to add, for debugging pruposes
-                --liftIO $ print $ map (show . pPrint) equations
+                liftIO $ putStrLn "Equations before normalisation filtering:"
+                liftIO $ print $ map (show . pPrint) equations
+                liftIO $ putStrLn "\n"
+                -}
+
+                let normFilter (_ :=>: a :=: b) = (/=) <$> normalise a <*> normalise b
+                
+                equations' <- filterM normFilter equations
+
+                {-
+                liftIO $ putStrLn "Equations after normalisation filtering:"
+                liftIO $ print $ map (show . pPrint) equations'
+                liftIO $ putStrLn "\n"
+                -}
+
+                -- Declare the relevant equations as axioms
+                lift $ lift $ mapM (axiom Normal) equations' 
                  
                 return True 
               _ -> return True 

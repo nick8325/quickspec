@@ -69,11 +69,11 @@ predicate proxy pred = PredRep instances
     instances =  makeInstance (\(dict :: Dict (Arbitrary (TestCase a))) -> (withDict dict genSuchThat) pred :: Gen (TestCaseWrapped str a))
               ++ names (NamesFor [symbolVal proxy] :: NamesFor (TestCaseWrapped str a))
 
-    getters = getrs "" pred (unTestCaseWrapped :: TestCaseWrapped str a -> TestCase a)
+    getters = getrs ("prj_" ++ symbolVal proxy) pred (unTestCaseWrapped :: TestCaseWrapped str a -> TestCase a)
 
     predicateCons = constant (symbolVal proxy) pred
 
-    embedder = constant "" (undefined :: EmbType str a)
+    embedder = constant ("emb_" ++ symbolVal proxy) (undefined :: EmbType str a)
 
 lookupPredicate :: Constant -> [PredRep] -> Maybe PredRep
 lookupPredicate c []     = Nothing
