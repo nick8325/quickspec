@@ -114,6 +114,14 @@ axiom mode p = do
          liftPruner (untypedAxiom mode (toPruner p'))
     | p' <- instances univ p ]
 
+unsafeAxiom :: (HasCallStack, Pruner s) => AxiomMode -> Prop -> PrunerM s ()
+unsafeAxiom mode p = do
+  univ <- askUniv
+  sequence_
+    [ do sequence_ [ PrunerM (generate (fromFun fun)) | fun <- usort (funs p') ]
+         liftPruner (untypedAxiom mode (toPruner p'))
+    | p' <- instances univ p ]
+
 toGoal :: Prop -> PruningProp
 toGoal = fmap (build . subst (con . skolem)) . toPruner
 

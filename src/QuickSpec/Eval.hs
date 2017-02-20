@@ -592,7 +592,7 @@ considerConditionalising regeneralised sig prop0 = do
                 -}
 
                 -- Declare the relevant equations as axioms
-                lift $ lift $ mapM (axiom Normal) equations' 
+                lift $ lift $ mapM (unsafeAxiom Normal) equations' 
                  
                 return True 
               _ -> return True 
