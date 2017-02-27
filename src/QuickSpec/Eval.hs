@@ -164,11 +164,11 @@ incrementalQuickSpec sig = do
                   constants = constants thy ++ [last (constants sig)] }
 
 chopUpSignature :: [(Constant, [Int])] -> Signature -> [Signature -> Signature]
-chopUpSignature cs sig = id:map phase phases
+chopUpSignature cs sig0 = id:map phase phases
   where
     phase n sig =
       sig {
-        constants = constants sig ++ [ c | (c, ns) <- cs, n `elem` ns ] }
+        constants = constants sig0 ++ [ c | (c, ns) <- cs, n `elem` ns ] }
     phases = usort (concatMap snd cs)
 
 choppyQuickSpec :: [(Constant, [Int])] -> Signature -> IO Signature

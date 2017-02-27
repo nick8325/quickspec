@@ -30,6 +30,7 @@ import {-# SOURCE #-} QuickSpec.Pruning.Completion(Completion)
 import {-# SOURCE #-} QuickSpec.Pruning.Simple(SimplePruner)
 import Twee.Base
 import qualified Twee.Label as Label
+import QuickSpec.Utils
 
 newtype Instance = Instance (Value Instance1) deriving Show
 newtype Instance1 a = Instance1 (Value (Instance2 a))
@@ -299,7 +300,7 @@ typeUniverse sig =
   Set.fromList $
     build (var (MkVar 0)):
     concatMap collapse
-      [ oneTypeVar (typ t) | c@Constant{} <- constants sig, t <- types (typ c) ]
+      [ oneTypeVar (typ t) | c@Constant{} <- usort (constants sig ++ map fromFun (funs (background sig))), t <- types (typ c) ]
   where
     types t = typeRes t:typeArgs t ++ concatMap types (typeArgs t)
     collapse ty@(App f tys) =
@@ -311,6 +312,7 @@ data TypeKind = Useless | Partial | Useful deriving (Eq, Show)
 
 typeKind :: Signature -> Type -> TypeKind
 typeKind sig ty
+  | isDictionary ty = Useful
   | occurs ty = Useful
   | any occurs (suffixes ty) = Partial
   | otherwise = Useless

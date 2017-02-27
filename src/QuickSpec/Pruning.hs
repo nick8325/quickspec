@@ -134,7 +134,7 @@ instances univ prop =
     cs =
       foldr intersection [Map.empty]
         (map (constrain univ)
-          (filter isFun
+          (filter (\x -> isFun x && not (isDictionary (typ x)))
             (usort (terms prop >>= termListToList >>= subterms))))
 
 intersection :: [Map Var Type] -> [Map Var Type] -> [Map Var Type]
