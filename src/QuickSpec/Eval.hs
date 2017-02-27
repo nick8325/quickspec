@@ -336,7 +336,8 @@ createRules sig = do
         EqualTo (From _ u) _ -> do
           --t' <- fmap (fromMaybe t) (lift (lift (rep t)))
           let t' = t
-          u' <- normalise u
+          -- u' <- normalise u
+              u' = u
           del <- lift $ gets delayed
           let wait = or [ isJust (matchList (buildList [x, y]) (buildList [t, u])) | (x, y) <- del ]
               f = head (funs t ++ funs u)
