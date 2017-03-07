@@ -55,7 +55,6 @@ genSuchThat p = TestCaseWrapped <$> arbitrary `suchThat` uncrry p
 
 data PredRep = PredRep {predInstances :: [Instance], selectors :: [Constant], predCons :: Constant, embedder :: Constant}
 
--- This is broken, I don't know why :(
 predicate :: forall a str. (KnownSymbol str,
                             Predicateable a,
                             Typeable a,
