@@ -545,22 +545,22 @@ considerConditionalising :: Bool -> Signature -> Prop -> M Bool
 considerConditionalising regeneralised sig prop0 = do
   let prop = if regeneralised then prop0 else regeneralise prop0
 
-  -- If we have discovered that "somePredicate x_1 x_2 x_3 = True"
-  -- we should add the axiom "get_x_n (toSomePredicate x_n) = x_n"
+  -- If we have discovered that "somePredicate x_1 x_2 ... x_n = True"
+  -- we should add the axiom "get_x_n (toSomePredicate x_1 x_2 ... x_n) = x_n"
   -- to the set of known equations
   truth <- lift $ gets trueTerm 
   case prop of
     (lhs :=>: t :=: u) ->
       if u == truth then
           case t of
-            App f ts -> case lookupPredicate f (predicates sig) of -- It is an interesting predicate
+            App f ts -> case lookupPredicate f (predicates sig) of -- It is an interesting predicate, i.e. it was added by the user
               Just prd -> do
                     -- Get the `p_n` selector
-                let selector i   = fromJust $ cast (selType i) $ sel i
-                    sel i        = app (selectors prd !! i) []
-                    emb          = fromJust $ cast embedderType $ app (embedder prd) []
+                let selector i = fromJust $ cast (selType i) $ sel i
+                    sel i      = app (selectors prd !! i) []
+                    emb        = fromJust $ cast embedderType $ app (embedder prd) []
 
-                    testCase     = head $ typeArgs $ typ $ sel 0
+                    testCase   = head $ typeArgs $ typ $ sel 0
 
                     -- Make sure the selector and embedder functions are casted to have the
                     -- types corresponding to the types in `ts`
@@ -574,24 +574,13 @@ considerConditionalising regeneralised sig prop0 = do
                     -- equations
                     equations = [ lhs :=>: apply (selector i) construction :=: x | (x, i) <- zip ts [0..]]
 
-                {-
-                -- Print the things we wanted to add, for debugging pruposes
-                liftIO $ putStrLn "Equations before normalisation filtering:"
-                liftIO $ print $ map (show . pPrint) equations
-                liftIO $ putStrLn "\n"
-                -}
-
                 let normFilter (_ :=>: a :=: b) = (/=) <$> normalise a <*> normalise b
                 
                 equations' <- filterM normFilter equations
 
-                {-
-                liftIO $ putStrLn "Equations after normalisation filtering:"
-                liftIO $ print $ map (show . pPrint) equations'
-                liftIO $ putStrLn "\n"
-                -}
-
                 -- Declare the relevant equations as axioms
+                -- This is "safe" because the equations do not result from testing
+                -- (the unsafe is a bit strange, it _probably_ won't crash...)
                 lift $ lift $ mapM (unsafeAxiom Normal) equations' 
                  
                 return True 
