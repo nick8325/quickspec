@@ -1,5 +1,5 @@
 -- | The main 'quickSpec' function lives here.
-{-# LANGUAGE CPP, TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables, TupleSections, FlexibleContexts #-}
+{-# LANGUAGE CPP, TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables, TupleSections, FlexibleContexts, DoAndIfThenElse #-}
 module QuickSpec.Eval where
 
 #include "errors.h"
@@ -31,6 +31,7 @@ import QuickSpec.TestSet
 import QuickSpec.Type
 import QuickSpec.Utils
 import QuickSpec.PrintConditionally
+import QuickSpec.PredicatesInterface hiding (size)
 import Test.QuickCheck.Random
 import Test.QuickCheck.Text
 import System.Random
@@ -48,9 +49,10 @@ data S = S {
   terms         :: Set (Term Constant),
   schemaTestSet :: TestSet (Term Constant),
   termTestSet   :: Map (Term Constant) (TestSet TermFrom),
+  trueTerm      :: !(Term Constant),
   freshTestSet  :: TestSet TermFrom,
-  proved        :: Set PruningProp,
-  discovered    :: [Prop],
+  proved        :: (Set PruningProp),
+  discovered    :: ([Prop]),
   howMany       :: Int,
   delayed       :: [(Term Constant, Term Constant)],
   kind          :: Type -> TypeKind,
@@ -112,6 +114,7 @@ initialState sig seeds terminal =
       allSchemas    = Set.empty,
       schemaTestSet = emptyTestSet (memo (makeTester specialise v seeds2 sig)),
       termTestSet   = Map.empty,
+      trueTerm      = build (con (toFun (constant "True" True))),
       freshTestSet  = emptyTestSet (memo (makeTester specialise v seeds2 sig)),
       proved        = Set.empty,
       discovered    = background sig,
@@ -468,7 +471,17 @@ consider sig makeEvent x = do
   terms <- lift (gets terms)
   allSchemas <- findAll x
   case res of
-    Just u | u `Set.member` terms -> return ()
+    Just u  | u `Set.member` terms -> do
+      conditionalised <- considerConditionalising False sig ([] :=>: t :=: u)
+      if not conditionalised then
+        do
+          let specx = specialise x
+          res' <- maybeNormalise specx
+          case res' of
+            Nothing -> return ()
+            Just u  -> void $ considerConditionalising False sig ([] :=>: specx :=: u)
+      else
+        return ()
     Nothing | t `Set.member` terms -> return ()
     _ -> do
       case res of
@@ -529,12 +542,64 @@ shouldPrint prop =
     conIsBackground_ (Apply _) = True
     conIsBackground_ con = conIsBackground con
 
+considerConditionalising :: Bool -> Signature -> Prop -> M Bool
+considerConditionalising regeneralised sig prop0 = do
+  let prop = if regeneralised then prop0 else regeneralise prop0
+
+  -- If we have discovered that "somePredicate x_1 x_2 ... x_n = True"
+  -- we should add the axiom "get_x_n (toSomePredicate x_1 x_2 ... x_n) = x_n"
+  -- to the set of known equations
+  truth <- lift $ gets trueTerm 
+  case prop of
+    (lhs :=>: t :=: u) ->
+      if u == truth then
+          case t of
+            App f ts -> case lookupPredicate f (predicates sig) of -- It is an interesting predicate, i.e. it was added by the user
+              Just prd -> do
+                    -- Get the `p_n` selector
+                let selector i = fromJust $ cast (selType i) $ sel i
+                    sel i      = app (selectors prd !! i) []
+                    emb        = fromJust $ cast embedderType $ app (embedder prd) []
+
+                    testCase   = head $ typeArgs $ typ $ sel 0
+
+                    -- Make sure the selector and embedder functions are casted to have the
+                    -- types corresponding to the types in `ts`
+                    castTestCase (App x [s, _]) = app x [s, arrowType (map typ ts) (typeOf True)]
+                    selType i = app Arrow [castTestCase testCase, typ (ts !! i)]
+                    embedderType = arrowType (map typ ts) (castTestCase testCase)
+
+                    -- The "to_p x1 x2 ... xm" term
+                    construction = foldl apply emb ts
+                    -- The "p_n (to_p x1 x2 ... xn ... xm) = xn"
+                    -- equations
+                    equations = [ lhs :=>: apply (selector i) construction :=: x | (x, i) <- zip ts [0..]]
+
+                let normFilter (_ :=>: a :=: b) = (/=) <$> normalise a <*> normalise b
+                
+                equations' <- filterM normFilter equations
+
+                -- Declare the relevant equations as axioms
+                -- This is "safe" because the equations do not result from testing
+                -- (the unsafe is a bit strange, it _probably_ won't crash...)
+                lift $ lift $ mapM (unsafeAxiom Normal) equations' 
+                 
+                return True 
+              _ -> return True 
+            _ -> do
+              lift $ modify $ \st -> st {trueTerm = t} -- This is the smallest term equal to `True`
+              return True 
+        else
+          return False
+    _ -> return False
+
 found :: Signature -> Prop -> M ()
-found sig prop0 = do
+found sig prop0 =  do
   let reorder (lhs :=>: t :=: u)
         | measure t >= measure u = lhs :=>: t :=: u
         | otherwise = lhs :=>: u :=: t
       prop = regeneralise (reorder prop0)
+
   props <- lift (gets discovered)
   (_, props') <- liftIO $ runPruner sig [] $ mapM_ (axiom Normal) (map (simplify_ sig) props)
 
@@ -577,12 +642,13 @@ found sig prop0 = do
   newTerm u
   onTerm putTemp "[renormalising existing terms...]"
   let norm s = do
-        ts <- filterM (fmap isJust . rep) (Set.toList s)
-        us <- mapM (fmap (fromMaybe __) . rep) ts
-        return ((s Set.\\ Set.fromList ts) `Set.union` Set.fromList us)
+                 ts <- filterM (fmap isJust . rep) (Set.toList s)
+                 us <- mapM (fmap (fromMaybe __) . rep) ts
+                 return ((s Set.\\ Set.fromList ts) `Set.union` Set.fromList us)
   terms <- lift (gets terms) >>= lift . lift . norm
   allSchemas <- lift (gets allSchemas) >>= lift . lift . norm
   lift $ modify (\s -> s { terms = terms, allSchemas = allSchemas })
+  considerConditionalising True sig prop
   onTerm putPart ""
 
 etaExpand :: Prop -> Prop

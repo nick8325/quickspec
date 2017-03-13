@@ -84,10 +84,11 @@ library
     QuickSpec.TestSet
     QuickSpec.Type
     QuickSpec.Utils
+    QuickSpec.Instance
 
   Build-depends: QuickCheck >= 2.7
                , base < 5
-               , constraints
+               , constraints >= 0.9
                , containers
                , dlist
                , heaps

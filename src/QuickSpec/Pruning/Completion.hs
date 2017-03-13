@@ -11,6 +11,7 @@ import Twee.Base
 import qualified Twee.Rule as Rule
 import qualified Twee as Twee
 import Twee(Twee)
+import Debug.Trace
 
 newtype Completion =
   Completion {
@@ -31,7 +32,7 @@ liftTwee m = do
 localTwee :: State (Twee PruningConstant) a -> StateT Completion IO a
 localTwee m = do
   ks <- gets twee
-  return (evalState m ks)
+  return $! evalState m ks
 
 newAxiom :: AxiomMode -> PropOf PruningTerm -> StateT Completion IO ()
 newAxiom _ ([] :=>: (t :=: u)) = do
@@ -41,6 +42,7 @@ newAxiom _ ([] :=>: (t :=: u)) = do
     unless (norm t == norm u) $ do
       Twee.newEquation (t Rule.:=: u)
       Twee.complete
+  return ()
 newAxiom _ _ = return ()
 
 while :: IO Bool -> IO () -> IO ()

@@ -16,7 +16,12 @@ import Control.Monad
 import Data.Functor.Identity
 import Twee.Base
 
-makeTester :: (a -> Term Constant) -> [Type -> Var -> Value Identity] -> [(QCGen, Int)] -> Signature -> Type -> Maybe (Value (TypedTestSet a))
+makeTester :: (a -> Term Constant)
+           -> [Type -> Var -> Value Identity]
+           -> [(QCGen, Int)]
+           -> Signature
+           -> Type
+           -> Maybe (Value (TypedTestSet a))
 makeTester toTerm vals tests sig ty = do
   i <- listToMaybe (findInstanceOf sig (defaultTypes sig ty))
   case unwrap (i :: Value Observe1) of
@@ -26,7 +31,14 @@ makeTester toTerm vals tests sig ty = do
           return . wrap w' $
             emptyTypedTestSet (tester sig toTerm vals tests (eval . runIdentity . reunwrap w . defaultTypes sig))
 
-tester :: Ord b => Signature -> (a -> Term Constant) -> [Type -> Var -> Value Identity] -> [(QCGen, Int)] -> (Value Identity -> Gen b) -> a -> Maybe [b]
+tester :: Ord b
+       => Signature
+       -> (a -> Term Constant)
+       -> [Type -> Var -> Value Identity]
+       -> [(QCGen, Int)]
+       -> (Value Identity -> Gen b)
+       -> a
+       -> Maybe [b]
 tester sig toTerm vals tests eval t =
   Just [ unGen (eval (evaluateTm (defaultTypes sig) val (toTerm t))) g n | (val, (g, n)) <- zip vals tests ]
 

@@ -1,90 +1,81 @@
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables,
+             TypeFamilies,
+             FlexibleContexts,
+             DataKinds
+#-}
 module QuickSpec.PredicatesInterface where
+import Data.Constraint
+import Data.Maybe
 import QuickSpec.Term
+import QuickSpec.Instance
 import Test.QuickCheck
 import Data.Dynamic
-
-fromJust (Just x) = x
+import Data.List
+import GHC.TypeLits
 
 class Predicateable a where
-    toPredicates :: a -> Gen (Maybe [Dynamic]) 
-    getters      :: Int -> String -> a -> [Int -> Constant]
-    size         :: a -> Int
+  uncrry       :: a -> TestCase a -> Bool
+  getrs        :: (Typeable x) => String -> a -> (x -> TestCase a) -> [Constant]
 
 instance Predicateable Bool where
-    toPredicates True  = return (Just [])
-    toPredicates False = return Nothing
-    getters _ _ _ = []
-    size _ = 0
+  uncrry       = const 
+  getrs _ _ _  = []
 
-instance (Predicateable b, Typeable a, Arbitrary a) => Predicateable (a -> b) where
-    getters indx name _ =
-        (:)
-        (\i ->
-            constant
-                (name++show indx)
-                (extract i :: Predicates -> a))
-        (map (\f -> f . (1+)) (getters (indx+1) name (undefined :: b)))
+instance forall a b. (Predicateable b, Typeable a, TestCase (a -> b) ~ (a, TestCase b)) => Predicateable (a -> b) where
+  uncrry f (a, b) = uncrry (f a) b
+  getrs s _ (foo :: x -> (a, TestCase b)) = constant s (fst . foo :: x -> a) : getrs (s++"'") (undefined :: b) (snd . foo :: x -> TestCase b)
 
-    -- here is where we could do the lazy predicate stuff for an instance
-    toPredicates predicate = do
-                                a <- arbitrary
-                                dyns <- toPredicates (predicate a)
-                                return $ fmap ((toDyn a):) dyns
+-- Foldr over functions
+type family (Foldr f b fun) :: * where
+  Foldr f def (a -> b) = f a (Foldr f def b)
+  Foldr f def b        = def
 
-    size _ = 1 + size (undefined :: b)
+-- Calculate the type of the "embedding" function,
+-- the _uninterpreted_ function which we add when pruning
+-- in the "(extract n) (toP x1 x2 ... xn ... xm) = xn" step
+type EmbType (str :: Symbol) a = Foldr (->) (TestCaseWrapped str a) a
 
-extract :: (Typeable a) => Int -> Predicates -> a
-extract i (P preds) = fromJust $ fromDynamic $ preds `at` i
+-- A test case for predicates of type a
+-- if `a ~ A -> B -> C -> Bool` we get `TestCase a ~ (A, (B, (C, ())))`
+--
+-- Some speedup should be possible by using unboxed tuples instead...
+type TestCase a = Foldr (,) () a
 
-at :: [(Int, [a])] -> Int -> a
-at [] _ = undefined
-at ((j, xs):tl) i
-    | i < j     = xs !! i
-    | otherwise = tl `at` (i-j)
+data TestCaseWrapped (str :: Symbol) a = TestCaseWrapped { unTestCaseWrapped :: (TestCase a) }
 
--- A type to hold _all_ predicates,
--- I imagine we will keep this type
--- hidden in QuickSpec
-data Predicates = P {unP :: [(Int, [Dynamic])]} deriving(Show)-- Arity + arguments
+instance Eq (TestCaseWrapped str a) where
+  p == q = False
 
--- Dummy instances, don't matter since we never inspect
--- the type (only it's projections)
-instance Eq Predicates where
-    p == q = False
+instance Ord (TestCaseWrapped str a) where
+  compare p q = LT
 
-instance Ord Predicates where
-    compare p q = LT
+-- A `suchThat` generator for a predicate
+genSuchThat :: (Predicateable a, Arbitrary (TestCase a)) => a -> Gen (TestCaseWrapped x a)
+genSuchThat p = TestCaseWrapped <$> arbitrary `suchThat` uncrry p
 
-type PredicateRep = (((Int, Gen (Maybe [Dynamic])), [Int -> Constant]), Constant)
+data PredRep = PredRep {predInstances :: [Instance], selectors :: [Constant], predCons :: Constant, embedder :: Constant}
 
-predicate :: (Predicateable a, Typeable a) => String -> a -> PredicateRep
-predicate name p = (((size p, toPredicates p), getters 0 name p), constant name p)
+predicate :: forall a str. (KnownSymbol str,
+                            Predicateable a,
+                            Typeable a,
+                            Typeable (EmbType str a),
+                            Typeable (TestCase a)) => (Proxy (str :: Symbol)) -> a -> PredRep 
+predicate proxy pred = PredRep instances
+                               getters
+                               predicateCons
+                               embedder
+  where
+    instances =  makeInstance (\(dict :: Dict (Arbitrary (TestCase a))) -> (withDict dict genSuchThat) pred :: Gen (TestCaseWrapped str a))
+              ++ names (NamesFor [symbolVal proxy] :: NamesFor (TestCaseWrapped str a))
 
-predicateGen :: (Predicateable a, Typeable a) => String -> a -> Gen [Dynamic] -> PredicateRep
-predicateGen name p g = (((size p, fmap Just g), getters 0 name p), constant name p)
+    getters = getrs ("prj_" ++ symbolVal proxy) pred (unTestCaseWrapped :: TestCaseWrapped str a -> TestCase a)
 
-preds :: [PredicateRep] -> (Gen Predicates, [Constant])
-preds xs = resolvePredicates $ unzip (map fst xs)
+    predicateCons = constant (symbolVal proxy) pred
 
-resolvePredicates :: ([(Int, Gen (Maybe [Dynamic]))], [[Int -> Constant]]) -> (Gen Predicates, [Constant])
-resolvePredicates (gen, getters) = (makeGen, concat $ zipWith (\fs i -> map ($i) fs) getters [0..])
-    where
-        makeOneGen :: (Int, Gen (Maybe [Dynamic])) -> Gen (Int, [Dynamic])
-        makeOneGen (i, generator) = do
-                                     v <- backtracking generator
-                                     return (i, v)
-        
-        makeGen = fmap P $ sequence $ map makeOneGen gen
+    embedder = constant ("emb_" ++ symbolVal proxy) (undefined :: EmbType str a)
 
-backtracking :: Gen (Maybe a) -> Gen a
-backtracking g = do
-                    x <- g
-                    i <- resize 10 arbitrary
-                    case x of
-                        Nothing -> backtracking (scale (\j -> max (j+i) 0) g) -- We failed
-                                                                              -- so we arbitrarily increase the size
-                                                                              -- which is probably a bad idea in general
-                        Just y  -> return y
-
-makeContexts reps = zipWith (\((_, fns), p) i -> (p, map ($i) fns)) reps [0..]
+lookupPredicate :: Constant -> [PredRep] -> Maybe PredRep
+lookupPredicate c []     = Nothing
+lookupPredicate c (x:xs) = if conName c == conName (predCons x)
+                           then Just x
+                           else lookupPredicate c xs

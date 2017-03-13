@@ -75,7 +75,7 @@ event :: (Ord e, Monad m) => RuleT e m e
 event = RuleT onMatch
 
 require :: Monad m => Bool -> RuleT e m ()
-require True = return ()
+require True  = return ()
 require False = fail ""
 
 execute :: Monad m => RulesT e m a -> RuleT e m a
