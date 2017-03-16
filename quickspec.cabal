@@ -39,11 +39,24 @@ Extra-source-files:
   README.asciidoc
   examples/Arith.hs
   examples/Bools.hs
+  examples/Combinators.hs
   examples/Composition.hs
+  examples/Conditionals.hs
+  examples/ConditionalsPruning.hs
+  examples/Const.hs
   examples/Geometry.hs
-  examples/Heaps.hs
+  examples/HugeLists.hs
+  examples/ListMonad.hs
   examples/Lists.hs
+  examples/MinMax.hs
+  examples/OctonionsComplicated.hs
+  examples/Octonions.hs
+  examples/Pairs.hs
+  examples/Parsing.hs
   examples/PrettyPrinting.hs
+  examples/PrettyPrintingModel.hs
+  examples/Process.hs
+  examples/Regex.hs
   src/errors.h
 
 source-repository head
