@@ -7,7 +7,9 @@ import Control.Arrow((&&&))
 import Control.Exception
 import Control.Spoon
 import Data.List(groupBy, sortBy)
+#if !MIN_VERSION_base(4,8,0)
 import Data.Monoid
+#endif
 import Data.Ord(comparing)
 import System.IO
 
