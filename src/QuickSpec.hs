@@ -11,6 +11,7 @@ module QuickSpec(
   module QuickSpec.Pruning.Simple,
   module QuickSpec.Rules,
   module QuickSpec.Signature,
+  module QuickSpec.Instance,
   module QuickSpec.Term,
   module QuickSpec.Test,
   module QuickSpec.TestSet,
@@ -32,4 +33,5 @@ import QuickSpec.TestSet
 import QuickSpec.Type
 import QuickSpec.Utils
 import QuickSpec.PredicatesInterface
+import QuickSpec.Instance
 import Data.Constraint
