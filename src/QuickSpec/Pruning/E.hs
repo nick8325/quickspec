@@ -45,11 +45,11 @@ translate hasConj axioms goal = Jukebox.runNameM [] $ do
   let var  = find (Map.fromList (zip vs varSyms))
       fun  = find (Map.fromList (zip fs funSyms))
       prop = find (Map.fromList (zip ps propSyms))
-      input kind form = Jukebox.Input "clause" kind form
+      input kind form = Jukebox.Input "clause" kind Jukebox.Unknown form
       conj | hasConj = input Jukebox.Conjecture
-           | otherwise = input Jukebox.Axiom . Jukebox.nt
+           | otherwise = input (Jukebox.Axiom "axiom") . Jukebox.nt
   return (conj (translateLiteral var fun prop goal):
-          map (input Jukebox.Axiom . translateProp var fun prop) axioms)
+          map (input (Jukebox.Axiom "axiom") . translateProp var fun prop) axioms)
 
 makeFunName :: PruningConstant -> String
 makeFunName Minimal = "a"

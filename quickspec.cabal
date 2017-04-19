@@ -114,7 +114,7 @@ library
                , uglymemo
 
   if flag(jukebox)
-    Build-depends: jukebox >= 0.2
+    Build-depends: jukebox >= 0.2.17
   else
     cpp-options: -DNO_JUKEBOX
   if flag(z3)
