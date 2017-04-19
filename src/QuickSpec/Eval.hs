@@ -205,11 +205,16 @@ quickSpec sigin = do
       theory = Just theory }
 
 runM :: Signature -> M a -> IO a
-runM sig m = withStdioTerminal $ \term -> do
+runM sig m = withTerminal $ \term -> do
   seeds <- fmap (take (maxTests_ sig)) (genSeeds 20)
   evalPruner sig
     (fromMaybe (emptyPruner sig) (theory sig))
     (evalStateT (runRulesT m) (initialState sig seeds term))
+  where
+    withTerminal =
+      if silent sig
+      then withNullTerminal
+      else withStdioTerminal
 
 onTerm :: (Terminal -> String -> IO ()) -> String -> M ()
 onTerm f s = do

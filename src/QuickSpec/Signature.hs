@@ -57,7 +57,8 @@ data Signature =
     simplify            :: Maybe (Signature -> Prop -> Prop),
     extraPruner         :: Maybe ExtraPruner,
     conditionalsContext :: [(Constant, [Constant])],
-    predicates          :: [PredRep]
+    predicates          :: [PredRep],
+    silent              :: Bool
   }
   deriving Typeable
 
@@ -203,8 +204,8 @@ namesFor_ sig ty =
 newtype DictOf c a = DictOf { unDictOf :: Dict (c a) } deriving Typeable
 
 instance Monoid Signature where
-  mempty = Signature [] [] [] Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing False Nothing Nothing [] []
-  Signature cs is b th d s ps dp s1 t tim pr simp p pctxs prds `mappend` Signature cs' is' b' th' d' s' ps' dp' s1' t' tim' pr' simp' p' pctxs' prds' =
+  mempty = Signature [] [] [] Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing False Nothing Nothing [] [] False
+  Signature cs is b th d s ps dp s1 t tim pr simp p pctxs prds sil `mappend` Signature cs' is' b' th' d' s' ps' dp' s1' t' tim' pr' simp' p' pctxs' prds' sil' =
     Signature (cs++cs') (is++is') (b++b')
       (th `mplus` th')
       (d `mplus` d')
@@ -219,6 +220,7 @@ instance Monoid Signature where
       (p `mplus` p')
       (pctxs `mplus` pctxs')
       (prds `mplus` prds')
+      (sil || sil')
 
 signature :: Signature
 signature = mempty
