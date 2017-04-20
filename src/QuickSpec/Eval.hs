@@ -186,14 +186,15 @@ choppyQuickSpec cs sig = do
 -- background theory in a later run of QuickSpec.
 quickSpec :: Signature -> IO Signature
 quickSpec sigin = do
-  let sig = predicateSig sigin 
-  putStrLn "== Signature =="
-  prettyPrint sig
-  putStrLn ""
-  putStrLn "== Laws =="
+  let sig = predicateSig sigin
+  unless (silent sig) $ do
+    putStrLn "== Signature =="
+    prettyPrint sig
+    putStrLn ""
+    putStrLn "== Laws =="
   runM sig $ do
     quickSpecLoop sig
-    when (printStatistics sig) $ do
+    when (not (silent sig) && printStatistics sig) $ do
       liftIO $ putStrLn "== Statistics =="
       summarise
     props <- lift (gets (reverse . discovered))
