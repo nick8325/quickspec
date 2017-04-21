@@ -1,12 +1,12 @@
 -- Polymorphic types and dynamic values.
-{-# LANGUAGE DeriveDataTypeable, CPP, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances, GeneralizedNewtypeDeriving, Rank2Types, ExistentialQuantification, PolyKinds, TypeFamilies, FlexibleContexts, StandaloneDeriving, PatternGuards #-}
+{-# LANGUAGE DeriveDataTypeable, CPP, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances, GeneralizedNewtypeDeriving, Rank2Types, ExistentialQuantification, PolyKinds, TypeFamilies, FlexibleContexts, StandaloneDeriving, PatternGuards, MultiParamTypeClasses #-}
 -- To avoid a warning about TyVarNumber's constructor being unused:
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
 module QuickSpec.Type(
   -- Types.
   Typeable,
-  Type, TyCon(..), tyCon, toTyCon, fromTyCon, A, B, C, D, E,
-  typeOf, typeRep, applyType, toTypeRep, fromTypeRep,
+  Type, TyCon(..), tyCon, fromTyCon, A, B, C, D, E,
+  typeOf, typeRep, applyType, fromTypeRep,
   arrowType, typeArgs, typeRes, typeDrop, typeArity, oneTypeVar, skolemiseTypeVars,
   isDictionary, getDictionary,
   -- Things that have types.
@@ -28,7 +28,6 @@ import Data.DList(DList)
 import Data.Maybe
 import qualified Data.Typeable as Ty
 import Data.Typeable(Typeable)
-import qualified Data.Typeable.Internal as Ty
 import GHC.Exts(Any)
 import GHC.Stack
 import Test.QuickCheck
@@ -45,13 +44,6 @@ deriving instance Typeable (() :: Constraint)
 type Type = Term TyCon
 
 data TyCon = Arrow | TyCon Ty.TyCon deriving (Eq, Ord, Show)
-
-instance Labelled TyCon where
-  cache = tyConCache
-
-{-# NOINLINE tyConCache #-}
-tyConCache :: Cache TyCon
-tyConCache = mkCache
 
 instance Pretty TyCon where
   pPrint Arrow = text "->"
@@ -90,25 +82,28 @@ typeRep :: Typeable (a :: k) => proxy a -> Type
 typeRep x = fromTypeRep (Ty.typeRep x)
 
 applyType :: Type -> Type -> Type
-applyType (Fun f tys) ty = build (fun f (unpack tys ++ [ty]))
+applyType (App f tys) ty = build (app f (unpack tys ++ [ty]))
 applyType _ _ = ERROR("tried to apply type variable")
 
 arrowType :: [Type] -> Type -> Type
 arrowType [] res = res
 arrowType (arg:args) res =
-  build (fun (auto Arrow) [arg, arrowType args res])
+  build (app (fun Arrow) [arg, arrowType args res])
 
 typeArgs :: Type -> [Type]
-typeArgs (Fun (F _ Arrow) (Cons arg (Cons res Empty))) = arg:typeArgs res
+typeArgs (App arrow (Cons arg (Cons res Empty)))
+  | fun_value arrow == Arrow = arg:typeArgs res
 typeArgs _ = []
 
 typeRes :: Type -> Type
-typeRes (Fun (F _ Arrow) (Cons _ (Cons res Empty))) = typeRes res
+typeRes (App arrow (Cons _ (Cons res Empty)))
+  | fun_value arrow == Arrow = typeRes res
 typeRes ty = ty
 
 typeDrop :: Int -> Type -> Type
 typeDrop 0 ty = ty
-typeDrop n (Fun (F _ Arrow) (Cons _ (Cons ty Empty))) = typeDrop (n-1) ty
+typeDrop n (App arrow (Cons _ (Cons ty Empty)))
+  | fun_value arrow == Arrow = typeDrop (n-1) ty
 
 typeArity :: Type -> Int
 typeArity = length . typeArgs
@@ -119,13 +114,13 @@ oneTypeVar = typeSubst (const (var (V 0)))
 skolemiseTypeVars :: Typed a => a -> a
 skolemiseTypeVars = typeSubst (const aTy)
   where
-    aTy = build (con (auto (fromTyCon (mkCon (__ :: A)))))
+    aTy = build (con (fun (fromTyCon (mkCon (__ :: A)))))
 
 fromTypeRep :: Ty.TypeRep -> Type
 fromTypeRep ty =
   case Ty.splitTyConApp ty of
     (tyVar, [ty]) | tyVar == varTyCon -> build (var (V (fromTyVar ty)))
-    (tyCon, tys) -> build (fun (auto (fromTyCon tyCon)) (map fromTypeRep tys))
+    (tyCon, tys) -> build (app (fun (fromTyCon tyCon)) (map fromTypeRep tys))
   where
     fromTyVar ty =
       case Ty.splitTyConApp ty of
@@ -152,38 +147,23 @@ mkCon = fst . Ty.splitTyConApp . Ty.typeOf
 tyCon :: Typeable a => a -> TyCon
 tyCon = fromTyCon . mkCon
 
--- For showing types.
-toTypeRep :: Type -> Ty.TypeRep
-toTypeRep (Fun (F _ tyCon) tys) = Ty.mkTyConApp (toTyCon tyCon) (map toTypeRep (unpack tys))
-toTypeRep (Var (V n)) = Ty.mkTyConApp varTyCon [toTyVar n]
-  where
-    toTyVar 0 = Ty.mkTyConApp zeroTyCon []
-    toTyVar n = Ty.mkTyConApp succTyCon [toTyVar (n-1)]
-
-toTyCon :: TyCon -> Ty.TyCon
-toTyCon Arrow = arrowTyCon
-toTyCon (TyCon tyCon) = tyCon
-
 getDictionary :: Type -> Maybe Type
-getDictionary (Fun (F _ (TyCon tc)) (Cons ty Empty))
-  | tc == dictTyCon = Just ty
+getDictionary (App tc (Cons ty Empty))
+  | fun_value tc == TyCon dictTyCon = Just ty
 getDictionary _ = Nothing
 
 isDictionary :: Type -> Bool
 isDictionary = isJust . getDictionary
 
 -- CoArbitrary instances.
-instance CoArbitrary Ty.TypeRep where
-#if __GLASGOW_HASKELL__ >= 710
-  coarbitrary (Ty.TypeRep (Ty.Fingerprint x y) _ _ _) =
-    coarbitrary x . coarbitrary y
-#else
-  coarbitrary (Ty.TypeRep (Ty.Fingerprint x y) _ _) =
-    coarbitrary x . coarbitrary y
-#endif
-
 instance CoArbitrary Type where
-  coarbitrary = coarbitrary . toTypeRep
+  coarbitrary = coarbitrary . singleton
+instance CoArbitrary (TermList TyCon) where
+  coarbitrary Empty = variant 0
+  coarbitrary (ConsSym (Var (V x)) ts) =
+    variant 1 . coarbitrary x . coarbitrary ts
+  coarbitrary (ConsSym (App f _) ts) =
+    variant 2 . coarbitrary (fun_id f) . coarbitrary ts
 
 -- Things with types.
 class Typed a where
@@ -194,20 +174,20 @@ class Typed a where
   otherTypesDL :: a -> DList Type
   otherTypesDL _ = mzero
   -- Substitute for all type variables.
-  typeReplace :: (TermListOf Type -> Builder TyCon) -> a -> a
+  typeSubst_ :: (Var -> Builder TyCon) -> a -> a
 
 {-# INLINE typeSubst #-}
 typeSubst :: (Typed a, Substitution s, SubstFun s ~ TyCon) => s -> a -> a
-typeSubst s x = typeReplace (Term.substList s) x
+typeSubst s x = typeSubst_ (evalSubst s) x
 
 -- Using the normal term machinery on types.
 newtype TypeView a = TypeView { unTypeView :: a }
 instance Typed a => Symbolic (TypeView a) where
   type ConstantOf (TypeView a) = TyCon
   termsDL = fmap singleton . typesDL . unTypeView
-  replace f = TypeView . typeReplace f . unTypeView
-instance Typed a => Singular (TypeView a) where
-  term = typ . unTypeView
+  subst_ sub = TypeView . typeSubst_ sub . unTypeView
+instance Typed a => Has (TypeView a) Type where
+  the = typ . unTypeView
 
 typesDL :: Typed a => a -> DList Type
 typesDL ty = return (typ ty) `mplus` otherTypesDL ty
@@ -240,32 +220,32 @@ canApply f x = isJust (tryApply f x)
 -- Instances.
 instance Typed Type where
   typ = id
-  typeReplace = replace
+  typeSubst_ = subst
 
 instance Apply Type where
-  tryApply (Fun (F _ Arrow) (Cons arg (Cons res Empty))) t
-    | t == arg = Just res
+  tryApply (App arrow (Cons arg (Cons res Empty))) t
+    | fun_value arrow == Arrow, t == arg = Just res
   tryApply _ _ = Nothing
 
 instance (Typed a, Typed b) => Typed (a, b) where
-  typ (x, y) = build (fun (auto (TyCon commaTyCon)) [typ x, typ y])
+  typ (x, y) = build (app (fun (TyCon commaTyCon)) [typ x, typ y])
   otherTypesDL (x, y) = otherTypesDL x `mplus` otherTypesDL y
-  typeReplace f (x, y) = (typeReplace f x, typeReplace f y)
+  typeSubst_ f (x, y) = (typeSubst_ f x, typeSubst_ f y)
 
 instance (Typed a, Typed b) => Typed (Either a b) where
   typ (Left x)  = typ x
   typ (Right x) = typ x
   otherTypesDL (Left x)  = otherTypesDL x
   otherTypesDL (Right x) = otherTypesDL x
-  typeReplace sub (Left x)  = Left  (typeReplace sub x)
-  typeReplace sub (Right x) = Right (typeReplace sub x)
+  typeSubst_ sub (Left x)  = Left  (typeSubst_ sub x)
+  typeSubst_ sub (Right x) = Right (typeSubst_ sub x)
 
 instance Typed a => Typed [a] where
   typ [] = typeOf ()
   typ (x:xs) = typ x
   otherTypesDL [] = mzero
   otherTypesDL (x:xs) = otherTypesDL x `mplus` msum (map typesDL xs)
-  typeReplace f xs = map (typeReplace f) xs
+  typeSubst_ f xs = map (typeSubst_ f) xs
 
 -- Represents a forall-quantifier over all the type variables in a type.
 -- Wrapping a term in Poly normalises the type by alpha-renaming
@@ -310,7 +290,7 @@ polyMgu ty1 ty2 = do
 instance Typed a => Typed (Poly a) where
   typ = typ . unPoly
   otherTypesDL = otherTypesDL . unPoly
-  typeReplace f (Poly x) = poly (typeReplace f x)
+  typeSubst_ f (Poly x) = poly (typeSubst_ f x)
 
 instance Apply a => Apply (Poly a) where
   tryApply f x = do
@@ -344,7 +324,7 @@ fromValue x = do
 
 instance Typed (Value f) where
   typ = valueType
-  typeReplace f (Value ty x) = Value (typeReplace f ty) x
+  typeSubst_ f (Value ty x) = Value (typeSubst_ f ty) x
 instance Applicative f => Apply (Value f) where
   tryApply f x = do
     ty <- tryApply (typ f) (typ x)
@@ -405,7 +385,7 @@ wrapFunctor f x =
 unwrapFunctor :: forall f g h. Typeable g => (forall a. f (g a) -> h a) -> Value f -> Value h
 unwrapFunctor f x =
   case typ x of
-    Fun _ tys | tys@(_:_) <- unpack tys ->
+    App _ tys | tys@(_:_) <- unpack tys ->
       case ty `applyType` last tys == typ x of
         True ->
           Value {
