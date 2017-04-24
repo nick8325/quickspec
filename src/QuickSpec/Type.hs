@@ -38,8 +38,6 @@ import qualified Twee.Term as Term
 import Twee.Label
 import Data.Ord
 
-deriving instance Typeable (() :: Constraint)
-
 -- A (possibly polymorphic) type.
 type Type = Term TyCon
 
