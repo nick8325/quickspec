@@ -23,30 +23,34 @@ instance Typed Var where
   otherTypesDL _ = mzero
   typeSubst_ sub (V ty x) = V (typeSubst_ sub ty) x
 
-pattern Var :: (Ord f, Typeable f) => Var -> Term f
-pattern Var x <- (patVar -> Just x)
-
 var :: (Ord f, Typeable f) => Var -> Builder (Either f Type)
 var (V ty x) = Base.app (fun (Right ty)) (Base.var (Base.V x))
 
-pattern App :: f -> [Term f] -> Term f
-pattern App f ts <- Base.App (F (Left f)) (unpack -> ts)
-
 fun :: (Ord f, Typeable f) => f -> Fun f
 fun = Base.fun . Left
+
+pattern Var :: (Ord f, Typeable f) => Var -> Term f
+pattern Var x <- (patVar -> Just x)
 
 patVar :: Term f -> Maybe Var
 patVar (Base.App (F (Right ty)) (Cons (Base.Var (Base.V x)) Empty)) =
   Just (V ty x)
 patVar _ = Nothing
 
-funs :: Symbolic f a => a -> [f]
+pattern App :: Fun f -> TermList f -> Term f
+pattern App f ts <- (patApp -> Just (f, ts))
+
+patApp :: Term f -> Maybe (Fun f, TermList f)
+patApp (Base.App f@(F (Left _)) ts) = Just (f, ts)
+patApp _ = Nothing
+
+funs :: Symbolic f a => a -> [Fun f]
 funs x = [ f | t <- terms x, App f _ <- subtermsList t ]
 
 vars :: Symbolic f a => a -> [Var]
 vars x = [ v | t <- terms x, Var v <- subtermsList t ]
 
-occ :: Symbolic f a => f -> a -> Int
+occ :: Symbolic f a => Fun f -> a -> Int
 occ x t = length (filter (== x) (funs t))
 
 occVar :: Symbolic f a => Var -> a -> Int
