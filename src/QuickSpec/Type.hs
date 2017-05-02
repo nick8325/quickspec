@@ -89,19 +89,19 @@ arrowType (arg:args) res =
   build (app (fun Arrow) [arg, arrowType args res])
 
 typeArgs :: Type -> [Type]
-typeArgs (App arrow (Cons arg (Cons res Empty)))
-  | fun_value arrow == Arrow = arg:typeArgs res
+typeArgs (App (F Arrow) (Cons arg (Cons res Empty))) =
+  arg:typeArgs res
 typeArgs _ = []
 
 typeRes :: Type -> Type
-typeRes (App arrow (Cons _ (Cons res Empty)))
-  | fun_value arrow == Arrow = typeRes res
+typeRes (App (F Arrow) (Cons _ (Cons res Empty))) =
+  typeRes res
 typeRes ty = ty
 
 typeDrop :: Int -> Type -> Type
 typeDrop 0 ty = ty
-typeDrop n (App arrow (Cons _ (Cons ty Empty)))
-  | fun_value arrow == Arrow = typeDrop (n-1) ty
+typeDrop n (App (F Arrow) (Cons _ (Cons ty Empty))) =
+  typeDrop (n-1) ty
 
 typeArity :: Type -> Int
 typeArity = length . typeArgs
@@ -146,8 +146,8 @@ tyCon :: Typeable a => a -> TyCon
 tyCon = fromTyCon . mkCon
 
 getDictionary :: Type -> Maybe Type
-getDictionary (App tc (Cons ty Empty))
-  | fun_value tc == TyCon dictTyCon = Just ty
+getDictionary (App (F (TyCon dict)) (Cons ty Empty))
+  | dict == dictTyCon = Just ty
 getDictionary _ = Nothing
 
 isDictionary :: Type -> Bool
@@ -221,8 +221,8 @@ instance Typed Type where
   typeSubst_ = subst
 
 instance Apply Type where
-  tryApply (App arrow (Cons arg (Cons res Empty))) t
-    | fun_value arrow == Arrow, t == arg = Just res
+  tryApply (App (F Arrow) (Cons arg (Cons res Empty))) t
+    | t == arg = Just res
   tryApply _ _ = Nothing
 
 instance (Typed a, Typed b) => Typed (a, b) where
