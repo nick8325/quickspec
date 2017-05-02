@@ -4,7 +4,7 @@
 -- value of that type.
 
 {-# LANGUAGE RankNTypes, CPP, ScopedTypeVariables #-}
-module QuickSpec.Instances where
+module QuickSpec.FindInstance where
 
 #include "errors.h"
 import Twee.Base
@@ -42,9 +42,9 @@ instValue :: Poly (Value Identity) -> Instances
 instValue x =
   -- Transform x into a single-argument function.
   case typ x of
-    App Arrow [_, App Arrow _] ->
+    App (F Arrow) (Cons _ (Cons (App (F Arrow) _) Empty)) ->
       instValue (apply uncur x)
-    App Arrow _ ->
+    App (F Arrow) _ ->
       makeInstances [x]
     _ ->
       makeInstances [apply delay x]
@@ -56,10 +56,10 @@ polyValue :: Typeable a => a -> Poly (Value Identity)
 polyValue = poly . toValue . Identity
 
 construct_ :: Instances -> Type -> [Value Identity]
-construct_ _ (App unit [])
+construct_ _ (App (F unit) Empty)
   | unit == tyCon () =
     return (toValue (Identity ()))
-construct_ res (App pair [ty1, ty2])
+construct_ res (App (F pair) (Cons ty1 (Cons ty2 Empty)))
   | pair == tyCon ((),()) = do
     x <- findInstance res ty1
     y <- findInstance res ty2
@@ -68,7 +68,7 @@ construct_ insts ty = do
   -- Find a function whose result type unifies with ty.
   -- Rename it to avoid clashes with ty.
   fun <- fmap (polyRename ty) (is_instances insts)
-  App Arrow [arg, res] <- return (typ fun)
+  App (F Arrow) (Cons arg (Cons res Empty)) <- return (typ fun)
   sub <- maybeToList (unify ty res)
   arg <- return (typeSubst sub arg)
   -- Find an argument for that function and apply the function.
