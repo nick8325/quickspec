@@ -1,12 +1,18 @@
--- A typeclass for running tests.
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
-
+-- A type of testers.
 module QuickSpec.Tester where
 
-import QuickSpec.Term
-import QuickSpec.Prop
+data Tester term =
+  Tester {
+    test :: term -> Result term }
 
-class Tester f a | a -> f where
-  testTerm :: Term f -> a -> Result f a
+data Result term = EqualTo term | Distinct (Tester term)
 
-data Result f a = EqualTo (Term f) | Distinct a
+makeTester ::
+  (term -> tester -> Either term tester) ->
+  tester -> Tester term
+makeTester test state =
+  Tester {
+    test = \t ->
+      case test t state of
+        Left u -> EqualTo u
+        Right state' -> Distinct (makeTester test state') }

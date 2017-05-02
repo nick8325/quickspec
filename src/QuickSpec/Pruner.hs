@@ -1,11 +1,18 @@
--- A typeclass for pruners.
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
-
+-- A type of pruners.
 module QuickSpec.Pruner where
 
-import QuickSpec.Term
 import QuickSpec.Prop
 
-class Pruner f a | a -> f where
-  normalise :: a -> Term f -> Term f
-  add :: Prop (Term f) -> a -> a
+data Pruner term =
+  Pruner {
+    normalise :: term -> term,
+    add :: Prop term -> Pruner term }
+
+makePruner ::
+  (pruner -> term -> term) ->
+  (Prop term -> pruner -> pruner) ->
+  pruner -> Pruner term
+makePruner norm add state =
+  Pruner {
+    normalise = \t -> norm state t,
+    add = \p -> makePruner norm add (add p state) }
