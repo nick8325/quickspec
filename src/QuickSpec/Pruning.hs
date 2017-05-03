@@ -1,5 +1,5 @@
 -- A type of pruners.
-module QuickSpec.Pruner where
+module QuickSpec.Pruning where
 
 import QuickSpec.Prop
 

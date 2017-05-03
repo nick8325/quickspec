@@ -6,7 +6,7 @@ module QuickSpec.Explore.Terms where
 import qualified Data.Set as Set
 import Data.Set(Set)
 import QuickSpec.Prop
-import QuickSpec.Pruner
+import QuickSpec.Pruning
 import QuickSpec.Testing.DecisionTree
 
 data State testcase result term =
