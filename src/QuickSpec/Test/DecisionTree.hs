@@ -1,4 +1,5 @@
 -- Decision trees for testing terms for equality.
+{-# LANGUAGE RecordWildCards #-}
 module QuickSpec.Test.DecisionTree where
 
 import Control.Monad
@@ -9,78 +10,88 @@ import QuickSpec.Type
 import QuickSpec.Term
 import Data.Functor.Identity
 
-data DecisionTree f =
+data DecisionTree testcase result term =
   DecisionTree {
-    ordDict  :: Type -> Maybe (Value OrdDict),
-    evaluate :: (Var -> Value Identity) -> Term f -> Value Identity,
-    test     :: Term f -> Term f -> Maybe (Var -> Value Identity),
-    tests    :: [Var -> Value Identity],
-    tree     :: Map Type (Value (TypedDecisionTree f))
-    }
+    -- A function for evaluating terms on test cases.
+    dt_evaluate :: term -> testcase -> result,
+    -- The set of test cases gathered so far.
+    dt_test_cases :: [testcase],
+    -- The tree itself.
+    dt_tree :: !(Maybe (InnerTree result term)) }
 
-newtype OrdDict a = Dict (Ord a)
+data InnerTree result term =
+    TestCase !(Map result (InnerTree result term))
+  | Singleton !term
 
-data TypedDecisionTree t a =
-    TestCase (Map a (TypedDecisionTree t a))
-  | Singleton (Tested t a)
+data Result testcase result term =
+    Distinct (DecisionTree testcase result term)
+  | EqualTo term
 
-data Tested t a =
-  Tested {
-    testedTerm  :: t,
-    tests :: [a] }
+-- Make a new decision tree.
+empty :: (term -> testcase -> result) -> DecisionTree testcase result term
+empty eval =
+  DecisionTree {
+    dt_evaluate = eval,
+    dt_test_cases = [],
+    dt_tree = Nothing }
 
-emptyDecisionTree :: (Type -> Maybe (Value (TypedDecisionTree t))) -> DecisionTree t
-emptyDecisionTree makeType = DecisionTree makeType Map.empty
+-- Add a new test case to a decision tree.
+addTestCase ::
+  testcase -> DecisionTree testcase result term ->
+  DecisionTree testcase result term
+addTestCase tc dt@DecisionTree{..} =
+  dt{dt_test_cases = dt_test_cases ++ [tc]}
 
-emptyTypedDecisionTree :: Ord a => (t -> Maybe [a]) -> TypedDecisionTree t a
-emptyTypedDecisionTree makeTerm = TypedDecisionTree makeTerm Dict (TestCase Map.empty)
-
-data Result t = New (DecisionTree t) | Old t
-
-findDecisionTree :: Typed t => t -> DecisionTree t -> Maybe (Value (TypedDecisionTree t))
-findDecisionTree x ts =
-  Map.lookup (typ x) (testSet ts) `mplus`
-  makeType ts (typ x)
-
-insert :: Typed t => t -> DecisionTree t -> Maybe (Result t)
-insert x ts = do
-  tts `In` w <- fmap unwrap (findDecisionTree x ts)
-  tt <- fmap (Tested x) (makeTerm tts x)
-  return $
-    case insert1 tt tts of
-      New1 tts ->
-        New ts { testSet = Map.insert (typ x) (wrap w tts) (testSet ts) }
-      Old1 t ->
-        Old t
-
-data Result1 t a = New1 (TypedDecisionTree t a) | Old1 t
-
-insert1 :: Typed t => Tested t a -> TypedDecisionTree t a -> Result1 t a
-insert1 x ts =
-  case dict ts of
-    Dict -> aux k (testedTerm x) (tests x) (testResults ts)
+-- Insert a value into a decision tree.
+insert :: Ord result =>
+  term -> DecisionTree testcase result term ->
+  Result testcase result term
+insert x dt@DecisionTree{dt_tree = Nothing, ..} =
+  Distinct dt{dt_tree = Just (Singleton x)}
+insert x dt@DecisionTree{dt_tree = Just dt_tree, ..} =
+  aux k dt_test_cases dt_tree
   where
-    k res = ts { testResults = res }
-    aux _ _ [] (Singleton (Tested y [])) = Old1 y
-    aux k x ts (Singleton (Tested y (t':ts'))) =
-      aux k x ts (TestCase (Map.singleton t' (Singleton (Tested y ts'))))
-    aux k x (t:ts) (TestCase res) =
-      case Map.lookup t res of
-        Nothing -> New1 (k (TestCase (Map.insert t (Singleton (Tested x ts)) res)))
-        Just res' ->
-          let k' r = k (TestCase (Map.insert t r res)) in
-          aux k' x ts res'
+    k tree = dt{dt_tree = Just tree}
+    aux _ [] (Singleton y) = EqualTo y
+    aux k (t:ts) (Singleton y) =
+      aux k (t:ts) $
+        TestCase (Map.singleton (dt_evaluate y t) (Singleton y)) 
+    aux k (t:ts) (TestCase res) =
+      let
+        val = dt_evaluate x t
+        k' tree = k (TestCase (Map.insert val tree res))
+      in case Map.lookup val res of
+        Nothing ->
+          Distinct (k' (Singleton x))
+        Just tree ->
+          aux k' ts tree
 
-statistics :: TypedDecisionTree t a -> (Int, Int)
-statistics (Singleton _) = (1, 0)
-statistics (TestCase rs) = (sum (map fst ss), sum [ m + n | (m, n) <- ss ])
+data Statistics =
+  Statistics {
+    -- Total number of terms in the decision tree
+    stat_num_terms :: !Int,
+    -- Total number of tests executed
+    stat_num_tests :: !Int,
+    -- Number of distinct test cases used
+    stat_num_test_cases :: !Int }
+  deriving (Eq, Show)
+
+statistics:: DecisionTree testcase result term -> Statistics
+statistics DecisionTree{dt_tree = Nothing} =
+  Statistics 0 0 0
+statistics DecisionTree{dt_tree = Just dt_tree, ..} =
+  Statistics {
+    stat_num_terms = x,
+    stat_num_tests = y,
+    stat_num_test_cases = length dt_test_cases }
   where
-    ss = map statistics (Map.elems rs)
+    (x, y) = stat dt_tree
 
-numTests :: DecisionTree t -> Int
-numTests =
-  sum . map (ofValue (snd . statistics . testResults)) . Map.elems . testSet
-
-numTerms :: DecisionTree t -> Int
-numTerms =
-  sum . map (ofValue (fst . statistics . testResults)) . Map.elems . testSet
+    -- Returns (number of terms, number of tests)
+    stat Singleton{} = (1, 0)
+    -- To calculate the number of test cases, note that each term
+    -- under res executed one test case on the way through this node.
+    stat (TestCase res) =
+      (sum (map fst ss), sum [ x + y | (x, y) <- ss ])
+      where
+        ss = map stat (Map.elems res)
