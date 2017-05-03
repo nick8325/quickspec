@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP, GeneralizedNewtypeDeriving, DeriveDataTypeable #-}
-module QuickSpec.Test where
+module QuickSpec.Testing.QuickCheck where
 
 #include "errors.h"
 import Data.Constraint

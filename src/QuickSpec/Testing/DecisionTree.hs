@@ -1,6 +1,6 @@
 -- Decision trees for testing terms for equality.
 {-# LANGUAGE RecordWildCards #-}
-module QuickSpec.Test.DecisionTree where
+module QuickSpec.Testing.DecisionTree where
 
 import Control.Monad
 import Data.Constraint
