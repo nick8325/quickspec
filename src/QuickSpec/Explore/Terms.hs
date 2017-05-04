@@ -7,6 +7,7 @@ import qualified Data.Set as Set
 import Data.Set(Set)
 import QuickSpec.Prop
 import QuickSpec.Pruning
+import QuickSpec.Testing
 import QuickSpec.Testing.DecisionTree
 
 data State testcase result term =
@@ -14,7 +15,7 @@ data State testcase result term =
     st_terms  :: Set term,
     st_pruner :: Pruner term,
     st_tree   :: DecisionTree testcase result term,
-    st_tester :: Prop term -> Maybe testcase }
+    st_tester :: Tester testcase (Prop term) }
 
 explore :: (Ord term, Ord result) =>
   term -> State testcase result term ->
@@ -36,11 +37,11 @@ explore t s = exp True s
               exp testMore s { st_terms = Set.insert u' (Set.delete u st_terms) }
             -- Ask QuickCheck for a counterexample to the property.
             | testMore,
-              Just tc <- st_tester prop ->
+              Just (tc, tester') <- test st_tester prop ->
                 -- Here we make testMore = False: if for some reason
                 -- the discovered counterexample fails to falsify the
                 -- equation, we don't want to run QuickCheck again!
-                exp False s { st_tree = addTestCase tc st_tree }
+                exp False s { st_tree = addTestCase tc st_tree, st_tester = tester' }
             | otherwise ->
                 (s { st_pruner = add st_pruner prop }, Just prop)
             where
