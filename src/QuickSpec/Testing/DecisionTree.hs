@@ -76,7 +76,7 @@ data Statistics =
     stat_num_test_cases :: !Int }
   deriving (Eq, Show)
 
-statistics:: DecisionTree testcase result term -> Statistics
+statistics :: DecisionTree testcase result term -> Statistics
 statistics DecisionTree{dt_tree = Nothing} =
   Statistics 0 0 0
 statistics DecisionTree{dt_tree = Just dt_tree, ..} =
