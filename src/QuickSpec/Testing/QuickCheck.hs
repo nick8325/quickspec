@@ -1,47 +1,45 @@
-{-# LANGUAGE CPP, GeneralizedNewtypeDeriving, DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleContexts, RecordWildCards, TupleSections #-}
 module QuickSpec.Testing.QuickCheck where
 
-#include "errors.h"
-import Data.Constraint
-import Data.Maybe
-import QuickSpec.Signature
-import QuickSpec.Instances
-import QuickSpec.Term
-import QuickSpec.TestSet
-import QuickSpec.Type
-import System.Random
+import QuickSpec.Testing
+import QuickSpec.Prop
 import Test.QuickCheck
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Random
 import Control.Monad
-import Data.Functor.Identity
-import Twee.Base
+import Data.List
+import Data.Maybe
+import System.Random
 
-makeTester :: (a -> Term Constant) -> [Type -> Var -> Value Identity] -> [(QCGen, Int)] -> Signature -> Type -> Maybe (Value (TypedTestSet a))
-makeTester toTerm vals tests sig ty = do
-  i <- listToMaybe (findInstance (instances sig) (defaultTypes sig ty))
-  case unwrap (i :: Value Observe1) of
-    Observe1 obs `In` w ->
-      case unwrap obs of
-        Observe Dict eval `In` w' ->
-          return . wrap w' $
-            emptyTypedTestSet (tester sig toTerm vals tests (eval . runIdentity . reunwrap w . defaultTypes sig))
+data Config =
+  Config {
+    cfg_num_tests :: Int,
+    cfg_max_test_size :: Int }
+  deriving Show
 
-tester :: Ord b => Signature -> (a -> Term Constant) -> [Type -> Var -> Value Identity] -> [(QCGen, Int)] -> (Value Identity -> Gen b) -> a -> Maybe [b]
-tester sig toTerm vals tests eval t =
-  Just [ unGen (eval (evaluateTm (defaultTypes sig) val (toTerm t))) g n | (val, (g, n)) <- zip vals tests ]
+quickCheckTester :: Eq result =>
+  Config -> Gen testcase -> (testcase -> term -> result) ->
+  Gen (Tester testcase (Prop term))
+quickCheckTester config gen eval =
+  makeTester (quickCheckTest config gen eval) <$> arbitrary
 
-env :: Signature -> Type -> Value Gen
-env sig ty =
-  case findInstance (instances sig) (defaultTypes sig ty) of
-    [] ->
-      fromMaybe __ $
-      cast ty $
-      toValue (ERROR("missing arbitrary instance for " ++ prettyShow ty) :: Gen A)
-    (i:_) -> i
+quickCheckTest :: Eq result => 
+  Config -> Gen testcase -> (testcase -> term -> result) -> QCGen ->
+  Prop term -> Maybe (testcase, QCGen)
+quickCheckTest Config{..} gen eval seed (lhs :=>: rhs) =
+  fmap (, seed2) $ msum (zipWith test seeds sizes)
+  where
+    (seed1, seed2) = split seed
+    
+    seeds = unfoldr (Just . split) seed1
+    sizes = cycle [0, 2..cfg_max_test_size]
 
-genSeeds :: Int -> IO [(QCGen, Int)]
-genSeeds maxSize = do
-  rnd <- newQCGen
-  let rnds rnd = rnd1 : rnds rnd2 where (rnd1, rnd2) = split rnd
-  return (zip (rnds rnd) (concat (repeat [0,2..maxSize])))
+    test g n = do
+      let testcase = unGen gen g n
+      guard $
+        or (map (not . testEq testcase) lhs) ||
+        testEq testcase rhs
+      return testcase
+
+    testEq testcase (t :=: u) =
+      eval testcase t == eval testcase u
