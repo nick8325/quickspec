@@ -20,9 +20,3 @@ makeTester tst state =
         Nothing -> Nothing
         Just (testcase, state') ->
           Just (testcase, makeTester tst state') }
-
--- Miscellaneous stuff which is generally useful for testing.
-class Valued f a where
-  value :: a -> Value f
-
-type TestCase f = Var -> Value f
