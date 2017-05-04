@@ -1,5 +1,5 @@
 -- Typed terms.
-{-# LANGUAGE PatternSynonyms, ViewPatterns, TypeSynonymInstances, FlexibleInstances, TypeFamilies, ConstraintKinds #-}
+{-# LANGUAGE PatternSynonyms, ViewPatterns, TypeSynonymInstances, FlexibleInstances, TypeFamilies, ConstraintKinds, DeriveGeneric, DeriveAnyClass #-}
 module QuickSpec.Term(module QuickSpec.Term, module Twee.Base) where
 
 import QuickSpec.Type
@@ -8,6 +8,8 @@ import Control.Monad
 import Twee.Base hiding (Symbolic, Term, TermList, Builder, pattern Var, pattern App, Var(..), Fun, F, fun, fun_value, var, funs, vars, occ, occVar, isApp, isVar, subterms, subtermsList, properSubterms)
 import qualified Data.DList as DList
 import Twee.Label
+import GHC.Generics
+import Test.QuickCheck(CoArbitrary)
 
 type Symbolic f a = (Base.Symbolic a, ConstantOf a ~ Either f Type, Typeable f, Ord f)
 type Term f = Base.Term (Either f Type)
@@ -16,7 +18,7 @@ type Builder f = Base.Builder (Either f Type)
 type Fun f = Base.Fun (Either f Type)
 
 data Var = V { var_ty :: Type, var_id :: {-# UNPACK #-} !Int }
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic, CoArbitrary)
 
 instance Typed Var where
   typ x = var_ty x

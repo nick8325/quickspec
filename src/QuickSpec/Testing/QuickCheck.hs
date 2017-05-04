@@ -1,3 +1,4 @@
+-- Testing conjectures using QuickCheck.
 {-# LANGUAGE FlexibleContexts, RecordWildCards, TupleSections #-}
 module QuickSpec.Testing.QuickCheck where
 
