@@ -30,6 +30,8 @@ explore t s = exp True s
           EqualTo u
             -- st_terms is not kept normalised wrt the discovered laws;
             -- instead, we normalise it lazily like so.
+            -- FIXME: double check if this actually improves performance
+            -- with the latest Twee.
             | t' == u' ->
               exp testMore s { st_terms = Set.insert u' (Set.delete u st_terms) }
             -- Ask QuickCheck for a counterexample to the property.
@@ -43,6 +45,6 @@ explore t s = exp True s
                 (s { st_pruner = add st_pruner prop }, Just prop)
             where
               u' = normalise st_pruner u
-              prop = [] :=>: t' :=: u'
+              prop = t === u
       where
         t' = normalise st_pruner t

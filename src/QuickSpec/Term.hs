@@ -5,7 +5,7 @@ module QuickSpec.Term(module QuickSpec.Term, module Twee.Base) where
 import QuickSpec.Type
 import qualified Twee.Base as Base
 import Control.Monad
-import Twee.Base hiding (Symbolic, Term, TermList, Builder, pattern Var, pattern App, Var(..), Fun, fun, var, funs, vars, occ, occVar, isApp, isVar, subterms, subtermsList, properSubterms)
+import Twee.Base hiding (Symbolic, Term, TermList, Builder, pattern Var, pattern App, Var(..), Fun, F, fun, fun_value, var, funs, vars, occ, occVar, isApp, isVar, subterms, subtermsList, properSubterms)
 import qualified Data.DList as DList
 import Twee.Label
 
@@ -23,17 +23,26 @@ instance Typed Var where
   otherTypesDL _ = mzero
   typeSubst_ sub (V ty x) = V (typeSubst_ sub ty) x
 
-var :: (Ord f, Typeable f) => Var -> Builder (Either f Type)
-var (V ty x) = Base.app (fun (Right ty)) (Base.var (Base.V x))
+var :: (Ord f, Typeable f) => Var -> Builder f
+var (V ty x) = Base.app (Base.fun (Right ty)) (Base.var (Base.V x))
 
 fun :: (Ord f, Typeable f) => f -> Fun f
 fun = Base.fun . Left
+
+fun_value :: Fun f -> f
+fun_value f =
+  case Base.fun_value f of
+    Left x -> x
+    Right _ -> error "type tag used as Fun"
+
+pattern F :: f -> Fun f
+pattern F x <- (fun_value -> x)
 
 pattern Var :: (Ord f, Typeable f) => Var -> Term f
 pattern Var x <- (patVar -> Just x)
 
 patVar :: Term f -> Maybe Var
-patVar (Base.App (F (Right ty)) (Cons (Base.Var (Base.V x)) Empty)) =
+patVar (Base.App (Base.F (Right ty)) (Cons (Base.Var (Base.V x)) Empty)) =
   Just (V ty x)
 patVar _ = Nothing
 
@@ -41,7 +50,7 @@ pattern App :: Fun f -> TermList f -> Term f
 pattern App f ts <- (patApp -> Just (f, ts))
 
 patApp :: Term f -> Maybe (Fun f, TermList f)
-patApp (Base.App f@(F (Left _)) ts) = Just (f, ts)
+patApp (Base.App f@(Base.F (Left _)) ts) = Just (f, ts)
 patApp _ = Nothing
 
 funs :: Symbolic f a => a -> [Fun f]

@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, DeriveGeneric, TypeFamilies, DeriveFunctor #-}
 module QuickSpec.Prop where
 
 #include "errors.h"
@@ -9,11 +9,17 @@ import QuickSpec.Type
 import QuickSpec.Utils
 import qualified Data.Map as Map
 import Twee.Pretty
+import Twee.Base
+import GHC.Generics
 
 data Prop a =
   (:=>:) {
     lhs :: [Equation a],
-    rhs :: Equation a } deriving Show
+    rhs :: Equation a }
+  deriving (Show, Generic, Functor)
+
+instance Symbolic a => Symbolic (Prop a) where
+  type ConstantOf (Prop a) = ConstantOf a
 
 instance Ord a => Eq (Prop a) where
   x == y = x `compare` y == EQ
@@ -43,7 +49,10 @@ instance Pretty a => Pretty (Prop a) where
           (map pPrint (lhs p))) <+> text "=>",
       nest 2 (pPrint (rhs p))]
 
-data Equation a = a :=: a deriving (Show, Eq, Ord)
+data Equation a = a :=: a deriving (Show, Eq, Ord, Generic, Functor)
+
+instance Symbolic a => Symbolic (Equation a) where
+  type ConstantOf (Equation a) = ConstantOf a
 
 infix 5 :=:
 
@@ -54,3 +63,7 @@ instance Typed a => Typed (Equation a) where
 
 instance Pretty a => Pretty (Equation a) where
   pPrintPrec _ _ (x :=: y) = hang (pPrint x <+> text "=") 2 (pPrint y)
+
+infix 4 ===
+(===) :: a -> a -> Prop a
+x === y = [] :=>: x :=: y
