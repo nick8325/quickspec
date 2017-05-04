@@ -82,10 +82,8 @@ subtermsList = filter (not . Base.isVar) . Base.subtermsList
 properSubterms :: (Ord f, Typeable f) => Term f -> [Term f]
 properSubterms = filter (not . Base.isVar) . Base.properSubterms
 
-evaluateTerm :: Applicative f =>
-  (fun -> Value f) ->
-  (Var -> Value f) ->
-  Term fun -> Value f
+evaluateTerm :: Apply a =>
+  (fun -> a) -> (Var -> a) -> Term fun -> a
 evaluateTerm fun var = eval
   where
     eval (Var x) = var x
