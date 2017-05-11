@@ -415,7 +415,8 @@ createRules sig = do
 
   rule $ do
     UntestableType ty <- event
-    execute $
+    unless (silent sig) $
+      execute $
       liftIO $ putStrLn $
         "Warning: generated term of untestable type " ++ prettyShow ty
 
