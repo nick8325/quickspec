@@ -69,9 +69,9 @@ type B = TyVarNumber (Succ Zero)
 type C = TyVarNumber (Succ (Succ Zero))
 type D = TyVarNumber (Succ (Succ (Succ Zero)))
 type E = TyVarNumber (Succ (Succ (Succ (Succ Zero))))
-newtype TyVarNumber a = TyVarNumber Any deriving Typeable
+newtype TyVarNumber (a :: *) = TyVarNumber Any deriving Typeable
 data Zero deriving Typeable
-data Succ a deriving Typeable
+data Succ (a :: *) deriving Typeable
 
 typeOf :: Typeable a => a -> Type
 typeOf x = fromTypeRep (Ty.typeOf x)
@@ -131,13 +131,13 @@ fromTyCon ty
   | otherwise = TyCon ty
 
 arrowTyCon, commaTyCon, listTyCon, varTyCon, succTyCon, zeroTyCon, dictTyCon :: Ty.TyCon
-arrowTyCon = mkCon (Proxy :: Proxy (() -> ()))
-commaTyCon = mkCon (Proxy :: Proxy ((),()))
-listTyCon  = mkCon (Proxy :: Proxy [()])
-varTyCon   = mkCon (Proxy :: Proxy (TyVarNumber ()))
-succTyCon  = mkCon (Proxy :: Proxy (Succ ()))
+arrowTyCon = mkCon (Proxy :: Proxy (->))
+commaTyCon = mkCon (Proxy :: Proxy (,))
+listTyCon  = mkCon (Proxy :: Proxy [])
+varTyCon   = mkCon (Proxy :: Proxy TyVarNumber)
+succTyCon  = mkCon (Proxy :: Proxy Succ)
 zeroTyCon  = mkCon (Proxy :: Proxy Zero)
-dictTyCon  = mkCon (Proxy :: Proxy (Dict ()))
+dictTyCon  = mkCon (Proxy :: Proxy Dict)
 
 mkCon :: Typeable a => proxy a -> Ty.TyCon
 mkCon = fst . Ty.splitTyConApp . Ty.typeRep

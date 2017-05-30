@@ -12,6 +12,7 @@ import Data.Monoid
 import Data.MemoUgly
 import Data.Functor.Identity
 import Data.Maybe
+import Data.Proxy
 import Control.Monad
 
 data Instances =
@@ -56,10 +57,10 @@ polyValue = poly . toValue . Identity
 
 construct_ :: Instances -> Type -> [Value Identity]
 construct_ _ (App (F unit) Empty)
-  | unit == tyCon () =
+  | unit == tyCon (Proxy :: Proxy ()) =
     return (toValue (Identity ()))
 construct_ res (App (F pair) (Cons ty1 (Cons ty2 Empty)))
-  | pair == tyCon ((),()) = do
+  | pair == tyCon (Proxy :: Proxy (,)) = do
     x <- findInstance res ty1
     y <- findInstance res ty2
     return (pairValues (liftM2 (,)) x y)

@@ -1,5 +1,5 @@
 -- Theory exploration which accepts one term at a time.
-{-# LANGUAGE RecordWildCards, FlexibleContexts #-}
+{-# LANGUAGE RecordWildCards, FlexibleContexts, PatternGuards #-}
 module QuickSpec.Explore.Terms where
 
 import qualified Data.Set as Set
