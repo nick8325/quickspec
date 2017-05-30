@@ -64,7 +64,7 @@ source-repository head
   branch:   master
 
 library
-  ghc-options: -Wall -fno-warn-name-shadowing
+  ghc-options: -W -fno-warn-name-shadowing -fno-warn-incomplete-patterns
   hs-source-dirs: src
   Exposed-modules:
     QuickSpec.Explore.Terms

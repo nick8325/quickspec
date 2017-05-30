@@ -8,7 +8,6 @@ module QuickSpec.FindInstance where
 
 import Twee.Base
 import QuickSpec.Type
-import Data.Monoid
 import Data.MemoUgly
 import Data.Functor.Identity
 import Data.Maybe

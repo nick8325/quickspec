@@ -21,7 +21,6 @@ module QuickSpec.Type(
   Unwrapped(..), unwrap, Wrapper(..),
   mapValue, forValue, ofValue, withValue, pairValues, wrapFunctor, unwrapFunctor) where
 
-import Control.Applicative
 import Control.Monad
 import Data.DList(DList)
 import Data.Maybe
@@ -33,9 +32,6 @@ import Test.QuickCheck
 import Unsafe.Coerce
 import Data.Constraint
 import Twee.Base
-import qualified Twee.Term as Term
-import Twee.Label
-import Data.Ord
 import Data.Proxy
 
 -- A (possibly polymorphic) type.
@@ -241,7 +237,7 @@ instance (Typed a, Typed b) => Typed (Either a b) where
 
 instance Typed a => Typed [a] where
   typ [] = typeOf ()
-  typ (x:xs) = typ x
+  typ (x:_) = typ x
   otherTypesDL [] = mzero
   otherTypesDL (x:xs) = otherTypesDL x `mplus` msum (map typesDL xs)
   typeSubst_ f xs = map (typeSubst_ f) xs

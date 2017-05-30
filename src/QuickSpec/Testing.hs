@@ -2,10 +2,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 module QuickSpec.Testing where
 
-import QuickSpec.Prop
-import QuickSpec.Term
-import QuickSpec.Type
-
 data Tester testcase prop =
   Tester {
     test :: prop -> Maybe (testcase, Tester testcase prop) }

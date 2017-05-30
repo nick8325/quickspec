@@ -2,13 +2,8 @@
 {-# LANGUAGE RecordWildCards #-}
 module QuickSpec.Testing.DecisionTree where
 
-import Control.Monad
-import Data.Constraint
 import qualified Data.Map as Map
 import Data.Map(Map)
-import QuickSpec.Type
-import QuickSpec.Term
-import Data.Functor.Identity
 
 data DecisionTree testcase result term =
   DecisionTree {

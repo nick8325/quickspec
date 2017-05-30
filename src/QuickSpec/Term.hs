@@ -6,8 +6,6 @@ import QuickSpec.Type
 import qualified Twee.Base as Base
 import Control.Monad
 import Twee.Base hiding (Symbolic, Term, TermList, Builder, pattern Var, pattern App, Var(..), Fun, F, fun, fun_value, var, funs, vars, occ, occVar, isApp, isVar, subterms, subtermsList, properSubterms)
-import qualified Data.DList as DList
-import Twee.Label
 import GHC.Generics
 import Test.QuickCheck(CoArbitrary)
 

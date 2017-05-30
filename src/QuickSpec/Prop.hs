@@ -6,7 +6,6 @@ import qualified Data.DList as DList
 import Data.Ord
 import QuickSpec.Type
 import QuickSpec.Utils
-import qualified Data.Map as Map
 import Twee.Pretty
 import Twee.Base
 import GHC.Generics

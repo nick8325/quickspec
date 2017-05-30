@@ -9,7 +9,6 @@ import Test.QuickCheck.Gen
 import Test.QuickCheck.Random
 import Control.Monad
 import Data.List
-import Data.Maybe
 import System.Random
 
 data Config =
