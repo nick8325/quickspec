@@ -67,7 +67,6 @@ library
   ghc-options: -Wall -fno-warn-name-shadowing
   hs-source-dirs: src
   Exposed-modules:
-    QuickSpec.Enumerate
     QuickSpec.Explore.Terms
     QuickSpec.FindInstance
     QuickSpec.Prop
