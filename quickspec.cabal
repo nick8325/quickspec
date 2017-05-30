@@ -57,67 +57,37 @@ Extra-source-files:
   examples/PrettyPrintingModel.hs
   examples/Process.hs
   examples/Regex.hs
-  src/errors.h
 
 source-repository head
   type:     git
   location: git://github.com/nick8325/quickspec.git
   branch:   master
 
-flag z3
-  Description: Use the Z3 prover for pruning.
-  Default: False
-
-flag jukebox
-  Description: Use the E and SPASS provers for pruning.
-  Default: True
-
 library
-  -- ghc-options: -Wall -fno-warn-name-shadowing -fno-warn-incomplete-patterns
+  ghc-options: -Wall -fno-warn-name-shadowing
   hs-source-dirs: src
-  include-dirs: src
   Exposed-modules:
-    Paths_quickspec
-    QuickSpec
-    QuickSpec.PredicatesInterface
-    QuickSpec.Eval
-    QuickSpec.Parse
-    QuickSpec.PrintConditionally
+    QuickSpec.Enumerate
+    QuickSpec.Explore.Terms
+    QuickSpec.FindInstance
     QuickSpec.Prop
     QuickSpec.Pruning
-    QuickSpec.Pruning.E
-    QuickSpec.Pruning.Z3
-    QuickSpec.Pruning.Waldmeister
-    QuickSpec.Pruning.Simple
-    QuickSpec.Pruning.Completion
-    QuickSpec.Rules
-    QuickSpec.Signature
+    QuickSpec.Pruning.EncodeTypes
+    QuickSpec.Pruning.Twee
     QuickSpec.Term
-    QuickSpec.Test
-    QuickSpec.TestSet
+    QuickSpec.Testing
+    QuickSpec.Testing.DecisionTree
+    QuickSpec.Testing.QuickCheck
     QuickSpec.Type
     QuickSpec.Utils
-    QuickSpec.Instance
 
-  Build-depends: QuickCheck >= 2.7
-               , base < 5
-               , constraints >= 0.9
-               , containers
-               , dlist
-               , heaps
-               , pretty
-               , process
-               , random
-               , spoon >= 0.2
-               , transformers
-               , twee
-               , uglymemo
-
-  if flag(jukebox)
-    Build-depends: jukebox >= 0.2.17
-  else
-    cpp-options: -DNO_JUKEBOX
-  if flag(z3)
-    Build-depends: z3 >= 4
-  else
-    cpp-options: -DNO_Z3
+  Build-depends:
+    base >= 4 && < 5,
+    twee >= 1,
+    dlist,
+    constraints,
+    QuickCheck >= 2.8,
+    random,
+    spoon,
+    containers,
+    uglymemo
