@@ -1,7 +1,6 @@
-{-# LANGUAGE CPP, DeriveGeneric, TypeFamilies, DeriveFunctor #-}
+{-# LANGUAGE DeriveGeneric, TypeFamilies, DeriveFunctor #-}
 module QuickSpec.Prop where
 
-#include "errors.h"
 import Control.Monad
 import qualified Data.DList as DList
 import Data.Ord

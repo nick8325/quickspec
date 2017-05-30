@@ -3,10 +3,9 @@
 -- polymorphic) functions and a target type, tries to construct a
 -- value of that type.
 
-{-# LANGUAGE RankNTypes, CPP, ScopedTypeVariables #-}
+{-# LANGUAGE RankNTypes, ScopedTypeVariables #-}
 module QuickSpec.FindInstance where
 
-#include "errors.h"
 import Twee.Base
 import QuickSpec.Type
 import Data.Monoid

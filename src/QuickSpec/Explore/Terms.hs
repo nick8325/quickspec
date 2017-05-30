@@ -1,8 +1,7 @@
 -- Theory exploration which accepts one term at a time.
-{-# LANGUAGE RecordWildCards, CPP, FlexibleContexts #-}
+{-# LANGUAGE RecordWildCards, FlexibleContexts #-}
 module QuickSpec.Explore.Terms where
 
-#include "errors.h"
 import qualified Data.Set as Set
 import Data.Set(Set)
 import QuickSpec.Prop
