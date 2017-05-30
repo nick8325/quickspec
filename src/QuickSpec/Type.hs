@@ -1,5 +1,5 @@
 -- Polymorphic types and dynamic values.
-{-# LANGUAGE DeriveDataTypeable, CPP, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances, GeneralizedNewtypeDeriving, Rank2Types, ExistentialQuantification, PolyKinds, TypeFamilies, FlexibleContexts, StandaloneDeriving, PatternGuards, MultiParamTypeClasses #-}
+{-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances, GeneralizedNewtypeDeriving, Rank2Types, ExistentialQuantification, PolyKinds, TypeFamilies, FlexibleContexts, StandaloneDeriving, PatternGuards, MultiParamTypeClasses #-}
 -- To avoid a warning about TyVarNumber's constructor being unused:
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
 module QuickSpec.Type(
@@ -21,7 +21,6 @@ module QuickSpec.Type(
   Unwrapped(..), unwrap, Wrapper(..),
   mapValue, forValue, ofValue, withValue, pairValues, wrapFunctor, unwrapFunctor) where
 
-#include "errors.h"
 import Control.Applicative
 import Control.Monad
 import Data.DList(DList)
@@ -37,6 +36,7 @@ import Twee.Base
 import qualified Twee.Term as Term
 import Twee.Label
 import Data.Ord
+import Data.Proxy
 
 -- A (possibly polymorphic) type.
 type Type = Term TyCon
@@ -81,7 +81,7 @@ typeRep x = fromTypeRep (Ty.typeRep x)
 
 applyType :: Type -> Type -> Type
 applyType (App f tys) ty = build (app f (unpack tys ++ [ty]))
-applyType _ _ = ERROR("tried to apply type variable")
+applyType _ _ = error "tried to apply type variable"
 
 arrowType :: [Type] -> Type -> Type
 arrowType [] res = res
@@ -112,7 +112,7 @@ oneTypeVar = typeSubst (const (var (V 0)))
 skolemiseTypeVars :: Typed a => a -> a
 skolemiseTypeVars = typeSubst (const aTy)
   where
-    aTy = build (con (fun (fromTyCon (mkCon (__ :: A)))))
+    aTy = build (con (fun (tyCon (Proxy :: Proxy A))))
 
 fromTypeRep :: Ty.TypeRep -> Type
 fromTypeRep ty =
@@ -131,18 +131,18 @@ fromTyCon ty
   | otherwise = TyCon ty
 
 arrowTyCon, commaTyCon, listTyCon, varTyCon, succTyCon, zeroTyCon, dictTyCon :: Ty.TyCon
-arrowTyCon = mkCon (__ :: () -> ())
-commaTyCon = mkCon (__ :: ((),()))
-listTyCon  = mkCon (__ :: [()])
-varTyCon   = mkCon (__ :: TyVarNumber ())
-succTyCon  = mkCon (__ :: Succ ())
-zeroTyCon  = mkCon (__ :: Zero)
-dictTyCon  = mkCon (__ :: Dict ())
+arrowTyCon = mkCon (Proxy :: Proxy (() -> ()))
+commaTyCon = mkCon (Proxy :: Proxy ((),()))
+listTyCon  = mkCon (Proxy :: Proxy [()])
+varTyCon   = mkCon (Proxy :: Proxy (TyVarNumber ()))
+succTyCon  = mkCon (Proxy :: Proxy (Succ ()))
+zeroTyCon  = mkCon (Proxy :: Proxy Zero)
+dictTyCon  = mkCon (Proxy :: Proxy (Dict ()))
 
-mkCon :: Typeable a => a -> Ty.TyCon
-mkCon = fst . Ty.splitTyConApp . Ty.typeOf
+mkCon :: Typeable a => proxy a -> Ty.TyCon
+mkCon = fst . Ty.splitTyConApp . Ty.typeRep
 
-tyCon :: Typeable a => a -> TyCon
+tyCon :: Typeable a => proxy a -> TyCon
 tyCon = fromTyCon . mkCon
 
 getDictionary :: Type -> Maybe Type
@@ -208,8 +208,9 @@ apply :: (HasCallStack, Apply a) => a -> a -> a
 apply f x =
   case tryApply f x of
     Nothing ->
-      ERROR("apply: ill-typed term: can't apply " ++
-            prettyShow (typ f) ++ " to " ++ prettyShow (typ x))
+      error $
+        "apply: ill-typed term: can't apply " ++
+        prettyShow (typ f) ++ " to " ++ prettyShow (typ x)
     Just y -> y
 
 canApply :: Apply a => a -> a -> Bool
@@ -313,11 +314,11 @@ toAny :: f a -> f Any
 toAny = unsafeCoerce
 
 toValue :: forall f (a :: *). Typeable a => f a -> Value f
-toValue x = Value (typeOf (__ :: a)) (toAny x)
+toValue x = Value (typeRep (Proxy :: Proxy a)) (toAny x)
 
 fromValue :: forall f (a :: *). Typeable a => Value f -> Maybe (f a)
 fromValue x = do
-  guard (typ x == typeOf (__ :: a))
+  guard (typ x == typeRep (Proxy :: Proxy a))
   return (fromAny (value x))
 
 instance Typed (Value f) where
@@ -344,7 +345,7 @@ unwrap x =
       (\y ->
         if typ x == typ y
         then fromAny (value y)
-        else ERROR("non-matching types"))
+        else error "non-matching types")
 
 mapValue :: (forall a. f a -> g a) -> Value f -> Value g
 mapValue f v =
@@ -369,7 +370,7 @@ pairValues f x y =
     valueType = ty,
     value = toAny (f (value x) (value y)) }
   where
-    ty = typeRep (__ :: proxy g) `applyType` typ x `applyType` typ y
+    ty = typeRep (Proxy :: Proxy g) `applyType` typ x `applyType` typ y
 
 wrapFunctor :: forall f g h. Typeable h => (forall a. f a -> g (h a)) -> Value f -> Value g
 wrapFunctor f x =
@@ -378,7 +379,7 @@ wrapFunctor f x =
     valueType = ty,
     value = toAny (f (value x)) }
   where
-    ty = typeRep (__ :: proxy h) `applyType` valueType x
+    ty = typeRep (Proxy :: Proxy h) `applyType` valueType x
 
 unwrapFunctor :: forall f g h. Typeable g => (forall a. f (g a) -> h a) -> Value f -> Value h
 unwrapFunctor f x =
@@ -390,6 +391,6 @@ unwrapFunctor f x =
             valueType = last tys,
             value = f (fromAny (value x)) }
         False ->
-          ERROR("non-matching types")
+          error "non-matching types"
   where
-    ty = typeRep (__ :: proxy g)
+    ty = typeRep (Proxy :: Proxy g)
