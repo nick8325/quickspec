@@ -16,6 +16,18 @@ data State testcase result term =
     st_tree   :: DecisionTree testcase result term,
     st_tester :: Tester testcase (Prop term) }
 
+initialState ::
+  (term -> testcase -> result) ->
+  Tester testcase (Prop term) ->
+  Pruner term ->
+  State testcase result term
+initialState eval tester pruner =
+  State {
+    st_terms = Set.empty,
+    st_pruner = pruner,
+    st_tree = empty eval,
+    st_tester = tester }
+
 explore :: (Ord term, Ord result) =>
   term -> State testcase result term ->
   (State testcase result term, Maybe (Prop term))
