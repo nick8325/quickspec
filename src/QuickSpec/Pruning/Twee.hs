@@ -37,9 +37,9 @@ addTwee config ([] :=>: t :=: u) state =
   completePure config $
     addAxiom config state axiom
   where
-    axiom =
-      Axiom 0 (prettyShow (t :=: u))
-        (skolemise t Twee.:=: skolemise u)
+    axiom = Axiom 0 (prettyShow (t :=: u)) (extend t Twee.:=: extend u)
+    extend = build . mapFun (fun . Function . fun_value)
+
 addTwee _ _ _ =
   error "twee pruner doesn't support non-unit equalities"
 
