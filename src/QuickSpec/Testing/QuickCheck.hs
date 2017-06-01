@@ -27,7 +27,7 @@ quickCheckTest :: Eq result =>
   Config -> Gen testcase -> (testcase -> term -> result) -> QCGen ->
   Prop term -> Maybe (testcase, QCGen)
 quickCheckTest Config{..} gen eval seed (lhs :=>: rhs) =
-  fmap (, seed2) $ msum (zipWith test seeds sizes)
+  fmap (, seed2) $ msum (take cfg_num_tests (zipWith test seeds sizes))
   where
     (seed1, seed2) = split seed
     
@@ -37,8 +37,8 @@ quickCheckTest Config{..} gen eval seed (lhs :=>: rhs) =
     test g n = do
       let testcase = unGen gen g n
       guard $
-        or (map (not . testEq testcase) lhs) ||
-        testEq testcase rhs
+        all (testEq testcase) lhs &&
+        not (testEq testcase rhs)
       return testcase
 
     testEq testcase (t :=: u) =
