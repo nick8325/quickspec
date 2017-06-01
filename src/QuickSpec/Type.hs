@@ -1,11 +1,11 @@
 -- Polymorphic types and dynamic values.
-{-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances, GeneralizedNewtypeDeriving, Rank2Types, ExistentialQuantification, PolyKinds, TypeFamilies, FlexibleContexts, StandaloneDeriving, PatternGuards, MultiParamTypeClasses #-}
+{-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances, GeneralizedNewtypeDeriving, Rank2Types, ExistentialQuantification, PolyKinds, TypeFamilies, FlexibleContexts, StandaloneDeriving, PatternGuards, MultiParamTypeClasses, ConstraintKinds #-}
 -- To avoid a warning about TyVarNumber's constructor being unused:
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
 module QuickSpec.Type(
   -- Types.
   Typeable,
-  Type, TyCon(..), tyCon, fromTyCon, A, B, C, D, E,
+  Type, TyCon(..), tyCon, fromTyCon, A, B, C, D, E, ClsA, ClsB, ClsC, ClsD, ClsE,
   typeOf, typeRep, applyType, fromTypeRep,
   arrowType, typeArgs, typeRes, typeDrop, typeArity, oneTypeVar, skolemiseTypeVars,
   isDictionary, getDictionary,
@@ -60,12 +60,23 @@ instance PrettyTerm TyCon where
       fixedArity (1+length (filter (== ',') (show con))) tupleStyle
   termStyle _ = curried
 
--- Type variables.
+-- Type and class variables.
 newtype A = A Any deriving Typeable
 newtype B = B Any deriving Typeable
 newtype C = C Any deriving Typeable
 newtype D = D Any deriving Typeable
 newtype E = E Any deriving Typeable
+
+class ClsA
+deriving instance Typeable ClsA
+class ClsB
+deriving instance Typeable ClsB
+class ClsC
+deriving instance Typeable ClsC
+class ClsD
+deriving instance Typeable ClsD
+class ClsE
+deriving instance Typeable ClsE
 
 typeVars :: [Ty.TypeRep]
 typeVars =
@@ -73,7 +84,12 @@ typeVars =
    Ty.typeRep (Proxy :: Proxy B),
    Ty.typeRep (Proxy :: Proxy C),
    Ty.typeRep (Proxy :: Proxy D),
-   Ty.typeRep (Proxy :: Proxy E)]
+   Ty.typeRep (Proxy :: Proxy E),
+   Ty.typeRep (Proxy :: Proxy ClsA),
+   Ty.typeRep (Proxy :: Proxy ClsB),
+   Ty.typeRep (Proxy :: Proxy ClsC),
+   Ty.typeRep (Proxy :: Proxy ClsD),
+   Ty.typeRep (Proxy :: Proxy ClsE)]
 
 typeOf :: Typeable a => a -> Type
 typeOf x = fromTypeRep (Ty.typeOf x)
