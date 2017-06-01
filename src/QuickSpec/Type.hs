@@ -33,6 +33,7 @@ import Unsafe.Coerce
 import Data.Constraint
 import Twee.Base
 import Data.Proxy
+import Data.List
 
 -- A (possibly polymorphic) type.
 type Type = Term TyCon
@@ -60,14 +61,19 @@ instance PrettyTerm TyCon where
   termStyle _ = curried
 
 -- Type variables.
-type A = TyVarNumber Zero
-type B = TyVarNumber (Succ Zero)
-type C = TyVarNumber (Succ (Succ Zero))
-type D = TyVarNumber (Succ (Succ (Succ Zero)))
-type E = TyVarNumber (Succ (Succ (Succ (Succ Zero))))
-newtype TyVarNumber (a :: *) = TyVarNumber Any deriving Typeable
-data Zero deriving Typeable
-data Succ (a :: *) deriving Typeable
+newtype A = A Any deriving Typeable
+newtype B = B Any deriving Typeable
+newtype C = C Any deriving Typeable
+newtype D = D Any deriving Typeable
+newtype E = E Any deriving Typeable
+
+typeVars :: [Ty.TypeRep]
+typeVars =
+  [Ty.typeRep (Proxy :: Proxy A),
+   Ty.typeRep (Proxy :: Proxy B),
+   Ty.typeRep (Proxy :: Proxy C),
+   Ty.typeRep (Proxy :: Proxy D),
+   Ty.typeRep (Proxy :: Proxy E)]
 
 typeOf :: Typeable a => a -> Type
 typeOf x = fromTypeRep (Ty.typeOf x)
@@ -111,28 +117,22 @@ skolemiseTypeVars = typeSubst (const aTy)
     aTy = build (con (fun (tyCon (Proxy :: Proxy A))))
 
 fromTypeRep :: Ty.TypeRep -> Type
-fromTypeRep ty =
-  case Ty.splitTyConApp ty of
-    (tyVar, [ty]) | tyVar == varTyCon -> build (var (V (fromTyVar ty)))
-    (tyCon, tys) -> build (app (fun (fromTyCon tyCon)) (map fromTypeRep tys))
-  where
-    fromTyVar ty =
-      case Ty.splitTyConApp ty of
-        (tyCon, [ty']) | tyCon == succTyCon -> succ (fromTyVar ty')
-        (tyCon, []) | tyCon == zeroTyCon -> 0
+fromTypeRep ty
+  | Just n <- elemIndex ty typeVars =
+      build (var (V n))
+  | otherwise =
+    let (tyCon, tys) = Ty.splitTyConApp ty in
+    build (app (fun (fromTyCon tyCon)) (map fromTypeRep tys))
 
 fromTyCon :: Ty.TyCon -> TyCon
 fromTyCon ty
   | ty == arrowTyCon = Arrow
   | otherwise = TyCon ty
 
-arrowTyCon, commaTyCon, listTyCon, varTyCon, succTyCon, zeroTyCon, dictTyCon :: Ty.TyCon
+arrowTyCon, commaTyCon, listTyCon, dictTyCon :: Ty.TyCon
 arrowTyCon = mkCon (Proxy :: Proxy (->))
 commaTyCon = mkCon (Proxy :: Proxy (,))
 listTyCon  = mkCon (Proxy :: Proxy [])
-varTyCon   = mkCon (Proxy :: Proxy TyVarNumber)
-succTyCon  = mkCon (Proxy :: Proxy Succ)
-zeroTyCon  = mkCon (Proxy :: Proxy Zero)
 dictTyCon  = mkCon (Proxy :: Proxy Dict)
 
 mkCon :: Typeable a => proxy a -> Ty.TyCon
