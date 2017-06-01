@@ -69,6 +69,7 @@ library
   Exposed-modules:
     QuickSpec.Explore.Terms
     QuickSpec.FindInstance
+    QuickSpec.Instances
     QuickSpec.Prop
     QuickSpec.Pruning
     QuickSpec.Pruning.EncodeTypes
