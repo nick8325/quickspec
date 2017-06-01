@@ -111,14 +111,18 @@ encode = build . enc
 
 decode :: (Ord f, Typed f, Typeable f) =>
   UntypedTerm f -> TypedTerm f
-decode = build . dec
+decode = build . dec Nothing
   where
-    dec (App (F (Tag ty)) (Cons (Var (V x)) Empty)) =
-      QS.var (QS.V ty x)
-    dec (App (F Tag{}) (Cons t Empty)) = dec t
-    dec (App (F Tag{}) _) =
+    dec _ (App (F (Tag ty)) (Cons t Empty)) =
+      dec (Just ty) t
+    dec _ (App (F Tag{}) _) =
       error "Tag function applied with wrong arity"
-    dec (App (F (Func f)) ts) =
-      QS.app (QS.fun f) (map dec (unpack ts))
-    dec (Var _) =
+    dec (Just ty) (Var (V x)) =
+      QS.var (QS.V ty x)
+    dec Nothing (Var _) =
       error "Naked variable in type-encoded term"
+    dec _ (App (F (Func f)) ts) =
+      QS.app (QS.fun f) $
+        zipWith dec
+          (map Just (typeArgs (typ f)))
+          (unpack ts)
