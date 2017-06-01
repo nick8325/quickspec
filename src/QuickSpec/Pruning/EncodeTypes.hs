@@ -16,6 +16,22 @@ data Tagged f =
   | Tag Type
   deriving (Eq, Ord, Show, Typeable)
 
+instance Arity f => Arity (Tagged f) where
+  arity (Func f) = arity f
+  arity (Tag _) = 1
+
+instance Sized f => Sized (Tagged f) where
+  size (Func f) = size f
+  size (Tag _) = 0
+
+instance Pretty f => Pretty (Tagged f) where
+  pPrint (Func f) = pPrint f
+  pPrint (Tag ty) = pPrint ty
+
+instance PrettyTerm f => PrettyTerm (Tagged f) where
+  termStyle (Func f) = termStyle f
+  termStyle (Tag _) = uncurried
+
 type TypedTerm f = QS.Term f
 type UntypedTerm f = Term (Tagged f)
 

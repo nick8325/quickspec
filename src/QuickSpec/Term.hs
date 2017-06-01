@@ -9,11 +9,14 @@ import Twee.Base hiding (Symbolic, Term, TermList, Builder, pattern Var, pattern
 import GHC.Generics
 import Test.QuickCheck(CoArbitrary)
 
-type Symbolic f a = (Base.Symbolic a, ConstantOf a ~ Either f Type, Typeable f, Ord f)
-type Term f = Base.Term (Either f Type)
-type TermList f = Base.TermList (Either f Type)
-type Builder f = Base.Builder (Either f Type)
-type Fun f = Base.Fun (Either f Type)
+type Symbolic f a = (Base.Symbolic a, ConstantOf a ~ Tagged f, Typeable f, Ord f)
+type Term f = Base.Term (Tagged f)
+type TermList f = Base.TermList (Tagged f)
+type Builder f = Base.Builder (Tagged f)
+type Fun f = Base.Fun (Tagged f)
+
+data Tagged f = TermFun f | TagFun Type
+  deriving (Eq, Ord, Show)
 
 data Var = V { var_ty :: Type, var_id :: {-# UNPACK #-} !Int }
   deriving (Eq, Ord, Show, Generic, CoArbitrary)
@@ -24,16 +27,16 @@ instance Typed Var where
   typeSubst_ sub (V ty x) = V (typeSubst_ sub ty) x
 
 var :: (Ord f, Typeable f) => Var -> Builder f
-var (V ty x) = Base.app (Base.fun (Right ty)) (Base.var (Base.V x))
+var (V ty x) = Base.app (Base.fun (TagFun ty)) (Base.var (Base.V x))
 
 fun :: (Ord f, Typeable f) => f -> Fun f
-fun = Base.fun . Left
+fun = Base.fun . TermFun
 
 fun_value :: Fun f -> f
 fun_value f =
   case Base.fun_value f of
-    Left x -> x
-    Right _ -> error "type tag used as Fun"
+    TermFun x -> x
+    TagFun _ -> error "type tag used as Fun"
 
 pattern F :: f -> Fun f
 pattern F x <- (fun_value -> x)
@@ -42,7 +45,7 @@ pattern Var :: Var -> Term f
 pattern Var x <- (patVar -> Just x)
 
 patVar :: Term f -> Maybe Var
-patVar (Base.App (Base.F (Right ty)) (Cons (Base.Var (Base.V x)) Empty)) =
+patVar (Base.App (Base.F (TagFun ty)) (Cons (Base.Var (Base.V x)) Empty)) =
   Just (V ty x)
 patVar _ = Nothing
 
@@ -50,8 +53,23 @@ pattern App :: Fun f -> TermList f -> Term f
 pattern App f ts <- (patApp -> Just (f, ts))
 
 patApp :: Term f -> Maybe (Fun f, TermList f)
-patApp (Base.App f@(Base.F (Left _)) ts) = Just (f, ts)
+patApp (Base.App f@(Base.F (TermFun _)) ts) = Just (f, ts)
 patApp _ = Nothing
+
+instance Sized f => Sized (Tagged f) where
+  size (TermFun f) = size f
+  size (TagFun _) = 0
+
+-- No instance for Arity to make it harder to accidentally use Pruning.Twee
+-- without Pruning.EncodeTypes.
+
+instance Pretty f => Pretty (Tagged f) where
+  pPrintPrec l p (TermFun f) = pPrintPrec l p f
+  pPrintPrec _ _ (TagFun ty) = pPrint ty
+
+instance PrettyTerm f => PrettyTerm (Tagged f) where
+  termStyle (TermFun f) = termStyle f
+  termStyle (TagFun  _) = invisible
 
 funs :: Symbolic f a => a -> [Fun f]
 funs x = [ f | t <- terms x, App f _ <- subtermsList t ]

@@ -41,11 +41,7 @@ instance Typed a => Typed (Prop a) where
 instance Pretty a => Pretty (Prop a) where
   pPrint ([] :=>: rhs) = pPrint rhs
   pPrint p =
-    sep [
-      fsep
-        (punctuate (text "" <+> text "&")
-          (map pPrint (lhs p))) <+> text "=>",
-      nest 2 (pPrint (rhs p))]
+    hsep (punctuate (text " &") (map pPrint (lhs p))) <+> text "=>" <+> pPrint (rhs p)
 
 data Equation a = a :=: a deriving (Show, Eq, Ord, Generic, Functor)
 
@@ -60,7 +56,7 @@ instance Typed a => Typed (Equation a) where
   typeSubst_ sub (x :=: y) = typeSubst_ sub x :=: typeSubst_ sub y
 
 instance Pretty a => Pretty (Equation a) where
-  pPrintPrec _ _ (x :=: y) = hang (pPrint x <+> text "=") 2 (pPrint y)
+  pPrintPrec _ _ (x :=: y) = pPrint x <+> text "=" <+> pPrint y
 
 infix 4 ===
 (===) :: a -> a -> Prop a
