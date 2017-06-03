@@ -16,12 +16,12 @@ baseInstances =
     inst $ \(x :: A) (y :: B) (z :: C) (w :: D) (v :: E) -> (x, y, z, w, v),
     -- Split conjunctions of typeclasses into individuals
     inst $ \() -> Dict :: Dict (),
-    inst $ \(Dict :: Dict ClsA) (Dict :: Dict ClsB) -> Dict :: Dict (ClsA, ClsB),
-    inst $ \(Dict :: Dict ClsA) (Dict :: Dict ClsB) (Dict :: Dict ClsC) -> Dict :: Dict (ClsA, ClsB, ClsC),
-    inst $ \(Dict :: Dict ClsA) (Dict :: Dict ClsB) (Dict :: Dict ClsC) (Dict :: Dict ClsD) -> Dict :: Dict (ClsA, ClsB, ClsC, ClsD),
-    inst $ \(Dict :: Dict ClsA) (Dict :: Dict ClsB) (Dict :: Dict ClsC) (Dict :: Dict ClsD) (Dict :: Dict ClsE) -> Dict :: Dict (ClsA, ClsB, ClsC, ClsD, ClsE),
+    inst $ \(Dict :: Dict ClassA) (Dict :: Dict ClassB) -> Dict :: Dict (ClassA, ClassB),
+    inst $ \(Dict :: Dict ClassA) (Dict :: Dict ClassB) (Dict :: Dict ClassC) -> Dict :: Dict (ClassA, ClassB, ClassC),
+    inst $ \(Dict :: Dict ClassA) (Dict :: Dict ClassB) (Dict :: Dict ClassC) (Dict :: Dict ClassD) -> Dict :: Dict (ClassA, ClassB, ClassC, ClassD),
+    inst $ \(Dict :: Dict ClassA) (Dict :: Dict ClassB) (Dict :: Dict ClassC) (Dict :: Dict ClassD) (Dict :: Dict ClassE) -> Dict :: Dict (ClassA, ClassB, ClassC, ClassD, ClassE),
     -- Derive typeclass instances using (:-)
-    inst $ \(Dict :: Dict ClsA) (Sub Dict :: ClsA :- ClsB) -> Dict :: Dict ClsB,
+    inst $ \(Dict :: Dict ClassA) (Sub Dict :: ClassA :- ClassB) -> Dict :: Dict ClassB,
     -- Standard names
     inst $ \(Names names :: Names A) ->
       Names (map (++ "s") names) :: Names [A],
@@ -42,7 +42,7 @@ baseInstances =
     inst (Sub Dict :: Ord A :- Eq A),
     -- From Arbitrary to Gen
     inst $ \(Dict :: Dict (Arbitrary A)) -> arbitrary :: Gen A,
-    inst $ \(dict :: Dict ClsA) -> return dict :: Gen (Dict ClsA)]
+    inst $ \(dict :: Dict ClassA) -> return dict :: Gen (Dict ClassA)]
 
 baseType :: forall proxy a. (Ord a, Arbitrary a, Typeable a) => proxy a -> Instances
 baseType _ =

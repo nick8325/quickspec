@@ -5,7 +5,7 @@
 module QuickSpec.Type(
   -- Types.
   Typeable,
-  Type, TyCon(..), tyCon, fromTyCon, A, B, C, D, E, ClsA, ClsB, ClsC, ClsD, ClsE,
+  Type, TyCon(..), tyCon, fromTyCon, A, B, C, D, E, ClassA, ClassB, ClassC, ClassD, ClassE,
   typeOf, typeRep, applyType, fromTypeRep,
   arrowType, typeArgs, typeRes, typeDrop, typeArity, oneTypeVar, skolemiseTypeVars,
   isDictionary, getDictionary,
@@ -67,16 +67,16 @@ newtype C = C Any deriving Typeable
 newtype D = D Any deriving Typeable
 newtype E = E Any deriving Typeable
 
-class ClsA
-deriving instance Typeable ClsA
-class ClsB
-deriving instance Typeable ClsB
-class ClsC
-deriving instance Typeable ClsC
-class ClsD
-deriving instance Typeable ClsD
-class ClsE
-deriving instance Typeable ClsE
+class ClassA
+deriving instance Typeable ClassA
+class ClassB
+deriving instance Typeable ClassB
+class ClassC
+deriving instance Typeable ClassC
+class ClassD
+deriving instance Typeable ClassD
+class ClassE
+deriving instance Typeable ClassE
 
 typeVars :: [Ty.TypeRep]
 typeVars =
@@ -85,11 +85,11 @@ typeVars =
    Ty.typeRep (Proxy :: Proxy C),
    Ty.typeRep (Proxy :: Proxy D),
    Ty.typeRep (Proxy :: Proxy E),
-   Ty.typeRep (Proxy :: Proxy ClsA),
-   Ty.typeRep (Proxy :: Proxy ClsB),
-   Ty.typeRep (Proxy :: Proxy ClsC),
-   Ty.typeRep (Proxy :: Proxy ClsD),
-   Ty.typeRep (Proxy :: Proxy ClsE)]
+   Ty.typeRep (Proxy :: Proxy ClassA),
+   Ty.typeRep (Proxy :: Proxy ClassB),
+   Ty.typeRep (Proxy :: Proxy ClassC),
+   Ty.typeRep (Proxy :: Proxy ClassD),
+   Ty.typeRep (Proxy :: Proxy ClassE)]
 
 typeOf :: Typeable a => a -> Type
 typeOf x = fromTypeRep (Ty.typeOf x)
