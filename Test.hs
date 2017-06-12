@@ -113,7 +113,7 @@ main = do
   let
     pruner =
       ET.encodeMonoTypes $
-      T.tweePruner T.Config { T.cfg_max_term_size = 7 }
+      T.tweePruner T.Config { T.cfg_max_term_size = 7, T.cfg_max_cp_depth = 2 }
     state0 = initialState (flip eval) tester pruner
 
   loop state0 allTerms

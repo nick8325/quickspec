@@ -14,7 +14,8 @@ import Twee.Base
 
 data Config =
   Config {
-    cfg_max_term_size :: Int }
+    cfg_max_term_size :: Int,
+    cfg_max_cp_depth :: Int }
 
 tweePruner :: (Ord f, Typeable f, Arity f, Sized f, PrettyTerm f, Ordered (Extended f)) =>
   Config -> Pruner (Term f)
@@ -23,7 +24,8 @@ tweePruner Config{..} =
   where
     config =
       Twee.defaultConfig {
-        Twee.cfg_max_term_size = cfg_max_term_size }
+        Twee.cfg_max_term_size = cfg_max_term_size,
+        Twee.cfg_max_cp_depth = cfg_max_cp_depth }
 
 normaliseTwee :: (Ord f, Typeable f, Arity f, Sized f, PrettyTerm f, Ordered (Extended f)) =>
   State (Extended f) -> Term f -> Term f
