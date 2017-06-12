@@ -44,7 +44,6 @@ instance Arity Con where
   arity One = 0
 
 instance Ordered (Extended (ET.Tagged Con)) where
-  f << g = B.fun_value f < B.fun_value g
   lessEq t u = KBO.lessEq t u
   lessIn model t  u = KBO.lessIn model t u
 
