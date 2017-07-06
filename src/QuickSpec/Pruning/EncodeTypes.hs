@@ -1,8 +1,9 @@
 -- Encode monomorphic types during pruning.
-{-# LANGUAGE TypeFamilies, RecordWildCards #-}
+{-# LANGUAGE TypeFamilies, RecordWildCards, FlexibleInstances #-}
 module QuickSpec.Pruning.EncodeTypes where
 
 import Twee.Base
+import qualified Twee.KBO as KBO
 import QuickSpec.Pruning
 import qualified QuickSpec.Term as QS
 import QuickSpec.Type
@@ -31,6 +32,10 @@ instance Pretty f => Pretty (Tagged f) where
 instance PrettyTerm f => PrettyTerm (Tagged f) where
   termStyle (Func f) = termStyle f
   termStyle (Tag _) = uncurried
+
+instance (Typeable f, Ord f, Arity f, Sized f, PrettyTerm f) => Ordered (Extended (Tagged f)) where
+  lessEq t u = KBO.lessEq t u
+  lessIn model t  u = KBO.lessIn model t u
 
 type TypedTerm f = QS.Term f
 type UntypedTerm f = Term (Tagged f)

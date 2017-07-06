@@ -4,7 +4,6 @@ import qualified QuickSpec.Testing.QuickCheck as QC
 import qualified QuickSpec.Pruning.Twee as T
 import qualified QuickSpec.Pruning.EncodeTypes as ET
 import qualified Twee.Base as B
-import qualified Twee.KBO as KBO
 import QuickSpec.Utils
 import QuickSpec.Term
 import QuickSpec.Type
@@ -42,10 +41,6 @@ instance Arity Con where
   arity Times = 2
   arity Zero = 0
   arity One = 0
-
-instance Ordered (Extended (ET.Tagged Con)) where
-  lessEq t u = KBO.lessEq t u
-  lessIn model t  u = KBO.lessIn model t u
 
 eval :: (Int -> Integer) -> Term Con -> Integer
 eval env (Var (V _ x)) = env x
@@ -103,6 +98,7 @@ allTerms = sortBy (comparing measure) $ concat (take 8 tss)
     tInt = typeRep (Proxy :: Proxy Integer)
 
 main = do
+  print (length allTerms)
   tester <-
     generate $ QC.quickCheckTester
       QC.Config { QC.cfg_num_tests = 1000, QC.cfg_max_test_size = 100 }
