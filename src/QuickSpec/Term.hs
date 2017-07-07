@@ -60,8 +60,9 @@ instance Sized f => Sized (Tagged f) where
   size (TermFun f) = size f
   size (TagFun _) = 0
 
--- No instance for Arity to make it harder to accidentally use Pruning.Twee
--- without Pruning.EncodeTypes.
+instance Arity f => Arity (Tagged f) where
+  arity (TermFun f) = arity f
+  arity (TagFun _) = 1
 
 instance Pretty f => Pretty (Tagged f) where
   pPrintPrec l p (TermFun f) = pPrintPrec l p f
@@ -107,3 +108,18 @@ evaluateTerm fun var = eval
     eval (Var x) = var x
     eval (App (F f) ts) =
       foldl apply (fun f) (map eval (unpack ts))
+
+instance (Ord f, Typeable f, Typed f) => Typed (Term f) where
+  typ (Var x) = typ x
+  typ (App (F f) ts) =
+    typeDrop (length (unpack ts)) (typ f)
+
+  otherTypesDL (Var _) = mempty
+  otherTypesDL (App (F f) ts) =
+    otherTypesDL f `mplus` otherTypesDL (unpack ts)
+
+  typeSubst_ sub = build . tsub
+    where
+      tsub (Var x) = var (typeSubst_ sub x)
+      tsub (App (F f) ts) =
+        app (fun (typeSubst_ sub f)) (map tsub (unpack ts))

@@ -45,7 +45,7 @@ data State f =
     st_pruner :: Pruner (UntypedTerm f),
     st_functions :: Set (Tagged f) }
 
-encodeMonoTypes :: (Ord f, Typeable f, Typed f) =>
+encodeMonoTypes :: (Ord f, Arity f, Typeable f, Typed f) =>
   Pruner (UntypedTerm f) -> Pruner (TypedTerm f)
 encodeMonoTypes pruner =
   makePruner normaliseMono addMono
@@ -63,7 +63,7 @@ normaliseMono State{..} =
   -- with their types (i.e. we can fall back to the naive type encoding).
   decode . normalise st_pruner . encode
 
-addMono :: (Ord f, Typed f, Typeable f) =>
+addMono :: (Ord f, Typed f, Arity f, Typeable f) =>
   Prop (TypedTerm f) -> State f -> State f
 addMono prop state =
   State{
@@ -73,7 +73,7 @@ addMono prop state =
     State{..} =
       foldl' addFunction state (map QS.fun_value (QS.funs prop))
 
-addFunction :: (Ord f, Typed f, Typeable f) =>
+addFunction :: (Ord f, Typed f, Arity f, Typeable f) =>
   State f -> f -> State f
 addFunction st@State{..} f
   | Func f `Set.member` st_functions = st
@@ -89,7 +89,7 @@ addFunction st@State{..} f
           Set.\\ st_functions
 
 -- Compute the typing axioms for a function or type tag.
-typingAxioms :: (Ord f, Typed f, Typeable f) =>
+typingAxioms :: (Ord f, Typed f, Arity f, Typeable f) =>
   Tagged f -> [Prop (UntypedTerm f)]
 typingAxioms (Tag ty) =
   [build (tag ty (tag ty x)) === build (tag ty x)]
@@ -103,9 +103,11 @@ typingAxioms (Func func) =
     xs = take n (map (var . V) [0..])
 
     ty = typ func
-    n = typeArity ty
-    args = typeArgs ty
-    res = typeRes ty
+    -- Use arity rather than typeArity, so that we can support
+    -- partially-applied functions
+    n = arity func
+    args = take n (typeArgs ty)
+    res = typeDrop n ty
 
     t = build (app f xs)
 
