@@ -3,6 +3,7 @@ import QuickSpec.Explore.Terms
 import qualified QuickSpec.Testing.QuickCheck as QC
 import qualified QuickSpec.Pruning.Twee as T
 import qualified QuickSpec.Pruning.EncodeTypes as ET
+import qualified QuickSpec.Pruning.HigherOrder as HO
 import qualified Twee.Base as B
 import QuickSpec.Utils
 import QuickSpec.Term
@@ -51,11 +52,23 @@ eval env (App (F Plus) (Cons t (Cons u Empty))) =
 eval env (App (F Times) (Cons t (Cons u Empty))) =
   eval env t * eval env u
 
+evalHO :: (Typeable f, Ord f, Arity f) => (Term f -> a) -> Term (HO.HigherOrder f) -> Either a (Term (HO.HigherOrder f))
+evalHO eval t =
+  case fromHO t of
+    Nothing -> Right t
+    Just u -> Left (eval u)
+  where
+    fromHO (Var x) = Just (build (var x))
+    fromHO (App (F (HO.Partial f n)) ts) | arity f == n = do
+      us <- mapM fromHO (unpack ts)
+      return (build (app (fun f) us))
+    fromHO _ = Nothing
+
 -- Term ordering - size, skeleton, generality.
 -- Satisfies the property:
 -- if measure (schema t) < measure (schema u) then t < u.
-type Measure = (Int, Int, MeasureFuns Con, Int, [Var])
-measure :: Term Con -> Measure
+type Measure = (Int, Int, MeasureFuns (HO.HigherOrder Con), Int, [Var])
+measure :: Term (HO.HigherOrder Con) -> Measure
 measure t =
   (size t, -length (vars t),
    MeasureFuns (build (skel (singleton t))),
@@ -80,21 +93,24 @@ compareFuns (App (F f) ts) (App (F g) us) =
   compare f g `orElse`
   compare (map MeasureFuns (unpack ts)) (map MeasureFuns (unpack us))
 
-allTerms :: [Term Con]
+allTerms :: [Term (HO.HigherOrder Con)]
 allTerms = sortBy (comparing measure) $ concat (take 8 tss)
   where
     tss = map sized [0..]
     sized 0 = []
     sized 1 =
       map build $
-      [con (fun Zero), con (fun One)] ++
+      [con (fun (HO.Partial Zero 0)),
+       con (fun (HO.Partial One 0)),
+       con (fun (HO.Partial Plus 0)),
+       con (fun (HO.Partial Times 0))] ++
       [var (V ty n) | n <- [0..2], ty <- [tInt]]
     sized n =
-      [ build (app (fun f) [t, u])
-      | f <- [Plus, Times],
-        i <- [0..n-1],
+      [ v
+      | i <- [0..n-1],
         t <- tss !! i,
-        u <- tss !! (n-1-i) ]
+        u <- tss !! (n-i),
+        Just v <- [tryApply t u] ]
     tInt = typeRep (Proxy :: Proxy Integer)
 
 main = do
@@ -103,13 +119,13 @@ main = do
     generate $ QC.quickCheckTester
       QC.Config { QC.cfg_num_tests = 1000, QC.cfg_max_test_size = 100 }
       arbitrary
-      eval
+      (evalHO . eval)
 
   let
     pruner =
       ET.encodeMonoTypes $
       T.tweePruner T.Config { T.cfg_max_term_size = 7, T.cfg_max_cp_depth = 2 }
-    state0 = initialState (flip eval) tester pruner
+    state0 = initialState (flip (evalHO . eval)) tester pruner
 
   loop state0 allTerms
   where
