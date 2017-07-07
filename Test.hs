@@ -12,6 +12,13 @@ import Data.List
 import Data.Ord
 import Test.QuickCheck
 import Data.Proxy
+import Data.Functor.Identity
+import Data.Maybe
+import Data.MemoUgly
+import QuickSpec.FindInstance
+import QuickSpec.Instances
+import Test.QuickCheck.Gen
+import Test.QuickCheck.Gen.Unsafe
 
 data Con = Plus | Times | Zero | One
   deriving (Eq, Ord, Show)
@@ -43,26 +50,23 @@ instance Arity Con where
   arity Zero = 0
   arity One = 0
 
-eval :: (Int -> Integer) -> Term Con -> Integer
-eval env (Var (V _ x)) = env x
-eval _ (App (F Zero) Empty) = 0
-eval _ (App (F One) Empty) = 1
-eval env (App (F Plus) (Cons t (Cons u Empty))) =
-  eval env t + eval env u
-eval env (App (F Times) (Cons t (Cons u Empty))) =
-  eval env t * eval env u
-
-evalHO :: (Typeable f, Ord f, Arity f) => (Term f -> a) -> Term (HO.HigherOrder f) -> Either a (Term (HO.HigherOrder f))
-evalHO eval t =
-  case fromHO t of
+eval :: (Var -> Value Identity) -> Term (HO.HigherOrder Con) -> Either Integer (Term (HO.HigherOrder Con))
+eval env t =
+  case fromValue (evaluateTerm (evalHO fun) env t) of
     Nothing -> Right t
-    Just u -> Left (eval u)
+    Just (Identity n) -> Left n
   where
-    fromHO (Var x) = Just (build (var x))
-    fromHO (App (F (HO.Partial f n)) ts) | arity f == n = do
-      us <- mapM fromHO (unpack ts)
-      return (build (app (fun f) us))
-    fromHO _ = Nothing
+    fun Zero = toValue (Identity (0 :: Integer))
+    fun One = toValue (Identity (1 :: Integer))
+    fun Plus = toValue (Identity ((+) :: Integer -> Integer -> Integer))
+    fun Times = toValue (Identity ((*) :: Integer -> Integer -> Integer))
+  
+evalHO :: Applicative g => (f -> Value g) -> HO.HigherOrder f -> Value g
+evalHO fun (HO.Partial f _) = fun f
+evalHO _ (HO.Apply ty) =
+  fromJust $
+    cast (build (app (B.fun Arrow) [ty, ty]))
+      (toValue (pure (($) :: (A -> B) -> (A -> B))))
 
 -- Term ordering - size, skeleton, generality.
 -- Satisfies the property:
@@ -116,19 +120,32 @@ moreTerms tss =
   where
     n = length tss
 
+arbitraryVal :: Instances -> Gen (Var -> Value Identity)
+arbitraryVal insts =
+  MkGen $ \g n -> memo $ \(V ty x) ->
+    forValue (typ ty) $ \gen ->
+      Identity (unGen (coarbitrary x gen) g n)
+  where
+    typ :: Type -> Value Gen
+    typ = memo $ \ty ->
+      case findInstance insts ty of
+        [] -> error "untestable type"
+        (gen:_) ->
+          mapValue (coarbitrary ty) gen
+
 main = do
   tester <-
     generate $ QC.quickCheckTester
       QC.Config { QC.cfg_num_tests = 1000, QC.cfg_max_test_size = 100 }
-      arbitrary
-      (evalHO . eval)
+      (arbitraryVal baseInstances)
+      eval
 
   let
     pruner =
       HO.encodeHigherOrder $
       ET.encodeMonoTypes $
       T.tweePruner T.Config { T.cfg_max_term_size = 7, T.cfg_max_cp_depth = 2 }
-    state0 = initialState (flip (evalHO . eval)) tester pruner
+    state0 = initialState (flip eval) tester pruner
 
   loop state0 6 [[]] [] baseTerms
   where
