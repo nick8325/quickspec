@@ -93,28 +93,30 @@ compareFuns (App (F f) ts) (App (F g) us) =
   compare f g `orElse`
   compare (map MeasureFuns (unpack ts)) (map MeasureFuns (unpack us))
 
-allTerms :: [Term (HO.HigherOrder Con)]
-allTerms = sortBy (comparing measure) $ concat (take 8 tss)
+baseTerms :: [Term (HO.HigherOrder Con)]
+baseTerms =
+  sortBy (comparing measure) $
+    map build $
+    [con (fun (HO.Partial Zero 0)),
+     con (fun (HO.Partial One 0)),
+     con (fun (HO.Partial Plus 0)),
+     con (fun (HO.Partial Times 0))] ++
+    [var (V ty n) | n <- [0..2], ty <- [tInt]]
   where
-    tss = map sized [0..]
-    sized 0 = []
-    sized 1 =
-      map build $
-      [con (fun (HO.Partial Zero 0)),
-       con (fun (HO.Partial One 0)),
-       con (fun (HO.Partial Plus 0)),
-       con (fun (HO.Partial Times 0))] ++
-      [var (V ty n) | n <- [0..2], ty <- [tInt]]
-    sized n =
-      [ v
-      | i <- [0..n-1],
-        t <- tss !! i,
-        u <- tss !! (n-i),
-        Just v <- [tryApply t u] ]
     tInt = typeRep (Proxy :: Proxy Integer)
 
+moreTerms :: [[Term (HO.HigherOrder Con)]] -> [Term (HO.HigherOrder Con)]
+moreTerms tss =
+  sortBy' measure $
+    [ v
+    | i <- [0..n-1],
+      t <- tss !! i,
+      u <- tss !! (n-i),
+      Just v <- [tryApply t u] ]
+  where
+    n = length tss
+
 main = do
-  print (length allTerms)
   tester <-
     generate $ QC.quickCheckTester
       QC.Config { QC.cfg_num_tests = 1000, QC.cfg_max_test_size = 100 }
@@ -123,16 +125,25 @@ main = do
 
   let
     pruner =
+      HO.encodeHigherOrder $
       ET.encodeMonoTypes $
       T.tweePruner T.Config { T.cfg_max_term_size = 7, T.cfg_max_cp_depth = 2 }
     state0 = initialState (flip (evalHO . eval)) tester pruner
 
-  loop state0 allTerms
+  loop state0 6 [[]] [] baseTerms
   where
-    loop state [] = return ()
-    loop state (t:ts) = do
+    loop state 0 _ _ [] = return ()
+    loop state n tss ts [] =
+      loop state (n-1) uss [] (moreTerms uss)
+      where
+        uss = tss ++ [ts]
+    loop state n tss us (t:ts) = do
       let (state', mprop) = explore t state
       case mprop of
-        Nothing -> return ()
-        Just prop -> prettyPrint prop
-      loop state' ts
+        Redundant ->
+          loop state' n tss us ts
+        Unique ->
+          loop state' n tss (t:us) ts
+        Discovered prop -> do
+          prettyPrint prop
+          loop state' n tss us ts

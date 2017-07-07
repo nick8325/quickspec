@@ -7,7 +7,7 @@ import Data.Set(Set)
 import QuickSpec.Prop
 import QuickSpec.Pruning
 import QuickSpec.Testing
-import QuickSpec.Testing.DecisionTree
+import QuickSpec.Testing.DecisionTree hiding (Result)
 
 data State testcase result term =
   State {
@@ -28,17 +28,22 @@ initialState eval tester pruner =
     st_tree = empty eval,
     st_tester = tester }
 
+data Result term =
+    Discovered (Prop term)
+  | Redundant
+  | Unique
+
 explore :: (Ord term, Ord result) =>
   term -> State testcase result term ->
-  (State testcase result term, Maybe (Prop term))
+  (State testcase result term, Result term)
 explore t s = exp True s
   where
     exp testMore s@State{..}
-      | t' `Set.member` st_terms = (s, Nothing)
+      | t' `Set.member` st_terms = (s, Redundant)
       | otherwise =
         case insert t st_tree of
           Distinct tree ->
-            (s { st_tree = tree, st_terms = Set.insert t' st_terms }, Nothing)
+            (s { st_tree = tree, st_terms = Set.insert t' st_terms }, Unique)
           EqualTo u
             -- st_terms is not kept normalised wrt the discovered laws;
             -- instead, we normalise it lazily like so.
@@ -54,7 +59,7 @@ explore t s = exp True s
                 -- equation, we don't want to run QuickCheck again!
                 exp False s { st_tree = addTestCase tc st_tree, st_tester = tester' }
             | otherwise ->
-                (s { st_pruner = add st_pruner prop }, Just prop)
+                (s { st_pruner = add st_pruner prop }, Discovered prop)
             where
               u' = normalise st_pruner u
               prop = t === u
