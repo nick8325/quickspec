@@ -31,7 +31,7 @@ normaliseTwee :: (Ord f, Typeable f, Arity f, Sized f, PrettyTerm f, Ordered (Ex
   State (Extended f) -> Term f -> Term f
 normaliseTwee state t =
   unskolemise $
-    Twee.result (Twee.normaliseTerm state (skolemise t))
+    Twee.result (Twee.normaliseTerm state (Twee.simplifyTerm state (skolemise t)))
 
 addTwee :: (Ord f, Typeable f, Arity f, Sized f, PrettyTerm f, Ordered (Extended f)) =>
   Twee.Config -> Prop (Term f) -> State (Extended f) -> State (Extended f)
