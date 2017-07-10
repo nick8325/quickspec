@@ -24,10 +24,7 @@ data Con = Plus | Times | Zero | One
   deriving (Eq, Ord, Show)
 
 instance Typed Con where
-  typ Plus = typeOf ((+) :: Integer -> Integer -> Integer)
-  typ Times = typeOf ((*) :: Integer -> Integer -> Integer)
-  typ Zero = typeOf (0 :: Integer)
-  typ One = typeOf (1 :: Integer)
+  typ = typ . evalConId
   typeSubst_ _ ty = ty
 
 instance Pretty Con where
@@ -45,21 +42,22 @@ instance Sized Con where
   size _ = 1
 
 instance Arity Con where
-  arity Plus = 2
-  arity Times = 2
-  arity Zero = 0
-  arity One = 0
+  arity = typeArity . typ . evalConId
 
-eval :: (Var -> Value Identity) -> Term (HO.HigherOrder Con) -> Either Integer (Term (HO.HigherOrder Con))
+evalCon :: Applicative f => Con -> Value f
+evalCon Zero = toValue (pure (0 :: Integer))
+evalCon One = toValue (pure (1 :: Integer))
+evalCon Plus = toValue (pure ((+) :: Integer -> Integer -> Integer))
+evalCon Times = toValue (pure ((*) :: Integer -> Integer -> Integer))
+
+evalConId :: Con -> Value Identity
+evalConId = evalCon
+
+eval :: (Var -> Value Maybe) -> Term (HO.HigherOrder Con) -> Either Integer (Term (HO.HigherOrder Con))
 eval env t =
-  case fromValue (evaluateTerm (evalHO fun) env t) of
+  case fromValue (evaluateTerm (evalHO evalCon) env t) of
     Nothing -> Right t
-    Just (Identity n) -> Left n
-  where
-    fun Zero = toValue (Identity (0 :: Integer))
-    fun One = toValue (Identity (1 :: Integer))
-    fun Plus = toValue (Identity ((+) :: Integer -> Integer -> Integer))
-    fun Times = toValue (Identity ((*) :: Integer -> Integer -> Integer))
+    Just (Just n) -> Left n
   
 evalHO :: Applicative g => (f -> Value g) -> HO.HigherOrder f -> Value g
 evalHO fun (HO.Partial f _) = fun f
@@ -120,18 +118,22 @@ moreTerms tss =
   where
     n = length tss
 
-arbitraryVal :: Instances -> Gen (Var -> Value Identity)
+arbitraryVal :: Instances -> Gen (Var -> Value Maybe)
 arbitraryVal insts =
   MkGen $ \g n -> memo $ \(V ty x) ->
-    forValue (typ ty) $ \gen ->
-      Identity (unGen (coarbitrary x gen) g n)
+    case typ ty of
+      Nothing ->
+        fromJust $ cast ty (toValue (Nothing :: Maybe A))
+      Just gen ->
+        forValue gen $ \gen ->
+          Just (unGen (coarbitrary x gen) g n)
   where
-    typ :: Type -> Value Gen
+    typ :: Type -> Maybe (Value Gen)
     typ = memo $ \ty ->
       case findInstance insts ty of
-        [] -> error "untestable type"
+        [] -> Nothing
         (gen:_) ->
-          mapValue (coarbitrary ty) gen
+          Just (mapValue (coarbitrary ty) gen)
 
 main = do
   tester <-
@@ -141,15 +143,16 @@ main = do
       eval
 
   let
+    size = 7
     pruner =
       HO.encodeHigherOrder $
       ET.encodeMonoTypes $
-      T.tweePruner T.Config { T.cfg_max_term_size = 7, T.cfg_max_cp_depth = 2 }
+      T.tweePruner T.Config { T.cfg_max_term_size = size, T.cfg_max_cp_depth = 2 }
     state0 = initialState (flip eval) tester pruner
 
-  loop state0 6 [[]] [] baseTerms
+  loop state0 size [[]] [] baseTerms
   where
-    loop state 0 _ _ [] = return ()
+    loop state 1 _ _ [] = return ()
     loop state n tss ts [] =
       loop state (n-1) uss [] (moreTerms uss)
       where
