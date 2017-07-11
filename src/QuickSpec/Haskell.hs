@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables, TypeOperators, GADTs, FlexibleInstances #-}
 module QuickSpec.Haskell where
 
-import QuickSpec.FindInstance
+import QuickSpec.Haskell.Resolve
 import QuickSpec.Type
 import Test.QuickCheck
 import Data.Constraint

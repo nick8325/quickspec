@@ -15,7 +15,6 @@ import Data.Proxy
 import Data.Functor.Identity
 import Data.Maybe
 import Data.MemoUgly
-import QuickSpec.FindInstance
 import QuickSpec.Haskell
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Gen.Unsafe
