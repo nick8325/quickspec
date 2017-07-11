@@ -1,11 +1,19 @@
-{-# LANGUAGE ScopedTypeVariables, TypeOperators #-}
-module QuickSpec.Instances where
+{-# LANGUAGE ScopedTypeVariables, TypeOperators, GADTs, FlexibleInstances #-}
+module QuickSpec.Haskell where
 
 import QuickSpec.FindInstance
 import QuickSpec.Type
 import Test.QuickCheck
 import Data.Constraint
 import Data.Proxy
+import qualified Twee.Base as B
+import qualified QuickSpec.Pruning.HigherOrder as HO
+import QuickSpec.Term
+import Data.Functor.Identity
+import Data.Maybe
+import Data.MemoUgly
+import Test.QuickCheck.Gen
+import Test.QuickCheck.Gen.Unsafe
 
 baseInstances :: Instances
 baseInstances =
@@ -43,7 +51,7 @@ baseInstances =
     -- From Arbitrary to Gen
     inst $ \(Dict :: Dict (Arbitrary A)) -> arbitrary :: Gen A,
     inst $ \(dict :: Dict ClassA) -> return dict :: Gen (Dict ClassA),
-    -- From Ord to OrdDict
+    -- From Dict to OrdDict
     inst (OrdDict :: Dict (Ord A) -> OrdDict A)]
 
 newtype OrdDict a = OrdDict (Dict (Ord a)) deriving Typeable
@@ -60,3 +68,64 @@ names :: Instances -> Type -> [String]
 names insts ty =
   case findInstance insts (skolemiseTypeVars ty) of
     (x:_) -> ofValue getNames x
+
+arbitraryVal :: Instances -> Gen (Var -> Value Maybe)
+arbitraryVal insts =
+  MkGen $ \g n -> memo $ \(V ty x) ->
+    case typ ty of
+      Nothing ->
+        fromJust $ cast ty (toValue (Nothing :: Maybe A))
+      Just gen ->
+        forValue gen $ \gen ->
+          Just (unGen (coarbitrary x gen) g n)
+  where
+    typ :: Type -> Maybe (Value Gen)
+    typ = memo $ \ty ->
+      case findInstance insts ty of
+        [] -> Nothing
+        (gen:_) ->
+          Just (mapValue (coarbitrary ty) gen)
+
+ordyVal :: Instances -> Value Identity -> Maybe (Value Ordy)
+ordyVal insts =
+  \x ->
+    case ordyTy (typ x) of
+      Nothing -> Nothing
+      Just f -> Just (f x)
+  where
+    ordyTy :: Type -> Maybe (Value Identity -> Value Ordy)
+    ordyTy = memo $ \ty ->
+      case findInstance insts ty :: [Value OrdDict] of
+        [] -> Nothing
+        (val:_) ->
+          case unwrap val of
+            OrdDict Dict `In` w ->
+              Just $ \val ->
+                wrap w (Ordy (runIdentity (reunwrap w val)))
+
+data Ordy a where Ordy :: Ord a => a -> Ordy a
+instance Eq (Value Ordy) where x == y = compare x y == EQ
+
+instance Ord (Value Ordy) where
+  compare x y =
+    compare (typ x) (typ y) `mappend`
+    case unwrap x of
+      Ordy xv `In` w ->
+        let Ordy yv = reunwrap w y in
+        compare xv yv
+
+eval :: Instances -> (f -> Value Maybe) -> (Var -> Value Maybe) -> Term f -> Either (Value Ordy) (Term f)
+eval insts ev env t =
+  case unwrap (evaluateTerm ev env t) of
+    Nothing `In` _ -> Right t
+    Just val `In` w ->
+      case ordyVal insts (wrap w (Identity val)) of
+        Nothing -> Right t
+        Just ordy -> Left ordy
+
+evalHO :: Applicative g => (f -> Value g) -> HO.HigherOrder f -> Value g
+evalHO fun (HO.Partial f _) = fun f
+evalHO _ (HO.Apply ty) =
+  fromJust $
+    cast (build (app (B.fun Arrow) [ty, ty]))
+      (toValue (pure (($) :: (A -> B) -> (A -> B))))

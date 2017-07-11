@@ -16,7 +16,7 @@ import Data.Functor.Identity
 import Data.Maybe
 import Data.MemoUgly
 import QuickSpec.FindInstance
-import QuickSpec.Instances
+import QuickSpec.Haskell
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Gen.Unsafe
 import qualified Data.Typeable as Ty
@@ -26,7 +26,7 @@ data Con = Plus | Times | Zero | One
   deriving (Eq, Ord, Show)
 
 instance Typed Con where
-  typ = typ . evalConId
+  typ = typ . (evalCon :: Con -> Value Identity)
   typeSubst_ _ ty = ty
 
 instance Pretty Con where
@@ -44,32 +44,13 @@ instance Sized Con where
   size _ = 1
 
 instance Arity Con where
-  arity = typeArity . typ . evalConId
+  arity = typeArity . typ
 
 evalCon :: Applicative f => Con -> Value f
 evalCon Zero = toValue (pure (0 :: Integer))
 evalCon One = toValue (pure (1 :: Integer))
 evalCon Plus = toValue (pure ((+) :: Integer -> Integer -> Integer))
 evalCon Times = toValue (pure ((*) :: Integer -> Integer -> Integer))
-
-evalConId :: Con -> Value Identity
-evalConId = evalCon
-
-eval :: Instances -> (Var -> Value Maybe) -> Term (HO.HigherOrder Con) -> Either (Value Ordy) (Term (HO.HigherOrder Con))
-eval insts env t =
-  case unwrap (evaluateTerm (evalHO evalCon) env t) of
-    Nothing `In` _ -> Right t
-    Just val `In` w ->
-      case ordyVal insts (wrap w (Identity val)) of
-        Nothing -> Right t
-        Just ordy -> Left ordy
-
-evalHO :: Applicative g => (f -> Value g) -> HO.HigherOrder f -> Value g
-evalHO fun (HO.Partial f _) = fun f
-evalHO _ (HO.Apply ty) =
-  fromJust $
-    cast (build (app (B.fun Arrow) [ty, ty]))
-      (toValue (pure (($) :: (A -> B) -> (A -> B))))
 
 -- Term ordering - size, skeleton, generality.
 -- Satisfies the property:
@@ -123,60 +104,12 @@ moreTerms tss =
   where
     n = length tss
 
-arbitraryVal :: Instances -> Gen (Var -> Value Maybe)
-arbitraryVal insts =
-  MkGen $ \g n -> memo $ \(V ty x) ->
-    case typ ty of
-      Nothing ->
-        fromJust $ cast ty (toValue (Nothing :: Maybe A))
-      Just gen ->
-        forValue gen $ \gen ->
-          Just (unGen (coarbitrary x gen) g n)
-  where
-    typ :: Type -> Maybe (Value Gen)
-    typ = memo $ \ty ->
-      case findInstance insts ty of
-        [] -> Nothing
-        (gen:_) ->
-          Just (mapValue (coarbitrary ty) gen)
-
-ordyVal :: Instances -> Value Identity -> Maybe (Value Ordy)
-ordyVal insts =
-  \x ->
-    case ordyTy (typ x) of
-      Nothing -> Nothing
-      Just f -> Just (f x)
-  where
-    ordy :: OrdDict A -> A -> Ordy A
-    ordy (OrdDict Dict) x = Ordy x
-
-    ordyTy :: Type -> Maybe (Value Identity -> Value Ordy)
-    ordyTy = memo $ \ty ->
-      case findInstance insts ty :: [Value OrdDict] of
-        [] -> Nothing
-        (val:_) ->
-          case unwrap val of
-            OrdDict Dict `In` w ->
-              Just $ \val ->
-                wrap w (Ordy (runIdentity (reunwrap w val)))
-
-data Ordy a where Ordy :: Ord a => a -> Ordy a
-instance Eq (Value Ordy) where x == y = compare x y == EQ
-
-instance Ord (Value Ordy) where
-  compare x y =
-    compare (typ x) (typ y) `mappend`
-    case unwrap x of
-      Ordy xv `In` w ->
-        let Ordy yv = reunwrap w y in
-        compare xv yv
-
 main = do
   tester <-
     generate $ QC.quickCheckTester
       QC.Config { QC.cfg_num_tests = 1000, QC.cfg_max_test_size = 100 }
       (arbitraryVal baseInstances)
-      (eval baseInstances)
+      (eval baseInstances (evalHO evalCon))
 
   let
     size = 7
@@ -184,7 +117,7 @@ main = do
       HO.encodeHigherOrder $
       ET.encodeMonoTypes $
       T.tweePruner T.Config { T.cfg_max_term_size = size, T.cfg_max_cp_depth = 2 }
-    state0 = initialState (flip (eval baseInstances)) tester pruner
+    state0 = initialState (flip (eval baseInstances (evalHO evalCon))) tester pruner
 
   loop state0 size [[]] [] baseTerms
   where
