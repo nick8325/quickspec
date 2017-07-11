@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances, GADTs #-}
 import QuickSpec.Explore.Terms
 import qualified QuickSpec.Testing.QuickCheck as QC
 import qualified QuickSpec.Pruning.Twee as T
@@ -19,6 +19,8 @@ import QuickSpec.FindInstance
 import QuickSpec.Instances
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Gen.Unsafe
+import qualified Data.Typeable as Ty
+import Data.Constraint
 
 data Con = Plus | Times | Zero | One
   deriving (Eq, Ord, Show)
@@ -53,12 +55,15 @@ evalCon Times = toValue (pure ((*) :: Integer -> Integer -> Integer))
 evalConId :: Con -> Value Identity
 evalConId = evalCon
 
-eval :: (Var -> Value Maybe) -> Term (HO.HigherOrder Con) -> Either Integer (Term (HO.HigherOrder Con))
-eval env t =
-  case fromValue (evaluateTerm (evalHO evalCon) env t) of
-    Nothing -> Right t
-    Just (Just n) -> Left n
-  
+eval :: Instances -> (Var -> Value Maybe) -> Term (HO.HigherOrder Con) -> Either (Value Ordy) (Term (HO.HigherOrder Con))
+eval insts env t =
+  case unwrap (evaluateTerm (evalHO evalCon) env t) of
+    Nothing `In` _ -> Right t
+    Just val `In` w ->
+      case ordyVal insts (wrap w (Identity val)) of
+        Nothing -> Right t
+        Just ordy -> Left ordy
+
 evalHO :: Applicative g => (f -> Value g) -> HO.HigherOrder f -> Value g
 evalHO fun (HO.Partial f _) = fun f
 evalHO _ (HO.Apply ty) =
@@ -135,12 +140,43 @@ arbitraryVal insts =
         (gen:_) ->
           Just (mapValue (coarbitrary ty) gen)
 
+ordyVal :: Instances -> Value Identity -> Maybe (Value Ordy)
+ordyVal insts =
+  \x ->
+    case ordyTy (typ x) of
+      Nothing -> Nothing
+      Just f -> Just (f x)
+  where
+    ordy :: OrdDict A -> A -> Ordy A
+    ordy (OrdDict Dict) x = Ordy x
+
+    ordyTy :: Type -> Maybe (Value Identity -> Value Ordy)
+    ordyTy = memo $ \ty ->
+      case findInstance insts ty :: [Value OrdDict] of
+        [] -> Nothing
+        (val:_) ->
+          case unwrap val of
+            OrdDict Dict `In` w ->
+              Just $ \val ->
+                wrap w (Ordy (runIdentity (reunwrap w val)))
+
+data Ordy a where Ordy :: Ord a => a -> Ordy a
+instance Eq (Value Ordy) where x == y = compare x y == EQ
+
+instance Ord (Value Ordy) where
+  compare x y =
+    compare (typ x) (typ y) `mappend`
+    case unwrap x of
+      Ordy xv `In` w ->
+        let Ordy yv = reunwrap w y in
+        compare xv yv
+
 main = do
   tester <-
     generate $ QC.quickCheckTester
       QC.Config { QC.cfg_num_tests = 1000, QC.cfg_max_test_size = 100 }
       (arbitraryVal baseInstances)
-      eval
+      (eval baseInstances)
 
   let
     size = 7
@@ -148,7 +184,7 @@ main = do
       HO.encodeHigherOrder $
       ET.encodeMonoTypes $
       T.tweePruner T.Config { T.cfg_max_term_size = size, T.cfg_max_cp_depth = 2 }
-    state0 = initialState (flip eval) tester pruner
+    state0 = initialState (flip (eval baseInstances)) tester pruner
 
   loop state0 size [[]] [] baseTerms
   where

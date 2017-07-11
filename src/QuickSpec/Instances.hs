@@ -42,7 +42,11 @@ baseInstances =
     inst (Sub Dict :: Ord A :- Eq A),
     -- From Arbitrary to Gen
     inst $ \(Dict :: Dict (Arbitrary A)) -> arbitrary :: Gen A,
-    inst $ \(dict :: Dict ClassA) -> return dict :: Gen (Dict ClassA)]
+    inst $ \(dict :: Dict ClassA) -> return dict :: Gen (Dict ClassA),
+    -- From Ord to OrdDict
+    inst (OrdDict :: Dict (Ord A) -> OrdDict A)]
+
+newtype OrdDict a = OrdDict (Dict (Ord a)) deriving Typeable
 
 baseType :: forall proxy a. (Ord a, Arbitrary a, Typeable a) => proxy a -> Instances
 baseType _ =
