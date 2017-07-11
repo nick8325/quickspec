@@ -21,8 +21,8 @@ import Test.QuickCheck.Gen.Unsafe
 import qualified Data.Typeable as Ty
 import Data.Constraint
 
-data Con = Plus | Times | Zero | One
-  deriving (Eq, Ord, Show)
+data Con = Plus | Times | Zero | One | Length | Append | Nil | Rev
+  deriving (Eq, Ord, Show, Bounded, Enum)
 
 instance Typed Con where
   typ = typ . (evalCon :: Con -> Value Identity)
@@ -33,10 +33,15 @@ instance Pretty Con where
   pPrint Times = text "*"
   pPrint Zero = text "0"
   pPrint One = text "1"
+  pPrint Length = text "length"
+  pPrint Append = text "++"
+  pPrint Nil = text "[]"
+  pPrint Rev = text "reverse"
 
 instance PrettyTerm Con where
   termStyle Plus = infixStyle 5
   termStyle Times = infixStyle 5
+  termStyle Append = infixStyle 5
   termStyle _ = curried
 
 instance Sized Con where
@@ -50,6 +55,10 @@ evalCon Zero = toValue (pure (0 :: Integer))
 evalCon One = toValue (pure (1 :: Integer))
 evalCon Plus = toValue (pure ((+) :: Integer -> Integer -> Integer))
 evalCon Times = toValue (pure ((*) :: Integer -> Integer -> Integer))
+evalCon Length = toValue (pure (fromIntegral . length :: [Char] -> Integer))
+evalCon Append = toValue (pure ((++) :: [Char] -> [Char] -> [Char]))
+evalCon Nil = toValue (pure ([] :: [Char]))
+evalCon Rev = toValue (pure (reverse :: [Char] -> [Char]))
 
 -- Term ordering - size, skeleton, generality.
 -- Satisfies the property:
@@ -84,13 +93,11 @@ baseTerms :: [Term (HO.HigherOrder Con)]
 baseTerms =
   sortBy (comparing measure) $
     map build $
-    [con (fun (HO.Partial Zero 0)),
-     con (fun (HO.Partial One 0)),
-     con (fun (HO.Partial Plus 0)),
-     con (fun (HO.Partial Times 0))] ++
-    [var (V ty n) | n <- [0..2], ty <- [tInt]]
+    [con (fun (HO.Partial f 0)) | f <- [minBound..maxBound]] ++
+    [var (V ty n) | n <- [0..2], ty <- [tInt, tList]]
   where
     tInt = typeRep (Proxy :: Proxy Integer)
+    tList = typeRep (Proxy :: Proxy [Char])
 
 moreTerms :: [[Term (HO.HigherOrder Con)]] -> [Term (HO.HigherOrder Con)]
 moreTerms tss =
