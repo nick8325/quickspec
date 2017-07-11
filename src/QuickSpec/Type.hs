@@ -15,7 +15,7 @@ module QuickSpec.Type(
   Apply(..), apply, canApply,
   -- Polymorphic types.
   canonicaliseType,
-  Poly, poly, unPoly, polyTyp, polyMap, polyRename, polyApply, polyPair, polyList, polyMgu,
+  Poly, toPolyValue, poly, unPoly, polyTyp, polyMap, polyRename, polyApply, polyPair, polyList, polyMgu,
   -- Dynamic values.
   Value, toValue, fromValue,
   Unwrapped(..), unwrap, Wrapper(..),
@@ -34,6 +34,7 @@ import Data.Constraint
 import Twee.Base
 import Data.Proxy
 import Data.List
+import Data.Char
 
 -- A (possibly polymorphic) type.
 type Type = Term TyCon
@@ -55,10 +56,13 @@ instance PrettyTerm TyCon where
     | con == listTyCon =
       fixedArity 1 $
       TermStyle $ \l _ _ [x] -> brackets (pPrintPrec l 0 x)
+    | show con == "()" || show con == "(%%)" =
+      fixedArity 0 tupleStyle -- by analogy with case below
     | take 2 (show con) == "(," ||
       take 3 (show con) == "(%," =
       fixedArity (1+length (filter (== ',') (show con))) tupleStyle
-  termStyle _ = curried
+    | isAlphaNum (head (show con)) = curried
+    | otherwise = infixStyle 5
 
 -- Type and class variables.
 newtype A = A Any deriving Typeable
@@ -309,6 +313,9 @@ instance Apply a => Apply (Poly a) where
     s <- unify (typ f') (arrowType [typ x'] resType)
     let (f'', x'') = typeSubst s (f', x')
     fmap poly (tryApply f'' x'')
+
+toPolyValue :: (Applicative f, Typeable a) => a -> Poly (Value f)
+toPolyValue = poly . toValue . pure
 
 -- Dynamic values inside an applicative functor.
 data Value f =

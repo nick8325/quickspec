@@ -29,7 +29,8 @@ baseInstances =
     inst $ \(Dict :: Dict ClassA) (Dict :: Dict ClassB) (Dict :: Dict ClassC) (Dict :: Dict ClassD) -> Dict :: Dict (ClassA, ClassB, ClassC, ClassD),
     inst $ \(Dict :: Dict ClassA) (Dict :: Dict ClassB) (Dict :: Dict ClassC) (Dict :: Dict ClassD) (Dict :: Dict ClassE) -> Dict :: Dict (ClassA, ClassB, ClassC, ClassD, ClassE),
     -- Derive typeclass instances using (:-)
-    inst $ \(Dict :: Dict ClassA) (Sub Dict :: ClassA :- ClassB) -> Dict :: Dict ClassB,
+    -- N.B. flip is there to resolve (:-) first to reduce backtracking
+    inst $ flip $ \(Dict :: Dict ClassA) (Sub Dict :: ClassA :- ClassB) -> Dict :: Dict ClassB,
     -- Standard names
     inst $ \(Names names :: Names A) ->
       Names (map (++ "s") names) :: Names [A],
@@ -47,6 +48,9 @@ baseInstances =
     inst (Sub Dict :: () :- CoArbitrary Integer),
     inst (Sub Dict :: () :- CoArbitrary Bool),
     inst (Sub Dict :: () :- CoArbitrary Char),
+    inst (Sub Dict :: Ord A :- Ord [A]),
+    inst (Sub Dict :: Arbitrary A :- Arbitrary [A]),
+    inst (Sub Dict :: CoArbitrary A :- CoArbitrary [A]),
     inst (Sub Dict :: Ord A :- Eq A),
     -- From Arbitrary to Gen
     inst $ \(Dict :: Dict (Arbitrary A)) -> arbitrary :: Gen A,
