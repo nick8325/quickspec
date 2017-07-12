@@ -3,7 +3,7 @@ import QuickSpec.Explore.Terms
 import qualified QuickSpec.Testing.QuickCheck as QC
 import qualified QuickSpec.Pruning.Twee as T
 import qualified QuickSpec.Pruning.EncodeTypes as ET
-import qualified QuickSpec.Pruning.HigherOrder as HO
+import qualified QuickSpec.Explore.PartialApplication as P
 import qualified Twee.Base as B
 import QuickSpec.Utils
 import QuickSpec.Term
@@ -21,7 +21,7 @@ import Test.QuickCheck.Gen.Unsafe
 import qualified Data.Typeable as Ty
 import Data.Constraint
 
-data Con = Plus | Times | Zero | One | Length | Append | Nil | Rev
+data Con = Plus | Times | Zero | One | Length | Append | Nil | Rev | Id
   deriving (Eq, Ord, Show, Bounded, Enum)
 
 instance Typed Con where
@@ -37,6 +37,7 @@ instance Pretty Con where
   pPrint Append = text "++"
   pPrint Nil = text "[]"
   pPrint Rev = text "reverse"
+  pPrint Id = text "id"
 
 instance PrettyTerm Con where
   termStyle Plus = infixStyle 5
@@ -59,18 +60,19 @@ evalCon Length = toValue (pure (fromIntegral . length :: [Char] -> Integer))
 evalCon Append = toValue (pure ((++) :: [Char] -> [Char] -> [Char]))
 evalCon Nil = toValue (pure ([] :: [Char]))
 evalCon Rev = toValue (pure (reverse :: [Char] -> [Char]))
+evalCon Id = toValue (pure (id :: [Char] -> [Char]))
 
-baseTerms :: [Term (HO.HigherOrder Con)]
+baseTerms :: [Term (P.PartiallyApplied Con)]
 baseTerms =
   sortBy (comparing measure) $
     map build $
-    [con (fun (HO.Partial f 0)) | f <- [minBound..maxBound]] ++
+    [con (fun (P.Partial f 0)) | f <- [minBound..maxBound]] ++
     [var (V ty n) | n <- [0..2], ty <- [tInt, tList]]
   where
     tInt = typeRep (Proxy :: Proxy Integer)
     tList = typeRep (Proxy :: Proxy [Char])
 
-moreTerms :: [[Term (HO.HigherOrder Con)]] -> [Term (HO.HigherOrder Con)]
+moreTerms :: [[Term (P.PartiallyApplied Con)]] -> [Term (P.PartiallyApplied Con)]
 moreTerms tss =
   sortBy' measure $
     [ v
@@ -86,15 +88,15 @@ main = do
     generate $ QC.quickCheckTester
       QC.Config { QC.cfg_num_tests = 1000, QC.cfg_max_test_size = 100 }
       (arbitraryVal baseInstances)
-      (eval baseInstances (evalHO evalCon))
+      (eval baseInstances (P.evalPartiallyApplied evalCon))
 
   let
     size = 7
     pruner =
-      HO.encodeHigherOrder $
+      P.encodePartialApplications $
       ET.encodeMonoTypes $
       T.tweePruner T.Config { T.cfg_max_term_size = size, T.cfg_max_cp_depth = 2 }
-    state0 = initialState (flip (eval baseInstances (evalHO evalCon))) tester pruner
+    state0 = initialState (flip (eval baseInstances (P.evalPartiallyApplied evalCon))) tester pruner
 
   loop state0 size [[]] [] baseTerms
   where

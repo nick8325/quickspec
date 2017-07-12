@@ -7,7 +7,6 @@ import Test.QuickCheck
 import Data.Constraint
 import Data.Proxy
 import qualified Twee.Base as B
-import qualified QuickSpec.Pruning.HigherOrder as HO
 import QuickSpec.Term
 import Data.Functor.Identity
 import Data.Maybe
@@ -126,10 +125,3 @@ eval insts ev env t =
       case ordyVal insts (wrap w (Identity val)) of
         Nothing -> Right t
         Just ordy -> Left ordy
-
-evalHO :: Applicative g => (f -> Value g) -> HO.HigherOrder f -> Value g
-evalHO fun (HO.Partial f _) = fun f
-evalHO _ (HO.Apply ty) =
-  fromJust $
-    cast (build (app (B.fun Arrow) [ty, ty]))
-      (toValue (pure (($) :: (A -> B) -> (A -> B))))
