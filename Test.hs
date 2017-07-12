@@ -60,35 +60,6 @@ evalCon Append = toValue (pure ((++) :: [Char] -> [Char] -> [Char]))
 evalCon Nil = toValue (pure ([] :: [Char]))
 evalCon Rev = toValue (pure (reverse :: [Char] -> [Char]))
 
--- Term ordering - size, skeleton, generality.
--- Satisfies the property:
--- if measure (schema t) < measure (schema u) then t < u.
-type Measure = (Int, Int, MeasureFuns (HO.HigherOrder Con), Int, [Var])
-measure :: Term (HO.HigherOrder Con) -> Measure
-measure t =
-  (size t, -length (vars t),
-   MeasureFuns (build (skel (singleton t))),
-   -length (usort (vars t)), vars t)
-  where
-    skel Empty = mempty
-    skel (Cons (Var (V ty x)) ts) = var (V ty 0) `mappend` skel ts
-    skel (Cons (App f ts) us) =
-      app f (skel ts) `mappend` skel us
-
-newtype MeasureFuns f = MeasureFuns (Term f)
-instance Ord f => Eq (MeasureFuns f) where
-  t == u = compare t u == EQ
-instance Ord f => Ord (MeasureFuns f) where
-  compare (MeasureFuns t) (MeasureFuns u) = compareFuns t u
-
-compareFuns :: Ord f => Term f -> Term f -> Ordering
-compareFuns (Var x) (Var y) = compare x y
-compareFuns Var{} App{} = LT
-compareFuns App{} Var{} = GT
-compareFuns (App (F f) ts) (App (F g) us) =
-  compare f g `orElse`
-  compare (map MeasureFuns (unpack ts)) (map MeasureFuns (unpack us))
-
 baseTerms :: [Term (HO.HigherOrder Con)]
 baseTerms =
   sortBy (comparing measure) $

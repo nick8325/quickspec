@@ -3,9 +3,10 @@
 module QuickSpec.Term(module QuickSpec.Term, module Twee.Base) where
 
 import QuickSpec.Type
+import QuickSpec.Utils
 import qualified Twee.Base as Base
 import Control.Monad
-import Twee.Base hiding (Symbolic, Term, TermList, Builder, pattern Var, pattern App, Var(..), Fun, F, fun, fun_value, var, funs, vars, occ, occVar, isApp, isVar, subterms, subtermsList, properSubterms)
+import Twee.Base hiding (Symbolic, Term, TermList, Builder, pattern Var, pattern App, Var(..), Fun, F, fun, fun_value, var, funs, vars, occ, occVar, isApp, isVar, subterms, subtermsList, properSubterms, Id(..))
 import GHC.Generics
 import Test.QuickCheck(CoArbitrary)
 
@@ -123,3 +124,32 @@ instance (Ord f, Typeable f, Typed f) => Typed (Term f) where
       tsub (Var x) = var (typeSubst_ sub x)
       tsub (App (F f) ts) =
         app (fun (typeSubst_ sub f)) (map tsub (unpack ts))
+
+-- A standard term ordering - size, skeleton, generality.
+-- Satisfies the property:
+-- if measure (schema t) < measure (schema u) then t < u.
+type Measure f = (Int, Int, MeasureFuns f, Int, [Var])
+measure :: (Sized f, Typeable f, Ord f) => Term f -> Measure f
+measure t =
+  (size t, -length (vars t),
+   MeasureFuns (build (skel (singleton t))),
+   -length (usort (vars t)), vars t)
+  where
+    skel Empty = mempty
+    skel (Cons (Var (V ty x)) ts) = var (V ty 0) `mappend` skel ts
+    skel (Cons (App f ts) us) =
+      app f (skel ts) `mappend` skel us
+
+newtype MeasureFuns f = MeasureFuns (Term f)
+instance Ord f => Eq (MeasureFuns f) where
+  t == u = compare t u == EQ
+instance Ord f => Ord (MeasureFuns f) where
+  compare (MeasureFuns t) (MeasureFuns u) = compareFuns t u
+
+compareFuns :: Ord f => Term f -> Term f -> Ordering
+compareFuns (Var x) (Var y) = compare x y
+compareFuns Var{} App{} = LT
+compareFuns App{} Var{} = GT
+compareFuns (App (F f) ts) (App (F g) us) =
+  compare f g `orElse`
+  compare (map MeasureFuns (unpack ts)) (map MeasureFuns (unpack us))
