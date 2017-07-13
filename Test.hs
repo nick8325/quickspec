@@ -3,7 +3,7 @@ import QuickSpec.Explore.Terms
 import qualified QuickSpec.Testing.QuickCheck as QC
 import qualified QuickSpec.Pruning.Twee as T
 import qualified QuickSpec.Pruning.EncodeTypes as ET
-import qualified QuickSpec.Explore.PartialApplication as P
+import QuickSpec.Explore.PartialApplication
 import qualified Twee.Base as B
 import QuickSpec.Utils
 import QuickSpec.Term
@@ -21,58 +21,26 @@ import Test.QuickCheck.Gen.Unsafe
 import qualified Data.Typeable as Ty
 import Data.Constraint
 
-data Con = Plus | Times | Zero | One | Length | Append | Nil | Rev | Id
-  deriving (Eq, Ord, Show, Bounded, Enum)
+type Con = PartiallyApplied Constant
 
-instance Typed Con where
-  typ = typ . (eval undefined :: Con -> Value Identity)
-  typeSubst_ _ ty = ty
+constants :: [Constant]
+constants = [
+  constant "+" ((+) :: Int -> Int -> Int),
+  constant "*" ((*) :: Int -> Int -> Int),
+  constant "0" (0 :: Int),
+  constant "1" (1 :: Int)]
 
-instance Pretty Con where
-  pPrint Plus = text "+"
-  pPrint Times = text "*"
-  pPrint Zero = text "0"
-  pPrint One = text "1"
-  pPrint Length = text "length"
-  pPrint Append = text "++"
-  pPrint Nil = text "[]"
-  pPrint Rev = text "reverse"
-  pPrint Id = text "id"
-
-instance PrettyTerm Con where
-  termStyle Plus = infixStyle 5
-  termStyle Times = infixStyle 5
-  termStyle Append = infixStyle 5
-  termStyle _ = curried
-
-instance Sized Con where
-  size _ = 1
-
-instance Arity Con where
-  arity = typeArity . typ
-
-instance Applicative f => Eval Con (Value f) where
-  eval _ Zero = toValue (pure (0 :: Integer))
-  eval _ One = toValue (pure (1 :: Integer))
-  eval _ Plus = toValue (pure ((+) :: Integer -> Integer -> Integer))
-  eval _ Times = toValue (pure ((*) :: Integer -> Integer -> Integer))
-  eval _ Length = toValue (pure (fromIntegral . length :: [Char] -> Integer))
-  eval _ Append = toValue (pure ((++) :: [Char] -> [Char] -> [Char]))
-  eval _ Nil = toValue (pure ([] :: [Char]))
-  eval _ Rev = toValue (pure (reverse :: [Char] -> [Char]))
-  eval _ Id = toValue (pure (id :: [Char] -> [Char]))
-
-baseTerms :: [Term (P.PartiallyApplied Con)]
+baseTerms :: [Term Con]
 baseTerms =
   sortBy (comparing measure) $
     map build $
-    [con (fun (P.Partial f 0)) | f <- [minBound..maxBound]] ++
+    [con (fun (Partial f 0)) | f <- constants] ++
     [var (V ty n) | n <- [0..2], ty <- [tInt, tList]]
   where
-    tInt = typeRep (Proxy :: Proxy Integer)
+    tInt = typeRep (Proxy :: Proxy Int)
     tList = typeRep (Proxy :: Proxy [Char])
 
-moreTerms :: [[Term (P.PartiallyApplied Con)]] -> [Term (P.PartiallyApplied Con)]
+moreTerms :: [[Term Con]] -> [Term Con]
 moreTerms tss =
   sortBy' measure $
     [ v
@@ -93,7 +61,7 @@ main = do
   let
     size = 7
     pruner =
-      P.encodePartialApplications $
+      encodePartialApplications $
       ET.encodeMonoTypes $
       T.tweePruner T.Config { T.cfg_max_term_size = size, T.cfg_max_cp_depth = 2 }
     state0 = initialState (flip (evalHaskell baseInstances)) tester pruner

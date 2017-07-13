@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, TypeOperators, GADTs, FlexibleInstances, FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables, TypeOperators, GADTs, FlexibleInstances, FlexibleContexts, MultiParamTypeClasses #-}
 module QuickSpec.Haskell where
 
 import QuickSpec.Haskell.Resolve
@@ -15,6 +15,9 @@ import Test.QuickCheck.Gen
 import Test.QuickCheck.Gen.Unsafe
 import Control.Monad
 import System.Random
+import qualified Twee.Base as Twee
+import Data.Char
+import Data.Ord
 
 baseInstances :: Instances
 baseInstances =
@@ -148,3 +151,64 @@ evalHaskell insts (env, obs) t =
       case obs (wrap w (Identity val)) of
         Nothing -> Right t
         Just ordy -> Left ordy
+
+data Constant =
+  Constant {
+    con_name  :: String,
+    con_style :: TermStyle,
+    con_value :: Value Identity }
+
+instance Eq Constant where
+  x == y =
+    con_name x == con_name y && typ (con_value x) == typ (con_value y)
+
+instance Ord Constant where
+  compare =
+    comparing $ \con ->
+      (con_name con, twiddle (arity con), typ con)
+      where
+        -- This trick comes from Prover9 and improves the ordering somewhat
+        twiddle 1 = 2
+        twiddle 2 = 1
+        twiddle x = x
+
+constant :: Typeable a => String -> a -> Constant
+constant name val =
+  Constant {
+    con_name = name,
+    con_style =
+      case () of
+        _ | name == "()" -> curried
+          | take 1 name == "," -> fixedArity (length name+1) tupleStyle
+          | take 2 name == "(," -> fixedArity (length name-1) tupleStyle
+          | isOp name && typeArity (typeOf val) >= 2 -> infixStyle 5
+          | isOp name -> prefix
+          | otherwise -> curried,
+    con_value = toValue (Identity val) }
+
+isOp :: String -> Bool
+isOp "[]" = False
+isOp ('"':_) = False
+isOp xs | all (== '.') xs = True
+isOp xs = not (all isIdent xs)
+  where
+    isIdent x = isAlphaNum x || x == '\'' || x == '_' || x == '.'
+
+instance Typed Constant where
+  typ = typ . con_value
+  typeSubst_ sub con = con { con_value = typeSubst_ sub (con_value con) }
+
+instance Pretty Constant where
+  pPrint = text . con_name
+
+instance PrettyTerm Constant where
+  termStyle = con_style
+
+instance Sized Constant where
+  size _ = 1
+
+instance Arity Constant where
+  arity = typeArity . typ
+
+instance Applicative f => Eval Constant (Value f) where
+  eval _ = mapValue (pure . runIdentity) . con_value
