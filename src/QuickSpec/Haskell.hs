@@ -13,6 +13,8 @@ import Data.Maybe
 import Data.MemoUgly
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Gen.Unsafe
+import Control.Monad
+import System.Random
 
 baseInstances :: Instances
 baseInstances =
@@ -55,7 +57,19 @@ baseInstances =
     inst $ \(Dict :: Dict (Arbitrary A)) -> arbitrary :: Gen A,
     inst $ \(dict :: Dict ClassA) -> return dict :: Gen (Dict ClassA),
     -- From Dict to OrdDict
-    inst (OrdDict :: Dict (Ord A) -> OrdDict A)]
+    inst (OrdDict :: Dict (Ord A) -> OrdDict A),
+    -- Observe
+    inst (\(Dict :: Dict (Ord A)) -> Observe (return id) :: Observe A A),
+    inst (\(Observe obsm :: Observe B C) (xm :: Gen A) ->
+      Observe (do {x <- xm; obs <- obsm; return (\f -> obs (f x))}) :: Observe (A -> B) C),
+    inst (\(obs :: Observe A B) -> Observe1 (toValue obs))]
+
+data Observe a b where
+  Observe :: Ord b => Gen (a -> b) -> Observe a b
+  deriving Typeable
+data Observe1 a = Observe1 (Value (Observe a)) deriving Typeable
+
+-- data SomeObserve a = forall args res. (Ord res, Arbitrary args) => SomeObserve (a -> args -> res) deriving Typeable
 
 newtype OrdDict a = OrdDict (Dict (Ord a)) deriving Typeable
 
@@ -72,15 +86,18 @@ names insts ty =
   case findInstance insts (skolemiseTypeVars ty) of
     (x:_) -> ofValue getNames x
 
-arbitraryVal :: Instances -> Gen (Var -> Value Maybe)
+arbitraryVal :: Instances -> Gen (Var -> Value Maybe, Value Identity -> Maybe TestResult)
 arbitraryVal insts =
-  MkGen $ \g n -> memo $ \(V ty x) ->
-    case typ ty of
-      Nothing ->
-        fromJust $ cast ty (toValue (Nothing :: Maybe A))
-      Just gen ->
-        forValue gen $ \gen ->
-          Just (unGen (coarbitrary x gen) g n)
+  MkGen $ \g n ->
+    let (g1, g2) = split g in
+    (memo $ \(V ty x) ->
+       case typ ty of
+         Nothing ->
+           fromJust $ cast ty (toValue (Nothing :: Maybe A))
+         Just gen ->
+           forValue gen $ \gen ->
+             Just (unGen (coarbitrary x gen) g1 n),
+     unGen (ordyVal insts) g2 n) 
   where
     typ :: Type -> Maybe (Value Gen)
     typ = memo $ \ty ->
@@ -89,22 +106,28 @@ arbitraryVal insts =
         (gen:_) ->
           Just (mapValue (coarbitrary ty) gen)
 
-ordyVal :: Instances -> Value Identity -> Maybe (Value Ordy)
+ordyVal :: Instances -> Gen (Value Identity -> Maybe TestResult)
 ordyVal insts =
-  \x ->
+  MkGen $ \g n -> \x ->
     case ordyTy (typ x) of
       Nothing -> Nothing
-      Just f -> Just (f x)
+      Just f -> Just (TestResult (typ x) (unGen f g n x))
   where
-    ordyTy :: Type -> Maybe (Value Identity -> Value Ordy)
+    ordyTy :: Type -> Maybe (Gen (Value Identity -> Value Ordy))
     ordyTy = memo $ \ty ->
-      case findInstance insts ty :: [Value OrdDict] of
+      case findInstance insts ty :: [Value Observe1] of
         [] -> Nothing
         (val:_) ->
           case unwrap val of
-            OrdDict Dict `In` w ->
-              Just $ \val ->
-                wrap w (Ordy (runIdentity (reunwrap w val)))
+            Observe1 val `In` w1 ->
+              case unwrap val of
+                Observe obs `In` w2 ->
+                  Just $
+                    MkGen $ \g n ->
+                      let observe = unGen obs g n in
+                      \x -> wrap w2 (Ordy (observe (runIdentity (reunwrap w1 x))))
+
+data TestResult = TestResult Type (Value Ordy) deriving (Eq, Ord, Show)
 
 data Ordy a where Ordy :: Ord a => a -> Ordy a
 instance Eq (Value Ordy) where x == y = compare x y == EQ
@@ -117,11 +140,11 @@ instance Ord (Value Ordy) where
         let Ordy yv = reunwrap w y in
         compare xv yv
 
-eval :: Instances -> (f -> Value Maybe) -> (Var -> Value Maybe) -> Term f -> Either (Value Ordy) (Term f)
-eval insts ev env t =
+eval :: Instances -> (f -> Value Maybe) -> (Var -> Value Maybe, Value Identity -> Maybe TestResult) -> Term f -> Either TestResult (Term f)
+eval insts ev (env, obs) t =
   case unwrap (evaluateTerm ev env t) of
     Nothing `In` _ -> Right t
     Just val `In` w ->
-      case ordyVal insts (wrap w (Identity val)) of
+      case obs (wrap w (Identity val)) of
         Nothing -> Right t
         Just ordy -> Left ordy
