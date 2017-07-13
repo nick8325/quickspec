@@ -2,11 +2,13 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 module QuickSpec.Testing where
 
-data Tester testcase prop =
-  Tester {
-    test :: prop -> Maybe (testcase, Tester testcase prop) }
+import QuickSpec.Prop
 
-makeTester :: (prop -> Maybe testcase) -> Tester testcase prop
+data Tester testcase term =
+  Tester {
+    test :: Prop term -> Maybe (testcase, Tester testcase term) }
+
+makeTester :: (Prop term -> Maybe testcase) -> Tester testcase term
 makeTester tst = res
   where
     res =

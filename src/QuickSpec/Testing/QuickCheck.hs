@@ -19,7 +19,7 @@ data Config =
 
 quickCheckTester :: Eq result =>
   Config -> Gen testcase -> (testcase -> term -> result) ->
-  Gen (Tester testcase (Prop term))
+  Gen (Tester testcase term)
 quickCheckTester config gen eval =
   makeTester <$> quickCheckTest config gen eval <$> arbitrary
 

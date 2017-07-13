@@ -30,7 +30,7 @@ moreTerms measure tss =
 quickSpec :: (Ord a, Ord f, Typeable f, Ord result, Apply (Term f), PrettyTerm f) =>
   (Term f -> a) ->
   (Term f -> testcase -> result) ->
-  Tester testcase (Prop (Term f)) ->
+  Tester testcase (Term f) ->
   Pruner (Term f) ->
   Int -> [f] -> [Type] -> IO ()
 quickSpec measure eval tester pruner size funs tys = do

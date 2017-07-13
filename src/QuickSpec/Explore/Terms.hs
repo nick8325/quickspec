@@ -14,11 +14,11 @@ data State testcase result term =
     st_terms  :: Set term,
     st_pruner :: Pruner term,
     st_tree   :: DecisionTree testcase result term,
-    st_tester :: Tester testcase (Prop term) }
+    st_tester :: Tester testcase term }
 
 initialState ::
   (term -> testcase -> result) ->
-  Tester testcase (Prop term) ->
+  Tester testcase term ->
   Pruner term ->
   State testcase result term
 initialState eval tester pruner =
