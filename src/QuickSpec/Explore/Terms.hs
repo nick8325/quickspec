@@ -43,7 +43,7 @@ explore t s = exp True s
             -- st_terms is not kept normalised wrt the discovered laws;
             -- instead, we normalise it lazily like so.
             | t' == u' ->
-              exp testMore s { st_terms = Set.insert u' (Set.delete u st_terms) }
+              (s { st_terms = Set.insert u' (Set.delete u st_terms) }, [], [])
             -- Ask QuickCheck for a counterexample to the property.
             | testMore,
               Just (tc, tester') <- test st_tester prop ->
