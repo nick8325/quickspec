@@ -28,22 +28,17 @@ initialState eval tester pruner =
     st_tree = empty eval,
     st_tester = tester }
 
-data Result term =
-    Discovered (Prop term)
-  | Redundant
-  | Unique
-
 explore :: (Ord term, Ord result) =>
   term -> State testcase result term ->
-  (State testcase result term, Result term)
+  (State testcase result term, [term], [Prop term])
 explore t s = exp True s
   where
     exp testMore s@State{..}
-      | t' `Set.member` st_terms = (s, Redundant)
+      | t' `Set.member` st_terms = (s, [], [])
       | otherwise =
         case insert t st_tree of
           Distinct tree ->
-            (s { st_tree = tree, st_terms = Set.insert t' st_terms }, Unique)
+            (s { st_tree = tree, st_terms = Set.insert t' st_terms }, [t], [])
           EqualTo u
             -- st_terms is not kept normalised wrt the discovered laws;
             -- instead, we normalise it lazily like so.
@@ -59,7 +54,7 @@ explore t s = exp True s
                 -- equation, we don't want to run QuickCheck again!
                 exp False s { st_tree = addTestCase tc st_tree, st_tester = tester' }
             | otherwise ->
-                (s { st_pruner = add st_pruner prop }, Discovered prop)
+                (s { st_pruner = add st_pruner prop }, [], [prop])
             where
               u' = normalise st_pruner u
               prop = t === u

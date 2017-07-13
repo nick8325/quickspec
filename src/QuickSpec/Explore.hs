@@ -44,12 +44,6 @@ quickSpec measure eval tester pruner size funs tys = do
       where
         uss = tss ++ [ts]
     loop state n tss us (t:ts) = do
-      let (state', mprop) = explore t state
-      case mprop of
-        Redundant ->
-          loop state' n tss us ts
-        Unique ->
-          loop state' n tss (t:us) ts
-        Discovered prop -> do
-          prettyPrint prop
-          loop state' n tss us ts
+      let (state', ts', props) = explore t state
+      mapM_ prettyPrint props
+      loop state' n tss (ts' ++ us) ts
