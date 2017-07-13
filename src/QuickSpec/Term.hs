@@ -1,5 +1,5 @@
 -- Typed terms.
-{-# LANGUAGE PatternSynonyms, ViewPatterns, TypeSynonymInstances, FlexibleInstances, TypeFamilies, ConstraintKinds, DeriveGeneric, DeriveAnyClass #-}
+{-# LANGUAGE PatternSynonyms, ViewPatterns, TypeSynonymInstances, FlexibleInstances, TypeFamilies, ConstraintKinds, DeriveGeneric, DeriveAnyClass, MultiParamTypeClasses #-}
 module QuickSpec.Term(module QuickSpec.Term, module Twee.Base) where
 
 import QuickSpec.Type
@@ -101,6 +101,12 @@ subtermsList = filter (not . Base.isVar) . Base.subtermsList
 
 properSubterms :: (Ord f, Typeable f) => Term f -> [Term f]
 properSubterms = filter (not . Base.isVar) . Base.properSubterms
+
+class Eval term val where
+  eval :: (Var -> val) -> term -> val
+
+instance (Apply a, Eval fun a) => Eval (Term fun) a where
+  eval env = evaluateTerm (eval env) env
 
 evaluateTerm :: Apply a =>
   (fun -> a) -> (Var -> a) -> Term fun -> a

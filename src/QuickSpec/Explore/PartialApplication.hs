@@ -1,5 +1,5 @@
 -- Pruning support for partial application and the like.
-{-# LANGUAGE FlexibleInstances, TypeSynonymInstances, RecordWildCards #-}
+{-# LANGUAGE FlexibleInstances, TypeSynonymInstances, RecordWildCards, MultiParamTypeClasses, FlexibleContexts #-}
 module QuickSpec.Explore.PartialApplication where
 
 import QuickSpec.Term
@@ -100,9 +100,9 @@ addFunction State{..} (Partial f _)
       vs = map var (zipWith V (typeArgs (typ f)) [0..])
 addFunction st _ = st
 
-evalPartiallyApplied :: Applicative g => (f -> Value g) -> PartiallyApplied f -> Value g
-evalPartiallyApplied eval (Partial f _) = eval f
-evalPartiallyApplied _ (Apply ty) =
-  fromJust $
-    cast (build (app (Twee.fun Arrow) [ty, ty]))
-      (toValue (pure (($) :: (A -> B) -> (A -> B))))
+instance (Applicative f, Eval fun (Value f)) => Eval (PartiallyApplied fun) (Value f) where
+  eval var (Partial f _) = eval var f
+  eval _ (Apply ty) =
+    fromJust $
+      cast (build (app (Twee.fun Arrow) [ty, ty]))
+        (toValue (pure (($) :: (A -> B) -> (A -> B))))

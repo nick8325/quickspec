@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances, GADTs #-}
+{-# LANGUAGE FlexibleInstances, GADTs, MultiParamTypeClasses #-}
 import QuickSpec.Explore.Terms
 import qualified QuickSpec.Testing.QuickCheck as QC
 import qualified QuickSpec.Pruning.Twee as T
@@ -25,7 +25,7 @@ data Con = Plus | Times | Zero | One | Length | Append | Nil | Rev | Id
   deriving (Eq, Ord, Show, Bounded, Enum)
 
 instance Typed Con where
-  typ = typ . (evalCon :: Con -> Value Identity)
+  typ = typ . (eval undefined :: Con -> Value Identity)
   typeSubst_ _ ty = ty
 
 instance Pretty Con where
@@ -51,16 +51,16 @@ instance Sized Con where
 instance Arity Con where
   arity = typeArity . typ
 
-evalCon :: Applicative f => Con -> Value f
-evalCon Zero = toValue (pure (0 :: Integer))
-evalCon One = toValue (pure (1 :: Integer))
-evalCon Plus = toValue (pure ((+) :: Integer -> Integer -> Integer))
-evalCon Times = toValue (pure ((*) :: Integer -> Integer -> Integer))
-evalCon Length = toValue (pure (fromIntegral . length :: [Char] -> Integer))
-evalCon Append = toValue (pure ((++) :: [Char] -> [Char] -> [Char]))
-evalCon Nil = toValue (pure ([] :: [Char]))
-evalCon Rev = toValue (pure (reverse :: [Char] -> [Char]))
-evalCon Id = toValue (pure (id :: [Char] -> [Char]))
+instance Applicative f => Eval Con (Value f) where
+  eval _ Zero = toValue (pure (0 :: Integer))
+  eval _ One = toValue (pure (1 :: Integer))
+  eval _ Plus = toValue (pure ((+) :: Integer -> Integer -> Integer))
+  eval _ Times = toValue (pure ((*) :: Integer -> Integer -> Integer))
+  eval _ Length = toValue (pure (fromIntegral . length :: [Char] -> Integer))
+  eval _ Append = toValue (pure ((++) :: [Char] -> [Char] -> [Char]))
+  eval _ Nil = toValue (pure ([] :: [Char]))
+  eval _ Rev = toValue (pure (reverse :: [Char] -> [Char]))
+  eval _ Id = toValue (pure (id :: [Char] -> [Char]))
 
 baseTerms :: [Term (P.PartiallyApplied Con)]
 baseTerms =
@@ -88,7 +88,7 @@ main = do
     generate $ QC.quickCheckTester
       QC.Config { QC.cfg_num_tests = 1000, QC.cfg_max_test_size = 100 }
       (arbitraryVal baseInstances)
-      (eval baseInstances (P.evalPartiallyApplied evalCon))
+      (evalHaskell baseInstances)
 
   let
     size = 7
@@ -96,7 +96,7 @@ main = do
       P.encodePartialApplications $
       ET.encodeMonoTypes $
       T.tweePruner T.Config { T.cfg_max_term_size = size, T.cfg_max_cp_depth = 2 }
-    state0 = initialState (flip (eval baseInstances (P.evalPartiallyApplied evalCon))) tester pruner
+    state0 = initialState (flip (evalHaskell baseInstances)) tester pruner
 
   loop state0 size [[]] [] baseTerms
   where

@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, TypeOperators, GADTs, FlexibleInstances #-}
+{-# LANGUAGE ScopedTypeVariables, TypeOperators, GADTs, FlexibleInstances, FlexibleContexts #-}
 module QuickSpec.Haskell where
 
 import QuickSpec.Haskell.Resolve
@@ -140,9 +140,9 @@ instance Ord (Value Ordy) where
         let Ordy yv = reunwrap w y in
         compare xv yv
 
-eval :: Instances -> (f -> Value Maybe) -> (Var -> Value Maybe, Value Identity -> Maybe TestResult) -> Term f -> Either TestResult (Term f)
-eval insts ev (env, obs) t =
-  case unwrap (evaluateTerm ev env t) of
+evalHaskell :: Eval f (Value Maybe) => Instances -> (Var -> Value Maybe, Value Identity -> Maybe TestResult) -> Term f -> Either TestResult (Term f)
+evalHaskell insts (env, obs) t =
+  case unwrap (eval env t) of
     Nothing `In` _ -> Right t
     Just val `In` w ->
       case obs (wrap w (Identity val)) of
