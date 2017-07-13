@@ -1,7 +1,12 @@
 {-# LANGUAGE DeriveDataTypeable, TypeOperators #-}
 import Control.Monad
 import Test.QuickCheck
-import QuickSpec hiding (background, (<>), text, nest, ($$))
+import QuickSpec.Haskell
+import QuickSpec.Haskell.Resolve
+import QuickSpec.Testing.QuickCheck
+import QuickSpec.Pruning.Twee
+import QuickSpec.Type
+import Data.Proxy
 
 newtype Layout = Layout [(Int, String)]
   deriving (Typeable, Eq, Ord, Show)
@@ -30,31 +35,20 @@ Layout xs <> Layout ys =
 nesting :: Layout -> Int
 nesting (Layout ((i,_):_)) = i
 
-background =
-  signature {
-    maxTermSize = Just 9,
-    constants = [
-      constant "\"\"" "",
-      constant "++" ((++) :: String -> String -> String),
-      constant "0" (0 :: Int),
-      constant "+" ((+) :: Int -> Int -> Int),
-      constant "length" (length :: String -> Int) ]}
-
-sig =
-  signature {
-    constants = [
-      constant "text" text,
-      constant "nest" nest,
-      constant "$$" ($$),
-      constant "<>" (<>) ],
-    instances = [baseType (undefined :: Layout) ]}
-
-sig' =
-  signature {
-    constants = [
-      constant "nesting" nesting ]}
-
-main = do
-  backgroundThy <- quickSpec background
-  thy <- quickSpec (backgroundThy `mappend` sig)
-  quickSpec (thy `mappend` sig')
+main =
+  quickSpec
+    defaultConfig {
+      cfg_max_size = 9,
+      cfg_instances = baseType (Proxy :: Proxy Layout) }
+    [constant "\"\"" "",
+     constant "++" ((++) :: String -> String -> String),
+     constant "0" (0 :: Int),
+     constant "+" ((+) :: Int -> Int -> Int),
+     constant "length" (length :: String -> Int),
+     constant "text" text,
+     constant "nest" nest,
+     constant "$$" ($$),
+     constant "<>" (<>) ]
+    [typeRep (Proxy :: Proxy Int),
+     typeRep (Proxy :: Proxy String),
+     typeRep (Proxy :: Proxy Layout)]

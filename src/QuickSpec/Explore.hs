@@ -14,7 +14,7 @@ baseTerms measure funs tys =
   sortBy' measure $
     map build $
     [con (fun f) | f <- funs] ++
-    [var (V ty n) | n <- [0..2], ty <- tys]
+    zipWith (\ty n -> var (V ty n)) (concatMap (replicate 3) tys) [0..]
 
 moreTerms :: (Ord a, Apply (Term f)) => (Term f -> a) -> [[Term f]] -> [Term f]
 moreTerms measure tss =
