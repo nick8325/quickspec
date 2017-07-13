@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, TypeOperators, GADTs, FlexibleInstances, FlexibleContexts, MultiParamTypeClasses #-}
+{-# LANGUAGE ScopedTypeVariables, TypeOperators, GADTs, FlexibleInstances, FlexibleContexts, MultiParamTypeClasses, RecordWildCards #-}
 module QuickSpec.Haskell where
 
 import QuickSpec.Haskell.Resolve
@@ -18,6 +18,11 @@ import System.Random
 import qualified Twee.Base as Twee
 import Data.Char
 import Data.Ord
+import qualified QuickSpec.Testing.QuickCheck as QuickCheck
+import qualified QuickSpec.Pruning.Twee as Twee
+import qualified QuickSpec.Explore
+import QuickSpec.Pruning.EncodeTypes
+import QuickSpec.Explore.PartialApplication
 
 baseInstances :: Instances
 baseInstances =
@@ -212,3 +217,36 @@ instance Arity Constant where
 
 instance Applicative f => Eval Constant (Value f) where
   eval _ = mapValue (pure . runIdentity) . con_value
+
+data Config =
+  Config {
+    cfg_quickCheck :: QuickCheck.Config,
+    cfg_twee :: Twee.Config,
+    cfg_max_size :: Int }
+
+defaultConfig :: Config
+defaultConfig =
+  Config {
+    cfg_quickCheck = QuickCheck.Config { QuickCheck.cfg_num_tests = 1000, QuickCheck.cfg_max_test_size = 100 },
+    cfg_twee = Twee.Config { Twee.cfg_max_term_size = minBound, Twee.cfg_max_cp_depth = 2 },
+    cfg_max_size = 7 }
+    
+
+quickSpec :: Config -> [Constant] -> [Type] -> IO ()
+quickSpec Config{..} funs tys = do
+  tester <-
+    generate $ QuickCheck.quickCheckTester
+      cfg_quickCheck
+      (arbitraryVal baseInstances)
+      (evalHaskell baseInstances)
+
+  let
+    pruner =
+      encodePartialApplications $
+      encodeMonoTypes $
+      Twee.tweePruner cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size }
+
+  QuickSpec.Explore.quickSpec measure (flip (evalHaskell baseInstances)) tester pruner cfg_max_size
+    [Partial f 0 | f <- funs]
+    tys
+  
