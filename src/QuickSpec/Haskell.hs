@@ -12,10 +12,7 @@ import Data.Functor.Identity
 import Data.Maybe
 import Data.MemoUgly
 import Test.QuickCheck.Gen
-import Test.QuickCheck.Gen.Unsafe
-import Control.Monad
 import System.Random
-import qualified Twee.Base as Twee
 import Data.Char
 import Data.Ord
 import qualified QuickSpec.Testing.QuickCheck as QuickCheck
@@ -148,8 +145,8 @@ instance Ord (Value Ordy) where
         let Ordy yv = reunwrap w y in
         compare xv yv
 
-evalHaskell :: Eval f (Value Maybe) => Instances -> (Var -> Value Maybe, Value Identity -> Maybe TestResult) -> Term f -> Either TestResult (Term f)
-evalHaskell insts (env, obs) t =
+evalHaskell :: Eval f (Value Maybe) => (Var -> Value Maybe, Value Identity -> Maybe TestResult) -> Term f -> Either TestResult (Term f)
+evalHaskell (env, obs) t =
   case unwrap (eval env t) of
     Nothing `In` _ -> Right t
     Just val `In` w ->
@@ -240,7 +237,7 @@ quickSpec Config{..} funs tys = do
     generate $ QuickCheck.quickCheckTester
       cfg_quickCheck
       (arbitraryVal instances)
-      (evalHaskell instances)
+      evalHaskell
 
   let
     pruner =
@@ -248,7 +245,7 @@ quickSpec Config{..} funs tys = do
       encodeMonoTypes $
       Twee.tweePruner cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size }
 
-  QuickSpec.Explore.quickSpec measure (flip (evalHaskell instances)) tester pruner cfg_max_size
+  QuickSpec.Explore.quickSpec measure (flip evalHaskell) tester pruner cfg_max_size
     [Partial f 0 | f <- funs]
     tys
   

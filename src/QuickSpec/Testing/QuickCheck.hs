@@ -37,9 +37,7 @@ quickCheckTest Config{..} gen eval seed =
     in
     msum (map test tests)
   where
-    (seed1, seed2) = split seed
-    
-    seeds = unfoldr (Just . split) seed1
+    seeds = unfoldr (Just . split) seed
     sizes = cycle [0, 2..cfg_max_test_size]
     tests = take cfg_num_tests (zipWith (unGen gen) seeds sizes)
 

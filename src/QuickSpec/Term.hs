@@ -142,7 +142,7 @@ measure t =
    -length (usort (vars t)), vars t)
   where
     skel Empty = mempty
-    skel (Cons (Var (V ty x)) ts) = var (V ty 0) `mappend` skel ts
+    skel (Cons (Var (V ty _)) ts) = var (V ty 0) `mappend` skel ts
     skel (Cons (App f ts) us) =
       app f (skel ts) `mappend` skel us
 

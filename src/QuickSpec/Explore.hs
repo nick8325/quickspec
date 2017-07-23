@@ -4,7 +4,6 @@ module QuickSpec.Explore where
 import QuickSpec.Explore.Terms
 import QuickSpec.Testing
 import QuickSpec.Pruning
-import QuickSpec.Prop
 import QuickSpec.Term
 import QuickSpec.Type
 import QuickSpec.Utils
@@ -38,7 +37,7 @@ quickSpec measure eval tester pruner size funs tys = do
 
   loop state0 size [[]] [] (baseTerms measure funs tys)
   where
-    loop state 1 _ _ [] = return ()
+    loop _ 1 _ _ [] = return ()
     loop state n tss ts [] =
       loop state (n-1) uss [] (moreTerms measure uss)
       where
