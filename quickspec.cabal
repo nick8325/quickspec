@@ -67,9 +67,11 @@ library
   ghc-options: -W -fno-warn-name-shadowing -fno-warn-incomplete-patterns
   hs-source-dirs: src
   Exposed-modules:
+    QuickSpec.Explore
+    QuickSpec.Explore.PartialApplication
     QuickSpec.Explore.Terms
-    QuickSpec.FindInstance
-    QuickSpec.Instances
+    QuickSpec.Haskell
+    QuickSpec.Haskell.Resolve
     QuickSpec.Prop
     QuickSpec.Pruning
     QuickSpec.Pruning.EncodeTypes
