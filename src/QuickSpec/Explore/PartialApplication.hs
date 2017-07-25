@@ -38,7 +38,7 @@ instance PrettyTerm f => PrettyTerm (PartiallyApplied f) where
   termStyle (Apply _) = invisible
 
 instance Typed f => Typed (PartiallyApplied f) where
-  typ (Apply ty) = build (app (Twee.fun Arrow) [ty, ty])
+  typ (Apply ty) = Twee.build (Twee.app (Twee.fun Arrow) [ty, ty])
   typ (Partial f _) = typ f
   otherTypesDL (Apply _) = mempty
   otherTypesDL (Partial f _) = otherTypesDL f
@@ -50,8 +50,8 @@ instance (Arity f, Ord f, Typeable f, Typed f) => Apply (Term (PartiallyApplied 
     tryApply (typ t) (typ u)
     return $
       case t of
-        App (F (Partial f n)) ts | n < arity f ->
-          build $ app (fun (Partial f (n+1))) [ts, singleton u]
+        App (Partial f n) ts | n < arity f ->
+          App (Partial f (n+1)) (ts ++ [u])
         _ ->
           simpleApply t u
 
@@ -59,7 +59,7 @@ simpleApply ::
   (Arity f, Ord f, Typeable f, Typed f) =>
   Term (PartiallyApplied f) -> Term (PartiallyApplied f) -> Term (PartiallyApplied f)
 simpleApply t u =
-  build $ app (fun (Apply (typ t))) [t, u]
+  App (Apply (typ t)) [t, u]
 
 data State f =
   State {
@@ -82,7 +82,7 @@ addPartialApplications prop state =
     st_functions = st_functions }
   where
     State{..} =
-      foldl' addFunction state (map fun_value (funs prop))
+      foldl' addFunction state (funs prop)
 
 addFunction :: (Ord f, Typed f, Arity f, Typeable f) =>
   State f -> PartiallyApplied f -> State f
@@ -93,16 +93,16 @@ addFunction State{..} (Partial f _)
       st_functions = Set.insert f st_functions }
     where
       axioms f =
-        [ simpleApply (partial i) (build (vs !! i)) === partial (i+1)
+        [ simpleApply (partial i) (vs !! i) === partial (i+1)
         | i <- [0..arity f-1] ]
       partial i =
-        build $ app (fun (Partial f i)) (take i vs)
-      vs = map var (zipWith V (typeArgs (typ f)) [0..])
+        App (Partial f i) (take i vs)
+      vs = map Var (zipWith V (typeArgs (typ f)) [0..])
 addFunction st _ = st
 
 instance (Applicative f, Eval fun (Value f)) => Eval (PartiallyApplied fun) (Value f) where
   eval var (Partial f _) = eval var f
   eval _ (Apply ty) =
     fromJust $
-      cast (build (app (Twee.fun Arrow) [ty, ty]))
+      cast (Twee.build (Twee.app (Twee.fun Arrow) [ty, ty]))
         (toValue (pure (($) :: (A -> B) -> (A -> B))))

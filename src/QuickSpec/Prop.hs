@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric, TypeFamilies, DeriveFunctor #-}
+{-# LANGUAGE DeriveGeneric, TypeFamilies, DeriveFunctor, FlexibleInstances, MultiParamTypeClasses, UndecidableInstances #-}
 module QuickSpec.Prop where
 
 import Control.Monad
@@ -6,8 +6,7 @@ import qualified Data.DList as DList
 import Data.Ord
 import QuickSpec.Type
 import QuickSpec.Utils
-import Twee.Pretty
-import Twee.Base
+import QuickSpec.Term
 import GHC.Generics
 
 data Prop a =
@@ -16,8 +15,11 @@ data Prop a =
     rhs :: Equation a }
   deriving (Show, Generic, Functor)
 
-instance Symbolic a => Symbolic (Prop a) where
-  type ConstantOf (Prop a) = ConstantOf a
+instance Symbolic f a => Symbolic f (Prop a) where
+  termsDL (lhs :=>: rhs) =
+    termsDL lhs `mplus` termsDL rhs
+  subst sub (lhs :=>: rhs) =
+    subst sub lhs :=>: subst sub rhs
 
 instance Ord a => Eq (Prop a) where
   x == y = x `compare` y == EQ
@@ -45,8 +47,9 @@ instance Pretty a => Pretty (Prop a) where
 
 data Equation a = a :=: a deriving (Show, Eq, Ord, Generic, Functor)
 
-instance Symbolic a => Symbolic (Equation a) where
-  type ConstantOf (Equation a) = ConstantOf a
+instance Symbolic f a => Symbolic f (Equation a) where
+  termsDL (t :=: u) = termsDL t `mplus` termsDL u
+  subst sub (t :=: u) = subst sub t :=: subst sub u
 
 infix 5 :=:
 

@@ -11,9 +11,8 @@ import QuickSpec.Utils
 baseTerms :: (Ord f, Typeable f, Ord a) => (Term f -> a) -> [f] -> [Type] -> [Term f]
 baseTerms measure funs tys =
   sortBy' measure $
-    map build $
-    [con (fun f) | f <- funs] ++
-    zipWith (\ty n -> var (V ty n)) (concatMap (replicate 3) tys) [0..]
+    [App f [] | f <- funs] ++
+    zipWith (\ty n -> Var (V ty n)) (concatMap (replicate 3) tys) [0..]
 
 moreTerms :: (Ord a, Apply (Term f)) => (Term f -> a) -> [[Term f]] -> [Term f]
 moreTerms measure tss =
