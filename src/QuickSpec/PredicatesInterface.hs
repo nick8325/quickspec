@@ -1,7 +1,9 @@
 {-# LANGUAGE ScopedTypeVariables,
              TypeFamilies,
              FlexibleContexts,
-             DataKinds
+             DataKinds,
+             Rank2Types,
+             GADTs
 #-}
 module QuickSpec.PredicatesInterface where
 import Data.Constraint
@@ -33,7 +35,7 @@ type family (Foldr f b fun) :: * where
 -- Calculate the type of the "embedding" function,
 -- the _uninterpreted_ function which we add when pruning
 -- in the "(extract n) (toP x1 x2 ... xn ... xm) = xn" step
-type EmbType (str :: Symbol) a = Foldr (->) (TestCaseWrapped str a) a
+type EmbType t a = Foldr (->) (TestCaseWrapped t a) a
 
 -- A test case for predicates of type a
 -- if `a ~ A -> B -> C -> Bool` we get `TestCase a ~ (A, (B, (C, ())))`
@@ -41,7 +43,7 @@ type EmbType (str :: Symbol) a = Foldr (->) (TestCaseWrapped str a) a
 -- Some speedup should be possible by using unboxed tuples instead...
 type TestCase a = Foldr (,) () a
 
-data TestCaseWrapped (str :: Symbol) a = TestCaseWrapped { unTestCaseWrapped :: (TestCase a) }
+data TestCaseWrapped t a = TestCaseWrapped { unTestCaseWrapped :: (TestCase a) }
 
 instance Eq (TestCaseWrapped str a) where
   p == q = False
@@ -53,26 +55,33 @@ instance Ord (TestCaseWrapped str a) where
 genSuchThat :: (Predicateable a, Arbitrary (TestCase a)) => a -> Gen (TestCaseWrapped x a)
 genSuchThat p = TestCaseWrapped <$> arbitrary `suchThat` uncrry p
 
-data PredRep = PredRep {predInstances :: [Instance], selectors :: [Constant], predCons :: Constant, embedder :: Constant}
+data Predicate = PRW (forall t. Typeable t => t -> PredRep)
 
-predicate :: forall a str. (KnownSymbol str,
-                            Predicateable a,
-                            Typeable a,
-                            Typeable (EmbType str a),
-                            Typeable (TestCase a)) => (Proxy (str :: Symbol)) -> a -> PredRep 
-predicate proxy pred = PredRep instances
-                               getters
-                               predicateCons
-                               embedder
+data PredRep = PredRep { predInstances :: [Instance]
+                       , selectors :: [Constant]
+                       , predCons :: Constant}
+
+predicate :: ( Predicateable a
+             , Typeable a
+             , Typeable (TestCase a))
+             => String -> a -> Predicate 
+predicate name p = PRW $ predI name p
+
+predI :: forall a t. ( Predicateable a,
+                           Typeable a,
+                           Typeable t,
+                           Typeable (TestCase a)) =>
+                           String -> a -> t -> PredRep 
+predI name pred _ = PredRep instances
+                                getters
+                                predicateCons
   where
-    instances =  makeInstance (\(dict :: Dict (Arbitrary (TestCase a))) -> (withDict dict genSuchThat) pred :: Gen (TestCaseWrapped str a))
-              ++ names (NamesFor [symbolVal proxy] :: NamesFor (TestCaseWrapped str a))
+    instances =  makeInstance (\(dict :: Dict (Arbitrary (TestCase a))) -> (withDict dict genSuchThat) pred :: Gen (TestCaseWrapped t a))
+              ++ names (NamesFor [name] :: NamesFor (TestCaseWrapped t a))
 
-    getters = getrs ("prj_" ++ symbolVal proxy) pred (unTestCaseWrapped :: TestCaseWrapped str a -> TestCase a)
+    getters = getrs ("prj_" ++ name) pred (unTestCaseWrapped :: TestCaseWrapped t a -> TestCase a)
 
-    predicateCons = constant (symbolVal proxy) pred
-
-    embedder = constant ("emb_" ++ symbolVal proxy) (undefined :: EmbType str a)
+    predicateCons = constant name pred
 
 lookupPredicate :: Constant -> [PredRep] -> Maybe PredRep
 lookupPredicate c []     = Nothing

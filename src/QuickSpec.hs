@@ -21,7 +21,7 @@ module QuickSpec(
 
 import QuickSpec.Eval hiding (terms)
 import QuickSpec.Parse
-import QuickSpec.Prop
+import QuickSpec.Prop hiding (Predicate)
 import QuickSpec.Pruning hiding (createRules, instances)
 import QuickSpec.Pruning.E
 import QuickSpec.Pruning.Simple hiding (S)

@@ -1,6 +1,4 @@
-{-# LANGUAGE DataKinds #-}
 import QuickSpec
-import GHC.TypeLits
 
 sig =
   signature {
@@ -9,7 +7,7 @@ sig =
        constant "++" ((++) :: [Int] -> [Int] -> [Int]),
        constant "zip" (zip :: [Int] -> [Int] -> [(Int,Int)])
     ],
-    predicates = [ predicate (undefined :: Proxy "eqLen")
+    predicates = [ predicate "eqLen"
                   ((\xs ys -> length xs == length ys) :: [Int] -> [Int] -> Bool)
                  ]
    }

@@ -561,12 +561,12 @@ considerConditionalising regeneralised sig prop0 = do
     (lhs :=>: t :=: u) ->
       if u == truth then
           case t of
-            App f ts -> case lookupPredicate f (predicates sig) of -- It is an interesting predicate, i.e. it was added by the user
+            App f ts -> case lookupPredicate f (predicatesI sig) of -- It is an interesting predicate, i.e. it was added by the user
               Just prd -> do
                     -- Get the `p_n` selector
                 let selector i = fromJust $ cast (selType i) $ sel i
                     sel i      = app (selectors prd !! i) []
-                    emb        = fromJust $ cast embedderType $ app (embedder prd) []
+                    emb        = app (Ghost embedderType) []
 
                     testCase   = head $ typeArgs $ typ $ sel 0
 
