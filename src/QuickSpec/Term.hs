@@ -70,11 +70,13 @@ data Constant =
     conIsBackground :: Bool }
   | Id Type
   | Apply Type
+  | Ghost Type
 
 instance Show Constant where
   show con@Constant{} = conName con
   show (Id ty) = "id[" ++ show ty ++ "]"
   show (Apply ty) = "apply[" ++ show ty ++ "]"
+  show (Ghost ty) = "ghost[" ++ show ty ++ "]"
 
 instance Label.Labelled Constant where
   cache = constantCache
@@ -94,6 +96,7 @@ instance Ord Constant where
       f con@Constant{..} = Left (twiddle (conArity - implicitArity (typ conGeneralValue)), conName, typ conGeneralValue, typ conValue)
       f (Apply ty) = Right (Left ty)
       f (Id ty) = Right (Right ty)
+      f (Ghost ty) = Right (Right ty)
       -- This tweak is taken from Prover9
       twiddle 2 = 1
       twiddle 1 = 2
@@ -101,27 +104,33 @@ instance Ord Constant where
 instance Pretty Constant where
   pPrint (Apply ty) = text "apply[" <> pPrint ty <> text "]"
   pPrint (Id ty) = text "id[" <> pPrint ty <> text "]"
+  pPrint (Ghost ty) = text "ghost[" <> pPrint ty <> text "]"
   pPrint con = text (conName con)
 instance PrettyTerm Constant where
   termStyle (Apply _) = invisible
   termStyle (Id _) = invisible
+  termStyle (Ghost _) = invisible
   termStyle f = implicitArguments n (conStyle f)
     where
       n = implicitArity (typ (conGeneralValue f))
 instance Typed Constant where
   typ (Apply ty) = app Arrow [ty, ty]
+  typ (Ghost ty) = ty
   typ (Id ty) = app Arrow [ty, ty]
   typ con = typ (conValue con)
   typeReplace sub (Apply ty) = Apply (typeReplace sub ty)
+  typeReplace sub (Ghost ty) = Ghost (typeReplace sub ty)
   typeReplace sub (Id ty) = Id (typeReplace sub ty)
   typeReplace sub x = x { conValue = typeReplace sub (conValue x) }
 instance Sized Constant where
   size (Apply _) = 0
   size (Id _) = 0
+  size (Ghost _) = 0
   size con = fromIntegral (conSize con)
 instance Arity Constant where
   arity (Apply _) = 2
   arity (Id _) = 1
+  arity (Ghost _) = 0
   arity con = conArity con
 
 implicitArity :: Type -> Int
@@ -139,6 +148,9 @@ instance Typed (Term Constant) where
 
 instance Apply (Term Constant) where
   tryApply t@(App Constant{} xs) u = tryApply' t u
+  tryApply (App (Ghost ty) xs) u = do
+    tryApply (typeDrop (length xs) ty) (typ u)
+    return $ app (Ghost ty) $ xs ++ [u]
   tryApply t u = do
     let ty = typ t
     tryApply ty (typ u)

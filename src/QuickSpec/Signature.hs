@@ -19,7 +19,7 @@ import Data.Set(Set)
 import Data.Traversable hiding (mapM)
 import Prelude hiding (sequence)
 import QuickSpec.Instance
-import QuickSpec.Prop
+import QuickSpec.Prop hiding (Predicate)
 import QuickSpec.Parse
 import QuickSpec.Term
 import QuickSpec.Type
@@ -57,7 +57,8 @@ data Signature =
     simplify            :: Maybe (Signature -> Prop -> Prop),
     extraPruner         :: Maybe ExtraPruner,
     conditionalsContext :: [(Constant, [Constant])],
-    predicates          :: [PredRep],
+    predicates          :: [Predicate],
+    predicatesI         :: [PredRep],
     silent              :: Bool
   }
   deriving Typeable
@@ -204,8 +205,8 @@ namesFor_ sig ty =
 newtype DictOf c a = DictOf { unDictOf :: Dict (c a) } deriving Typeable
 
 instance Monoid Signature where
-  mempty = Signature [] [] [] Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing False Nothing Nothing [] [] False
-  Signature cs is b th d s ps dp s1 t tim pr simp p pctxs prds sil `mappend` Signature cs' is' b' th' d' s' ps' dp' s1' t' tim' pr' simp' p' pctxs' prds' sil' =
+  mempty = Signature [] [] [] Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing False Nothing Nothing [] [] [] False
+  Signature cs is b th d s ps dp s1 t tim pr simp p pctxs prdsu prds sil `mappend` Signature cs' is' b' th' d' s' ps' dp' s1' t' tim' pr' simp' p' pctxs' prdsu' prds' sil' =
     Signature (cs++cs') (is++is') (b++b')
       (th `mplus` th')
       (d `mplus` d')
@@ -219,6 +220,7 @@ instance Monoid Signature where
       (simp `mplus` simp')
       (p `mplus` p')
       (pctxs `mplus` pctxs')
+      (prdsu `mplus` prdsu')
       (prds `mplus` prds')
       (sil || sil')
 
@@ -337,9 +339,14 @@ printTheory :: Signature -> IO ()
 printTheory sig = putStrLn (showTheory (background sig))
 
 predicateSig :: Signature -> Signature
-predicateSig sig = let ps             = predicates sig in
+predicateSig sig = let ps             = fixPreds () $ predicates sig in
                        sig {constants = nub $ constants sig ++ (concatMap selectors ps) ++ map predCons ps ++ [constant "True" True | not (null ps)],
                             instances =
                                instances sig ++ map predInstances ps,
-                            conditionalsContext = [(predCons p, selectors p) | p <- ps]
+                            conditionalsContext = [(predCons p, selectors p) | p <- ps],
+                            predicatesI = ps
                            }
+
+fixPreds :: forall t. Typeable t => t -> [Predicate] -> [PredRep]
+fixPreds _ [] = []
+fixPreds t (PRW f : ps) = f t : fixPreds ((), t) ps
