@@ -54,4 +54,6 @@ and has a number of limitations:
 Despite these limitations, QuickSpec works well on many examples.
 The best way to get started with it is to look at the `examples`
 directory, for example `Arith.hs` or `ListMonad.hs`.
-You can also look at our paper, [Quick specifications for the busy programmer](http://www.cse.chalmers.se/~nicsma/papers/quickspec2.pdf).
+You can also look at our paper,
+http://www.cse.chalmers.se/~nicsma/papers/quickspec2.pdf[Quick
+specifications for the busy programmer].
