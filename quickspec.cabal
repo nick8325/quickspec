@@ -110,7 +110,7 @@ library
                , random
                , spoon >= 0.2
                , transformers
-               , twee
+               , twee < 2
                , uglymemo
 
   if flag(jukebox)
