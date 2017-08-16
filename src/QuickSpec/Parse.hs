@@ -60,7 +60,7 @@ instance Parse (Literal (Term Constant)) where
         string "="
         u <- parse cs
         let eqv = toValue (return (undefined :: A -> A -> Bool))
-            eq = Constant "eq" eqv (poly eqv) 0 undefined undefined undefined
+            eq = Constant "eq" eqv (poly eqv) 0 undefined undefined undefined undefined 
             App _ [t', u'] = unPoly (foldl apply (poly (app eq [])) [poly t, poly u])
         return (t' :=: u')
       predicate = do
