@@ -1,12 +1,12 @@
 -- Polymorphic types and dynamic values.
-{-# LANGUAGE DeriveDataTypeable, CPP, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances, GeneralizedNewtypeDeriving, Rank2Types, ExistentialQuantification, PolyKinds, TypeFamilies, FlexibleContexts, StandaloneDeriving #-}
+{-# LANGUAGE DeriveDataTypeable, CPP, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances, GeneralizedNewtypeDeriving, Rank2Types, ExistentialQuantification, PolyKinds, TypeFamilies, FlexibleContexts, StandaloneDeriving, PatternGuards #-}
 -- To avoid a warning about TyVarNumber's constructor being unused:
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
 module QuickSpec.Type(
   -- Types.
   Typeable,
-  Type, TyCon(..), tyCon, toTyCon, fromTyCon, A, B, C, D, E,
-  typeOf, typeRep, applyType, toTypeRep, fromTypeRep,
+  Type, TyCon(..), tyCon, fromTyCon, A, B, C, D, E,
+  typeOf, typeRep, applyType, fromTypeRep,
   arrowType, typeArgs, typeRes, typeDrop, typeArity, oneTypeVar, skolemiseTypeVars,
   isDictionary, getDictionary,
   -- Things that have types.
@@ -28,7 +28,6 @@ import Data.DList(DList)
 import Data.Maybe
 import qualified Data.Typeable as Ty
 import Data.Typeable(Typeable)
-import qualified Data.Typeable.Internal as Ty
 import GHC.Exts(Any)
 import GHC.Stack
 import Test.QuickCheck
@@ -38,6 +37,9 @@ import Twee.Base
 import qualified Twee.Term as Term
 import qualified Twee.Label as Label
 import Data.Ord
+import Data.Proxy
+import Data.Char
+import Data.List
 
 deriving instance Typeable (() :: Constraint)
 
@@ -75,20 +77,31 @@ instance PrettyTerm TyCon where
     | con == listTyCon =
       fixedArity 1 $
       TermStyle $ \l _ _ [x] -> brackets (pPrintPrec l 0 x)
+    | show con == "()" || show con == "(%%)" =
+      fixedArity 0 tupleStyle -- by analogy with case below
     | take 2 (show con) == "(," ||
       take 3 (show con) == "(%," =
       fixedArity (1+length (filter (== ',') (show con))) tupleStyle
-  termStyle _ = curried
+    | isAlphaNum (head (show con)) = curried
+    | otherwise = infixStyle 5
 
--- Type variables.
-type A = TyVarNumber Zero
-type B = TyVarNumber (Succ Zero)
-type C = TyVarNumber (Succ (Succ Zero))
-type D = TyVarNumber (Succ (Succ (Succ Zero)))
-type E = TyVarNumber (Succ (Succ (Succ (Succ Zero))))
-newtype TyVarNumber a = TyVarNumber Any deriving Typeable
-data Zero deriving Typeable
-data Succ a deriving Typeable
+-- Type and class variables.
+newtype A = A Any deriving Typeable
+newtype B = B Any deriving Typeable
+newtype C = C Any deriving Typeable
+newtype D = D Any deriving Typeable
+newtype E = E Any deriving Typeable
+
+typeVars :: [Ty.TypeRep]
+typeVars =
+  [Ty.typeRep (Proxy :: Proxy A),
+   Ty.typeRep (Proxy :: Proxy B),
+   Ty.typeRep (Proxy :: Proxy C),
+   Ty.typeRep (Proxy :: Proxy D),
+   Ty.typeRep (Proxy :: Proxy E)]
+
+typeVar :: Type
+typeVar = typeRep (Proxy :: Proxy A)
 
 typeOf :: Typeable a => a -> Type
 typeOf x = fromTypeRep (Ty.typeOf x)
@@ -125,50 +138,32 @@ oneTypeVar = typeSubst (const (var (MkVar 0)))
 skolemiseTypeVars :: Typed a => a -> a
 skolemiseTypeVars = typeSubst (const aTy)
   where
-    aTy = app (fromTyCon (mkCon (__ :: A))) []
+    aTy = app (fromTyCon (mkCon (Proxy :: Proxy A))) []
 
 fromTypeRep :: Ty.TypeRep -> Type
-fromTypeRep ty =
-  case Ty.splitTyConApp ty of
-    (tyVar, [ty]) | tyVar == varTyCon -> build (var (MkVar (fromTyVar ty)))
-    (tyCon, tys) -> app (fromTyCon tyCon) (map fromTypeRep tys)
-  where
-    fromTyVar ty =
-      case Ty.splitTyConApp ty of
-        (tyCon, [ty']) | tyCon == succTyCon -> succ (fromTyVar ty')
-        (tyCon, []) | tyCon == zeroTyCon -> 0
+fromTypeRep ty
+  | Just n <- elemIndex ty typeVars =
+      build (var (MkVar n))
+  | otherwise =
+    let (tyCon, tys) = Ty.splitTyConApp ty in
+    build (fun (toFun (fromTyCon tyCon)) (map fromTypeRep tys))
 
 fromTyCon :: Ty.TyCon -> TyCon
 fromTyCon ty
   | ty == arrowTyCon = Arrow
   | otherwise = TyCon ty
 
-arrowTyCon, commaTyCon, listTyCon, varTyCon, succTyCon, zeroTyCon, dictTyCon :: Ty.TyCon
-arrowTyCon = mkCon (__ :: () -> ())
-commaTyCon = mkCon (__ :: ((),()))
-listTyCon  = mkCon (__ :: [()])
-varTyCon   = mkCon (__ :: TyVarNumber ())
-succTyCon  = mkCon (__ :: Succ ())
-zeroTyCon  = mkCon (__ :: Zero)
-dictTyCon  = mkCon (__ :: Dict ())
+arrowTyCon, commaTyCon, listTyCon, dictTyCon :: Ty.TyCon
+arrowTyCon = mkCon (Proxy :: Proxy (->))
+commaTyCon = mkCon (Proxy :: Proxy (,))
+listTyCon  = mkCon (Proxy :: Proxy [])
+dictTyCon  = mkCon (Proxy :: Proxy Dict)
 
-mkCon :: Typeable a => a -> Ty.TyCon
-mkCon = fst . Ty.splitTyConApp . Ty.typeOf
+mkCon :: Typeable a => proxy a -> Ty.TyCon
+mkCon = fst . Ty.splitTyConApp . Ty.typeRep
 
-tyCon :: Typeable a => a -> TyCon
+tyCon :: Typeable a => proxy a -> TyCon
 tyCon = fromTyCon . mkCon
-
--- For showing types.
-toTypeRep :: Type -> Ty.TypeRep
-toTypeRep (App tyCon tys) = Ty.mkTyConApp (toTyCon tyCon) (map toTypeRep tys)
-toTypeRep (Var (MkVar n)) = Ty.mkTyConApp varTyCon [toTyVar n]
-  where
-    toTyVar 0 = Ty.mkTyConApp zeroTyCon []
-    toTyVar n = Ty.mkTyConApp succTyCon [toTyVar (n-1)]
-
-toTyCon :: TyCon -> Ty.TyCon
-toTyCon Arrow = arrowTyCon
-toTyCon (TyCon tyCon) = tyCon
 
 getDictionary :: Type -> Maybe Type
 getDictionary (App (TyCon tc) [ty]) | tc == dictTyCon = Just ty
@@ -178,17 +173,14 @@ isDictionary :: Type -> Bool
 isDictionary = isJust . getDictionary
 
 -- CoArbitrary instances.
-instance CoArbitrary Ty.TypeRep where
-#if __GLASGOW_HASKELL__ >= 710
-  coarbitrary (Ty.TypeRep (Ty.Fingerprint x y) _ _ _) =
-    coarbitrary x . coarbitrary y
-#else
-  coarbitrary (Ty.TypeRep (Ty.Fingerprint x y) _ _) =
-    coarbitrary x . coarbitrary y
-#endif
-
 instance CoArbitrary Type where
-  coarbitrary = coarbitrary . toTypeRep
+  coarbitrary = coarbitrary . singleton
+instance CoArbitrary (TermList TyCon) where
+  coarbitrary Empty = variant 0
+  coarbitrary (ConsSym (Var (MkVar x)) ts) =
+    variant 1 . coarbitrary x . coarbitrary ts
+  coarbitrary (ConsSym (Fun (MkFun f) _) ts) =
+    variant 2 . coarbitrary f . coarbitrary ts
 
 -- Things with types.
 class Typed a where
@@ -233,7 +225,10 @@ infixl `apply`
 apply :: (HasCallStack, Apply a) => a -> a -> a
 apply f x =
   case tryApply f x of
-    Nothing -> ERROR("apply: ill-typed term: (" ++ prettyShow (typ f) ++ ") to  (" ++ prettyShow (typ x) ++ ")")
+    Nothing ->
+      error $
+        "apply: ill-typed term: can't apply " ++
+        prettyShow (typ f) ++ " to " ++ prettyShow (typ x)
     Just y -> y
 
 canApply :: Apply a => a -> a -> Bool
@@ -355,7 +350,7 @@ unwrap x =
       (\y ->
         if typ x == typ y
         then fromAny (value y)
-        else ERROR("non-matching types"))
+        else error "non-matching types")
 
 mapValue :: (forall a. f a -> g a) -> Value f -> Value g
 mapValue f v =
@@ -380,7 +375,7 @@ pairValues f x y =
     valueType = ty,
     value = toAny (f (value x) (value y)) }
   where
-    ty = typeRep (__ :: proxy g) `applyType` typ x `applyType` typ y
+    ty = typeRep (Proxy :: Proxy g) `applyType` typ x `applyType` typ y
 
 wrapFunctor :: forall f g h. Typeable h => (forall a. f a -> g (h a)) -> Value f -> Value g
 wrapFunctor f x =
@@ -389,18 +384,18 @@ wrapFunctor f x =
     valueType = ty,
     value = toAny (f (value x)) }
   where
-    ty = typeRep (__ :: proxy h) `applyType` valueType x
+    ty = typeRep (Proxy :: Proxy h) `applyType` valueType x
 
 unwrapFunctor :: forall f g h. Typeable g => (forall a. f (g a) -> h a) -> Value f -> Value h
 unwrapFunctor f x =
   case typ x of
-    App _ tys@(_:_) ->
+    App _ tys | tys@(_:_) <- tys ->
       case ty `applyType` last tys == typ x of
         True ->
           Value {
             valueType = last tys,
             value = f (fromAny (value x)) }
         False ->
-          ERROR("non-matching types")
+          error "non-matching types"
   where
-    ty = typeRep (__ :: proxy g)
+    ty = typeRep (Proxy :: Proxy g)

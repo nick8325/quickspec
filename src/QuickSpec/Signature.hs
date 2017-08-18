@@ -1,5 +1,5 @@
 -- Signatures, collecting and finding witnesses, etc.
-{-# LANGUAGE CPP, ConstraintKinds, ExistentialQuantification, ScopedTypeVariables, DeriveDataTypeable, Rank2Types, StandaloneDeriving, TypeOperators, FlexibleContexts, KindSignatures, GeneralizedNewtypeDeriving, GADTs #-}
+{-# LANGUAGE CPP, ConstraintKinds, ExistentialQuantification, ScopedTypeVariables, DeriveDataTypeable, Rank2Types, StandaloneDeriving, TypeOperators, FlexibleContexts, KindSignatures, GeneralizedNewtypeDeriving, GADTs, PatternGuards #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module QuickSpec.Signature where
 
@@ -32,6 +32,7 @@ import {-# SOURCE #-} QuickSpec.Pruning.Simple(SimplePruner)
 import Twee.Base
 import qualified Twee.Label as Label
 import QuickSpec.Utils
+import Data.Proxy
 
 deriving instance Typeable Ord
 deriving instance Typeable Arbitrary
@@ -262,10 +263,10 @@ findInstanceOf sig ty =
 
 findInstance :: Signature -> Type -> [Value Identity]
 findInstance sig (App unit [])
-  | unit == tyCon () =
+  | unit == tyCon (Proxy :: Proxy ()) =
     return (toValue (Identity ()))
 findInstance sig (App pair [ty1, ty2])
-  | pair == tyCon ((),()) = do
+  | pair == tyCon (Proxy :: Proxy (,)) = do
     x <- findInstance sig ty1
     y <- findInstance sig ty2
     return (pairValues (liftA2 (,)) x y)

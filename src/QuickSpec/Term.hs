@@ -13,7 +13,7 @@ import qualified Data.Map as Map
 import Data.Ord
 import QuickSpec.Type
 import QuickSpec.Utils
-import Test.QuickCheck hiding (subterms)
+import Test.QuickCheck hiding (subterms, Function)
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Random
 import Twee.Base
