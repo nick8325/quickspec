@@ -2,6 +2,7 @@
 import Control.Monad
 import Test.QuickCheck
 import QuickSpec hiding (background, (<>), text, nest, ($$))
+import Data.Typeable
 
 newtype Layout = Layout [(Int, String)]
   deriving (Typeable, Eq, Ord, Show)

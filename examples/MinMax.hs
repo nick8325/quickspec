@@ -2,6 +2,7 @@
 import QuickSpec hiding (Constant)
 import Test.QuickCheck
 import Data.Monoid
+import Data.Typeable
 
 newtype Constant = Constant Integer deriving (Eq, Ord, Typeable, Num)
 instance Arbitrary Constant where

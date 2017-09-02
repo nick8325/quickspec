@@ -7,6 +7,8 @@ import Prelude hiding (flip, cycle)
 import Data.Monoid
 import Control.Monad
 import Data.Word
+import Data.Typeable
+import Data.Constraint
 
 class Half a where
   zero :: a

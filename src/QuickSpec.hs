@@ -1,30 +1,25 @@
--- | Main QuickSpec module.  Exports basic functionality.
---
--- This is typically the only module you need when using QuickSpec.
+-- | The main QuickSpec module.
 module QuickSpec(
-  module QuickSpec.PredicatesInterface,
-  module QuickSpec.Eval,
-  module QuickSpec.Parse,
-  module QuickSpec.Prop,
-  module QuickSpec.Pruning,
-  module QuickSpec.Pruning.E,
-  module QuickSpec.Pruning.Simple,
-  module QuickSpec.Rules,
-  module QuickSpec.Signature,
-  module QuickSpec.Instance,
-  module QuickSpec.Term,
-  module QuickSpec.Test,
-  module QuickSpec.TestSet,
-  module QuickSpec.Type,
-  module QuickSpec.Utils,
-  module Data.Constraint) where
+  quickSpec,
+  quickSpecWithBackground,
+  Signature(..),
+  signature,
+  constant,
+  predicate,
+  NamesFor(..),
+  baseType,
+  baseTypeNames,
+  makeInstance,
+  inst,
+  observe,
+  A, B, C, D, E) where
 
-import QuickSpec.Eval hiding (terms)
+import QuickSpec.Eval
 import QuickSpec.Parse
-import QuickSpec.Prop hiding (Predicate)
-import QuickSpec.Pruning hiding (createRules, instances)
+import QuickSpec.Prop
+import QuickSpec.Pruning
 import QuickSpec.Pruning.E
-import QuickSpec.Pruning.Simple hiding (S)
+import QuickSpec.Pruning.Simple
 import QuickSpec.Rules
 import QuickSpec.Signature
 import QuickSpec.Term
@@ -34,4 +29,3 @@ import QuickSpec.Type
 import QuickSpec.Utils
 import QuickSpec.PredicatesInterface
 import QuickSpec.Instance
-import Data.Constraint

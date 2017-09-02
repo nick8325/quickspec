@@ -33,6 +33,7 @@ import Twee.Base
 import qualified Twee.Label as Label
 import QuickSpec.Utils
 import Data.Proxy
+import qualified Data.Typeable as Typeable
 
 deriving instance Typeable Ord
 deriving instance Typeable Arbitrary
@@ -47,7 +48,7 @@ data Signature =
     instances           :: [[Instance]],
     background          :: [Prop],
     theory              :: Maybe PrunerType,
-    defaultTo           :: Maybe Type,
+    defaultTo           :: Maybe Typeable.TypeRep,
     maxTermSize         :: Maybe Int,
     maxPruningSize      :: Maybe Int,
     maxTermDepth        :: Maybe Int,
@@ -100,10 +101,7 @@ defaultTo_ :: Signature -> Type
 defaultTo_ sig =
   case defaultTo sig of
     Nothing -> typeOf (undefined :: Int)
-    Just ty
-      | null (vars ty) -> ty
-      | otherwise ->
-        error $ "Default type is not ground: " ++ prettyShow ty
+    Just ty -> fromTypeRep ty
 
 maxTermSize_ :: Signature -> Int
 maxTermSize_ = fromMaybe 7 . maxTermSize

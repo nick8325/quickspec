@@ -7,7 +7,9 @@ import Data.Char
 import Test.QuickCheck hiding ((><))
 import System.IO.Unsafe
 import System.Timeout
-import QuickSpec hiding (New, In, Name, Event)
+import QuickSpec
+import QuickSpec.Utils(usort)
+import Data.Typeable
 
 --------------------------------------------------------------------------------
 
@@ -358,7 +360,7 @@ sig =
     , con "tau"  (Act Tau)
     , con "+"    (:+:)
     , con "|"    (:|:)
-    , (con "*"   Star){ conStyle = Postfix }
+    , con "*"   Star
     , con "new"  New
     ]
     
