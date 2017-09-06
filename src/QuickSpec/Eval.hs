@@ -287,12 +287,13 @@ summarise = do
 allUnifications :: Term Constant -> [Term Constant]
 allUnifications t = map f ss
   where
-    vs = [ map (x,) (take (varCount x) xs) | xs <- partitionBy fst (usort (typedVars t)), x <- xs ]
+    vs = [ map (x,) (select xs) | xs <- partitionBy fst (usort (typedVars t)), x <- xs ]
     ss = map Map.fromList (sequence vs)
     go s x = Map.findWithDefault __ x s
     f s = typedSubst (curry (typedVar . go s)) t
     typedVar (ty, x) = fun (toFun (Id ty)) [var x]
-    varCount (ty, _) = 4
+    select [(ty, x)] = [(ty, x), (ty, succ x)]
+    select xs = take 4 xs
 
 -- | Create the rules for processing QuickSpec events.
 createRules :: Signature -> M ()
