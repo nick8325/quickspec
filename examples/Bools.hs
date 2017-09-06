@@ -1,8 +1,8 @@
+-- Testing functions on booleans. "not x" is used as a condition.
 import QuickSpec
 
 sig =
   signature {
-    maxTermSize = Just 7,
     predicates = [predicate "not" not],
     constants = [
        constant "True" True,

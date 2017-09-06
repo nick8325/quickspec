@@ -1,3 +1,4 @@
+-- A simple example testing arithmetic functions.
 import QuickSpec
 
 sig =

@@ -1,6 +1,5 @@
 *.sw*
 /dist
-examples/*
 !examples/*.hs
 cabal.sandbox.config
 .cabal-sandbox/
