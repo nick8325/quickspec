@@ -611,31 +611,24 @@ found sig prop0 =  do
   props <- lift (gets discovered)
   (_, props') <- liftIO $ runPruner sig [] $ mapM_ (axiom Normal) (map (simplify_ sig) props)
 
-  let prop' = etaExpand prop
+  let etas = etaExpand prop
   onTerm putTemp "[running extra pruner...]"
   res <- liftIO $ pruner (extraPruner_ sig) props' (toGoal (simplify_ sig prop))
   case res of
     True ->
       return ()
     False -> do
-      lift $ modify (\s -> s { discovered = prop':discovered s })
-      let isPretty (_ :=>: t :=: u) = isPretty1 t && isPretty1 u
-          isPretty1 (App f ts) | undersaturated (conStyle f) (length ts) = False
-          isPretty1 _ = True
-          -- XXX
-          -- undersaturated Invisible 0 = True
-          -- undersaturated (Tuple m) n | m > n = True
-          -- undersaturated (Infix _) n | n < 2 = True
-          -- undersaturated (Infixr _) n | n < 2 = True
-          -- undersaturated Prefix 0 = True
-          -- undersaturated Postfix 0 = True
-          -- undersaturated Gyrator n | n < 2 = True
-          undersaturated _ _ = False
+      lift $ modify (\s -> s { discovered = prop:discovered s })
+      let isPretty (_ :=>: t :=: u) = isPretty1 t || isPretty1 u
+          isPretty1 (App Constant{conName = x} ts)
+            | isOp x && length ts == 2 = True
+          isPretty1 _ = False
           rename prop@(lhs :=>: t :=: u)
             | t `isVariantOf` u = lhs' :=>: u' :=: t'
             | otherwise = prettyRename sig prop
             where
               lhs' :=>: t' :=: u' = prettyRename sig prop
+          prop' = head (filter isPretty etas ++ [last etas])
       when (shouldPrint prop') $ do
         lift $ modify (\s -> s { howMany = howMany s + 1 })
         n <- lift $ gets howMany
@@ -659,11 +652,12 @@ found sig prop0 =  do
   considerConditionalising True sig prop
   onTerm putPart ""
 
-etaExpand :: Prop -> Prop
+etaExpand :: Prop -> [Prop]
 etaExpand prop@(lhs :=>: t :=: u) =
+  prop:
   case (tryApply t x, tryApply u x) of
     (Just t', Just u') -> etaExpand (lhs :=>: t' :=: u')
-    _ -> prop
+    _ -> []
   where
     x = build (fun (toFun (Id (head (typeArgs (typ t) ++ [typeOf ()])))) [var (MkVar n)])
     n = boundList (buildList (map var (vars prop)))
