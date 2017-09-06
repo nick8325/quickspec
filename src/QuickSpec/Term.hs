@@ -24,14 +24,14 @@ import qualified Data.DList as DList
 -- Term ordering - size, skeleton, generality.
 -- Satisfies the property:
 -- if measure (schema t) < measure (schema u) then t < u.
-type Measure = (Int, Int, MeasureFuns (Extended Constant), Int, [Var])
+type Measure = (Int, Int, MeasureFuns (Extended Constant), Int, [(Type, Var)])
 measure :: Term Constant -> Measure
 measure t =
   (size t, -length (vars' t),
    MeasureFuns (build (skel (buildList (extended (singleton t))))),
    -length (usort (vars' t)), vars' t)
   where
-    vars' = map snd . filter (not . isDictionary . fst) . typedVars
+    vars' = filter (not . isDictionary . fst) . typedVars
     skel Empty = mempty
     skel (Cons (Var x) ts) = con minimal `mappend` skel ts
     skel (Cons (Fun f ts) us) =
