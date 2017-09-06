@@ -110,13 +110,10 @@ library
                , random
                , spoon >= 0.2
                , transformers
-               , twee
+               , twee == 0.1
                , uglymemo
 
-  if flag(jukebox)
-    Build-depends: jukebox >= 0.2.17
-  else
-    cpp-options: -DNO_JUKEBOX
+  Build-depends: jukebox == 0.2.17
   if flag(z3)
     Build-depends: z3 >= 4
   else

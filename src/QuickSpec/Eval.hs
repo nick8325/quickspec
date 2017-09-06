@@ -154,6 +154,9 @@ schemasOfSize n sig = do
       x <- xs,
       case maxTermDepth sig of { Nothing -> True; Just d -> depth (unPoly x) <= d } ]
 
+-- | Run QuickSpec with a given set of background functions.
+-- The first signature should contain only the background functions,
+-- the second signature only the foreground functions.
 quickSpecWithBackground :: Signature -> Signature -> IO Signature
 quickSpecWithBackground sig1 sig2 = do
   thy <- quickSpec sig1
@@ -180,10 +183,7 @@ choppyQuickSpec cs sig = do
   where
    sigs = chopUpSignature cs sig
 
--- | Run QuickSpec. The returned signature contains the discovered
--- equations. By using |mappend| to combine the returned signature
--- and a new signature, you can use the discovered equations as
--- background theory in a later run of QuickSpec.
+-- | Run QuickSpec on a given signature.
 quickSpec :: Signature -> IO Signature
 quickSpec sigin = do
   let sig = predicateSig sigin
@@ -287,12 +287,13 @@ summarise = do
 allUnifications :: Term Constant -> [Term Constant]
 allUnifications t = map f ss
   where
-    vs = [ map (x,) (take (varCount x) xs) | xs <- partitionBy fst (usort (typedVars t)), x <- xs ]
+    vs = [ map (x,) (select xs) | xs <- partitionBy fst (usort (typedVars t)), x <- xs ]
     ss = map Map.fromList (sequence vs)
     go s x = Map.findWithDefault __ x s
     f s = typedSubst (curry (typedVar . go s)) t
     typedVar (ty, x) = fun (toFun (Id ty)) [var x]
-    varCount (ty, _) = 4
+    select [(ty, x)] = [(ty, x), (ty, succ x)]
+    select xs = take 4 xs
 
 -- | Create the rules for processing QuickSpec events.
 createRules :: Signature -> M ()

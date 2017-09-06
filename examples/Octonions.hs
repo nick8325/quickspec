@@ -4,6 +4,7 @@ import QuickSpec
 import Test.QuickCheck
 import Twee.Pretty
 import Control.Monad
+import Data.Typeable
 
 class Fractional a => Conj a where
   conj :: a -> a
@@ -40,7 +41,7 @@ sig =
   signature {
     constants = [
       constant "*" ((*) :: It -> It -> It),
-      (constant "^-1" (recip :: It -> It)) { conStyle = postfix },
+      constant "inv" (recip :: It -> It),
       constant "1" (1 :: It)
     ],
     maxTermSize = Just 7,

@@ -4,6 +4,8 @@ import Test.QuickCheck
 import QuickSpec hiding (background, (<>), text, nest, ($$))
 import Data.List
 import Text.ParserCombinators.ReadP
+import Data.Typeable
+import Data.Constraint
 
 deriving instance Typeable ReadP
 
@@ -29,7 +31,7 @@ bg =
   signature {
     instances = [
       inst (Sub Dict :: Arbitrary A :- Arbitrary (ReadP A)),
-      makeInstance (\(Dict :: Dict (Ord A)) -> Observe Dict (\(p :: ReadP A) -> obsReadP p)) ],
+      makeInstance (\(Dict :: Dict (Ord A)) -> observe (obsReadP :: ReadP A -> Gen [(A, String)]))],
 
     constants = [
       constant "return" (return :: A -> ReadP A),

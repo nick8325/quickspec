@@ -61,6 +61,8 @@ data PredRep = PredRep { predInstances :: [Instance]
                        , selectors :: [Constant]
                        , predCons :: Constant}
 
+-- | Declare a predicate with a given name and value.
+-- The predicate should have type @... -> Bool@.
 predicate :: ( Predicateable a
              , Typeable a
              , Typeable (TestCase a))

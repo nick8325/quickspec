@@ -1,5 +1,5 @@
 -- Signatures, collecting and finding witnesses, etc.
-{-# LANGUAGE CPP, ConstraintKinds, ExistentialQuantification, ScopedTypeVariables, DeriveDataTypeable, Rank2Types, StandaloneDeriving, TypeOperators, FlexibleContexts, KindSignatures, GeneralizedNewtypeDeriving, GADTs #-}
+{-# LANGUAGE CPP, ConstraintKinds, ExistentialQuantification, ScopedTypeVariables, DeriveDataTypeable, Rank2Types, StandaloneDeriving, TypeOperators, FlexibleContexts, KindSignatures, GeneralizedNewtypeDeriving, GADTs, PatternGuards #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module QuickSpec.Signature where
 
@@ -32,6 +32,8 @@ import {-# SOURCE #-} QuickSpec.Pruning.Simple(SimplePruner)
 import Twee.Base
 import qualified Twee.Label as Label
 import QuickSpec.Utils
+import Data.Proxy
+import qualified Data.Typeable as Typeable
 
 deriving instance Typeable Ord
 deriving instance Typeable Arbitrary
@@ -40,26 +42,58 @@ deriving instance Typeable Gen
 
 type PrunerType = Completion
 
+-- | The entire QuickSpec configuration.
+-- The only fields you will probably need are
+-- `constants`, `instances`, `predicates` and `maxTermSize`.
+--
+-- For example, the following signature explores @++@ and @reverse@:
+--
+-- @
+-- sig =
+--   `signature` {
+--      `constants` = [
+--        `constant` "reverse" (reverse :: [`A`] -> [`A`]),
+--        `constant` "++" ((++) :: [`A`] -> [`A`] -> [`A`]) ]}
+-- @
+
 data Signature =
   Signature {
+    -- | The constants and functions to explore. Created by using `constant`.
     constants           :: [Constant],
+    -- | Typeclass instances for testing. Created by using `baseType`, `inst` or `makeInstance`.
     instances           :: [[Instance]],
-    background          :: [Prop],
-    theory              :: Maybe PrunerType,
-    defaultTo           :: Maybe Type,
-    maxTermSize         :: Maybe Int,
-    maxPruningSize      :: Maybe Int,
-    maxTermDepth        :: Maybe Int,
-    maxCommutativeSize  :: Maybe Int,
-    maxTests            :: Maybe Int,
-    testTimeout         :: Maybe Int,
-    printStatistics     :: Bool,
-    simplify            :: Maybe (Signature -> Prop -> Prop),
-    extraPruner         :: Maybe ExtraPruner,
-    conditionalsContext :: [(Constant, [Constant])],
+    -- | Predicates for use in conditional equations. Created by using `predicate`.
     predicates          :: [Predicate],
-    predicatesI         :: [PredRep],
-    silent              :: Bool
+    -- | A type which type variables default to for testing.
+    defaultTo           :: Maybe Typeable.TypeRep,
+    -- | The maximum size of terms to explore (default: 7).
+    maxTermSize         :: Maybe Int,
+    -- | The maximum depth of terms to explore (default: unlimited).
+    maxTermDepth        :: Maybe Int,
+    -- | The number of test cases to try for each law (default: 1000).
+    maxTests            :: Maybe Int,
+    -- | For experts: a list of properties which are already known to be true.
+    background          :: [Prop],
+    -- | For experts: a timeout for running test cases.
+    testTimeout         :: Maybe Int,
+    -- | For experts: the maximum size of terms to reason about during pruning.
+    maxPruningSize      :: Maybe Int,
+    -- | For experts: below this size all schemas are instantiated.
+    maxCommutativeSize  :: Maybe Int,
+    -- | For experts: a function which is called to simplify discovered laws.
+    simplify            :: Maybe (Signature -> Prop -> Prop),
+    -- | For experts: an extra function used to prune the discovered laws.
+    extraPruner         :: Maybe ExtraPruner,
+    -- | For experts: print internal statistics.
+    printStatistics     :: Bool,
+    -- | For experts: don't print anything out.
+    silent              :: Bool,
+    -- | Internal use: the initial state of the pruner.
+    theory              :: Maybe PrunerType,
+    -- | Internal use: for conditionals.
+    conditionalsContext :: [(Constant, [Constant])],
+    -- | Internal use: for conditionals.
+    predicatesI         :: [PredRep]
   }
   deriving Typeable
 
@@ -99,10 +133,7 @@ defaultTo_ :: Signature -> Type
 defaultTo_ sig =
   case defaultTo sig of
     Nothing -> typeOf (undefined :: Int)
-    Just ty
-      | null (vars ty) -> ty
-      | otherwise ->
-        error $ "Default type is not ground: " ++ prettyShow ty
+    Just ty -> fromTypeRep ty
 
 maxTermSize_ :: Signature -> Int
 maxTermSize_ = fromMaybe 7 . maxTermSize
@@ -205,25 +236,49 @@ namesFor_ sig ty =
 newtype DictOf c a = DictOf { unDictOf :: Dict (c a) } deriving Typeable
 
 instance Monoid Signature where
-  mempty = Signature [] [] [] Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing False Nothing Nothing [] [] [] False
-  Signature cs is b th d s ps dp s1 t tim pr simp p pctxs prdsu prds sil `mappend` Signature cs' is' b' th' d' s' ps' dp' s1' t' tim' pr' simp' p' pctxs' prdsu' prds' sil' =
-    Signature (cs++cs') (is++is') (b++b')
-      (th `mplus` th')
-      (d `mplus` d')
-      (s `mplus` s')
-      (ps `mplus` ps')
-      (dp `mplus` dp')
-      (s1 `mplus` s1')
-      (t `mplus` t')
-      (tim `mplus` tim')
-      (pr || pr')
-      (simp `mplus` simp')
-      (p `mplus` p')
-      (pctxs `mplus` pctxs')
-      (prdsu `mplus` prdsu')
-      (prds `mplus` prds')
-      (sil || sil')
+  mempty =
+    Signature {
+      constants = [],
+      instances = [],
+      defaultTo = Nothing,
+      maxTermSize = Nothing,
+      maxTermDepth = Nothing,
+      maxTests = Nothing,
+      background = [],
+      testTimeout = Nothing,
+      maxPruningSize = Nothing,
+      maxCommutativeSize = Nothing,
+      theory = Nothing,
+      simplify = Nothing,
+      extraPruner = Nothing,
+      conditionalsContext = [],
+      predicates = [],
+      predicatesI = [],
+      printStatistics = False,
+      silent = False }
 
+  mappend sig1 sig2 =
+    Signature {
+      constants = constants sig1 ++ constants sig2,
+      instances = instances sig1 ++ instances sig2,
+      defaultTo = defaultTo sig1 `mplus` defaultTo sig2,
+      maxTermSize = maxTermSize sig1 `mplus` maxTermSize sig2,
+      maxTermDepth = maxTermDepth sig1 `mplus` maxTermDepth sig2,
+      maxTests = maxTests sig1 `mplus` maxTests sig2,
+      background = background sig1 ++ background sig2,
+      testTimeout = testTimeout sig1 `mplus` testTimeout sig2,
+      maxPruningSize = maxPruningSize sig1 `mplus` maxPruningSize sig2,
+      maxCommutativeSize = maxCommutativeSize sig1 `mplus` maxCommutativeSize sig2,
+      theory = theory sig1 `mplus` theory sig2,
+      simplify = simplify sig1 `mplus` simplify sig2,
+      extraPruner = extraPruner sig1 `mplus` extraPruner sig2,
+      conditionalsContext = conditionalsContext sig1 ++ conditionalsContext sig2,
+      predicates = predicates sig1 ++ predicates sig2,
+      predicatesI = predicatesI sig1 ++ predicatesI sig2,
+      printStatistics = printStatistics sig1 || printStatistics sig2,
+      silent = silent sig1 || silent sig2 }
+
+-- | An empty signature.
 signature :: Signature
 signature = mempty
 
@@ -262,10 +317,10 @@ findInstanceOf sig ty =
 
 findInstance :: Signature -> Type -> [Value Identity]
 findInstance sig (App unit [])
-  | unit == tyCon () =
+  | unit == tyCon (Proxy :: Proxy ()) =
     return (toValue (Identity ()))
 findInstance sig (App pair [ty1, ty2])
-  | pair == tyCon ((),()) = do
+  | pair == tyCon (Proxy :: Proxy (,)) = do
     x <- findInstance sig ty1
     y <- findInstance sig ty2
     return (pairValues (liftA2 (,)) x y)

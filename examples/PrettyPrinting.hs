@@ -3,6 +3,8 @@ import Control.Monad
 import Test.QuickCheck
 import QuickSpec hiding (background, (<>), text, nest, ($$))
 import Text.PrettyPrint.HughesPJ
+import Data.Typeable
+import Data.Constraint
 
 deriving instance Typeable Doc
 

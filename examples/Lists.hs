@@ -11,10 +11,6 @@ sig =
       constant "[]" ([] :: [A]),
       constant "map" (map :: (A -> B) -> [A] -> [B]),
       constant "length" (length :: [A] -> Int),
-      constant "sort" (typeclass sort :: Dict (Ord A) -> [A] -> [A]),
       constant "concat" (concat :: [[A]] -> [A]) ]}
-
-typeclass :: (c => a) -> Dict c -> a
-typeclass x Dict = x
 
 main = quickSpec sig

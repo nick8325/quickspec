@@ -3,6 +3,7 @@ import QuickSpec
 import Data.List
 import System.Environment
 import Control.Monad
+import QuickSpec.Utils(usort)
 
 main = do
   args <- getArgs
