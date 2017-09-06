@@ -360,7 +360,7 @@ sig =
     , con "tau"  (Act Tau)
     , con "+"    (:+:)
     , con "|"    (:|:)
-    , con "*"   Star
+    , (con "*"   Star) --{ conStyle = Postfix }
     , con "new"  New
     ]
     

@@ -75,13 +75,13 @@ predI :: forall a t. ( Predicateable a,
                            Typeable (TestCase a)) =>
                            String -> a -> t -> PredRep 
 predI name pred _ = PredRep instances
-                                getters
-                                predicateCons
+                            [ g { conIsHidden = True } | g <- getters ]
+                            predicateCons
   where
     instances =  makeInstance (\(dict :: Dict (Arbitrary (TestCase a))) -> (withDict dict genSuchThat) pred :: Gen (TestCaseWrapped t a))
               ++ names (NamesFor [name] :: NamesFor (TestCaseWrapped t a))
 
-    getters = getrs ("prj_" ++ name) pred (unTestCaseWrapped :: TestCaseWrapped t a -> TestCase a)
+    getters = [ g { conSize = 0 } | g <- getrs ("prj_" ++ name) pred (unTestCaseWrapped :: TestCaseWrapped t a -> TestCase a) ]
 
     predicateCons = constant name pred
 

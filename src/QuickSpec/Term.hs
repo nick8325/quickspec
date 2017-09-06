@@ -67,7 +67,8 @@ data Constant =
     conArity        :: Int,
     conStyle        :: TermStyle,
     conSize         :: Int,
-    conIsBackground :: Bool }
+    conIsBackground :: Bool,
+    conIsHidden     :: Bool }
   | Id Type
   | Apply Type
   | Ghost Type
@@ -230,7 +231,7 @@ isOp xs = not (all isIdent xs)
 --
 -- QuickSpec will then understand that the constant is really polymorphic.
 constant :: Typeable a => String -> a -> Constant
-constant name x = Constant name value (poly value) 0 style 1 False
+constant name x = Constant name value (poly value) 0 style 1 False False
   where
     value = toValue (Identity x)
     ar = typeArity (typeOf x)

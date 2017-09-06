@@ -100,7 +100,7 @@ data Signature =
 instance Pretty Signature where
   pPrint sig = vcat (map prettyDecl decls)
     where
-      decls = [(show (pPrint (app c [])), pPrintType (canonicalise (typ c))) | c <- constants sig, not (conIsBackground c)]
+      decls = [(show (pPrint (app c [])), pPrintType (canonicalise (typ c))) | c <- constants sig, not (conIsBackground c), not (conIsHidden c) ]
       maxWidth = maximum (0:map (length . fst) decls)
       pad xs = replicate (maxWidth - length xs) ' ' ++ xs
       prettyDecl (name, ty) =
