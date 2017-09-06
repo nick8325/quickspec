@@ -358,7 +358,7 @@ sig =
     , con "tau"  (Act Tau)
     , con "+"    (:+:)
     , con "|"    (:|:)
-    , (con "*"   Star){ conStyle = Postfix }
+    , (con "*"   Star) --{ conStyle = Postfix }
     , con "new"  New
     ]
     

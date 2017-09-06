@@ -79,7 +79,7 @@ predI name pred _ = PredRep instances
     instances =  makeInstance (\(dict :: Dict (Arbitrary (TestCase a))) -> (withDict dict genSuchThat) pred :: Gen (TestCaseWrapped t a))
               ++ names (NamesFor [name] :: NamesFor (TestCaseWrapped t a))
 
-    getters = getrs ("prj_" ++ name) pred (unTestCaseWrapped :: TestCaseWrapped t a -> TestCase a)
+    getters = [ g { conSize = 0 } | g <- getrs ("prj_" ++ name) pred (unTestCaseWrapped :: TestCaseWrapped t a -> TestCase a) ]
 
     predicateCons = constant name pred
 
