@@ -142,7 +142,9 @@ maxPruningSize_ :: Signature -> Int
 maxPruningSize_ sig =
   max (fromMaybe 0 (maxPruningSize sig)) (maxTermSize_ sig)
 
-maxCommutativeSize_ = fromMaybe 5 . maxCommutativeSize
+maxCommutativeSize_ sig
+  | null (predicatesI sig) = fromMaybe 5 (maxCommutativeSize sig)
+  | otherwise = maxTermSize_ sig
 
 maxTests_ :: Signature -> Int
 maxTests_ = fromMaybe 1000 . maxTests
