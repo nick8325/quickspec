@@ -352,12 +352,15 @@ createRules sig = do
           let wait = or [ isJust (matchList (buildList [x, y]) (buildList [t, u])) | (x, y) <- del ]
               f = head (funs t ++ funs u)
               munge = build . extended . singleton . typedSubst (\_ x -> var x)
-          case orientTerms (munge t') (munge u') of
-            Just dir | not wait -> do
+              delay =
+                null (predicatesI sig) &&
+                (wait || isNothing (orientTerms (munge t') (munge u')))
+          case delay of
+            True ->
+              lift $ modify (\s -> s { delayed = (t, u):delayed s })
+            False -> do
               generate (Found ([] :=>: t' :=: u'))
               add
-            _ -> do
-              lift $ modify (\s -> s { delayed = (t, u):delayed s })
         Representative -> add
 
   rule $ do
