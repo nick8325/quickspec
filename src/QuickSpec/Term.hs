@@ -222,6 +222,13 @@ isOp xs = not (all isIdent xs)
   where
     isIdent x = isAlphaNum x || x == '\'' || x == '_' || x == '.'
 
+-- | Declare a constant with a given name and value.
+-- If the constant you want to use is polymorphic, you can use the types
+-- `A`, `B`, `C`, `D`, `E` to monomorphise it, for example:
+--
+-- > constant "reverse" (reverse :: [A] -> [A])
+--
+-- QuickSpec will then understand that the constant is really polymorphic.
 constant :: Typeable a => String -> a -> Constant
 constant name x = Constant name value (poly value) 0 style 1 False
   where

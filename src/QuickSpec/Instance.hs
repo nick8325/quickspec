@@ -44,6 +44,12 @@ instance Typed Instance where
       Instance1 y `In` w ->
         Instance (wrap w (Instance1 (typeReplace sub y)))
 
+-- | Declare how to build a value of type @a@ from a value of type @b@.
+-- For example, one can declare how to generate lists with:
+--
+-- @
+-- makeInstance (\(gen :: `Gen` A) -> `listOf` gen)
+-- @
 makeInstance :: forall a b. (Typeable a, Typeable b) => (b -> a) -> [Instance]
 makeInstance f =
   case typeOf (undefined :: a) of
@@ -52,12 +58,14 @@ makeInstance f =
     _ ->
       [Instance (toValue (Instance1 (toValue (Instance2 f))))]
 
+-- | Declare a new monomorphic type.
 baseType :: forall a. (Ord a, Arbitrary a, Typeable a) => a -> [Instance]
 baseType _ =
   mconcat [
     inst (Sub Dict :: () :- Ord a),
     inst (Sub Dict :: () :- Arbitrary a)]
 
+-- | Declare a new monomorphic type, saying how you want variables of that type to be named.
 baseTypeNames :: forall a. (Ord a, Arbitrary a, Typeable a) => [String] -> a -> [Instance]
 baseTypeNames xs _ =
   mconcat [
@@ -65,30 +73,35 @@ baseTypeNames xs _ =
     inst (Sub Dict :: () :- Arbitrary a),
     names (NamesFor xs :: NamesFor a)]
 
+-- | Declare a typeclass instance.
 inst :: forall c1 c2. (Typeable c1, Typeable c2) => c1 :- c2 -> [Instance]
 inst ins = makeInstance f
   where
     f :: Dict c1 -> Dict c2
     f Dict = case ins of Sub dict -> dict
 
+-- | Declare a typeclass instance.
 inst2 :: forall c1 c2 c3. (Typeable c1, Typeable c2, Typeable c3) => (c1, c2) :- c3 -> [Instance]
 inst2 ins = makeInstance f
   where
     f :: (Dict c1, Dict c2) -> Dict c3
     f (Dict, Dict) = case ins of Sub dict -> dict
 
+-- | Declare a typeclass instance.
 inst3 :: forall c1 c2 c3 c4. (Typeable c1, Typeable c2, Typeable c3, Typeable c4) => (c1, c2, c3) :- c4 -> [Instance]
 inst3 ins = makeInstance f
   where
     f :: (Dict c1, Dict c2, Dict c3) -> Dict c4
     f (Dict, Dict, Dict) = case ins of Sub dict -> dict
 
+-- | Declare a typeclass instance.
 inst4 :: forall c1 c2 c3 c4 c5. (Typeable c1, Typeable c2, Typeable c3, Typeable c4, Typeable c5) => (c1, c2, c3, c4) :- c5 -> [Instance]
 inst4 ins = makeInstance f
   where
     f :: (Dict c1, Dict c2, Dict c3, Dict c4) -> Dict c5
     f (Dict, Dict, Dict, Dict) = case ins of Sub dict -> dict
 
+-- | Declare a typeclass instance.
 inst5 :: forall c1 c2 c3 c4 c5 c6. (Typeable c1, Typeable c2, Typeable c3, Typeable c4, Typeable c5, Typeable c6) => (c1, c2, c3, c4, c5) :- c6 -> [Instance]
 inst5 ins = makeInstance f
   where

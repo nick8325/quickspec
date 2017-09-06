@@ -154,6 +154,9 @@ schemasOfSize n sig = do
       x <- xs,
       case maxTermDepth sig of { Nothing -> True; Just d -> depth (unPoly x) <= d } ]
 
+-- | Run QuickSpec with a given set of background functions.
+-- The first signature should contain only the background functions,
+-- the second signature only the foreground functions.
 quickSpecWithBackground :: Signature -> Signature -> IO Signature
 quickSpecWithBackground sig1 sig2 = do
   thy <- quickSpec sig1
@@ -180,10 +183,7 @@ choppyQuickSpec cs sig = do
   where
    sigs = chopUpSignature cs sig
 
--- | Run QuickSpec. The returned signature contains the discovered
--- equations. By using |mappend| to combine the returned signature
--- and a new signature, you can use the discovered equations as
--- background theory in a later run of QuickSpec.
+-- | Run QuickSpec on a given signature.
 quickSpec :: Signature -> IO Signature
 quickSpec sigin = do
   let sig = predicateSig sigin

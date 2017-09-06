@@ -1,18 +1,21 @@
 -- | The main QuickSpec module.
 module QuickSpec(
+  -- * Running QuickSpec
   quickSpec,
   quickSpecWithBackground,
-  Signature(..),
   signature,
+  Signature(..),
+  -- * Declaring functions and predicates
   constant,
   predicate,
-  NamesFor(..),
+  -- * Type variables for declaring polymorphic functions
+  A, B, C, D, E,
+  -- * Declaring new types
   baseType,
   baseTypeNames,
   makeInstance,
-  inst,
-  observe,
-  A, B, C, D, E) where
+  inst, inst2, inst3, inst4, inst5,
+  observe) where
 
 import QuickSpec.Eval
 import QuickSpec.Parse
