@@ -14,18 +14,8 @@ import Control.Monad
 import Data.Word
 import Data.Constraint
 
-class Half a where
-  zero :: a
-  neg :: a -> a
-  plus :: a -> a -> a
-  half :: a -> a
-
-instance (Half a, Half b) => Half (a, b) where
-  zero = (zero, zero)
-  neg (x, y) = (neg x, neg y)
-  plus (x, y) (z, w) = (plus x z, plus y w)
-  half (x, y) = (half x, half y)
-
+-- We use our own number type for efficiency purposes.
+-- This can represent numbers of the form x/2^e where x and e are integers.
 data Rat = Rat { mantissa :: Integer, exponent :: Int } deriving (Eq, Ord, Show, Typeable)
 -- Rat x e = x / 2^e
 
@@ -42,6 +32,14 @@ instance Arbitrary Rat where
 instance CoArbitrary Rat where
   coarbitrary (Rat x e) = coarbitrary x . coarbitrary e
 
+-- A class for types (like Rat) which can be added, subtracted and
+-- divided by 2.
+class Half a where
+  zero :: a
+  neg :: a -> a
+  plus :: a -> a -> a
+  half :: a -> a
+
 instance Half Rat where
   zero = rat 0 0
   neg (Rat x e) = Rat (negate x) e
@@ -51,12 +49,20 @@ instance Half Rat where
       e = e1 `max` e2
   half (Rat x e) = Rat x (e+1)
 
+instance (Half a, Half b) => Half (a, b) where
+  zero = (zero, zero)
+  neg (x, y) = (neg x, neg y)
+  plus (x, y) (z, w) = (plus x z, plus y w)
+  half (x, y) = (half x, half y)
+
+-- A vector is a pair of points.
 type Vector = (Rat, Rat)
 
 -- We represent a geometrical object as a triple of vectors.
 -- I forget what they mean :)
 -- I think two of them represent the direction of the x-axis and y-axis.
 -- The word represents an abstract "drawing command".
+>>>>>>> 140f248... Change examples.
 type Object = (Vector, Vector, Vector, Word)
 
 -- A drawing takes size and rotation information and returns a set of objects.

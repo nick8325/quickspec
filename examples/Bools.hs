@@ -1,3 +1,4 @@
+-- Testing functions on booleans. "not x" is used as a condition.
 import QuickSpec
 
 main = quickSpec [

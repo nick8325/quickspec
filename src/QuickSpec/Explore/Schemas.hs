@@ -148,8 +148,9 @@ mostSpecific = subst (\(V ty _) -> Var (V ty 0))
 allUnifications :: Term fun -> [Term fun]
 allUnifications t = map f ss
   where
-    vs = [ map (x,) (take (varCount x) xs) | xs <- partitionBy typ (usort (vars t)), x <- xs ]
+    vs = [ map (x,) (select xs) | xs <- partitionBy typ (usort (vars t)), x <- xs ]
     ss = map Map.fromList (sequence vs)
     go s x = Map.findWithDefault undefined x s
     f s = subst (Var . go s) t
-    varCount _ = 4
+    select [Var ty x] = [Var ty x, Var ty (succ x)]
+    select xs = take 4 xs

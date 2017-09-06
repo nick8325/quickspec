@@ -1,3 +1,4 @@
+-- Function composition.
 import QuickSpec
 
 main = quickSpec [

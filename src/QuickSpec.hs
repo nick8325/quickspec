@@ -1,4 +1,3 @@
-
 -- | The main QuickSpec module.
 --
 -- For many examples of use, see the @examples@ directory in the source distribution,
