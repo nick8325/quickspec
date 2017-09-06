@@ -8,6 +8,8 @@ import Data.Ratio
 import Control.Monad
 import QuickSpec hiding ((:=:), background)
 import Data.Monoid
+import Data.Typeable
+import Data.Constraint
 
 deriving instance Typeable Positive
 

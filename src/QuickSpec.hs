@@ -15,7 +15,8 @@ module QuickSpec(
   baseTypeNames,
   makeInstance,
   inst, inst2, inst3, inst4, inst5,
-  observe) where
+  observe,
+  names, NamesFor(..)) where
 
 import QuickSpec.Eval
 import QuickSpec.Parse
