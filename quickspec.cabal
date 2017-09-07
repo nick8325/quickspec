@@ -32,8 +32,11 @@ Description:
   The laws that QuickSpec generates are not proved correct, but have
   passed at least 1000 QuickCheck tests.
   .
+  For normal use, you will only need the main "QuickSpec" module.
+  .
   For more information, see the @README@ file at
-  https://github.com/nick8325/quickspec/blob/master/README.asciidoc.
+  <https://github.com/nick8325/quickspec/blob/master/README.asciidoc>,
+  or look at the @examples@ directory.
 
 Extra-source-files:
   README.asciidoc

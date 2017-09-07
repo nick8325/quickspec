@@ -1,4 +1,7 @@
 -- | The main QuickSpec module.
+--
+-- For many examples of use, see the @examples@ directory in the source distribution,
+-- which you can also find at <https://github.com/nick8325/quickspec/blob/master/examples>.
 module QuickSpec(
   -- * Running QuickSpec
   quickSpec,

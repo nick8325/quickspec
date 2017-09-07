@@ -46,7 +46,7 @@ type PrunerType = Completion
 -- The only fields you will probably need are
 -- `constants`, `instances`, `predicates` and `maxTermSize`.
 --
--- For example, the following signature explores @++@ and @reverse@:
+-- As a simple example, the following signature explores @++@ and @reverse@:
 --
 -- @
 -- sig =
@@ -55,7 +55,44 @@ type PrunerType = Completion
 --        `constant` "reverse" (reverse :: [`A`] -> [`A`]),
 --        `constant` "++" ((++) :: [`A`] -> [`A`] -> [`A`]) ]}
 -- @
-
+--
+-- To test a user-defined datatype, use `baseType`:
+--
+-- @
+-- data T = ...
+-- sig =
+--   `signature` {
+--     `constants` = ...,
+--     `instances` = [`baseType` (undefined :: T)] }
+-- @
+--
+-- To test a /polymorphic/ user-defined datatype, you will need to use `inst` or
+-- `makeInstance` to declare `Ord` and `Arbitrary` instances:
+--
+-- @
+-- data T a = ...
+-- sig =
+--   `signature` {
+--      `constants` = ...,
+--      `instances` = [
+--        `inst` (`Sub` `Dict` :: Ord `A` `:-` Ord (T `A`)),
+--        `inst` (`Sub` `Dict` :: Arbitrary `A` `:-` Arbitrary (T `A`)) ]}
+-- @
+--
+-- or:
+--
+-- @
+-- data T a = ...
+-- sig =
+--   `signature` {
+--      `constants` = ...,
+--      `instances` = [
+--        `makeInstance` (\(Dict :: Dict (Ord A) -> Dict :: Dict (Ord (T A)))),
+--        `makeInstance` (\(Dict :: Dict (Arbitrary A) -> Dict :: Dict (Arbitrary (T A)))) ]}
+-- @
+--
+-- Instead of an `Arbitrary` and `Ord` instance, it is possible to supply a
+-- generator and an observational equality function; see @examples/PrettyPrinting.hs@.
 data Signature =
   Signature {
     -- | The constants and functions to explore. Created by using `constant`.
@@ -216,6 +253,9 @@ defaultInstances = [
 data Observe a b = Observe (Dict (Ord b)) (a -> Gen b) deriving Typeable
 newtype Observe1 a = Observe1 (Value (Observe a)) deriving Typeable
 
+-- | Declare that values of a particular type should be compared by observational equality.
+--
+-- See @examples/PrettyPrinting.hs@ for an example.
 observe :: Ord b => (a -> Gen b) -> Observe a b
 observe = Observe Dict
 

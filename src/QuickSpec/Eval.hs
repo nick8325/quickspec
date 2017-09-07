@@ -184,6 +184,22 @@ choppyQuickSpec cs sig = do
    sigs = chopUpSignature cs sig
 
 -- | Run QuickSpec on a given signature.
+--
+-- If you want to use background functions, you can use the `Monoid` instance of
+-- `Signature`, like so:
+--
+-- @
+-- backgroundSig :: Signature -- contains background functions
+-- sig :: Signature -- contains all other functions
+--
+-- main = do
+--   backgroundTheory <- quickSpec backgroundSig
+--   quickSpec (backgroundTheory \``mappend`\` sig)
+-- @
+--
+-- This can also be used to gradually add more and more functions to the signature.
+--
+-- Alternatively, you can use `quickSpecWithBackground`.
 quickSpec :: Signature -> IO Signature
 quickSpec sigin = do
   let sig = predicateSig sigin

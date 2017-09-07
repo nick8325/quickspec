@@ -1,5 +1,5 @@
 -- Pretty-printing combinators.
--- Illustrates observational equality.
+-- Illustrates observational equality, and using custom generators.
 -- See the QuickSpec paper for more details.
 {-# LANGUAGE DeriveDataTypeable, TypeOperators, StandaloneDeriving #-}
 import Control.Monad
