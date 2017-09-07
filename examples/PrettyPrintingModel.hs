@@ -1,3 +1,6 @@
+-- Pretty-printing combinators, testing against a model implementation.
+-- Illustrates running QuickSpec on a progressively larger set of signatures.
+-- See the QuickSpec paper for more details.
 {-# LANGUAGE DeriveDataTypeable, TypeOperators #-}
 import Control.Monad
 import Test.QuickCheck

@@ -1,3 +1,6 @@
+-- Pretty-printing combinators.
+-- Illustrates observational equality.
+-- See the QuickSpec paper for more details.
 {-# LANGUAGE DeriveDataTypeable, TypeOperators, StandaloneDeriving #-}
 import Control.Monad
 import Test.QuickCheck
@@ -22,6 +25,7 @@ instance Arbitrary Doc where
 arbString :: Gen String
 arbString = listOf (elements "ab")
 
+-- Observational equality.
 obsDoc :: Context -> Doc -> String
 obsDoc (Context ctx) d = render (ctx d)
 

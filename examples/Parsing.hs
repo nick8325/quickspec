@@ -1,3 +1,5 @@
+-- Parser combinators.
+-- Illustrates observational equality with polymorphic types.
 {-# LANGUAGE DeriveDataTypeable, TypeOperators, ScopedTypeVariables, StandaloneDeriving, TypeApplications #-}
 import Control.Monad
 import Test.QuickCheck
@@ -8,6 +10,7 @@ import Data.Constraint
 
 deriving instance Typeable ReadP
 
+-- Generate random parsers.
 instance Arbitrary a => Arbitrary (ReadP a) where
   arbitrary = fmap readS_to_P arbReadS
 
@@ -16,6 +19,7 @@ arbReadS = fmap convert (liftM2 (,) (elements [0..5]) arbitrary)
   where
     convert (n, parse) xs = take n [(x, drop n xs) | (x, n) <- parse xs]
 
+-- Observational equality for parsers.
 obsReadP :: Ord a => String -> ReadP a -> [(a, String)]
 obsReadP input parser =
   sort (readP_to_S parser input)

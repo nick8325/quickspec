@@ -1,3 +1,4 @@
+-- The monad laws for lists.
 import Control.Monad
 import QuickSpec
 

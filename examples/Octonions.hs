@@ -1,3 +1,4 @@
+-- The octonions, made using the Cayley-Dickson construction.
 {-# LANGUAGE GeneralizedNewtypeDeriving, DeriveDataTypeable, FlexibleInstances #-}
 import Data.Ratio
 import QuickSpec
@@ -11,6 +12,7 @@ newtype SmallRational = SmallRational Rational
 instance Arbitrary SmallRational where
   arbitrary = SmallRational <$> liftM2 (%) arbitrary (arbitrary `suchThat` (/= 0))
 
+-- A class for types with conjugation, a norm operator and a generator.
 class Fractional a => Conj a where
   conj :: a -> a
   norm :: a -> Rational
@@ -19,6 +21,7 @@ class Fractional a => Conj a where
 instance Conj Rational where
   conj x = x
   norm x = x*x
+  -- Only generate small rationals for efficiency.
   it = liftM2 (Prelude./) (elements [-10..10]) (elements [1..10])
 
 instance Conj a => Conj (a, a) where
@@ -43,10 +46,13 @@ newtype Octonion = Octonion (Quaternion, Quaternion) deriving (Eq, Ord, Num, Typ
 type It = Octonion
 
 main = quickSpec [
+  -- Make the pruner more powerful, which is helpful when Doing Maths
   withPruningTermSize 9,
+  -- One test suffices :)
   withMaxTests 1,
   con "*" ((*) :: It -> It -> It),
   (con "inv" (recip :: It -> It)),
   con "1" (1 :: It),
   baseType (Proxy :: Proxy It),
+  -- Division is undefined on zero octonions.
   inst (arbitrary `suchThat` (/= 0) :: Gen It) ]

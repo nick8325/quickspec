@@ -1,3 +1,8 @@
+-- Henderson's functional geometry. See the QuickSpec paper.
+--
+-- Illustrates:
+--   * Observational equality
+--   * Running QuickSpec on a progressively larger set of signatures
 {-# LANGUAGE DeriveDataTypeable, TypeOperators, FlexibleInstances, GeneralizedNewtypeDeriving #-}
 import QuickSpec
 import Test.QuickCheck
@@ -47,8 +52,14 @@ instance Half Rat where
   half (Rat x e) = Rat x (e+1)
 
 type Vector = (Rat, Rat)
+
+-- We represent a geometrical object as a triple of vectors.
+-- I forget what they mean :)
+-- I think two of them represent the direction of the x-axis and y-axis.
+-- The word represents an abstract "drawing command".
 type Object = (Vector, Vector, Vector, Word)
 
+-- A drawing takes size and rotation information and returns a set of objects.
 newtype Drawing = Drawing (Vector -> Vector -> Vector -> Objs) deriving Typeable
 newtype Objs = Objs { unObjs :: Set Object } deriving (Eq, Ord, Typeable, Show)
 instance Arbitrary Objs where arbitrary = fmap objs arbitrary
@@ -75,6 +86,7 @@ instance Arbitrary Drawing where
 blank :: Drawing
 blank = Drawing (\_ _ _ -> objs Set.empty)
 
+-- The primed versions of the combinators are buggy
 over, beside, above, above' :: Drawing -> Drawing -> Drawing
 over (Drawing p) (Drawing q) = Drawing (\a b c -> p a b c `union` q a b c)
 beside (Drawing p) (Drawing q) = Drawing (\a b c -> p a (half b) c `union` q (a `plus` half b) (half b) c)
@@ -97,6 +109,7 @@ cycle, cycle' :: Drawing -> Drawing
 cycle x = quartet x (rot (rot (rot x))) (rot x) (rot (rot x))
 cycle' x = quartet' x (rot (rot (rot x))) (rot x) (rot (rot x))
 
+-- Observational equality for drawings.
 obsDrawing :: (Vector, Vector, Vector) -> Drawing -> Objs
 obsDrawing (a, b, c) (Drawing d) = d a b c
 
@@ -108,6 +121,7 @@ main =
     inst (Sub Dict :: () :- Ord Objs),
     series [sig1, sig2, sig3, sig4, sig5, sig6, sig7] ]
   where
+    -- A series of bigger and bigger signatures.
     sig1 = [con "over" over]
     sig2 = [
       con "beside" beside,
