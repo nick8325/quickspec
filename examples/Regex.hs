@@ -1,3 +1,4 @@
+-- Regular expressions.
 {-# LANGUAGE GeneralizedNewtypeDeriving,DeriveDataTypeable, FlexibleInstances #-}
 import qualified Control.Monad.State as S
 import Control.Monad.State hiding (State, state)
@@ -30,6 +31,7 @@ data Regex a = Char a | AnyChar | Epsilon | Zero
              | Choice (Regex a) (Regex a)
              | Plus (Regex a) deriving (Typeable, Show)
 
+-- This should really use observational equality instead.
 vals :: [[Sym]]
 vals = unGen (vector 100) (mkQCGen 12345) 10
 

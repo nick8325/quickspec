@@ -1,3 +1,4 @@
+-- The octonions, made using the Cayley-Dickson construction.
 {-# LANGUAGE GeneralizedNewtypeDeriving, DeriveDataTypeable, FlexibleInstances #-}
 import Data.Ratio
 import QuickSpec
@@ -6,6 +7,7 @@ import Twee.Pretty
 import Control.Monad
 import Data.Typeable
 
+-- A class for types with conjugation, a norm operator and a generator.
 class Fractional a => Conj a where
   conj :: a -> a
   norm :: a -> Rational
@@ -14,6 +16,7 @@ class Fractional a => Conj a where
 instance Conj Rational where
   conj x = x
   norm x = x*x
+  -- Only generate small rationals for efficiency.
   it = liftM2 (Prelude./) (elements [-10..10]) (elements [1..10])
 
 instance Conj a => Conj (a, a) where
@@ -46,10 +49,12 @@ sig =
     ],
     maxTermSize = Just 7,
     maxPruningSize = Just 9,
+    -- One test suffices :)
     maxTests = Just 1,
     --extraPruner = Just (Waldmeister 5),
     instances = [
       baseType (undefined :: It),
+      -- Division is undefined on zero octonions.
       makeInstance (\() -> arbitrary `suchThat` (/= 0) :: Gen It)]}
 
 main = quickSpec sig

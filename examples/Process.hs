@@ -1,3 +1,4 @@
+-- A simple process calculus.
 {-# LANGUAGE DeriveDataTypeable
            , GeneralizedNewtypeDeriving
   #-}

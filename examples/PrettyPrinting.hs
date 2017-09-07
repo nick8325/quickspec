@@ -1,3 +1,6 @@
+-- Pretty-printing combinators.
+-- Illustrates observational equality.
+-- See the QuickSpec paper for more details.
 {-# LANGUAGE DeriveDataTypeable, TypeOperators, StandaloneDeriving #-}
 import Control.Monad
 import Test.QuickCheck
@@ -38,6 +41,7 @@ background =
 --   n <- arbitrary
 --   return (render (nest n d))
 
+-- Observational equality.
 obsDoc :: Doc -> Gen String
 obsDoc d = fmap render ctx
   where
