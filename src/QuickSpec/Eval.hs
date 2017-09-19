@@ -264,7 +264,7 @@ exploreSize sig n = do
     t' <- normalise t
     u' <- normalise u
     unless (t' == u') $ do
-      generate (Found ([] :=>: t' :=: u'))
+      generate (Found ([] :=>: t :=: u))
     newTerm u'
 
 summarise :: M ()
