@@ -9,7 +9,7 @@ import GHC.Generics
 import Test.QuickCheck(CoArbitrary)
 import Data.DList(DList)
 import qualified Data.DList as DList
-import Twee.Base(Sized(..), Arity(..), Pretty(..), PrettyTerm(..), TermStyle(..), prettyPrint)
+import Twee.Base(Sized(..), Arity(..), Pretty(..), PrettyTerm(..), TermStyle(..), EqualsBonus, prettyPrint)
 import Twee.Pretty
 
 data Term f = Var {-# UNPACK #-} !Var | App !f ![Term f]

@@ -48,7 +48,7 @@ instance PrettyTerm TyCon where
   termStyle Arrow =
     fixedArity 2 $
     TermStyle $ \l p d [x, y] ->
-      pPrintParen (p > 8) $
+      maybeParens (p > 8) $
         pPrintPrec l 9 x <+> d <+>
         pPrintPrec l 0 y
 
@@ -285,9 +285,7 @@ polyMap f (Poly x) = poly (f x)
 
 polyRename :: (Typed a, Typed b) => a -> Poly b -> b
 polyRename x (Poly y) =
-  typeSubst (\(V n) -> var (V (k+n))) y
-  where
-    V k = maximum (fmap bound (typesDL x))
+  unTypeView (renameAvoiding (TypeView x) (TypeView y))
 
 polyApply :: (Typed a, Typed b, Typed c) => (a -> b -> c) -> Poly a -> Poly b -> Poly c
 polyApply f (Poly x) y = poly (f x (polyRename x y))

@@ -14,7 +14,7 @@ import qualified Twee.Base as Twee
 import Twee hiding (Config(..))
 import Twee.Rule
 import Twee.Proof hiding (Config, defaultConfig)
-import Twee.Base(Ordered(..), Extended(..), pattern F, pattern Empty, unpack)
+import Twee.Base(Ordered(..), Extended(..), EqualsBonus, pattern F, pattern Empty, unpack)
 import QuickSpec.Pruning.EncodeTypes(Tagged)
 
 data Config =
@@ -22,11 +22,11 @@ data Config =
     cfg_max_term_size :: Int,
     cfg_max_cp_depth :: Int }
 
-instance (Pretty f, PrettyTerm f, Ord f, Typeable f, Sized f, Arity f, f ~ Tagged g) => Ordered (Extended f) where
+instance (Pretty f, PrettyTerm f, Ord f, Typeable f, Sized f, Arity f, EqualsBonus f, f ~ Tagged g) => Ordered (Extended f) where
   lessEq = KBO.lessEq
   lessIn = KBO.lessIn
 
-tweePruner :: (Ord f, Typeable f, Arity f, Sized f, PrettyTerm f, f ~ Tagged g) =>
+tweePruner :: (Ord f, Typeable f, Arity f, Sized f, PrettyTerm f, EqualsBonus f, f ~ Tagged g) =>
   Config -> Pruner (Term f)
 tweePruner Config{..} =
   makePruner normaliseTwee (addTwee config) initialState
@@ -36,13 +36,13 @@ tweePruner Config{..} =
         Twee.cfg_max_term_size = cfg_max_term_size,
         Twee.cfg_max_cp_depth = cfg_max_cp_depth }
 
-normaliseTwee :: (Ord f, Typeable f, Arity f, Sized f, PrettyTerm f, f ~ Tagged g) =>
+normaliseTwee :: (Ord f, Typeable f, Arity f, Sized f, PrettyTerm f, EqualsBonus f, f ~ Tagged g) =>
   State (Extended f) -> Term f -> Term f
 normaliseTwee state t =
   fromTwee $
     result (normaliseTerm state (simplifyTerm state (skolemise t)))
 
-addTwee :: (Ord f, Typeable f, Arity f, Sized f, PrettyTerm f, f ~ Tagged g) =>
+addTwee :: (Ord f, Typeable f, Arity f, Sized f, PrettyTerm f, EqualsBonus f, f ~ Tagged g) =>
   Twee.Config -> Prop (Term f) -> State (Extended f) -> State (Extended f)
 addTwee config ([] :=>: t :=: u) state =
   completePure config $

@@ -32,6 +32,8 @@ instance PrettyTerm f => PrettyTerm (Tagged f) where
   termStyle (Func f) = termStyle f
   termStyle (Tag _) = uncurried
 
+instance EqualsBonus (Tagged f) where
+
 type TypedTerm f = Term f
 type UntypedTerm f = Term (Tagged f)
 
