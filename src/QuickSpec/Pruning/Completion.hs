@@ -13,6 +13,7 @@ import qualified Twee as Twee
 import Twee(Twee)
 import qualified Twee.Queue as Queue
 import Debug.Trace
+import qualified Data.Set as Set
 
 data Completion =
   Completion {
@@ -23,7 +24,7 @@ initialState :: Int -> Bool -> Completion
 initialState n cp =
   Completion {
     twee = (Twee.initialState 0 1) { Twee.maxSize = Just n, Twee.tracing = False, Twee.maxCancellationSize = Just 0 },
-    addCriticalPairs = True }
+    addCriticalPairs = cp }
 
 liftTwee :: State (Twee PruningConstant) a -> StateT Completion IO a
 liftTwee m = do
@@ -64,11 +65,12 @@ findRep axioms t =
   localTwee $ do
     sequence_ [ Twee.newEquation (t Rule.:=: u) | [] :=>: t :=: u <- axioms ]
     s <- get
-    let u = Rule.result (Twee.normalise s t)
+    let rw = Rule.rewrite "reduce" Rule.reduces (Twee.rules s)
+    let u = Rule.result (Twee.normalise s (Set.findMin (Rule.normalForms rw [t])))
     if t == u then return Nothing else return (Just u)
 
 instance Pruner Completion where
-  emptyPruner sig = initialState (maxPruningSize_ sig) True
+  emptyPruner sig = initialState (maxPruningSize_ sig) False
   untypedRep      = findRep
   untypedAxiom    = newAxiom
   pruningReport   = Twee.report . twee
