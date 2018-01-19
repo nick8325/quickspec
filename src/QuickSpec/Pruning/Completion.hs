@@ -11,16 +11,19 @@ import Twee.Base
 import qualified Twee.Rule as Rule
 import qualified Twee as Twee
 import Twee(Twee)
+import qualified Twee.Queue as Queue
 import Debug.Trace
 
-newtype Completion =
+data Completion =
   Completion {
-    twee       :: Twee PruningConstant }
+    twee :: Twee PruningConstant,
+    addCriticalPairs :: Bool }
 
-initialState :: Int -> Completion
-initialState n =
+initialState :: Int -> Bool -> Completion
+initialState n cp =
   Completion {
-    twee       = (Twee.initialState 0 1) { Twee.maxSize = Just n, Twee.tracing = False, Twee.maxCancellationSize = Just 0 } }
+    twee = (Twee.initialState 0 1) { Twee.maxSize = Just n, Twee.tracing = False, Twee.maxCancellationSize = Just 0 },
+    addCriticalPairs = True }
 
 liftTwee :: State (Twee PruningConstant) a -> StateT Completion IO a
 liftTwee m = do
@@ -36,12 +39,16 @@ localTwee m = do
 
 newAxiom :: AxiomMode -> PropOf PruningTerm -> StateT Completion IO ()
 newAxiom _ ([] :=>: (t :=: u)) = do
+  cp <- gets addCriticalPairs
   liftTwee $ do
     s <- get
     let norm = Rule.result . Twee.normalise s
     unless (norm t == norm u) $ do
       Twee.newEquation (t Rule.:=: u)
-      Twee.complete
+      if cp then
+        Twee.complete
+       else
+        modify (\s -> s { Twee.queue = Queue.emptyFrom (Twee.queue s) })
   return ()
 newAxiom _ _ = return ()
 
@@ -61,7 +68,7 @@ findRep axioms t =
     if t == u then return Nothing else return (Just u)
 
 instance Pruner Completion where
-  emptyPruner sig = initialState (maxPruningSize_ sig)
+  emptyPruner sig = initialState (maxPruningSize_ sig) True
   untypedRep      = findRep
   untypedAxiom    = newAxiom
   pruningReport   = Twee.report . twee
