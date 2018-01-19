@@ -70,7 +70,7 @@ findRep axioms t =
     if t == u then return Nothing else return (Just u)
 
 instance Pruner Completion where
-  emptyPruner sig = initialState (maxPruningSize_ sig) False
+  emptyPruner sig = initialState (maxPruningSize_ sig) True
   untypedRep      = findRep
   untypedAxiom    = newAxiom
   pruningReport   = Twee.report . twee
