@@ -30,7 +30,7 @@ import qualified Data.Typeable as Ty
 import Data.Typeable(Typeable)
 import GHC.Exts(Any)
 import GHC.Stack
-import Test.QuickCheck
+import Test.QuickCheck hiding (Fun)
 import Unsafe.Coerce
 import Data.Constraint
 import Twee.Base

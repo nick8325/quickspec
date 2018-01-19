@@ -25,7 +25,7 @@ import QuickSpec.Term
 import QuickSpec.Type
 import QuickSpec.PredicatesInterface
 import System.Timeout
-import Test.QuickCheck hiding (subterms)
+import Test.QuickCheck hiding (subterms, Fun)
 import Data.Ord
 import {-# SOURCE #-} QuickSpec.Pruning.Completion(Completion)
 import {-# SOURCE #-} QuickSpec.Pruning.Simple(SimplePruner)
