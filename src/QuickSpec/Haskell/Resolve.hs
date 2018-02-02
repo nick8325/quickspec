@@ -36,7 +36,7 @@ data Instances =
 makeInstances :: [Poly (Value Identity)] -> Instances
 makeInstances is = inst
   where
-    inst = Instances is (memo (find_ inst))
+    inst = Instances is (memo (find_ inst . canonicaliseType))
 
 instance Monoid Instances where
   mempty = makeInstances []
