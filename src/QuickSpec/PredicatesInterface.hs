@@ -9,11 +9,12 @@ module QuickSpec.PredicatesInterface where
 import Data.Constraint
 import Data.Maybe
 import QuickSpec.Term
-import QuickSpec.Instance
+import QuickSpec.Resolve
 import Test.QuickCheck
 import Data.Dynamic
 import Data.List
 import GHC.TypeLits
+import QuickSpec.NamesFor
 
 class Predicateable a where
   uncrry       :: a -> TestCase a -> Bool
@@ -57,7 +58,7 @@ genSuchThat p = TestCaseWrapped <$> arbitrary `suchThat` uncrry p
 
 data Predicate = PRW (forall t. Typeable t => t -> PredRep)
 
-data PredRep = PredRep { predInstances :: [Instance]
+data PredRep = PredRep { predInstances :: Instances
                        , selectors :: [Constant]
                        , predCons :: Constant}
 
@@ -78,8 +79,10 @@ predI name pred _ = PredRep instances
                             [ g { conIsHidden = True } | g <- getters ]
                             predicateCons
   where
-    instances =  makeInstance (\(dict :: Dict (Arbitrary (TestCase a))) -> (withDict dict genSuchThat) pred :: Gen (TestCaseWrapped t a))
-              ++ names (NamesFor [name] :: NamesFor (TestCaseWrapped t a))
+    instances =
+      inst (\(dict :: Dict (Arbitrary (TestCase a))) -> (withDict dict genSuchThat) pred :: Gen (TestCaseWrapped t a))
+      `mappend`
+      inst (NamesFor [name] :: NamesFor (TestCaseWrapped t a))
 
     getters = [ g { conSize = 0 } | g <- getrs ("prj_" ++ name) pred (unTestCaseWrapped :: TestCaseWrapped t a -> TestCase a) ]
 

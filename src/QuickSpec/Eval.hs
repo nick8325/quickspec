@@ -202,7 +202,7 @@ choppyQuickSpec cs sig = do
 -- Alternatively, you can use `quickSpecWithBackground`.
 quickSpec :: Signature -> IO Signature
 quickSpec sigin = do
-  let sig = predicateSig sigin
+  let sig = predicateSig (addDefaultInstances sigin)
   unless (silent sig) $ do
     putStrLn "== Signature =="
     prettyPrint sig

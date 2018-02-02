@@ -16,8 +16,7 @@ module QuickSpec(
   -- * Declaring new types
   baseType,
   baseTypeNames,
-  makeInstance,
-  inst, inst2, inst3, inst4, inst5,
+  inst,
   observe,
   names, NamesFor(..)) where
 
@@ -35,4 +34,5 @@ import QuickSpec.TestSet
 import QuickSpec.Type
 import QuickSpec.Utils
 import QuickSpec.PredicatesInterface
-import QuickSpec.Instance
+import QuickSpec.NamesFor
+import QuickSpec.Resolve

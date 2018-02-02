@@ -1,11 +1,11 @@
 -- Polymorphic types and dynamic values.
-{-# LANGUAGE DeriveDataTypeable, CPP, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances, GeneralizedNewtypeDeriving, Rank2Types, ExistentialQuantification, PolyKinds, TypeFamilies, FlexibleContexts, StandaloneDeriving, PatternGuards #-}
+{-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances, GeneralizedNewtypeDeriving, Rank2Types, ExistentialQuantification, PolyKinds, TypeFamilies, FlexibleContexts, StandaloneDeriving, PatternGuards, MultiParamTypeClasses, ConstraintKinds #-}
 -- To avoid a warning about TyVarNumber's constructor being unused:
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
 module QuickSpec.Type(
   -- Types.
   Typeable,
-  Type, TyCon(..), tyCon, fromTyCon, A, B, C, D, E,
+  Type, TyCon(..), tyCon, fromTyCon, A, B, C, D, E, ClassA, ClassB, ClassC, ClassD, ClassE, typeVar,
   typeOf, typeRep, applyType, fromTypeRep,
   arrowType, typeArgs, typeRes, typeDrop, typeArity, oneTypeVar, skolemiseTypeVars,
   isDictionary, getDictionary,
@@ -15,14 +15,12 @@ module QuickSpec.Type(
   Apply(..), apply, canApply,
   -- Polymorphic types.
   canonicaliseType,
-  Poly, poly, unPoly, polyTyp, polyMap, polyApply, polyPair, polyList, polyMgu,
+  Poly, toPolyValue, poly, unPoly, polyTyp, polyMap, polyRename, polyApply, polyPair, polyList, polyMgu,
   -- Dynamic values.
   Value, toValue, fromValue,
   Unwrapped(..), unwrap, Wrapper(..),
   mapValue, forValue, ofValue, withValue, pairValues, wrapFunctor, unwrapFunctor) where
 
-#include "errors.h"
-import Control.Applicative
 import Control.Monad
 import Data.DList(DList)
 import Data.Maybe
@@ -38,10 +36,8 @@ import qualified Twee.Term as Term
 import qualified Twee.Label as Label
 import Data.Ord
 import Data.Proxy
-import Data.Char
 import Data.List
-
-deriving instance Typeable (() :: Constraint)
+import Data.Char
 
 -- A (possibly polymorphic) type.
 type Type = Term TyCon
@@ -60,7 +56,7 @@ instance Numbered TyCon where
   toInt (TyCon ty) = Label.label ty + 1
 
   fromInt 0 = Arrow
-  fromInt n = TyCon (fromMaybe __ (Label.find (n-1)))
+  fromInt n = TyCon (fromMaybe undefined (Label.find (n-1)))
 
 instance Pretty TyCon where
   pPrint Arrow = text "->"
@@ -92,13 +88,29 @@ newtype C = C Any deriving Typeable
 newtype D = D Any deriving Typeable
 newtype E = E Any deriving Typeable
 
+class ClassA
+deriving instance Typeable ClassA
+class ClassB
+deriving instance Typeable ClassB
+class ClassC
+deriving instance Typeable ClassC
+class ClassD
+deriving instance Typeable ClassD
+class ClassE
+deriving instance Typeable ClassE
+
 typeVars :: [Ty.TypeRep]
 typeVars =
   [Ty.typeRep (Proxy :: Proxy A),
    Ty.typeRep (Proxy :: Proxy B),
    Ty.typeRep (Proxy :: Proxy C),
    Ty.typeRep (Proxy :: Proxy D),
-   Ty.typeRep (Proxy :: Proxy E)]
+   Ty.typeRep (Proxy :: Proxy E),
+   Ty.typeRep (Proxy :: Proxy ClassA),
+   Ty.typeRep (Proxy :: Proxy ClassB),
+   Ty.typeRep (Proxy :: Proxy ClassC),
+   Ty.typeRep (Proxy :: Proxy ClassD),
+   Ty.typeRep (Proxy :: Proxy ClassE)]
 
 typeVar :: Type
 typeVar = typeRep (Proxy :: Proxy A)
@@ -111,7 +123,7 @@ typeRep x = fromTypeRep (Ty.typeRep x)
 
 applyType :: Type -> Type -> Type
 applyType (Fun f tys) ty = build (fun f (fromTermList tys ++ [ty]))
-applyType _ _ = ERROR("tried to apply type variable")
+applyType _ _ = error "tried to apply type variable"
 
 arrowType :: [Type] -> Type -> Type
 arrowType [] res = res
@@ -248,10 +260,19 @@ instance (Typed a, Typed b) => Typed (a, b) where
   otherTypesDL (x, y) = otherTypesDL x `mplus` otherTypesDL y
   typeReplace f (x, y) = (typeReplace f x, typeReplace f y)
 
+instance (Typed a, Typed b) => Typed (Either a b) where
+  typ (Left x)  = typ x
+  typ (Right x) = typ x
+  otherTypesDL (Left x)  = otherTypesDL x
+  otherTypesDL (Right x) = otherTypesDL x
+  typeReplace sub (Left x)  = Left  (typeReplace sub x)
+  typeReplace sub (Right x) = Right (typeReplace sub x)
+
 instance Typed a => Typed [a] where
   typ [] = typeOf ()
-  typ (x:xs) = typ (x, xs)
-  otherTypesDL = msum . map otherTypesDL
+  typ (x:_) = typ x
+  otherTypesDL [] = mzero
+  otherTypesDL (x:xs) = otherTypesDL x `mplus` msum (map typesDL xs)
   typeReplace f xs = map (typeReplace f) xs
 
 -- Represents a forall-quantifier over all the type variables in a type.
@@ -272,11 +293,14 @@ polyTyp (Poly x) = Poly (typ x)
 polyMap :: (Typed a, Typed b) => (a -> b) -> Poly a -> Poly b
 polyMap f (Poly x) = poly (f x)
 
-polyApply :: (Typed a, Typed b, Typed c) => (a -> b -> c) -> Poly a -> Poly b -> Poly c
-polyApply f (Poly x) (Poly y) = poly (f x y')
+polyRename :: (Typed a, Typed b) => a -> Poly b -> b
+polyRename x (Poly y) =
+  typeSubst (\(MkVar n) -> var (MkVar (k+n))) y
   where
-    y' = typeSubst (\(MkVar n) -> var (MkVar (k+n))) y
-    k  = maximum (fmap bound (typesDL x))
+    k = maximum (fmap bound (typesDL x))
+
+polyApply :: (Typed a, Typed b, Typed c) => (a -> b -> c) -> Poly a -> Poly b -> Poly c
+polyApply f (Poly x) y = poly (f x (polyRename x y))
 
 polyPair :: (Typed a, Typed b) => Poly a -> Poly b -> Poly (a, b)
 polyPair = polyApply (,)
@@ -303,6 +327,9 @@ instance Apply a => Apply (Poly a) where
     let (f'', x'') = typeSubst s (f', x')
     fmap poly (tryApply f'' x'')
 
+toPolyValue :: (Applicative f, Typeable a) => a -> Poly (Value f)
+toPolyValue = poly . toValue . pure
+
 -- Dynamic values inside an applicative functor.
 data Value f =
   Value {
@@ -319,11 +346,11 @@ toAny :: f a -> f Any
 toAny = unsafeCoerce
 
 toValue :: forall f (a :: *). Typeable a => f a -> Value f
-toValue x = Value (typeOf (__ :: a)) (toAny x)
+toValue x = Value (typeRep (Proxy :: Proxy a)) (toAny x)
 
 fromValue :: forall f (a :: *). Typeable a => Value f -> Maybe (f a)
 fromValue x = do
-  guard (typ x == typeOf (__ :: a))
+  guard (typ x == typeRep (Proxy :: Proxy a))
   return (fromAny (value x))
 
 instance Typed (Value f) where
