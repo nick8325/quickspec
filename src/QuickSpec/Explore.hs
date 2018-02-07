@@ -7,6 +7,7 @@ import QuickSpec.Pruning
 import QuickSpec.Term
 import QuickSpec.Type
 import QuickSpec.Utils
+import Control.Monad.IO.Class
 
 baseTerms :: (Ord f, Typeable f, Ord a) => (Term f -> a) -> [f] -> [Type] -> [Term f]
 baseTerms measure funs tys =
@@ -25,14 +26,14 @@ moreTerms measure tss =
   where
     n = length tss
 
-quickSpec :: (Ord a, Ord f, Typeable f, Ord result, Apply (Term f), PrettyTerm f) =>
+quickSpec ::
+  (Ord a, Ord f, Typeable f, Ord result, Apply (Term f), PrettyTerm f,
+   MonadIO m, Pruner (Term f) m, Tester testcase (Term f) m) =>
   (Term f -> a) ->
   (Term f -> testcase -> result) ->
-  Tester testcase (Term f) ->
-  Pruner (Term f) ->
-  Int -> [f] -> [Type] -> IO ()
-quickSpec measure eval tester pruner size funs tys = do
-  let state0 = initialState eval tester pruner
+  Int -> [f] -> [Type] -> m ()
+quickSpec measure eval size funs tys = do
+  let state0 = initialState eval
 
   loop state0 size [[]] [] (baseTerms measure funs tys)
   where
@@ -42,6 +43,6 @@ quickSpec measure eval tester pruner size funs tys = do
       where
         uss = tss ++ [ts]
     loop state n tss us (t:ts) = do
-      let (state', ts', props) = explore t state
-      mapM_ prettyPrint props
+      (state', ts', props) <- explore t state
+      mapM_ (liftIO . prettyPrint) props
       loop state' n tss (ts' ++ us) ts

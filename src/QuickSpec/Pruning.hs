@@ -1,18 +1,14 @@
 -- A type of pruners.
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
 module QuickSpec.Pruning where
 
 import QuickSpec.Prop
 
-data Pruner term =
-  Pruner {
-    normalise :: term -> term,
-    add :: Prop term -> Pruner term }
+class Monad m => Pruner term m | m -> term where
+  normaliser :: m (term -> term)
+  add :: Prop term -> m ()
 
-makePruner ::
-  (pruner -> term -> term) ->
-  (Prop term -> pruner -> pruner) ->
-  pruner -> Pruner term
-makePruner norm add state =
-  Pruner {
-    normalise = \t -> norm state t,
-    add = \p -> makePruner norm add (add p state) }
+normalise :: Pruner term m => term -> m term
+normalise t = do
+  norm <- normaliser
+  return (norm t)

@@ -12,49 +12,48 @@ import QuickSpec.Testing.DecisionTree hiding (Result)
 data State testcase result term =
   State {
     st_terms  :: Set term,
-    st_pruner :: Pruner term,
-    st_tree   :: DecisionTree testcase result term,
-    st_tester :: Tester testcase term }
+    st_tree   :: DecisionTree testcase result term }
 
 initialState ::
   (term -> testcase -> result) ->
-  Tester testcase term ->
-  Pruner term ->
   State testcase result term
-initialState eval tester pruner =
+initialState eval =
   State {
     st_terms = Set.empty,
-    st_pruner = pruner,
-    st_tree = empty eval,
-    st_tester = tester }
+    st_tree = empty eval }
 
-explore :: (Ord term, Ord result) =>
+explore :: (Ord term, Ord result, Tester testcase term m, Pruner term m) =>
   term -> State testcase result term ->
-  (State testcase result term, [term], [Prop term])
-explore t s = exp True s
+  m (State testcase result term, [term], [Prop term])
+explore t s = do
+  norm <- normaliser
+  exp norm True s
   where
-    exp testMore s@State{..}
-      | t' `Set.member` st_terms = (s, [], [])
+    exp norm testMore s@State{..}
+      | t' `Set.member` st_terms = return (s, [], [])
       | otherwise =
         case insert t st_tree of
           Distinct tree ->
-            (s { st_tree = tree, st_terms = Set.insert t' st_terms }, [t], [])
+            return (s { st_tree = tree, st_terms = Set.insert t' st_terms }, [t], [])
           EqualTo u
             -- st_terms is not kept normalised wrt the discovered laws;
             -- instead, we normalise it lazily like so.
             | t' == u' ->
-              (s { st_terms = Set.insert u' (Set.delete u st_terms) }, [], [])
+              return (s { st_terms = Set.insert u' (Set.delete u st_terms) }, [], [])
             -- Ask QuickCheck for a counterexample to the property.
-            | testMore,
-              Just (tc, tester') <- test st_tester prop ->
-                -- Here we make testMore = False: if for some reason
-                -- the discovered counterexample fails to falsify the
-                -- equation, we don't want to run QuickCheck again!
-                exp False s { st_tree = addTestCase tc st_tree, st_tester = tester' }
-            | otherwise ->
-                (s { st_pruner = add st_pruner prop }, [], [prop])
+            | otherwise -> do
+                res <- test prop
+                case res of
+                  Nothing -> do
+                    add prop
+                    return (s, [], [prop])
+                  Just tc -> do
+                    -- Here we make testMore = False: if for some reason
+                    -- the discovered counterexample fails to falsify the
+                    -- equation, we don't want to run QuickCheck again!
+                    exp norm False s { st_tree = addTestCase tc st_tree }
             where
-              u' = normalise st_pruner u
+              u' = norm u
               prop = t === u
       where
-        t' = normalise st_pruner t
+        t' = norm t

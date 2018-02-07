@@ -1,8 +1,9 @@
 -- Encode monomorphic types during pruning.
-{-# LANGUAGE TypeFamilies, RecordWildCards, FlexibleInstances #-}
+{-# LANGUAGE RecordWildCards, FlexibleInstances, GeneralizedNewtypeDeriving, MultiParamTypeClasses, FlexibleContexts, ScopedTypeVariables, UndecidableInstances #-}
 module QuickSpec.Pruning.EncodeTypes where
 
 import QuickSpec.Pruning
+import QuickSpec.Testing
 import QuickSpec.Term
 import QuickSpec.Type
 import QuickSpec.Prop
@@ -10,6 +11,10 @@ import qualified Data.Set as Set
 import Data.Set(Set)
 import Data.List
 import Data.Proxy
+import Control.Monad
+import Control.Monad.IO.Class
+import Control.Monad.Trans.State.Strict
+import Control.Monad.Trans
 
 data Tagged f =
     Func f
@@ -37,53 +42,51 @@ instance EqualsBonus (Tagged f) where
 type TypedTerm f = Term f
 type UntypedTerm f = Term (Tagged f)
 
-data State f =
-  State {
-    st_pruner :: Pruner (UntypedTerm f),
+newtype MonoPruner f pruner a =
+  MonoPruner (StateT (MState f) pruner a)
+  deriving (Functor, Applicative, Monad, MonadIO, MonadTrans)
+
+newtype MState f =
+  MState {
     st_functions :: Set (Tagged f) }
 
-encodeMonoTypes :: (Ord f, Typed f, Arity f) =>
-  Pruner (UntypedTerm f) -> Pruner (TypedTerm f)
-encodeMonoTypes pruner =
-  makePruner normaliseMono addMono
-    State {
-      st_pruner = pruner,
-      st_functions = Set.empty }
+runEncodeTypes :: Monad pruner => MonoPruner f pruner a -> pruner a
+runEncodeTypes (MonoPruner x) = evalStateT x (MState Set.empty)
 
-normaliseMono :: (Ord f, Typed f) =>
-  State f -> TypedTerm f -> TypedTerm f
-normaliseMono State{..} =
-  -- Note that we don't call addFunction on the functions in the term.
-  -- This is because doing so might be expensive, as adding typing
-  -- axioms starts the completion algorithm.
-  -- This is OK because in encode, we tag all functions and variables
-  -- with their types (i.e. we can fall back to the naive type encoding).
-  decode . normalise st_pruner . encode
+instance (Ord f, Typed f, Arity f, Pruner (UntypedTerm f) pruner) => Pruner (TypedTerm f) (MonoPruner f pruner) where
+  normaliser =
+    MonoPruner $ do
+      norm <- lift (normaliser :: pruner (UntypedTerm f -> UntypedTerm f))
+      
+      -- Note that we don't call addFunction on the functions in the term.
+      -- This is because doing so might be expensive, as adding typing
+      -- axioms starts the completion algorithm.
+      -- This is OK because in encode, we tag all functions and variables
+      -- with their types (i.e. we can fall back to the naive type encoding).
+      return $ \t ->
+        decode . norm . encode $ t
 
-addMono :: (Ord f, Typed f, Arity f) =>
-  Prop (TypedTerm f) -> State f -> State f
-addMono prop state =
-  State{
-    st_pruner = add st_pruner (fmap encode prop),
-    st_functions = st_functions }
-  where
-    State{..} =
-      foldl' addFunction state (funs prop)
+  add prop = do
+    mapM_ addFunction (funs prop)
+    lift (add (encode <$> prop))
 
-addFunction :: (Ord f, Typed f, Arity f) =>
-  State f -> f -> State f
-addFunction st@State{..} f
-  | Func f `Set.member` st_functions = st
-  | otherwise =
-    State{
-      st_pruner = foldl' add st_pruner (concatMap typingAxioms funcs),
-      st_functions = Set.union st_functions (Set.fromList funcs) }
-    where
+instance Tester testcase term m => Tester testcase term (MonoPruner f m) where
+  test = lift . test
+
+addFunction ::
+  (Ord f, Typed f, Arity f, Pruner (UntypedTerm f) pruner) =>
+  f -> MonoPruner f pruner ()
+addFunction f = MonoPruner $ do
+  MState{..} <- get
+  unless (Func f `Set.member` st_functions) $ do
+    let
       funcs = Func f:tags
       tags =
         Set.toList $
           Set.fromList (map Tag (typeRes (typ f):typeArgs (typ f)))
           Set.\\ st_functions
+    put MState{st_functions = Set.union st_functions (Set.fromList funcs)}
+    lift $ mapM_ add (concatMap typingAxioms funcs)
 
 -- Compute the typing axioms for a function or type tag.
 typingAxioms :: (Ord f, Typed f, Arity f) =>

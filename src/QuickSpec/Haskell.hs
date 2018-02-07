@@ -20,6 +20,7 @@ import qualified QuickSpec.Pruning.Twee as Twee
 import qualified QuickSpec.Explore
 import QuickSpec.Pruning.EncodeTypes
 import QuickSpec.Explore.PartialApplication
+import Control.Monad
 
 baseInstances :: Instances
 baseInstances =
@@ -230,22 +231,27 @@ defaultConfig =
     cfg_max_size = 7,
     cfg_instances = mempty }
 
+type M =
+  EncodePartialApplications Constant
+    (MonoPruner (PartiallyApplied Constant)
+    (Twee.TweePrunerT (Tagged (PartiallyApplied Constant))
+    (QuickCheck.QuickCheckTester
+      (Var -> Value Maybe, Value Identity -> Maybe TestResult)
+      (Term (PartiallyApplied Constant))
+      (Either TestResult (Term (PartiallyApplied Constant)))
+    IO)))
+
 quickSpec :: Config -> [Constant] -> [Type] -> IO ()
 quickSpec Config{..} funs tys = do
-  let instances = cfg_instances `mappend` baseInstances
-  tester <-
-    generate $ QuickCheck.quickCheckTester
-      cfg_quickCheck
-      (arbitraryVal instances)
-      evalHaskell
-
   let
-    pruner =
-      encodePartialApplications $
-      encodeMonoTypes $
-      Twee.tweePruner cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size }
-
-  QuickSpec.Explore.quickSpec measure (flip evalHaskell) tester pruner cfg_max_size
-    [Partial f 0 | f <- funs]
-    tys
-  
+    instances = cfg_instances `mappend` baseInstances
+    loop :: M ()
+    loop =
+      QuickSpec.Explore.quickSpec measure (flip evalHaskell) cfg_max_size
+        [Partial f 0 | f <- funs]
+        tys
+  join $ generate $
+    QuickCheck.runQuickCheckTester cfg_quickCheck (arbitraryVal instances) evalHaskell $
+    Twee.runTwee cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size } $
+    runEncodeTypes $
+    runEncodePartialApplications loop

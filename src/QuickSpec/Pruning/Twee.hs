@@ -1,7 +1,8 @@
 -- A pruner that uses twee.
-{-# LANGUAGE RecordWildCards, FlexibleContexts, FlexibleInstances, GADTs, PatternSynonyms #-}
+{-# LANGUAGE RecordWildCards, FlexibleContexts, FlexibleInstances, GADTs, PatternSynonyms, GeneralizedNewtypeDeriving, MultiParamTypeClasses, UndecidableInstances #-}
 module QuickSpec.Pruning.Twee where
 
+import QuickSpec.Testing
 import QuickSpec.Pruning
 import QuickSpec.Prop
 import QuickSpec.Term
@@ -16,6 +17,10 @@ import Twee.Rule
 import Twee.Proof hiding (Config, defaultConfig)
 import Twee.Base(Ordered(..), Extended(..), EqualsBonus, pattern F, pattern Empty, unpack)
 import QuickSpec.Pruning.EncodeTypes(Tagged)
+import Control.Monad.Trans.Reader
+import Control.Monad.Trans.State.Strict hiding (State)
+import Control.Monad.Trans
+import Control.Monad.IO.Class
 
 data Config =
   Config {
@@ -26,15 +31,35 @@ instance (Pretty f, PrettyTerm f, Ord f, Typeable f, Sized f, Arity f, EqualsBon
   lessEq = KBO.lessEq
   lessIn = KBO.lessIn
 
-tweePruner :: (Ord f, Typeable f, Arity f, Sized f, PrettyTerm f, EqualsBonus f, f ~ Tagged g) =>
-  Config -> Pruner (Term f)
-tweePruner Config{..} =
-  makePruner normaliseTwee (addTwee config) initialState
+newtype TweePrunerT f m a =
+  TweePruner (ReaderT Twee.Config (StateT (State (Extended f)) m) a)
+  deriving (Functor, Applicative, Monad, MonadIO)
+
+instance MonadTrans (TweePrunerT f) where
+  lift = TweePruner . lift . lift
+
+runTwee :: Monad m => Config -> TweePrunerT f m a -> m a
+runTwee Config{..} (TweePruner x) =
+  evalStateT (runReaderT x config) initialState
   where
     config =
       defaultConfig {
         Twee.cfg_max_term_size = cfg_max_term_size,
         Twee.cfg_max_cp_depth = cfg_max_cp_depth }
+
+instance (Ord f, Typeable f, Arity f, Sized f, PrettyTerm f, EqualsBonus f, f ~ Tagged g, Monad m) =>
+  Pruner (Term f) (TweePrunerT f m) where
+  normaliser = TweePruner $ do
+    state <- lift get
+    return (normaliseTwee state)
+
+  add prop = TweePruner $ do
+    config <- ask
+    state <- lift get
+    lift (put $! addTwee config prop state)
+
+instance Tester testcase term m => Tester testcase term (TweePrunerT f m) where
+  test = lift . test
 
 normaliseTwee :: (Ord f, Typeable f, Arity f, Sized f, PrettyTerm f, EqualsBonus f, f ~ Tagged g) =>
   State (Extended f) -> Term f -> Term f
