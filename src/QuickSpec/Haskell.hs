@@ -20,6 +20,7 @@ import qualified QuickSpec.Pruning.Twee as Twee
 import qualified QuickSpec.Explore
 import QuickSpec.Pruning.EncodeTypes
 import QuickSpec.Explore.PartialApplication
+import QuickSpec.Pruning.Background
 import Control.Monad
 
 baseInstances :: Instances
@@ -175,6 +176,8 @@ instance Ord Constant where
         twiddle 2 = 1
         twiddle x = x
 
+instance Background Constant
+
 constant :: Typeable a => String -> a -> Constant
 constant name val =
   Constant {
@@ -232,7 +235,7 @@ defaultConfig =
     cfg_instances = mempty }
 
 type M =
-  EncodePartialApplications Constant
+  WithBackground (PartiallyApplied Constant)
     (MonoPruner (PartiallyApplied Constant)
     (Twee.TweePrunerT (Tagged (PartiallyApplied Constant))
     (QuickCheck.QuickCheckTester
@@ -254,4 +257,4 @@ quickSpec Config{..} funs tys = do
     QuickCheck.runQuickCheckTester cfg_quickCheck (arbitraryVal instances) evalHaskell $
     Twee.runTwee cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size } $
     runEncodeTypes $
-    runEncodePartialApplications loop
+    runWithBackground loop

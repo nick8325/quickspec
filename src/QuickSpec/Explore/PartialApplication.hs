@@ -6,6 +6,7 @@ import QuickSpec.Term
 import QuickSpec.Type
 import QuickSpec.Testing
 import QuickSpec.Pruning
+import QuickSpec.Pruning.Background
 import QuickSpec.Prop
 import qualified Twee.Base as Twee
 import qualified Data.Set as Set
@@ -50,58 +51,31 @@ instance Typed f => Typed (PartiallyApplied f) where
   typeSubst_ sub (Apply ty) = Apply (typeSubst_ sub ty)
   typeSubst_ sub (Partial f n) = Partial (typeSubst_ sub f) n
 
-instance (Arity f, Ord f, Typeable f, Typed f) => Apply (Term (PartiallyApplied f)) where
+instance (Arity f, Typed f) => Apply (Term (PartiallyApplied f)) where
   tryApply t u = do
     tryApply (typ t) (typ u)
     return $
       case t of
-        -- App (Partial f n) ts | n < arity f ->
-        --   App (Partial f (n+1)) (ts ++ [u])
+        App (Partial f n) ts | n < arity f ->
+          App (Partial f (n+1)) (ts ++ [u])
         _ ->
           simpleApply t u
 
 simpleApply ::
-  (Arity f, Ord f, Typeable f, Typed f) =>
+  Typed f =>
   Term (PartiallyApplied f) -> Term (PartiallyApplied f) -> Term (PartiallyApplied f)
 simpleApply t u =
   App (Apply (typ t)) [t, u]
 
-newtype EncodePartialApplications f m a =
-  EncodePartialApplications (StateT (Set f) m a)
-  deriving (Functor, Applicative, Monad, MonadIO)
-
-instance MonadTrans (EncodePartialApplications f) where
-  lift = EncodePartialApplications . lift
-
-runEncodePartialApplications :: Monad m => EncodePartialApplications f m a -> m a
-runEncodePartialApplications (EncodePartialApplications x) =
-  evalStateT x Set.empty
-
-instance (Ord f, Arity f, Typeable f, Typed f, Pruner (Term (PartiallyApplied f)) m) =>
-  Pruner (Term (PartiallyApplied f)) (EncodePartialApplications f m) where
-  normaliser = lift normaliser
-  add prop = do
-    mapM_ addFunction (funs prop)
-    lift (add prop)
-
-instance Tester testcase term m => Tester testcase term (EncodePartialApplications f m) where
-  test = lift . test
-
-addFunction :: (Ord f, Typed f, Arity f, Typeable f, Pruner (Term (PartiallyApplied f)) m) =>
-  PartiallyApplied f -> EncodePartialApplications f m ()
--- addFunction (Partial f _) = EncodePartialApplications $ do
---   funcs <- get
---   unless (f `Set.member` funcs) $ do
---     put (Set.insert f funcs)
---     mapM_ (lift . add) (axioms f)
---     where
---       axioms f =
---         [ simpleApply (partial i) (vs !! i) === partial (i+1)
---         | i <- [0..arity f-1] ]
---       partial i =
---         App (Partial f i) (take i vs)
---       vs = map Var (zipWith V (typeArgs (typ f)) [0..])
-addFunction _ = return ()
+instance (Arity f, Typed f, Background f) => Background (PartiallyApplied f) where
+  background (Partial f _) =
+    [ simpleApply (partial i) (vs !! i) === partial (i+1)
+    | i <- [0..arity f-1] ]
+    where
+      partial i =
+        App (Partial f i) (take i vs)
+      vs = map Var (zipWith V (typeArgs (typ f)) [0..])
+  background _ = []
 
 instance (Applicative f, Eval fun (Value f)) => Eval (PartiallyApplied fun) (Value f) where
   eval var (Partial f _) = eval var f

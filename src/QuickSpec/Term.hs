@@ -1,11 +1,11 @@
 -- Typed terms.
-{-# LANGUAGE PatternSynonyms, ViewPatterns, TypeSynonymInstances, FlexibleInstances, TypeFamilies, ConstraintKinds, DeriveGeneric, DeriveAnyClass, MultiParamTypeClasses, FunctionalDependencies, UndecidableInstances #-}
+{-# LANGUAGE PatternSynonyms, ViewPatterns, TypeSynonymInstances, FlexibleInstances, TypeFamilies, ConstraintKinds, DeriveGeneric, DeriveAnyClass, MultiParamTypeClasses, FunctionalDependencies, UndecidableInstances, TypeOperators, DeriveFunctor #-}
 module QuickSpec.Term(module QuickSpec.Term, module Twee.Base, module Twee.Pretty) where
 
 import QuickSpec.Type
 import QuickSpec.Utils
 import Control.Monad
-import GHC.Generics
+import GHC.Generics(Generic)
 import Test.QuickCheck(CoArbitrary)
 import Data.DList(DList)
 import qualified Data.DList as DList
@@ -13,7 +13,7 @@ import Twee.Base(Sized(..), Arity(..), Pretty(..), PrettyTerm(..), TermStyle(..)
 import Twee.Pretty
 
 data Term f = Var {-# UNPACK #-} !Var | App !f ![Term f]
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Functor)
 
 data Var = V { var_ty :: !Type, var_id :: {-# UNPACK #-} !Int }
   deriving (Eq, Ord, Show, Generic, CoArbitrary)
@@ -121,3 +121,25 @@ compareFuns App{} Var{} = GT
 compareFuns (App f ts) (App g us) =
   compare f g `orElse`
   compare (map MeasureFuns ts) (map MeasureFuns us)
+
+----------------------------------------------------------------------
+-- Data types a la carte-ish.
+----------------------------------------------------------------------
+
+data a :+: b = Inl a | Inr b
+
+instance (Eval fun1 a, Eval fun2 a) => Eval (fun1 :+: fun2) a where
+  eval env (Inl x) = eval env x
+  eval env (Inr x) = eval env x
+
+instance (Sized fun1, Sized fun2) => Sized (fun1 :+: fun2) where
+  size (Inl x) = size x
+  size (Inr x) = size x
+
+instance (Typed fun1, Typed fun2) => Typed (fun1 :+: fun2) where
+  typ (Inl x) = typ x
+  typ (Inr x) = typ x
+  otherTypesDL (Inl x) = otherTypesDL x
+  otherTypesDL (Inr x) = otherTypesDL x
+  typeSubst_ sub (Inl x) = Inl (typeSubst_ sub x)
+  typeSubst_ sub (Inr x) = Inr (typeSubst_ sub x)
