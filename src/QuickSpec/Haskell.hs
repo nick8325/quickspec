@@ -235,14 +235,12 @@ defaultConfig =
     cfg_instances = mempty }
 
 type M =
-  WithBackground (PartiallyApplied Constant)
-    (MonoPruner (PartiallyApplied Constant)
-    (Twee.TweePrunerT (Tagged (PartiallyApplied Constant))
-    (QuickCheck.QuickCheckTester
-      (Var -> Value Maybe, Value Identity -> Maybe TestResult)
-      (Term (PartiallyApplied Constant))
-      (Either TestResult (Term (PartiallyApplied Constant)))
-    IO)))
+  Twee.TweePrunerT (PartiallyApplied Constant)
+  (QuickCheck.QuickCheckTester
+    (Var -> Value Maybe, Value Identity -> Maybe TestResult)
+    (Term (PartiallyApplied Constant))
+    (Either TestResult (Term (PartiallyApplied Constant)))
+    IO)
 
 quickSpec :: Config -> [Constant] -> [Type] -> IO ()
 quickSpec Config{..} funs tys = do
@@ -256,5 +254,4 @@ quickSpec Config{..} funs tys = do
   join $ generate $
     QuickCheck.runQuickCheckTester cfg_quickCheck (arbitraryVal instances) evalHaskell $
     Twee.runTwee cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size } $
-    runEncodeTypes $
-    runWithBackground loop
+    loop

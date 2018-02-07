@@ -16,7 +16,8 @@ import Twee hiding (Config(..))
 import Twee.Rule
 import Twee.Proof hiding (Config, defaultConfig)
 import Twee.Base(Ordered(..), Extended(..), EqualsBonus, pattern F, pattern Empty, unpack)
-import QuickSpec.Pruning.EncodeTypes(Tagged)
+import QuickSpec.Pruning.EncodeTypes
+import QuickSpec.Pruning.Background
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Strict hiding (State)
 import Control.Monad.Trans
@@ -31,15 +32,15 @@ instance (Pretty f, PrettyTerm f, Ord f, Typeable f, Sized f, Arity f, EqualsBon
   lessEq = KBO.lessEq
   lessIn = KBO.lessIn
 
-newtype TweePrunerT f m a =
-  TweePruner (ReaderT Twee.Config (StateT (State (Extended f)) m) a)
+newtype UntypedTweePrunerT f m a =
+  UntypedTweePruner (ReaderT Twee.Config (StateT (State (Extended f)) m) a)
   deriving (Functor, Applicative, Monad, MonadIO)
 
-instance MonadTrans (TweePrunerT f) where
-  lift = TweePruner . lift . lift
+instance MonadTrans (UntypedTweePrunerT f) where
+  lift = UntypedTweePruner . lift . lift
 
-runTwee :: Monad m => Config -> TweePrunerT f m a -> m a
-runTwee Config{..} (TweePruner x) =
+runUntypedTwee :: Monad m => Config -> UntypedTweePrunerT f m a -> m a
+runUntypedTwee Config{..} (UntypedTweePruner x) =
   evalStateT (runReaderT x config) initialState
   where
     config =
@@ -48,17 +49,17 @@ runTwee Config{..} (TweePruner x) =
         Twee.cfg_max_cp_depth = cfg_max_cp_depth }
 
 instance (Ord f, Typeable f, Arity f, Sized f, PrettyTerm f, EqualsBonus f, f ~ Tagged g, Monad m) =>
-  Pruner (Term f) (TweePrunerT f m) where
-  normaliser = TweePruner $ do
+  Pruner (Term f) (UntypedTweePrunerT f m) where
+  normaliser = UntypedTweePruner $ do
     state <- lift get
     return (normaliseTwee state)
 
-  add prop = TweePruner $ do
+  add prop = UntypedTweePruner $ do
     config <- ask
     state <- lift get
     lift (put $! addTwee config prop state)
 
-instance Tester testcase term m => Tester testcase term (TweePrunerT f m) where
+instance Tester testcase term m => Tester testcase term (UntypedTweePrunerT f m) where
   test = lift . test
 
 normaliseTwee :: (Ord f, Typeable f, Arity f, Sized f, PrettyTerm f, EqualsBonus f, f ~ Tagged g) =>
@@ -106,3 +107,21 @@ fromTwee = unsk
       Var (V typeVar x)
     unsk (Twee.App (F (Function f)) ts) =
       App f (map unsk (unpack ts))
+
+newtype TweePrunerT f m a =
+  TweePruner (WithBackground f (MonoPruner f (UntypedTweePrunerT (Tagged f) m)) a)
+  deriving (Functor, Applicative, Monad, MonadIO)
+
+instance MonadTrans (TweePrunerT f) where
+  lift = TweePruner . lift . lift . lift
+
+runTwee :: (Background f, Monad m) => Config -> TweePrunerT f m a -> m a
+runTwee config (TweePruner x) =
+  runUntypedTwee config (runEncodeTypes (runWithBackground x))
+instance (Ord f, Typed f, Background f, Typeable f, Arity f, Sized f, PrettyTerm f, Monad m) =>
+  Pruner (Term f) (TweePrunerT f m) where
+  normaliser = TweePruner normaliser
+  add prop = TweePruner (add prop)
+
+instance Tester testcase term m => Tester testcase term (TweePrunerT f m) where
+  test = lift . test
