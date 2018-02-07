@@ -262,7 +262,7 @@ defaultInstances =
 
 addDefaultInstances :: Signature -> Signature
 addDefaultInstances sig =
-  sig { instances = defaultInstances `mappend` instances sig }
+  sig { instances = instances sig `mappend` defaultInstances }
 
 data Observe a b = Observe (Dict (Ord b)) (a -> Gen b) deriving Typeable
 newtype Observe1 a = Observe1 (Value (Observe a)) deriving Typeable
