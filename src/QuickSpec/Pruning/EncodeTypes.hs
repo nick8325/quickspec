@@ -3,6 +3,7 @@
 module QuickSpec.Pruning.EncodeTypes where
 
 import QuickSpec.Pruning
+import QuickSpec.Pruning.Background
 import QuickSpec.Testing
 import QuickSpec.Term
 import QuickSpec.Type
@@ -43,20 +44,16 @@ type TypedTerm f = Term f
 type UntypedTerm f = Term (Tagged f)
 
 newtype MonoPruner f pruner a =
-  MonoPruner (StateT (MState f) pruner a)
-  deriving (Functor, Applicative, Monad, MonadIO, MonadTrans)
+  MonoPruner { runEncodeTypes :: pruner a }
+  deriving (Functor, Applicative, Monad, MonadIO)
 
-newtype MState f =
-  MState {
-    st_functions :: Set (Tagged f) }
-
-runEncodeTypes :: Monad pruner => MonoPruner f pruner a -> pruner a
-runEncodeTypes (MonoPruner x) = evalStateT x (MState Set.empty)
+instance MonadTrans (MonoPruner f) where
+  lift = MonoPruner
 
 instance (Ord f, Typed f, Arity f, Pruner (UntypedTerm f) pruner) => Pruner (TypedTerm f) (MonoPruner f pruner) where
   normaliser =
     MonoPruner $ do
-      norm <- lift (normaliser :: pruner (UntypedTerm f -> UntypedTerm f))
+      norm <- normaliser :: pruner (UntypedTerm f -> UntypedTerm f)
       
       -- Note that we don't call addFunction on the functions in the term.
       -- This is because doing so might be expensive, as adding typing
@@ -66,27 +63,13 @@ instance (Ord f, Typed f, Arity f, Pruner (UntypedTerm f) pruner) => Pruner (Typ
       return $ \t ->
         decode . norm . encode $ t
 
-  add prop = do
-    mapM_ addFunction (funs prop)
-    lift (add (encode <$> prop))
+  add prop = lift (add (encode <$> prop))
 
 instance Tester testcase term m => Tester testcase term (MonoPruner f m) where
   test = lift . test
 
-addFunction ::
-  (Ord f, Typed f, Arity f, Pruner (UntypedTerm f) pruner) =>
-  f -> MonoPruner f pruner ()
-addFunction f = MonoPruner $ do
-  MState{..} <- get
-  unless (Func f `Set.member` st_functions) $ do
-    let
-      funcs = Func f:tags
-      tags =
-        Set.toList $
-          Set.fromList (map Tag (typeRes (typ f):typeArgs (typ f)))
-          Set.\\ st_functions
-    put MState{st_functions = Set.union st_functions (Set.fromList funcs)}
-    lift $ mapM_ add (concatMap typingAxioms funcs)
+instance (Ord f, Typed f, Arity f) => Background (Tagged f) where
+  background = typingAxioms
 
 -- Compute the typing axioms for a function or type tag.
 typingAxioms :: (Ord f, Typed f, Arity f) =>

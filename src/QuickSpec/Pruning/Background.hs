@@ -39,11 +39,11 @@ instance Tester testcase term m => Tester testcase term (WithBackground f m) whe
   test = lift . test
 
 addFunction :: (Ord f, Background f, Pruner (Term f) m) => f -> WithBackground f m ()
-addFunction f = WithBackground $ do
-  funcs <- get
+addFunction f = do
+  funcs <- WithBackground get
   unless (f `Set.member` funcs) $ do
-    put (Set.insert f funcs)
-    mapM_ (lift . add) (background f)
+    WithBackground (put (Set.insert f funcs))
+    mapM_ add (background f)
 
 instance (Background fun1, Background fun2) => Background (fun1 :+: fun2) where
   background (Inl x) = map (fmap (fmap Inl)) (background x)
