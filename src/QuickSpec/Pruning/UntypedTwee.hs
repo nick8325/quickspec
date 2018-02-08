@@ -7,7 +7,6 @@ import QuickSpec.Pruning
 import QuickSpec.Prop
 import QuickSpec.Term
 import QuickSpec.Type
-import Data.Typeable
 import qualified Twee
 import qualified Twee.Equation as Twee
 import qualified Twee.KBO as KBO
@@ -16,12 +15,9 @@ import Twee hiding (Config(..))
 import Twee.Rule
 import Twee.Proof hiding (Config, defaultConfig)
 import Twee.Base(Ordered(..), Extended(..), EqualsBonus, pattern F, pattern Empty, unpack)
-import qualified QuickSpec.Pruning.Background as Background
-import QuickSpec.Pruning.Background(Background)
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Strict hiding (State)
 import Control.Monad.Trans
-import Control.Monad.IO.Class
 
 data Config =
   Config {
@@ -104,3 +100,4 @@ fromTwee = unsk
       Var (V typeVar x)
     unsk (Twee.App (F (Function f)) ts) =
       App f (map unsk (unpack ts))
+    unsk _ = error "variable introduced by rewriting"

@@ -4,25 +4,12 @@ module QuickSpec.Pruning.Twee(Config(..), module QuickSpec.Pruning.Twee) where
 
 import QuickSpec.Testing
 import QuickSpec.Pruning
-import QuickSpec.Prop
 import QuickSpec.Term
-import QuickSpec.Type
-import Data.Typeable
-import qualified Twee
-import qualified Twee.Equation as Twee
-import qualified Twee.KBO as KBO
-import qualified Twee.Base as Twee
-import Twee hiding (Config(..))
-import Twee.Rule
-import Twee.Proof hiding (Config, defaultConfig)
-import Twee.Base(Ordered(..), Extended(..), EqualsBonus, pattern F, pattern Empty, unpack)
 import qualified QuickSpec.Pruning.Types as Types
 import qualified QuickSpec.Pruning.Background as Background
 import QuickSpec.Pruning.Background(Background)
-import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Strict hiding (State)
 import Control.Monad.Trans
-import Control.Monad.IO.Class
 import qualified QuickSpec.Pruning.UntypedTwee as Untyped
 import QuickSpec.Pruning.UntypedTwee(Config(..))
 

@@ -127,6 +127,8 @@ typeDrop :: Int -> Type -> Type
 typeDrop 0 ty = ty
 typeDrop n (App (F Arrow) (Cons _ (Cons ty Empty))) =
   typeDrop (n-1) ty
+typeDrop _ _ =
+  error "typeDrop on non-function type"
 
 typeArity :: Type -> Int
 typeArity = length . typeArgs
@@ -412,5 +414,6 @@ unwrapFunctor f x =
             value = f (fromAny (value x)) }
         False ->
           error "non-matching types"
+    _ -> error "value of type f a had wrong type"
   where
     ty = typeRep (Proxy :: Proxy g)

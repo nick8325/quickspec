@@ -60,6 +60,8 @@ insert x dt@DecisionTree{dt_tree = Just dt_tree, ..} =
           Distinct (k' (Singleton x))
         Just tree ->
           aux k' ts tree
+    aux _ [] (TestCase _) =
+      error "unexpected node in decision tree"
 
 data Statistics =
   Statistics {

@@ -9,13 +9,7 @@ import QuickSpec.Testing
 import QuickSpec.Term
 import QuickSpec.Type
 import QuickSpec.Prop
-import qualified Data.Set as Set
-import Data.Set(Set)
-import Data.List
-import Data.Proxy
-import Control.Monad
 import Control.Monad.IO.Class
-import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans
 
 data Tagged fun =

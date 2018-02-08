@@ -27,9 +27,9 @@ explore :: (Ord term, Ord result, MonadTester testcase term m, MonadPruner term 
   m (State testcase result term, [term], [Prop term])
 explore t s = do
   norm <- normaliser
-  exp norm True s
+  exp norm s
   where
-    exp norm testMore s@State{..}
+    exp norm s@State{..}
       | t' `Set.member` st_terms = return (s, [], [])
       | otherwise =
         case insert t st_tree of
@@ -48,10 +48,7 @@ explore t s = do
                     add prop
                     return (s, [], [prop])
                   Just tc -> do
-                    -- Here we make testMore = False: if for some reason
-                    -- the discovered counterexample fails to falsify the
-                    -- equation, we don't want to run QuickCheck again!
-                    exp norm False s { st_tree = addTestCase tc st_tree }
+                    exp norm s { st_tree = addTestCase tc st_tree }
             where
               u' = norm u
               prop = t === u

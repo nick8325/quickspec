@@ -4,19 +4,10 @@ module QuickSpec.Explore.PartialApplication where
 
 import QuickSpec.Term
 import QuickSpec.Type
-import QuickSpec.Testing
-import QuickSpec.Pruning
 import QuickSpec.Pruning.Background
 import QuickSpec.Prop
 import qualified Twee.Base as Twee
-import qualified Data.Set as Set
-import Data.Set(Set)
-import Data.List
 import Data.Maybe
-import Control.Monad
-import Control.Monad.IO.Class
-import Control.Monad.Trans
-import Control.Monad.Trans.State.Strict hiding (State)
 
 data PartiallyApplied f =
     -- A partially-applied function symbol.

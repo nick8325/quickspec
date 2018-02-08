@@ -19,7 +19,6 @@ import qualified QuickSpec.Testing.QuickCheck as QuickCheck
 import qualified QuickSpec.Pruning.Twee as Twee
 import qualified QuickSpec.Explore
 import QuickSpec.Explore.PartialApplication
-import qualified QuickSpec.Pruning.Background as Background
 import QuickSpec.Pruning.Background(Background)
 import Control.Monad
 
@@ -92,6 +91,7 @@ names :: Instances -> Type -> [String]
 names insts ty =
   case findInstance insts (skolemiseTypeVars ty) of
     (x:_) -> ofValue getNames x
+    [] -> error "don't know how to name variables"
 
 arbitraryVal :: Instances -> Gen (Var -> Value Maybe, Value Identity -> Maybe TestResult)
 arbitraryVal insts =
