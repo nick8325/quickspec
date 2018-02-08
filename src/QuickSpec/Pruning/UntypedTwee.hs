@@ -1,4 +1,4 @@
--- A pruner that uses twee.
+-- A pruner that uses twee. Does not respect types.
 {-# LANGUAGE RecordWildCards, FlexibleContexts, FlexibleInstances, GADTs, PatternSynonyms, GeneralizedNewtypeDeriving, MultiParamTypeClasses, UndecidableInstances #-}
 module QuickSpec.Pruning.UntypedTwee where
 
