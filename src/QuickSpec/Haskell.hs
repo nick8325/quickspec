@@ -58,6 +58,9 @@ baseInstances =
     inst (Sub Dict :: Ord A :- Ord [A]),
     inst (Sub Dict :: Arbitrary A :- Arbitrary [A]),
     inst (Sub Dict :: CoArbitrary A :- CoArbitrary [A]),
+    inst (Sub Dict :: Ord A :- Ord (Maybe A)),
+    inst (Sub Dict :: Arbitrary A :- Arbitrary (Maybe A)),
+    inst (Sub Dict :: CoArbitrary A :- CoArbitrary (Maybe A)),
     inst (Sub Dict :: Ord A :- Eq A),
     -- From Arbitrary to Gen
     inst $ \(Dict :: Dict (Arbitrary A)) -> arbitrary :: Gen A,
