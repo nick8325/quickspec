@@ -237,24 +237,12 @@ defaultConfig =
     cfg_max_size = 7,
     cfg_instances = mempty }
 
-type M =
-  Twee.Pruner (PartiallyApplied Constant)
-  (QuickCheck.Tester
-    (Var -> Value Maybe, Value Identity -> Maybe TestResult)
-    (Term (PartiallyApplied Constant))
-    (Either TestResult (Term (PartiallyApplied Constant)))
-    IO)
-
 quickSpec :: Config -> [Constant] -> [Type] -> IO ()
 quickSpec Config{..} funs tys = do
-  let
-    instances = cfg_instances `mappend` baseInstances
-    loop :: M ()
-    loop =
-      QuickSpec.Explore.quickSpec measure (flip evalHaskell) cfg_max_size
-        [Partial f 0 | f <- funs]
-        tys
+  let instances = cfg_instances `mappend` baseInstances
   join $ generate $
     QuickCheck.run cfg_quickCheck (arbitraryVal instances) evalHaskell $
     Twee.run cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size } $
-    loop
+    QuickSpec.Explore.quickSpec measure (flip evalHaskell) cfg_max_size
+      [Partial f 0 | f <- funs]
+      tys
