@@ -43,6 +43,12 @@ quickSpec measure eval size funs tys = do
       where
         uss = tss ++ [ts]
     loop state n tss us (t:ts) = do
-      (state', ts', props) <- explore t state
-      mapM_ (liftIO . prettyPrint) props
-      loop state' n tss (ts' ++ us) ts
+      (state', res) <- explore t state
+      case res of
+        Singleton ->
+          loop state' n tss (t:us) ts
+        Discovered prop -> do
+          liftIO (prettyPrint prop)
+          loop state' n tss us ts
+        Knew _ ->
+          loop state' n tss us ts
