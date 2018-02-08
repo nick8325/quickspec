@@ -18,9 +18,9 @@ import Data.Ord
 import qualified QuickSpec.Testing.QuickCheck as QuickCheck
 import qualified QuickSpec.Pruning.Twee as Twee
 import qualified QuickSpec.Explore
-import QuickSpec.Pruning.EncodeTypes
 import QuickSpec.Explore.PartialApplication
-import QuickSpec.Pruning.Background
+import qualified QuickSpec.Pruning.Background as Background
+import QuickSpec.Pruning.Background(Background)
 import Control.Monad
 
 baseInstances :: Instances
@@ -235,8 +235,8 @@ defaultConfig =
     cfg_instances = mempty }
 
 type M =
-  Twee.TweePrunerT (PartiallyApplied Constant)
-  (QuickCheck.QuickCheckTester
+  Twee.Pruner (PartiallyApplied Constant)
+  (QuickCheck.Tester
     (Var -> Value Maybe, Value Identity -> Maybe TestResult)
     (Term (PartiallyApplied Constant))
     (Either TestResult (Term (PartiallyApplied Constant)))
@@ -252,6 +252,6 @@ quickSpec Config{..} funs tys = do
         [Partial f 0 | f <- funs]
         tys
   join $ generate $
-    QuickCheck.runQuickCheckTester cfg_quickCheck (arbitraryVal instances) evalHaskell $
-    Twee.runTwee cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size } $
+    QuickCheck.run cfg_quickCheck (arbitraryVal instances) evalHaskell $
+    Twee.run cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size } $
     loop

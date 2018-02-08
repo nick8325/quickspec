@@ -13,36 +13,33 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans
 import Control.Monad.Trans.State.Strict hiding (State)
 
-newtype WithBackground f m a =
-  WithBackground (StateT (Set f) m a)
-  deriving (Functor, Applicative, Monad, MonadIO)
-
-instance MonadTrans (WithBackground f) where
-  lift = WithBackground . lift
+newtype Pruner fun m a =
+  Pruner (StateT (Set fun) m a)
+  deriving (Functor, Applicative, Monad, MonadIO, MonadTrans, MonadTester testcase term)
 
 class Background f where
   background :: f -> [Prop (Term f)]
   background _ = []
 
-runWithBackground :: (Monad m, Background f) => WithBackground f m a -> m a
-runWithBackground (WithBackground x) =
+run :: (Monad m, Background fun) => Pruner fun m a -> m a
+run (Pruner x) =
   evalStateT x Set.empty
 
-instance (Ord f, Background f, Pruner (Term f) m) =>
-  Pruner (Term f) (WithBackground f m) where
+instance (Ord fun, Background fun, MonadPruner (Term fun) m) =>
+  MonadPruner (Term fun) (Pruner fun m) where
   normaliser = lift normaliser
   add prop = do
     mapM_ addFunction (funs prop)
     lift (add prop)
 
-instance Tester testcase term m => Tester testcase term (WithBackground f m) where
-  test = lift . test
+-- instance Tester testcase term m => Tester testcase term (WithBackground f m) where
+--   test = lift . test
 
-addFunction :: (Ord f, Background f, Pruner (Term f) m) => f -> WithBackground f m ()
+addFunction :: (Ord fun, Background fun, MonadPruner (Term fun) m) => fun -> Pruner fun m ()
 addFunction f = do
-  funcs <- WithBackground get
+  funcs <- Pruner get
   unless (f `Set.member` funcs) $ do
-    WithBackground (put (Set.insert f funcs))
+    Pruner (put (Set.insert f funcs))
     mapM_ add (background f)
 
 instance (Background fun1, Background fun2) => Background (fun1 :+: fun2) where

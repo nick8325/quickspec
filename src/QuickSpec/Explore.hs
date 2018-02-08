@@ -27,11 +27,11 @@ moreTerms measure tss =
     n = length tss
 
 quickSpec ::
-  (Ord a, Ord f, Typeable f, Ord result, Apply (Term f), PrettyTerm f,
-   MonadIO m, Pruner (Term f) m, Tester testcase (Term f) m) =>
-  (Term f -> a) ->
-  (Term f -> testcase -> result) ->
-  Int -> [f] -> [Type] -> m ()
+  (Ord measure, Ord fun, Typeable fun, Ord result, Apply (Term fun), PrettyTerm fun,
+   MonadIO m, MonadPruner (Term fun) m, MonadTester testcase (Term fun) m) =>
+  (Term fun -> measure) ->
+  (Term fun -> testcase -> result) ->
+  Int -> [fun] -> [Type] -> m ()
 quickSpec measure eval size funs tys = do
   let state0 = initialState eval
 

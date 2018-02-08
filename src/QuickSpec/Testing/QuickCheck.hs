@@ -20,37 +20,42 @@ data Config =
     cfg_max_test_size :: Int }
   deriving Show
 
-data QuickCheckTesterStuff testcase term result =
-  QuickCheckTesterStuff {
-    qc_config :: Config,
-    qc_gen :: Gen testcase,
-    qc_eval :: testcase -> term -> result,
-    qc_seed :: QCGen }
+data Environment testcase term result =
+  Environment {
+    env_config :: Config,
+    env_gen :: Gen testcase,
+    env_eval :: testcase -> term -> result,
+    env_seed :: QCGen }
 
-newtype QuickCheckTester testcase term result m a =
-  QuickCheckTester (ReaderT (QuickCheckTesterStuff testcase term result) m a)
+newtype Tester testcase term result m a =
+  Tester (ReaderT (Environment testcase term result) m a)
   deriving (Functor, Applicative, Monad, MonadIO)
 
-instance MonadTrans (QuickCheckTester testcase term result) where
-  lift = QuickCheckTester . lift
+instance MonadTrans (Tester testcase term result) where
+  lift = Tester . lift
 
-runQuickCheckTester ::
+run ::
   Config -> Gen testcase -> (testcase -> term -> result) ->
-  QuickCheckTester testcase term result m a -> Gen (m a)
-runQuickCheckTester config gen eval (QuickCheckTester x) = do
+  Tester testcase term result m a -> Gen (m a)
+run config gen eval (Tester x) = do
   seed <- arbitrary
-  return (runReaderT x (QuickCheckTesterStuff config gen eval seed))
+  return $ runReaderT x
+    Environment {
+      env_config = config,
+      env_gen = gen,
+      env_eval = eval,
+      env_seed = seed }
 
-instance (Monad m, Eq result) => Tester testcase term (QuickCheckTester testcase term result m) where
+instance (Monad m, Eq result) => MonadTester testcase term (Tester testcase term result m) where
   test prop =
-    QuickCheckTester $ do
-      stuff <- ask
-      return (quickCheckTest stuff prop)
+    Tester $ do
+      env <- ask
+      return (quickCheckTest env prop)
 
 quickCheckTest :: Eq result => 
-  QuickCheckTesterStuff testcase term result ->
+  Environment testcase term result ->
   Prop term -> Maybe testcase
-quickCheckTest QuickCheckTesterStuff{qc_config = Config{..}, ..} =
+quickCheckTest Environment{env_config = Config{..}, ..} =
   \(lhs :=>: rhs) ->
     let
       test testcase = do
@@ -61,9 +66,9 @@ quickCheckTest QuickCheckTesterStuff{qc_config = Config{..}, ..} =
     in
     msum (map test tests)
   where
-    seeds = unfoldr (Just . split) qc_seed
+    seeds = unfoldr (Just . split) env_seed
     sizes = cycle [0, 2..cfg_max_test_size]
-    tests = take cfg_num_tests (zipWith (unGen qc_gen) seeds sizes)
+    tests = take cfg_num_tests (zipWith (unGen env_gen) seeds sizes)
 
     testEq testcase (t :=: u) =
-      qc_eval testcase t == qc_eval testcase u
+      env_eval testcase t == env_eval testcase u

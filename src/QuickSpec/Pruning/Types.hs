@@ -1,9 +1,10 @@
 -- Encode monomorphic types during pruning.
 {-# LANGUAGE RecordWildCards, FlexibleInstances, GeneralizedNewtypeDeriving, MultiParamTypeClasses, FlexibleContexts, ScopedTypeVariables, UndecidableInstances #-}
-module QuickSpec.Pruning.EncodeTypes where
+module QuickSpec.Pruning.Types where
 
 import QuickSpec.Pruning
-import QuickSpec.Pruning.Background
+import qualified QuickSpec.Pruning.Background as Background
+import QuickSpec.Pruning.Background(Background)
 import QuickSpec.Testing
 import QuickSpec.Term
 import QuickSpec.Type
@@ -17,43 +18,43 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans
 
-data Tagged f =
-    Func f
+data Tagged fun =
+    Func fun
   | Tag Type
   deriving (Eq, Ord, Show, Typeable)
 
-instance Arity f => Arity (Tagged f) where
+instance Arity fun => Arity (Tagged fun) where
   arity (Func f) = arity f
   arity (Tag _) = 1
 
-instance Sized f => Sized (Tagged f) where
+instance Sized fun => Sized (Tagged fun) where
   size (Func f) = size f
   size (Tag _) = 0
 
-instance Pretty f => Pretty (Tagged f) where
+instance Pretty fun => Pretty (Tagged fun) where
   pPrint (Func f) = pPrint f
   pPrint (Tag ty) = pPrint ty
 
-instance PrettyTerm f => PrettyTerm (Tagged f) where
+instance PrettyTerm fun => PrettyTerm (Tagged fun) where
   termStyle (Func f) = termStyle f
   termStyle (Tag _) = uncurried
 
-instance EqualsBonus (Tagged f) where
+instance EqualsBonus (Tagged fun) where
 
-type TypedTerm f = Term f
-type UntypedTerm f = Term (Tagged f)
+type TypedTerm fun = Term fun
+type UntypedTerm fun = Term (Tagged fun)
 
-newtype MonoPruner f pruner a =
-  MonoPruner { runEncodeTypes :: pruner a }
-  deriving (Functor, Applicative, Monad, MonadIO)
+newtype Pruner fun pruner a =
+  Pruner { run :: pruner a }
+  deriving (Functor, Applicative, Monad, MonadIO, MonadTester testcase term)
 
-instance MonadTrans (MonoPruner f) where
-  lift = MonoPruner
+instance MonadTrans (Pruner fun) where
+  lift = Pruner
 
-instance (Ord f, Typed f, Arity f, Pruner (UntypedTerm f) pruner) => Pruner (TypedTerm f) (MonoPruner f pruner) where
+instance (Ord fun, Typed fun, Arity fun, MonadPruner (UntypedTerm fun) pruner) => MonadPruner (TypedTerm fun) (Pruner fun pruner) where
   normaliser =
-    MonoPruner $ do
-      norm <- normaliser :: pruner (UntypedTerm f -> UntypedTerm f)
+    Pruner $ do
+      norm <- normaliser :: pruner (UntypedTerm fun -> UntypedTerm fun)
       
       -- Note that we don't call addFunction on the functions in the term.
       -- This is because doing so might be expensive, as adding typing
@@ -65,15 +66,12 @@ instance (Ord f, Typed f, Arity f, Pruner (UntypedTerm f) pruner) => Pruner (Typ
 
   add prop = lift (add (encode <$> prop))
 
-instance Tester testcase term m => Tester testcase term (MonoPruner f m) where
-  test = lift . test
-
-instance (Ord f, Typed f, Arity f) => Background (Tagged f) where
+instance (Ord fun, Typed fun, Arity fun) => Background (Tagged fun) where
   background = typingAxioms
 
 -- Compute the typing axioms for a function or type tag.
-typingAxioms :: (Ord f, Typed f, Arity f) =>
-  Tagged f -> [Prop (UntypedTerm f)]
+typingAxioms :: (Ord fun, Typed fun, Arity fun) =>
+  Tagged fun -> [Prop (UntypedTerm fun)]
 typingAxioms (Tag ty) =
   [tag ty (tag ty x) === tag ty x]
   where
@@ -100,10 +98,10 @@ typingAxioms (Func func) =
         [tag ty (xs !! i)] ++
         drop (i+1) xs
 
-tag :: Type -> UntypedTerm f -> UntypedTerm f
+tag :: Type -> UntypedTerm fun -> UntypedTerm fun
 tag ty t = App (Tag ty) [t]
 
-encode :: Typed f => TypedTerm f -> UntypedTerm f
+encode :: Typed fun => TypedTerm fun -> UntypedTerm fun
 -- We always add type tags; see comment in normaliseMono.
 -- In the common case, twee will immediately remove these surplus type tags
 -- by rewriting using the typing axioms.
@@ -111,7 +109,7 @@ encode (Var x) = tag (typ x) (Var x)
 encode (App f ts) =
   tag (typeRes (typ f)) (App (Func f) (map encode ts))
 
-decode :: Typed f => UntypedTerm f -> TypedTerm f
+decode :: Typed fun => UntypedTerm fun -> TypedTerm fun
 decode = dec Nothing
   where
     dec _ (App (Tag ty) [t]) =

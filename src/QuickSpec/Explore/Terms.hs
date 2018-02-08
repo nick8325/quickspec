@@ -22,7 +22,7 @@ initialState eval =
     st_terms = Set.empty,
     st_tree = empty eval }
 
-explore :: (Ord term, Ord result, Tester testcase term m, Pruner term m) =>
+explore :: (Ord term, Ord result, MonadTester testcase term m, MonadPruner term m) =>
   term -> State testcase result term ->
   m (State testcase result term, [term], [Prop term])
 explore t s = do
