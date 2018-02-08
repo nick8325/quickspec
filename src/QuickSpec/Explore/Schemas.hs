@@ -43,16 +43,16 @@ explore ::
   (Ord result, Sized fun, Typed fun, Ord fun, PrettyTerm fun,
   MonadTester testcase (Term fun) m, MonadPruner (Term fun) m) =>
   Term fun -> State testcase result fun ->
-  m (State testcase result fun, Maybe (Term fun), [Prop (Term fun)])
+  m (State testcase result fun, Maybe (Term fun))
 explore t state@State{..} = do
-  (classes, res) <- Terms.explore t st_classes
+  (classes, res) <- withReadOnlyPruner $ Terms.explore t st_classes
   let state' = state{st_classes = classes}
   case res of
     Singleton ->
       if st_instantiate_singleton t then
         instantiate t t state'
       else
-        return (state', Just t, [])
+        return (state', Just t)
     Discovered ([] :=>: _ :=: u) ->
       exploreIn u t state'
     Knew ([] :=>: _ :=: u) ->
@@ -63,14 +63,14 @@ exploreIn ::
   (Ord result, Sized fun, Typed fun, Ord fun, PrettyTerm fun,
   MonadTester testcase (Term fun) m, MonadPruner (Term fun) m) =>
   Term fun -> Term fun -> State testcase result fun ->
-  m (State testcase result fun, Maybe (Term fun), [Prop (Term fun)])
+  m (State testcase result fun, Maybe (Term fun))
 exploreIn rep t state@State{..} =
   case Map.lookup rep st_instances of
     Nothing -> do
       -- First time instantiating this class - instantiate both terms
-      (state, _, props1) <- instantiate rep rep state
-      (state, mt, props2) <- instantiate rep t state
-      return (state, mt, props1 ++ props2)
+      (state, _) <- instantiate rep rep state
+      (state, mt) <- instantiate rep t state
+      return (state, mt)
     Just _ ->
       instantiate rep t state
     
@@ -78,36 +78,24 @@ instantiate ::
   (Ord result, Sized fun, Typed fun, Ord fun, PrettyTerm fun,
   MonadTester testcase (Term fun) m, MonadPruner (Term fun) m) =>
   Term fun -> Term fun -> State testcase result fun ->
-  m (State testcase result fun, Maybe (Term fun), [Prop (Term fun)])
+  m (State testcase result fun, Maybe (Term fun))
 instantiate rep t state@State{..} = do
   let
     instances = sortBy (comparing generality) (allUnifications (mostGeneral t))
-    loop [] terms props =
+    loop [] terms =
       return
-        (state{st_instances = Map.insert rep terms st_instances},
-         Just t, reverse props)
-    loop (t:ts) terms props = do
-      (terms, res) <- Terms.explore t terms
-      case res of
-        Discovered prop -> do
-          add prop
-          loop ts terms (prop:props)
-        _ ->
-          loop ts terms props
+        (state{st_instances = Map.insert rep terms st_instances}, Just t)
+    loop (t:ts) terms = do
+      (terms, _) <- Terms.explore t terms
+      loop ts terms
   
   let terms = Map.findWithDefault st_empty rep st_instances
   -- First check if schema is redundant
   (terms, res) <- Terms.explore (mostGeneral t) terms
   case res of
-    Knew _ ->
-      return (state{st_instances = Map.insert rep terms st_instances}, Nothing, [])
-    Discovered prop -> do
-      -- Not redundant - instantiate
-      add prop
-      return (state{st_instances = Map.insert rep terms st_instances}, Nothing, [prop])
-    Singleton ->
-      -- Not redundant - instantiate
-      loop instances terms []
+    Singleton -> loop instances terms
+    _ ->
+      return (state{st_instances = Map.insert rep terms st_instances}, Nothing)
 
 -- sortBy (comparing generality) should give most general instances first.
 generality :: Term f -> (Int, [Var])

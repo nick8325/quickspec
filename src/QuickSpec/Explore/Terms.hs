@@ -47,6 +47,7 @@ explore t s = do
     res <- test prop
     case res of
       Nothing -> do
+        add prop
         return (s, Discovered prop)
       Just tc -> do
         exp norm s { st_tree = addTestCase tc (st_tree s) } $
