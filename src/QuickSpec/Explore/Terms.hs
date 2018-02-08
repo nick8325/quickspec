@@ -11,12 +11,13 @@ import QuickSpec.Testing.DecisionTree hiding (Result, Singleton)
 
 data State testcase result term =
   State {
-    -- Terms already generated.
-    -- Stored as a map from normal form to original term.
+    -- Terms already explored. These are stored in the *values* of the map.
+    -- The keys are those terms but normalised.
+    -- We do it like this so that explore can guarantee to always return
+    -- the same representative for each equivalence class (see below).
     st_terms  :: Map term term,
     -- Decision tree mapping test case results to terms.
-    -- Terms are stored as originally passed to the 'explore' function,
-    -- i.e., not normalised.
+    -- Terms are not stored normalised.
     st_tree   :: DecisionTree testcase result term }
 
 initialState ::
@@ -28,10 +29,15 @@ initialState eval =
     st_tree = empty eval }
 
 data Result term =
+    -- Discovered a new law.
     Discovered (Prop term)
+    -- Term is equal to an existing term so redundant.
   | Knew (Prop term)
   | Singleton
 
+-- The Prop returned is always t :=: u, where t is the term passed to explore
+-- and u is the representative of t's equivalence class, not normalised.
+-- The representatives of the equivalence classes are guaranteed not to change.
 explore :: (Ord term, Ord result, MonadTester testcase term m, MonadPruner term m) =>
   term -> State testcase result term ->
   m (State testcase result term, Result term)
@@ -41,7 +47,6 @@ explore t s = do
     res <- test prop
     case res of
       Nothing -> do
-        add prop
         return (s, Discovered prop)
       Just tc -> do
         exp norm s { st_tree = addTestCase tc (st_tree s) } $

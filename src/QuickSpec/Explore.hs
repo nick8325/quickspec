@@ -1,19 +1,20 @@
 {-# LANGUAGE FlexibleContexts #-}
 module QuickSpec.Explore where
 
-import QuickSpec.Explore.Terms
+import QuickSpec.Explore.Schemas
 import QuickSpec.Testing
 import QuickSpec.Pruning
 import QuickSpec.Term
 import QuickSpec.Type
 import QuickSpec.Utils
 import Control.Monad.IO.Class
+import Data.Maybe
 
 baseTerms :: (Ord f, Typeable f, Ord a) => (Term f -> a) -> [f] -> [Type] -> [Term f]
 baseTerms measure funs tys =
   sortBy' measure $
     [App f [] | f <- funs] ++
-    zipWith (\ty n -> Var (V ty n)) (concatMap (replicate 3) tys) [0..]
+    [Var (V ty 0) | ty <- tys]
 
 moreTerms :: (Ord a, Apply (Term f)) => (Term f -> a) -> [[Term f]] -> [Term f]
 moreTerms measure tss =
@@ -27,15 +28,15 @@ moreTerms measure tss =
     n = length tss
 
 quickSpec ::
-  (Ord measure, Ord fun, Typeable fun, Ord result, Apply (Term fun), PrettyTerm fun,
+  (Ord measure, Ord fun, Typeable fun, Sized fun, Typed fun, Ord result, Apply (Term fun), PrettyTerm fun,
    MonadIO m, MonadPruner (Term fun) m, MonadTester testcase (Term fun) m) =>
   (Term fun -> measure) ->
   (Term fun -> testcase -> result) ->
   Int -> [fun] -> [Type] -> m ()
-quickSpec measure eval size funs tys = do
-  let state0 = initialState eval
+quickSpec measure eval maxSize funs tys = do
+  let state0 = initialState (\t -> size t <= 5) eval
 
-  loop state0 size [[]] [] (baseTerms measure funs tys)
+  loop state0 maxSize [[]] [] (baseTerms measure funs tys)
   where
     loop _ 1 _ _ [] = return ()
     loop state n tss ts [] =
@@ -43,12 +44,6 @@ quickSpec measure eval size funs tys = do
       where
         uss = tss ++ [ts]
     loop state n tss us (t:ts) = do
-      (state', res) <- explore t state
-      case res of
-        Singleton ->
-          loop state' n tss (t:us) ts
-        Discovered prop -> do
-          liftIO (prettyPrint prop)
-          loop state' n tss us ts
-        Knew _ ->
-          loop state' n tss us ts
+      (state', terms, props) <- explore t state
+      mapM_ (liftIO . prettyPrint) props
+      loop state' n tss (maybeToList terms ++ us) ts
