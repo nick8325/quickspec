@@ -27,9 +27,18 @@ explore :: (Ord term, Ord result, MonadTester testcase term m, MonadPruner term 
   m (State testcase result term, [term], [Prop term])
 explore t s = do
   norm <- normaliser
-  exp norm s
+  exp norm s $ \prop -> do
+    res <- test prop
+    case res of
+      Nothing -> do
+        add prop
+        return (s, [], [prop])
+      Just tc -> do
+        exp norm s { st_tree = addTestCase tc (st_tree s) } $
+          error "returned counterexample failed to falsify property"
+          
   where
-    exp norm s@State{..}
+    exp norm s@State{..} found
       | t' `Set.member` st_terms = return (s, [], [])
       | otherwise =
         case insert t st_tree of
@@ -41,14 +50,7 @@ explore t s = do
             | t' == u' ->
               return (s { st_terms = Set.insert u' (Set.delete u st_terms) }, [], [])
             -- Ask QuickCheck for a counterexample to the property.
-            | otherwise -> do
-                res <- test prop
-                case res of
-                  Nothing -> do
-                    add prop
-                    return (s, [], [prop])
-                  Just tc -> do
-                    exp norm s { st_tree = addTestCase tc st_tree }
+            | otherwise -> found prop
             where
               u' = norm u
               prop = t === u
