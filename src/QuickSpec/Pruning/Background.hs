@@ -32,9 +32,6 @@ instance (Ord fun, Background fun, MonadPruner (Term fun) m) =>
     mapM_ addFunction (funs prop)
     lift (add prop)
 
--- instance Tester testcase term m => Tester testcase term (WithBackground f m) where
---   test = lift . test
-
 addFunction :: (Ord fun, Background fun, MonadPruner (Term fun) m) => fun -> Pruner fun m ()
 addFunction f = do
   funcs <- Pruner get
