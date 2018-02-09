@@ -37,7 +37,7 @@ makeLensAs ''Schemas
 instance_ :: Ord fun => Term fun -> Lens (Schemas testcase result fun) (Terms testcase result (Term fun))
 instance_ t =
   lens
-    (\s@Schemas{..} -> Map.findWithDefault sc_empty t sc_instances)
+    (\Schemas{..} -> Map.findWithDefault sc_empty t sc_instances)
     (\x s -> modL instances (Map.insert t x) s)
 
 initialState ::
@@ -91,7 +91,7 @@ exploreIn rep t = do
     Terms.Discovered prop -> do
       add prop
       return (Rejected [prop])
-    Terms.Knew prop ->
+    Terms.Knew _ ->
       return (Rejected [])
     Terms.Singleton -> do
       -- Instantiate rep too if not already done
