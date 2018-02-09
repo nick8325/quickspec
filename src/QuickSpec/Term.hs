@@ -11,6 +11,7 @@ import Data.DList(DList)
 import qualified Data.DList as DList
 import Twee.Base(Sized(..), Arity(..), Pretty(..), PrettyTerm(..), TermStyle(..), EqualsBonus, prettyPrint)
 import Twee.Pretty
+import qualified Data.Map.Strict as Map
 
 data Term f = Var {-# UNPACK #-} !Var | App !f ![Term f]
   deriving (Eq, Ord, Show, Functor)
@@ -67,6 +68,16 @@ subterms, properSubterms :: Term f -> [Term f]
 subterms t = t:properSubterms t
 properSubterms (App _ ts) = concatMap subterms ts
 properSubterms _ = []
+
+-- Introduces variables in a canonical order.
+-- Also makes sure that variables of different types have different numbers
+canonicalise :: (Symbolic fun a, Typed fun) => a -> a
+canonicalise t = subst (\x -> Map.findWithDefault undefined x sub) t
+  where
+    sub =
+      Map.fromList
+        [(x, Var (V ty n))
+        | (x@(V ty _), n) <- zip (usort (vars t)) [0..]]
 
 class Eval term val where
   eval :: (Var -> val) -> term -> val

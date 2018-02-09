@@ -34,6 +34,10 @@ instance PrettyTerm f => PrettyTerm (PartiallyApplied f) where
   termStyle (Partial f _) = termStyle f
   termStyle (Apply _) = invisible
 
+instance PrettyArity f => PrettyArity (PartiallyApplied f) where
+  prettyArity (Partial f _) = prettyArity f
+  prettyArity (Apply _) = 1
+
 instance Typed f => Typed (PartiallyApplied f) where
   typ (Apply ty) = Twee.build (Twee.app (Twee.fun Arrow) [ty, ty])
   typ (Partial f _) = typ f

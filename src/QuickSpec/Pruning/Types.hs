@@ -13,7 +13,6 @@ import QuickSpec.Terminal
 import QuickSpec.Utils
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
-import qualified Data.Map.Strict as Map
 
 data Tagged fun =
     Func fun
@@ -61,7 +60,7 @@ instance (Ord fun, Typed fun, Arity fun, MonadPruner (UntypedTerm fun) pruner) =
       return $ \t ->
         decode . norm . encode $ t
 
-  add prop = lift (add (encode <$> renameVars prop))
+  add prop = lift (add (encode <$> canonicalise prop))
 
 instance (Ord fun, Typed fun, Arity fun) => Background (Tagged fun) where
   background = typingAxioms
@@ -122,12 +121,3 @@ decode = dec Nothing
         zipWith dec
           (map Just (typeArgs (typ f)))
           ts
-
--- Renames variables which have the same number but different types
-renameVars :: (Symbolic fun a, Typed fun) => a -> a
-renameVars t = subst (\x -> Map.findWithDefault undefined x sub) t
-  where
-    sub =
-      Map.fromList
-        [(x, Var (V ty n))
-        | (x@(V ty _), n) <- zip (usort (vars t)) [0..]]

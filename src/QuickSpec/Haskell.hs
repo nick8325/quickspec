@@ -3,6 +3,7 @@ module QuickSpec.Haskell where
 
 import QuickSpec.Haskell.Resolve
 import QuickSpec.Type
+import QuickSpec.Prop
 import Test.QuickCheck
 import Data.Constraint
 import Data.Proxy
@@ -164,6 +165,7 @@ data Constant =
   Constant {
     con_name  :: String,
     con_style :: TermStyle,
+    con_pretty_arity :: Int,
     con_value :: Value Identity }
 
 instance Eq Constant where
@@ -194,6 +196,11 @@ constant name val =
           | isOp name && typeArity (typeOf val) >= 2 -> infixStyle 5
           | isOp name -> prefix
           | otherwise -> curried,
+    con_pretty_arity =
+      case () of
+        _ | isOp name && typeArity (typeOf val) >= 2 -> 2
+          | isOp name -> 1
+          | otherwise -> 0,
     con_value = toValue (Identity val) }
 
 isOp :: String -> Bool
@@ -213,6 +220,9 @@ instance Pretty Constant where
 
 instance PrettyTerm Constant where
   termStyle = con_style
+
+instance PrettyArity Constant where
+  prettyArity = con_pretty_arity
 
 instance Sized Constant where
   size _ = 1
@@ -244,6 +254,6 @@ quickSpec Config{..} funs tys = do
   join $ fmap withStdioTerminal $ generate $
     QuickCheck.run cfg_quickCheck (arbitraryVal instances) evalHaskell $
     Twee.run cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size } $
-    QuickSpec.Explore.quickSpec measure (flip evalHaskell) cfg_max_size
+    QuickSpec.Explore.quickSpec (names instances) measure (flip evalHaskell) cfg_max_size
       [Partial f 0 | f <- funs]
       tys

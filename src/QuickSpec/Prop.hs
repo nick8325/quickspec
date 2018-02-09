@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric, TypeFamilies, DeriveFunctor, FlexibleInstances, MultiParamTypeClasses, UndecidableInstances #-}
+{-# LANGUAGE DeriveGeneric, TypeFamilies, DeriveFunctor, FlexibleInstances, MultiParamTypeClasses, UndecidableInstances, FlexibleContexts #-}
 module QuickSpec.Prop where
 
 import Control.Monad
@@ -8,6 +8,10 @@ import QuickSpec.Type
 import QuickSpec.Utils
 import QuickSpec.Term
 import GHC.Generics
+import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
+import Control.Monad.Trans.State.Strict
+import Text.PrettyPrint
 
 data Prop a =
   (:=>:) {
@@ -64,3 +68,55 @@ instance Pretty a => Pretty (Equation a) where
 infix 4 ===
 (===) :: a -> a -> Prop a
 x === y = [] :=>: x :=: y
+
+----------------------------------------------------------------------
+-- Making properties look pretty (naming variables, etc.)
+----------------------------------------------------------------------
+
+class PrettyArity fun where
+  prettyArity :: fun -> Int
+  prettyArity _ = 0
+
+prettyProp ::
+  (Typed fun, Apply (Term fun), PrettyTerm fun, PrettyArity fun) =>
+  (Type -> [String]) -> Prop (Term fun) -> Doc
+prettyProp cands =
+  pPrint . nameVars cands . eta . canonicalise
+  where
+    eta prop =
+      case filter isPretty (etaExpand prop) of
+        [] -> last (etaExpand prop)
+        (prop:_) -> prop
+
+    isPretty (_ :=>: t :=: u) = isPretty1 t && isPretty1 u
+    isPretty1 (App f ts) = prettyArity f <= length ts
+    isPretty1 (Var _) = True
+
+    etaExpand prop@(lhs :=>: t :=: u) =
+      prop:
+      case (tryApply t x, tryApply u x) of
+        (Just t', Just u') -> etaExpand (lhs :=>: t' :=: u')
+        _ -> []
+      where
+        x = Var (V (head (typeArgs (typ t))) n)
+        n = maximum (0:map (succ . var_id) (vars prop))
+
+data Named fun = Name String | Fun fun
+instance Pretty fun => Pretty (Named fun) where
+  pPrintPrec l p (Name name) = text name
+  pPrintPrec l p (Fun fun) = pPrintPrec l p fun
+instance PrettyTerm fun => PrettyTerm (Named fun) where
+  termStyle Name{} = uncurried
+  termStyle (Fun fun) = termStyle fun
+
+nameVars :: (Type -> [String]) -> Prop (Term fun) -> Prop (Term (Named fun))
+nameVars cands p =
+  subst (\x -> Map.findWithDefault undefined x sub) (fmap (fmap Fun) p)
+  where
+    sub = Map.fromList (evalState (mapM assign (usort (vars p))) Set.empty)
+    assign x = do
+      s <- get
+      let names = supply (cands (typ x))
+          name = head (filter (`Set.notMember` s) names)
+      modify (Set.insert name)
+      return (x, App (Name name) [])
