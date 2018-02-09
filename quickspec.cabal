@@ -98,4 +98,5 @@ library
     containers,
     uglymemo,
     data-lens-light,
-    transformers
+    transformers,
+    template-haskell
