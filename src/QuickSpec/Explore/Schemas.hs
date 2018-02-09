@@ -20,12 +20,21 @@ import Debug.Trace
 
 data Schemas testcase result fun =
   Schemas {
-    _sc_instantiate_singleton :: Term fun -> Bool,
-    _sc_empty :: Terms testcase result (Term fun),
-    _sc_classes :: Terms testcase result (Term fun),
-    _sc_instances :: Map (Term fun) (Terms testcase result (Term fun)) }
+    sc_instantiate_singleton :: Term fun -> Bool,
+    sc_empty :: Terms testcase result (Term fun),
+    sc_classes :: Terms testcase result (Term fun),
+    sc_instances :: Map (Term fun) (Terms testcase result (Term fun)) }
 
-makeLens ''Schemas
+makeLensAs ''Schemas [("sc_classes", "classes"), ("sc_instances", "instances")]
+
+maybeInstance :: Ord fun => Term fun -> Lens (Schemas testcase result fun) (Maybe (Terms testcase result (Term fun)))
+maybeInstance t = key t # instances
+
+instance_ :: Ord fun => Term fun -> Lens (Schemas testcase result fun) (Terms testcase result (Term fun))
+instance_ t =
+  lens
+    (\s@Schemas{..} -> Map.findWithDefault sc_empty t sc_instances)
+    (\x s -> modL instances (Map.insert t x) s)
 
 initialState ::
   (Term fun -> Bool) ->
@@ -33,22 +42,10 @@ initialState ::
   Schemas testcase result fun
 initialState inst eval =
   Schemas {
-    _sc_instantiate_singleton = inst,
-    _sc_empty = Terms.initialState eval,
-    _sc_classes = Terms.initialState eval,
-    _sc_instances = Map.empty }
-
-key :: Ord a => a -> Lens (Map a b) (Maybe b)
-key x = lens (Map.lookup x) (\my m -> Map.alter (const my) x m)
-
-sc_instance :: Ord fun => Term fun -> Lens (Schemas testcase result fun) (Maybe (Terms testcase result (Term fun)))
-sc_instance t = key t # sc_instances
-
-sc_instance_def :: Ord fun => Term fun -> Lens (Schemas testcase result fun) (Terms testcase result (Term fun))
-sc_instance_def t =
-  lens
-    (\s -> Map.findWithDefault (s ^. sc_empty) t (s ^. sc_instances))
-    (\x s -> modL sc_instances (Map.insert t x) s)
+    sc_instantiate_singleton = inst,
+    sc_empty = Terms.initialState eval,
+    sc_classes = Terms.initialState eval,
+    sc_instances = Map.empty }
 
 data Result fun =
     Accepted { result_props :: [Prop (Term fun)] }
@@ -61,10 +58,10 @@ explore ::
   MonadTester testcase (Term fun) m, MonadPruner (Term fun) m) =>
   Term fun -> StateT (Schemas testcase result fun) m (Result fun)
 explore t = do
-  res <- zoom sc_classes (Terms.explore t)
+  res <- zoom classes (Terms.explore t)
   case res of
     Terms.Singleton -> do
-      inst <- access sc_instantiate_singleton
+      inst <- gets sc_instantiate_singleton
       if inst t then
         instantiate t t
        else -- XX this is wrong - should generate most general version only
@@ -82,7 +79,7 @@ exploreIn ::
   Term fun -> Term fun ->
   StateT (Schemas testcase result fun) m (Result fun)
 exploreIn rep t = do
-  terms <- access (sc_instance rep)
+  terms <- access (maybeInstance rep)
   case terms of
     Nothing -> do
       -- First time instantiating this class - instantiate both terms
@@ -101,7 +98,7 @@ instantiate ::
   MonadTester testcase (Term fun) m, MonadPruner (Term fun) m) =>
   Term fun -> Term fun ->
   StateT (Schemas testcase result fun) m (Result fun)
-instantiate rep t = zoom (sc_instance_def rep) $ do
+instantiate rep t = zoom (instance_ rep) $ do
   let
     instances = sortBy (comparing generality) (allUnifications (mostGeneral t))
     loop [] props = return (Accepted (reverse props))

@@ -13,9 +13,20 @@ import Data.Monoid
 import Data.Ord(comparing)
 import System.IO
 import qualified Control.Category as Category
+import qualified Data.Map.Strict as Map
+import Data.Map(Map)
+import Language.Haskell.TH.Syntax
+import Data.Lens.Light
 
 (#) :: Category.Category cat => cat b c -> cat a b -> cat a c
 (#) = (Category..)
+
+key :: Ord a => a -> Lens (Map a b) (Maybe b)
+key x = lens (Map.lookup x) (\my m -> Map.alter (const my) x m)
+
+makeLensAs :: Name -> [(String, String)] -> Q [Dec]
+makeLensAs ty names =
+  nameMakeLens ty (\x -> lookup x names)
 
 repeatM :: Monad m => m a -> m [a]
 repeatM = sequence . repeat
