@@ -22,7 +22,10 @@ import qualified QuickSpec.Explore
 import QuickSpec.Explore.PartialApplication
 import QuickSpec.Pruning.Background(Background)
 import Control.Monad
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.State.Strict
 import QuickSpec.Terminal
+import Text.Printf
 
 baseInstances :: Instances
 baseInstances =
@@ -250,10 +253,18 @@ defaultConfig =
 
 quickSpec :: Config -> [Constant] -> [Type] -> IO ()
 quickSpec Config{..} funs tys = do
-  let instances = cfg_instances `mappend` baseInstances
-  join $ fmap withStdioTerminal $ generate $
+  let
+    instances = cfg_instances `mappend` baseInstances
+    present prop = do
+      n :: Int <- get
+      put (n+1)
+      putLine (printf "%3d. %s" n (show (prettyProp (names instances) prop)))
+  join $
+    fmap withStdioTerminal $
+    generate $
     QuickCheck.run cfg_quickCheck (arbitraryVal instances) evalHaskell $
     Twee.run cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size } $
-    QuickSpec.Explore.quickSpec (names instances) measure (flip evalHaskell) cfg_max_size
+    flip evalStateT 1 $
+    QuickSpec.Explore.quickSpec present measure (flip evalHaskell) cfg_max_size
       [Partial f 0 | f <- funs]
       tys

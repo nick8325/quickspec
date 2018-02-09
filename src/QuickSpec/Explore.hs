@@ -10,6 +10,7 @@ import QuickSpec.Utils
 import QuickSpec.Terminal
 import QuickSpec.Prop
 import Control.Monad.IO.Class
+import Control.Monad.Trans.Class
 import Control.Monad.Trans.State.Strict
 
 baseTerms :: (Ord f, Typeable f, Ord a) => (Term f -> a) -> [f] -> [Type] -> [Term f]
@@ -31,12 +32,12 @@ moreTerms measure tss =
 
 quickSpec ::
   (Ord measure, Ord fun, Typeable fun, Sized fun, Typed fun, Ord result, Apply (Term fun), PrettyTerm fun, PrettyArity fun,
-   MonadTerminal m, MonadPruner (Term fun) m, MonadTester testcase (Term fun) m) =>
-  (Type -> [String]) ->
+   MonadPruner (Term fun) m, MonadTester testcase (Term fun) m) =>
+  (Prop (Term fun) -> m ()) ->
   (Term fun -> measure) ->
   (Term fun -> testcase -> result) ->
   Int -> [fun] -> [Type] -> m ()
-quickSpec cands measure eval maxSize funs tys = do
+quickSpec present measure eval maxSize funs tys = do
   let state0 = initialState (\t -> size t <= 5) eval
 
   evalStateT (loop maxSize [[]] [] (baseTerms measure funs tys)) state0
@@ -48,7 +49,7 @@ quickSpec cands measure eval maxSize funs tys = do
         uss = tss ++ [ts]
     loop n tss us (t:ts) = do
       res <- explore t
-      mapM_ (putLine . show . prettyProp cands) (result_props res)
+      lift $ mapM_ present (result_props res)
       case res of
         Accepted _ ->
           loop n tss (t:us) ts
