@@ -64,18 +64,21 @@ source-repository head
   branch:   master
 
 library
-  ghc-options: -W -fno-warn-name-shadowing -fno-warn-incomplete-patterns
+  ghc-options: -W
   hs-source-dirs: src
   Exposed-modules:
     QuickSpec.Explore
     QuickSpec.Explore.PartialApplication
+    QuickSpec.Explore.Schemas
     QuickSpec.Explore.Terms
     QuickSpec.Haskell
     QuickSpec.Haskell.Resolve
     QuickSpec.Prop
     QuickSpec.Pruning
-    QuickSpec.Pruning.EncodeTypes
+    QuickSpec.Pruning.Background
     QuickSpec.Pruning.Twee
+    QuickSpec.Pruning.Types
+    QuickSpec.Pruning.UntypedTwee
     QuickSpec.Term
     QuickSpec.Testing
     QuickSpec.Testing.DecisionTree
@@ -85,11 +88,13 @@ library
 
   Build-depends:
     base >= 4 && < 5,
-    twee >= 1,
+    twee-lib >= 2,
     dlist,
     constraints,
     QuickCheck >= 2.8,
     random,
     spoon,
     containers,
-    uglymemo
+    uglymemo,
+    data-lens-light,
+    transformers

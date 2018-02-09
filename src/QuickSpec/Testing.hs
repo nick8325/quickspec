@@ -3,7 +3,7 @@
 module QuickSpec.Testing where
 
 import QuickSpec.Prop
-import Control.Monad.Trans
+import Control.Monad.Trans.Class
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Reader
 

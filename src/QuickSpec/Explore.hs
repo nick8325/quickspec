@@ -8,7 +8,6 @@ import QuickSpec.Term
 import QuickSpec.Type
 import QuickSpec.Utils
 import Control.Monad.IO.Class
-import Data.Maybe
 import Control.Monad.Trans.State.Strict
 
 baseTerms :: (Ord f, Typeable f, Ord a) => (Term f -> a) -> [f] -> [Type] -> [Term f]

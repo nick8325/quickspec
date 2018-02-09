@@ -10,7 +10,7 @@ import qualified Data.Set as Set
 import Data.Set(Set)
 import Control.Monad
 import Control.Monad.IO.Class
-import Control.Monad.Trans
+import Control.Monad.Trans.Class
 import Control.Monad.Trans.State.Strict hiding (State)
 
 newtype Pruner fun m a =

@@ -4,7 +4,7 @@ module QuickSpec.Pruning where
 
 import QuickSpec.Prop
 import QuickSpec.Testing
-import Control.Monad.Trans
+import Control.Monad.Trans.Class
 import Control.Monad.IO.Class
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Reader

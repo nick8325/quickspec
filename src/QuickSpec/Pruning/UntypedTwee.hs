@@ -17,7 +17,8 @@ import Twee.Proof hiding (Config, defaultConfig)
 import Twee.Base(Ordered(..), Extended(..), EqualsBonus, pattern F, pattern Empty, unpack)
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Strict hiding (State)
-import Control.Monad.Trans
+import Control.Monad.Trans.Class
+import Control.Monad.IO.Class
 
 data Config =
   Config {

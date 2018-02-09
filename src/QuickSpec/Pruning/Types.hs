@@ -10,7 +10,7 @@ import QuickSpec.Term
 import QuickSpec.Type
 import QuickSpec.Prop
 import Control.Monad.IO.Class
-import Control.Monad.Trans
+import Control.Monad.Trans.Class
 
 data Tagged fun =
     Func fun

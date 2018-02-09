@@ -2,8 +2,6 @@
 {-# LANGUAGE RecordWildCards, FlexibleContexts, PatternGuards, TupleSections, TemplateHaskell #-}
 module QuickSpec.Explore.Schemas where
 
-import qualified Data.Set as Set
-import Data.Set(Set)
 import qualified Data.Map.Strict as Map
 import Data.Map(Map)
 import QuickSpec.Prop
@@ -15,11 +13,9 @@ import QuickSpec.Utils
 import qualified QuickSpec.Explore.Terms as Terms
 import QuickSpec.Explore.Terms(Terms)
 import Control.Monad.Trans.State.Strict hiding (State)
-import Data.Typeable
 import Data.List
 import Data.Ord
 import Data.Lens.Light
-import QuickSpec.Utils
 import Debug.Trace
 
 data Schemas testcase result fun =
@@ -71,9 +67,9 @@ explore t = do
       inst <- access sc_instantiate_singleton
       if inst t then
         instantiate t t
-      else -- XX this is wrong - should generate most general version only
+       else -- XX this is wrong - should generate most general version only
         return (Accepted [])
-    Terms.Discovered prop@([] :=>: _ :=: u) ->
+    Terms.Discovered ([] :=>: _ :=: u) ->
       exploreIn u t
     Terms.Knew ([] :=>: _ :=: u) ->
       exploreIn u t

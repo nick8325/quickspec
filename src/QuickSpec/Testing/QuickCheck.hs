@@ -9,7 +9,7 @@ import Test.QuickCheck.Gen
 import Test.QuickCheck.Random
 import Control.Monad
 import Control.Monad.IO.Class
-import Control.Monad.Trans
+import Control.Monad.Trans.Class
 import Control.Monad.Trans.Reader
 import Data.List
 import System.Random
