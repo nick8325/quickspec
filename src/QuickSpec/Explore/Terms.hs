@@ -38,6 +38,8 @@ data Result term =
 -- The Prop returned is always t :=: u, where t is the term passed to explore
 -- and u is the representative of t's equivalence class, not normalised.
 -- The representatives of the equivalence classes are guaranteed not to change.
+--
+-- Discovered properties are not added to the pruner.
 explore :: (Ord term, Ord result, MonadTester testcase term m, MonadPruner term m) =>
   term -> State testcase result term ->
   m (State testcase result term, Result term)
@@ -47,7 +49,6 @@ explore t s = do
     res <- test prop
     case res of
       Nothing -> do
-        add prop
         return (s, Discovered prop)
       Just tc -> do
         exp norm s { st_tree = addTestCase tc (st_tree s) } $

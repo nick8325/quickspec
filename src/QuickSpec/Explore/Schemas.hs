@@ -11,14 +11,13 @@ import QuickSpec.Pruning
 import QuickSpec.Term
 import QuickSpec.Type
 import QuickSpec.Testing
-import QuickSpec.Testing.DecisionTree hiding (Singleton)
 import QuickSpec.Utils
 import qualified QuickSpec.Explore.Terms as Terms
-import QuickSpec.Explore.Terms(Result(..))
 import Control.Monad.Trans.State.Strict hiding (State)
 import Data.Typeable
 import Data.List
 import Data.Ord
+import Debug.Trace
 
 data State testcase result fun =
   State {
@@ -38,64 +37,81 @@ initialState inst eval =
     st_classes = Terms.initialState eval,
     st_instances = Map.empty }
 
+data Result testcase result fun =
+    Accepted { result_state :: State testcase result fun, result_props :: [Prop (Term fun)] }
+  | Rejected { result_state :: State testcase result fun, result_props :: [Prop (Term fun)] }
+
 -- The schema is represented as a term where there is only one distinct variable of each type
+-- Discovered properties are added to the pruner. Use watchPruner to see them.
 explore ::
   (Ord result, Sized fun, Typed fun, Ord fun, PrettyTerm fun,
   MonadTester testcase (Term fun) m, MonadPruner (Term fun) m) =>
   Term fun -> State testcase result fun ->
-  m (State testcase result fun, Maybe (Term fun))
+  m (Result testcase result fun)
 explore t state@State{..} = do
-  (classes, res) <- withReadOnlyPruner $ Terms.explore t st_classes
+  (classes, res) <- Terms.explore t st_classes
   let state' = state{st_classes = classes}
   case res of
-    Singleton ->
+    Terms.Singleton ->
       if st_instantiate_singleton t then
         instantiate t t state'
-      else
-        return (state', Just t)
-    Discovered ([] :=>: _ :=: u) ->
+      else -- XX this is wrong - should generate most general version only
+        return (Accepted state' [])
+    Terms.Discovered prop@([] :=>: _ :=: u) ->
       exploreIn u t state'
-    Knew ([] :=>: _ :=: u) ->
+    Terms.Knew ([] :=>: _ :=: u) ->
       exploreIn u t state'
     _ -> error "term layer returned non-equational property"
 
+{-# INLINEABLE exploreIn #-}
 exploreIn ::
   (Ord result, Sized fun, Typed fun, Ord fun, PrettyTerm fun,
   MonadTester testcase (Term fun) m, MonadPruner (Term fun) m) =>
   Term fun -> Term fun -> State testcase result fun ->
-  m (State testcase result fun, Maybe (Term fun))
+  m (Result testcase result fun)
 exploreIn rep t state@State{..} =
   case Map.lookup rep st_instances of
     Nothing -> do
       -- First time instantiating this class - instantiate both terms
-      (state, _) <- instantiate rep rep state
-      (state, mt) <- instantiate rep t state
-      return (state, mt)
+
+      -- rep must be accepted because the equivalence relation is empty,
+      -- but it may generate properties where both sides have rep as schema
+      Accepted state props <- instantiate rep rep state
+      res <- instantiate rep t state
+      return res { result_props = props ++ result_props res }
     Just _ ->
       instantiate rep t state
     
+{-# INLINEABLE instantiate #-}
 instantiate ::
   (Ord result, Sized fun, Typed fun, Ord fun, PrettyTerm fun,
   MonadTester testcase (Term fun) m, MonadPruner (Term fun) m) =>
   Term fun -> Term fun -> State testcase result fun ->
-  m (State testcase result fun, Maybe (Term fun))
+  m (Result testcase result fun)
 instantiate rep t state@State{..} = do
   let
     instances = sortBy (comparing generality) (allUnifications (mostGeneral t))
-    loop [] terms =
+    loop [] terms props =
       return
-        (state{st_instances = Map.insert rep terms st_instances}, Just t)
-    loop (t:ts) terms = do
-      (terms, _) <- Terms.explore t terms
-      loop ts terms
+        (Accepted state{st_instances = Map.insert rep terms st_instances} (reverse props))
+    loop (t:ts) terms props = do
+      (terms, res) <- Terms.explore t terms
+      case res of
+        Terms.Discovered prop -> do
+          add prop
+          loop ts terms (prop:props)
+        _ -> loop ts terms props
   
   let terms = Map.findWithDefault st_empty rep st_instances
   -- First check if schema is redundant
   (terms, res) <- Terms.explore (mostGeneral t) terms
   case res of
-    Singleton -> loop instances terms
-    _ ->
-      return (state{st_instances = Map.insert rep terms st_instances}, Nothing)
+    Terms.Singleton -> loop instances terms []
+    Terms.Discovered prop -> do
+      add prop
+      return (Rejected state{st_instances = Map.insert rep terms st_instances} [prop])
+    Terms.Knew _ ->
+      return (Rejected state{st_instances = Map.insert rep terms st_instances} [])
 
 -- sortBy (comparing generality) should give most general instances first.
 generality :: Term f -> (Int, [Var])

@@ -44,6 +44,10 @@ quickSpec measure eval maxSize funs tys = do
       where
         uss = tss ++ [ts]
     loop state n tss us (t:ts) = do
-      ((state', terms), props) <- watchPruner (explore t state)
-      mapM_ (liftIO . prettyPrint) props
-      loop state' n tss (maybeToList terms ++ us) ts
+      res <- explore t state
+      mapM_ (liftIO . prettyPrint) (result_props res)
+      case res of
+        Accepted state _ ->
+          loop state n tss (t:us) ts
+        Rejected state _ ->
+          loop state n tss us ts
