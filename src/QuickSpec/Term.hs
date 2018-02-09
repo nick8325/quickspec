@@ -12,6 +12,7 @@ import qualified Data.DList as DList
 import Twee.Base(Sized(..), Arity(..), Pretty(..), PrettyTerm(..), TermStyle(..), EqualsBonus, prettyPrint)
 import Twee.Pretty
 import qualified Data.Map.Strict as Map
+import Data.List
 
 data Term f = Var {-# UNPACK #-} !Var | App !f ![Term f]
   deriving (Eq, Ord, Show, Functor)
@@ -77,7 +78,7 @@ canonicalise t = subst (\x -> Map.findWithDefault undefined x sub) t
     sub =
       Map.fromList
         [(x, Var (V ty n))
-        | (x@(V ty _), n) <- zip (usort (vars t)) [0..]]
+        | (x@(V ty _), n) <- zip (nub (vars t)) [0..]]
 
 class Eval term val where
   eval :: (Var -> val) -> term -> val
