@@ -14,6 +14,7 @@ import Control.Monad.Trans.Reader
 import Data.List
 import System.Random
 import QuickSpec.Terminal
+import QuickSpec.Utils
 
 data Config =
   Config {
@@ -24,9 +25,8 @@ data Config =
 data Environment testcase term result =
   Environment {
     env_config :: Config,
-    env_gen :: Gen testcase,
-    env_eval :: testcase -> term -> result,
-    env_seed :: QCGen }
+    env_tests :: [testcase],
+    env_eval :: testcase -> term -> result }
 
 newtype Tester testcase term result m a =
   Tester (ReaderT (Environment testcase term result) m a)
@@ -69,11 +69,7 @@ quickCheckTest Environment{env_config = Config{..}, ..} =
           not (testEq testcase rhs)
         return testcase
     in
-    msum (map test tests)
+    msum (map test env_tests)
   where
-    seeds = unfoldr (Just . split) env_seed
-    sizes = cycle [0, 2..cfg_max_test_size]
-    tests = take cfg_num_tests (zipWith (unGen env_gen) seeds sizes)
-
     testEq testcase (t :=: u) =
       env_eval testcase t == env_eval testcase u
