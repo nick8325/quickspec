@@ -80,6 +80,7 @@ library
     QuickSpec.Pruning.Types
     QuickSpec.Pruning.UntypedTwee
     QuickSpec.Term
+    QuickSpec.Terminal
     QuickSpec.Testing
     QuickSpec.Testing.DecisionTree
     QuickSpec.Testing.QuickCheck

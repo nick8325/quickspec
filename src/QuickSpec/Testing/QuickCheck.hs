@@ -13,6 +13,7 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.Reader
 import Data.List
 import System.Random
+import QuickSpec.Terminal
 
 data Config =
   Config {
@@ -29,7 +30,7 @@ data Environment testcase term result =
 
 newtype Tester testcase term result m a =
   Tester (ReaderT (Environment testcase term result) m a)
-  deriving (Functor, Applicative, Monad, MonadIO)
+  deriving (Functor, Applicative, Monad, MonadIO, MonadTerminal)
 
 instance MonadTrans (Tester testcase term result) where
   lift = Tester . lift
@@ -37,20 +38,24 @@ instance MonadTrans (Tester testcase term result) where
 run ::
   Config -> Gen testcase -> (testcase -> term -> result) ->
   Tester testcase term result m a -> Gen (m a)
-run config gen eval (Tester x) = do
+run config@Config{..} gen eval (Tester x) = do
   seed <- arbitrary
+  let
+    seeds = unfoldr (Just . split) seed
+    sizes = cycle [0, 2..cfg_max_test_size]
+    tests = take cfg_num_tests (zipWith (unGen gen) seeds sizes)
   return $ runReaderT x
     Environment {
       env_config = config,
-      env_gen = gen,
-      env_eval = eval,
-      env_seed = seed }
+      env_tests = tests,
+      env_eval = eval }
 
-instance (Monad m, Eq result) => MonadTester testcase term (Tester testcase term result m) where
+instance (MonadTerminal m, Eq result) => MonadTester testcase term (Tester testcase term result m) where
   test prop =
+    withStatus "running QuickCheck" $
     Tester $ do
       env <- ask
-      return (quickCheckTest env prop)
+      return $! quickCheckTest env prop
 
 quickCheckTest :: Eq result => 
   Environment testcase term result ->

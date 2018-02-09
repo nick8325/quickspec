@@ -5,6 +5,7 @@ module QuickSpec.Pruning.Twee(Config(..), module QuickSpec.Pruning.Twee) where
 import QuickSpec.Testing
 import QuickSpec.Pruning
 import QuickSpec.Term
+import QuickSpec.Terminal
 import qualified QuickSpec.Pruning.Types as Types
 import qualified QuickSpec.Pruning.Background as Background
 import QuickSpec.Pruning.Background(Background)
@@ -16,7 +17,7 @@ import QuickSpec.Pruning.UntypedTwee(Config(..))
 
 newtype Pruner fun m a =
   Pruner (Background.Pruner fun (Types.Pruner fun (Untyped.Pruner (Types.Tagged fun) m)) a)
-  deriving (Functor, Applicative, Monad, MonadIO, MonadTester testcase term, MonadPruner (Term fun))
+  deriving (Functor, Applicative, Monad, MonadIO, MonadTester testcase term, MonadPruner (Term fun), MonadTerminal)
 
 instance MonadTrans (Pruner fun) where
   lift = Pruner . lift . lift . lift

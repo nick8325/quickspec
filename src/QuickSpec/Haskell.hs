@@ -21,6 +21,7 @@ import qualified QuickSpec.Explore
 import QuickSpec.Explore.PartialApplication
 import QuickSpec.Pruning.Background(Background)
 import Control.Monad
+import QuickSpec.Terminal
 
 baseInstances :: Instances
 baseInstances =
@@ -240,7 +241,7 @@ defaultConfig =
 quickSpec :: Config -> [Constant] -> [Type] -> IO ()
 quickSpec Config{..} funs tys = do
   let instances = cfg_instances `mappend` baseInstances
-  join $ generate $
+  join $ fmap withStdioTerminal $ generate $
     QuickCheck.run cfg_quickCheck (arbitraryVal instances) evalHaskell $
     Twee.run cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size } $
     QuickSpec.Explore.quickSpec measure (flip evalHaskell) cfg_max_size

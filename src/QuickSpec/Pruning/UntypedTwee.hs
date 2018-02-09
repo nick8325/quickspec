@@ -19,6 +19,7 @@ import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Strict hiding (State)
 import Control.Monad.Trans.Class
 import Control.Monad.IO.Class
+import QuickSpec.Terminal
 
 data Config =
   Config {
@@ -31,7 +32,7 @@ instance (Pretty fun, PrettyTerm fun, Ord fun, Typeable fun, Sized fun, Arity fu
 
 newtype Pruner fun m a =
   Pruner (ReaderT Twee.Config (StateT (State (Extended fun)) m) a)
-  deriving (Functor, Applicative, Monad, MonadIO, MonadTester testcase term)
+  deriving (Functor, Applicative, Monad, MonadIO, MonadTester testcase term, MonadTerminal)
 
 instance MonadTrans (Pruner fun) where
   lift = Pruner . lift . lift
@@ -45,13 +46,13 @@ run Config{..} (Pruner x) =
         Twee.cfg_max_term_size = cfg_max_term_size,
         Twee.cfg_max_cp_depth = cfg_max_cp_depth }
 
-instance (Ord fun, Typeable fun, Arity fun, Sized fun, PrettyTerm fun, EqualsBonus fun, Monad m) =>
+instance (Ord fun, Typeable fun, Arity fun, Sized fun, PrettyTerm fun, EqualsBonus fun, MonadTerminal m) =>
   MonadPruner (Term fun) (Pruner fun m) where
   normaliser = Pruner $ do
     state <- lift get
     return (normaliseTwee state)
 
-  add prop = Pruner $ do
+  add prop = withStatus "filtering redundant laws" $ Pruner $ do
     config <- ask
     state <- lift get
     lift (put $! addTwee config prop state)

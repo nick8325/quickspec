@@ -7,6 +7,7 @@ import QuickSpec.Pruning
 import QuickSpec.Term
 import QuickSpec.Type
 import QuickSpec.Utils
+import QuickSpec.Terminal
 import Control.Monad.IO.Class
 import Control.Monad.Trans.State.Strict
 
@@ -29,7 +30,7 @@ moreTerms measure tss =
 
 quickSpec ::
   (Ord measure, Ord fun, Typeable fun, Sized fun, Typed fun, Ord result, Apply (Term fun), PrettyTerm fun,
-   MonadIO m, MonadPruner (Term fun) m, MonadTester testcase (Term fun) m) =>
+   MonadTerminal m, MonadPruner (Term fun) m, MonadTester testcase (Term fun) m) =>
   (Term fun -> measure) ->
   (Term fun -> testcase -> result) ->
   Int -> [fun] -> [Type] -> m ()
@@ -45,7 +46,7 @@ quickSpec measure eval maxSize funs tys = do
         uss = tss ++ [ts]
     loop n tss us (t:ts) = do
       res <- explore t
-      mapM_ (liftIO . prettyPrint) (result_props res)
+      mapM_ (putLine . prettyShow) (result_props res)
       case res of
         Accepted _ ->
           loop n tss (t:us) ts

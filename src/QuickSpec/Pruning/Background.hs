@@ -6,6 +6,7 @@ import QuickSpec.Term
 import QuickSpec.Testing
 import QuickSpec.Pruning
 import QuickSpec.Prop
+import QuickSpec.Terminal
 import qualified Data.Set as Set
 import Data.Set(Set)
 import Control.Monad
@@ -15,7 +16,7 @@ import Control.Monad.Trans.State.Strict hiding (State)
 
 newtype Pruner fun m a =
   Pruner (StateT (Set fun) m a)
-  deriving (Functor, Applicative, Monad, MonadIO, MonadTrans, MonadTester testcase term)
+  deriving (Functor, Applicative, Monad, MonadIO, MonadTrans, MonadTester testcase term, MonadTerminal)
 
 class Background f where
   background :: f -> [Prop (Term f)]

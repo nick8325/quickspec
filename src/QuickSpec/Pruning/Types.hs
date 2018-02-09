@@ -9,6 +9,7 @@ import QuickSpec.Testing
 import QuickSpec.Term
 import QuickSpec.Type
 import QuickSpec.Prop
+import QuickSpec.Terminal
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
 
@@ -40,7 +41,7 @@ type UntypedTerm fun = Term (Tagged fun)
 
 newtype Pruner fun pruner a =
   Pruner { run :: pruner a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadTester testcase term)
+  deriving (Functor, Applicative, Monad, MonadIO, MonadTester testcase term, MonadTerminal)
 
 instance MonadTrans (Pruner fun) where
   lift = Pruner
