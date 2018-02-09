@@ -8,25 +8,26 @@ import QuickSpec.Prop
 import QuickSpec.Pruning
 import QuickSpec.Testing
 import QuickSpec.Testing.DecisionTree hiding (Result, Singleton)
+import Control.Monad.Trans.State.Strict hiding (State)
 
-data State testcase result term =
-  State {
+data Terms testcase result term =
+  Terms {
     -- Terms already explored. These are stored in the *values* of the map.
     -- The keys are those terms but normalised.
     -- We do it like this so that explore can guarantee to always return
     -- the same representative for each equivalence class (see below).
-    st_terms  :: Map term term,
+    tm_terms  :: Map term term,
     -- Decision tree mapping test case results to terms.
     -- Terms are not stored normalised.
-    st_tree   :: DecisionTree testcase result term }
+    tm_tree   :: DecisionTree testcase result term }
 
 initialState ::
   (term -> testcase -> result) ->
-  State testcase result term
+  Terms testcase result term
 initialState eval =
-  State {
-    st_terms = Map.empty,
-    st_tree = empty eval }
+  Terms {
+    tm_terms = Map.empty,
+    tm_tree = empty eval }
 
 data Result term =
     -- Discovered a new law.
@@ -41,32 +42,35 @@ data Result term =
 --
 -- Discovered properties are not added to the pruner.
 explore :: (Ord term, Ord result, MonadTester testcase term m, MonadPruner term m) =>
-  term -> State testcase result term ->
-  m (State testcase result term, Result term)
-explore t s = do
+  term -> StateT (Terms testcase result term) m (Result term)
+explore t = do
   norm <- normaliser
-  exp norm s $ \prop -> do
+  exp norm $ \prop -> do
     res <- test prop
     case res of
       Nothing -> do
-        return (s, Discovered prop)
+        return (Discovered prop)
       Just tc -> do
-        exp norm s { st_tree = addTestCase tc (st_tree s) } $
+        modify (\s -> s { tm_tree = addTestCase tc (tm_tree s) })
+        exp norm $
           error "returned counterexample failed to falsify property"
           
   where
-    exp norm s@State{..} found =
-      case Map.lookup t' st_terms of
-        Just u -> return (s, Knew (t === u))
+    exp norm found = do
+      tm@Terms{..} <- get
+      case Map.lookup t' tm_terms of
+        Just u -> return (Knew (t === u))
         Nothing ->
-          case insert t st_tree of
-            Distinct tree ->
-              return (s { st_tree = tree, st_terms = Map.insert t' t st_terms }, Singleton)
+          case insert t tm_tree of
+            Distinct tree -> do
+              put tm { tm_tree = tree, tm_terms = Map.insert t' t tm_terms }
+              return Singleton
             EqualTo u
-              -- st_terms is not kept normalised wrt the discovered laws;
+              -- tm_terms is not kept normalised wrt the discovered laws;
               -- instead, we normalise it lazily like so.
-              | t' == u' ->
-                return (s { st_terms = Map.insert u' u st_terms }, Knew prop)
+              | t' == u' -> do
+                put tm { tm_terms = Map.insert u' u tm_terms }
+                return (Knew prop)
               -- Ask QuickCheck for a counterexample to the property.
               | otherwise -> found prop
               where

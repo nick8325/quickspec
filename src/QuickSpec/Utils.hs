@@ -12,6 +12,10 @@ import Data.Monoid
 #endif
 import Data.Ord(comparing)
 import System.IO
+import qualified Control.Category as Category
+
+(#) :: Category.Category cat => cat b c -> cat a b -> cat a c
+(#) = (Category..)
 
 repeatM :: Monad m => m a -> m [a]
 repeatM = sequence . repeat

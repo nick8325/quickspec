@@ -9,6 +9,7 @@ import QuickSpec.Type
 import QuickSpec.Utils
 import Control.Monad.IO.Class
 import Data.Maybe
+import Control.Monad.Trans.State.Strict
 
 baseTerms :: (Ord f, Typeable f, Ord a) => (Term f -> a) -> [f] -> [Type] -> [Term f]
 baseTerms measure funs tys =
@@ -36,18 +37,18 @@ quickSpec ::
 quickSpec measure eval maxSize funs tys = do
   let state0 = initialState (\t -> size t <= 5) eval
 
-  loop state0 maxSize [[]] [] (baseTerms measure funs tys)
+  evalStateT (loop maxSize [[]] [] (baseTerms measure funs tys)) state0
   where
-    loop _ 1 _ _ [] = return ()
-    loop state n tss ts [] =
-      loop state (n-1) uss [] (moreTerms measure uss)
+    loop 1 _ _ [] = return ()
+    loop n tss ts [] =
+      loop (n-1) uss [] (moreTerms measure uss)
       where
         uss = tss ++ [ts]
-    loop state n tss us (t:ts) = do
-      res <- explore t state
+    loop n tss us (t:ts) = do
+      res <- explore t
       mapM_ (liftIO . prettyPrint) (result_props res)
       case res of
-        Accepted state _ ->
-          loop state n tss (t:us) ts
-        Rejected state _ ->
-          loop state n tss us ts
+        Accepted _ ->
+          loop n tss (t:us) ts
+        Rejected _ ->
+          loop n tss us ts
