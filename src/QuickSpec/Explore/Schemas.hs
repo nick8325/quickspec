@@ -16,19 +16,23 @@ import Control.Monad.Trans.State.Strict hiding (State)
 import Data.List
 import Data.Ord
 import Data.Lens.Light
-import Debug.Trace
+import qualified Data.Set as Set
+import Data.Set(Set)
+import Data.Maybe
+import Control.Monad
 
 data Schemas testcase result fun =
   Schemas {
     sc_instantiate_singleton :: Term fun -> Bool,
     sc_empty :: Terms testcase result (Term fun),
     sc_classes :: Terms testcase result (Term fun),
+    sc_instantiated :: Set (Term fun),
     sc_instances :: Map (Term fun) (Terms testcase result (Term fun)) }
 
-makeLensAs ''Schemas [("sc_classes", "classes"), ("sc_instances", "instances")]
-
-maybeInstance :: Ord fun => Term fun -> Lens (Schemas testcase result fun) (Maybe (Terms testcase result (Term fun)))
-maybeInstance t = key t # instances
+makeLensAs ''Schemas
+  [("sc_classes", "classes"),
+   ("sc_instances", "instances"),
+   ("sc_instantiated", "instantiated")]
 
 instance_ :: Ord fun => Term fun -> Lens (Schemas testcase result fun) (Terms testcase result (Term fun))
 instance_ t =
@@ -45,6 +49,7 @@ initialState inst eval =
     sc_instantiate_singleton = inst,
     sc_empty = Terms.initialState eval,
     sc_classes = Terms.initialState eval,
+    sc_instantiated = Set.empty,
     sc_instances = Map.empty }
 
 data Result fun =
@@ -52,7 +57,6 @@ data Result fun =
   | Rejected { result_props :: [Prop (Term fun)] }
 
 -- The schema is represented as a term where there is only one distinct variable of each type
--- Discovered properties are added to the pruner. Use watchPruner to see them.
 explore ::
   (Ord result, Sized fun, Typed fun, Ord fun, PrettyTerm fun,
   MonadTester testcase (Term fun) m, MonadPruner (Term fun) m) =>
@@ -63,8 +67,10 @@ explore t = do
     Terms.Singleton -> do
       inst <- gets sc_instantiate_singleton
       if inst t then
-        instantiate t t
-       else -- XX this is wrong - should generate most general version only
+        instantiateRep t
+       else do
+        -- Add the most general instance of the schema
+        zoom (instance_ t) (Terms.explore (mostGeneral t))
         return (Accepted [])
     Terms.Discovered ([] :=>: _ :=: u) ->
       exploreIn u t
@@ -79,19 +85,34 @@ exploreIn ::
   Term fun -> Term fun ->
   StateT (Schemas testcase result fun) m (Result fun)
 exploreIn rep t = do
-  terms <- access (maybeInstance rep)
-  case terms of
-    Nothing -> do
-      -- First time instantiating this class - instantiate both terms
-
-      -- rep must be accepted because the equivalence relation is empty,
-      -- but it may generate properties where both sides have rep as schema
-      Accepted props <- instantiate rep rep
+  -- First check if schema is redundant
+  res <- zoom (instance_ rep) (Terms.explore (mostGeneral t))
+  case res of
+    Terms.Discovered prop -> do
+      add prop
+      return (Rejected [prop])
+    Terms.Knew prop ->
+      return (Rejected [])
+    Terms.Singleton -> do
+      -- Instantiate rep too if not already done
+      inst <- access instantiated
+      props <-
+        if Set.notMember rep inst
+        then result_props <$> instantiateRep rep
+        else return []
       res <- instantiate rep t
       return res { result_props = props ++ result_props res }
-    Just _ ->
-      instantiate rep t
-    
+
+{-# INLINEABLE instantiateRep #-}
+instantiateRep ::
+  (Ord result, Sized fun, Typed fun, Ord fun, PrettyTerm fun,
+  MonadTester testcase (Term fun) m, MonadPruner (Term fun) m) =>
+  Term fun ->
+  StateT (Schemas testcase result fun) m (Result fun)
+instantiateRep t = do
+  instantiated %= Set.insert t
+  instantiate t t
+
 {-# INLINEABLE instantiate #-}
 instantiate ::
   (Ord result, Sized fun, Typed fun, Ord fun, PrettyTerm fun,
@@ -99,26 +120,14 @@ instantiate ::
   Term fun -> Term fun ->
   StateT (Schemas testcase result fun) m (Result fun)
 instantiate rep t = zoom (instance_ rep) $ do
-  let
-    instances = sortBy (comparing generality) (allUnifications (mostGeneral t))
-    loop [] props = return (Accepted (reverse props))
-    loop (t:ts) props = do
-      res <- Terms.explore t
-      case res of
-        Terms.Discovered prop -> do
-          add prop
-          loop ts (prop:props)
-        _ -> loop ts props
-
-  -- First check if schema is redundant
-  res <- Terms.explore (mostGeneral t)
-  case res of
-    Terms.Singleton -> trace ("instantiate " ++ prettyShow t) $ loop instances []
-    Terms.Discovered prop -> do
-      add prop
-      return (Rejected [prop])
-    Terms.Knew _ ->
-      return (Rejected [])
+  let instances = sortBy (comparing generality) (allUnifications (mostGeneral t))
+  Accepted <$> catMaybes <$> forM instances (\t -> do
+    res <- Terms.explore t
+    case res of
+      Terms.Discovered prop -> do
+        add prop
+        return (Just prop)
+      _ -> return Nothing)
 
 -- sortBy (comparing generality) should give most general instances first.
 generality :: Term f -> (Int, [Var])
