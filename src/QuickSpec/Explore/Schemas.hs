@@ -151,4 +151,4 @@ allUnifications t = map f ss
     ss = map Map.fromList (sequence vs)
     go s x = Map.findWithDefault undefined x s
     f s = subst (Var . go s) t
-    varCount _ = 3
+    varCount _ = 4
