@@ -38,6 +38,9 @@ literals p = rhs p:lhs p
 unitProp :: Equation a -> Prop a
 unitProp p = [] :=>: p
 
+mapFun :: (fun1 -> fun2) -> Prop (Term fun1) -> Prop (Term fun2)
+mapFun f = fmap (fmap f)
+
 instance Typed a => Typed (Prop a) where
   typ _ = typeOf True
   otherTypesDL p = DList.fromList (literals p) >>= typesDL

@@ -50,6 +50,13 @@ instance PrettyTerm f => Pretty (Term f) where
   pPrintPrec l p (App f xs) =
     pPrintTerm (termStyle f) l p (pPrint f) xs
 
+isApp :: Term f -> Bool
+isApp App{} = True
+isApp Var{} = False
+
+isVar :: Term f -> Bool
+isVar = not . isApp
+
 terms :: Symbolic f a => a -> [Term f]
 terms = DList.toList . termsDL
 
@@ -100,7 +107,7 @@ instance Typed f => Typed (Term f) where
 
   otherTypesDL (Var _) = mempty
   otherTypesDL (App f ts) =
-    otherTypesDL f `mplus` otherTypesDL ts
+    typesDL f `mplus` typesDL ts
 
   typeSubst_ sub = tsub
     where

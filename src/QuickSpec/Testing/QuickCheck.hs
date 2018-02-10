@@ -15,6 +15,7 @@ import Data.List
 import System.Random
 import QuickSpec.Terminal
 import QuickSpec.Utils
+import QuickSpec.Term
 
 data Config =
   Config {
@@ -50,26 +51,24 @@ run config@Config{..} gen eval (Tester x) = do
       env_tests = tests,
       env_eval = eval }
 
-instance (MonadTerminal m, Eq result) => MonadTester testcase term (Tester testcase term result m) where
+instance (MonadTerminal m, Eq result, Pretty term) => MonadTester testcase term (Tester testcase term result m) where
   test prop =
     withStatus "running QuickCheck" $
     Tester $ do
       env <- ask
       return $! quickCheckTest env prop
 
-quickCheckTest :: Eq result => 
+quickCheckTest :: (Pretty term, Eq result) => 
   Environment testcase term result ->
   Prop term -> Maybe testcase
-quickCheckTest Environment{env_config = Config{..}, ..} =
-  \(lhs :=>: rhs) ->
-    let
-      test testcase = do
+quickCheckTest Environment{env_config = Config{..}, ..} (lhs :=>: rhs) =
+  msum (map test env_tests)
+  where
+    test testcase = do
         guard $
           all (testEq testcase) lhs &&
           not (testEq testcase rhs)
         return testcase
-    in
-    msum (map test env_tests)
-  where
+
     testEq testcase (t :=: u) =
       env_eval testcase t == env_eval testcase u

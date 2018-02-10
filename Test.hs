@@ -11,4 +11,5 @@ constants = [
 
 main = do
   quickSpec defaultConfig constants
-    [typeRep (Proxy :: Proxy Int)]
+    (typeRep (Proxy :: Proxy Int))
+    [typeRep (Proxy :: Proxy Int), typeRep (Proxy :: Proxy (Int -> Int))]

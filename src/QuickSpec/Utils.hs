@@ -24,6 +24,15 @@ import Data.Lens.Light
 key :: Ord a => a -> Lens (Map a b) (Maybe b)
 key x = lens (Map.lookup x) (\my m -> Map.alter (const my) x m)
 
+keyDefault :: Ord a => a -> b -> Lens (Map a b) b
+keyDefault x y = lens (Map.findWithDefault y x) (\y m -> Map.insert x y m)
+
+fstLens :: Lens (a, b) a
+fstLens = lens fst (\x (_, y) -> (x, y))
+
+sndLens :: Lens (a, b) b
+sndLens = lens snd (\y (x, _) -> (x, y))
+
 makeLensAs :: Name -> [(String, String)] -> Q [Dec]
 makeLensAs ty names =
   nameMakeLens ty (\x -> lookup x names)

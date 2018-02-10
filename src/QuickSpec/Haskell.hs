@@ -25,7 +25,9 @@ import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.State.Strict
 import QuickSpec.Terminal
+import QuickSpec.Explore.Polymorphic
 import Text.Printf
+import Debug.Trace
 
 baseInstances :: Instances
 baseInstances =
@@ -60,12 +62,20 @@ baseInstances =
     inst (Sub Dict :: () :- CoArbitrary Integer),
     inst (Sub Dict :: () :- CoArbitrary Bool),
     inst (Sub Dict :: () :- CoArbitrary Char),
+    inst (Sub Dict :: (CoArbitrary A, Arbitrary B) :- Arbitrary (A -> B)),
+    inst (Sub Dict :: Eq A :- Eq [A]),
     inst (Sub Dict :: Ord A :- Ord [A]),
     inst (Sub Dict :: Arbitrary A :- Arbitrary [A]),
     inst (Sub Dict :: CoArbitrary A :- CoArbitrary [A]),
+    inst (Sub Dict :: Eq A :- Eq (Maybe A)),
     inst (Sub Dict :: Ord A :- Ord (Maybe A)),
     inst (Sub Dict :: Arbitrary A :- Arbitrary (Maybe A)),
     inst (Sub Dict :: CoArbitrary A :- CoArbitrary (Maybe A)),
+    inst (Sub Dict :: Eq A :- Eq (Abstract A)),
+    inst (Sub Dict :: Ord A :- Ord (Abstract A)),
+    inst (Sub Dict :: Arbitrary A :- Arbitrary (Abstract A)),
+    inst (Sub Dict :: CoArbitrary A :- CoArbitrary (Abstract A)),
+    inst (Sub Dict :: (Arbitrary A, CoArbitrary B) :- CoArbitrary (A -> B)),
     inst (Sub Dict :: Ord A :- Eq A),
     -- From Arbitrary to Gen
     inst $ \(Dict :: Dict (Arbitrary A)) -> arbitrary :: Gen A,
@@ -155,13 +165,13 @@ instance Ord (Value Ordy) where
         let Ordy yv = reunwrap w y in
         compare xv yv
 
-evalHaskell :: Eval f (Value Maybe) => (Var -> Value Maybe, Value Identity -> Maybe TestResult) -> Term f -> Either TestResult (Term f)
+evalHaskell :: (PrettyTerm f, Eval f (Value Maybe)) => (Var -> Value Maybe, Value Identity -> Maybe TestResult) -> Term f -> Either TestResult (Term f)
 evalHaskell (env, obs) t =
   case unwrap (eval env t) of
-    Nothing `In` _ -> Right t
+    Nothing `In` _ -> trace ("couldn't evaluate " ++ prettyShow t) $ Right t
     Just val `In` w ->
       case obs (wrap w (Identity val)) of
-        Nothing -> Right t
+        Nothing -> trace ("no observer for " ++ prettyShow t) $ Right t
         Just ordy -> Left ordy
 
 data Constant =
@@ -251,8 +261,8 @@ defaultConfig =
     cfg_max_size = 7,
     cfg_instances = mempty }
 
-quickSpec :: Config -> [Constant] -> [Type] -> IO ()
-quickSpec Config{..} funs tys = do
+quickSpec :: Config -> [Constant] -> Type -> [Type] -> IO ()
+quickSpec Config{..} funs ty tys = do
   let
     instances = cfg_instances `mappend` baseInstances
     present prop = do
@@ -267,4 +277,5 @@ quickSpec Config{..} funs tys = do
     flip evalStateT 1 $
     QuickSpec.Explore.quickSpec present measure (flip evalHaskell) cfg_max_size
       [Partial f 0 | f <- funs]
+      ty
       tys
