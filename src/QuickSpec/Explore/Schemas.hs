@@ -35,10 +35,7 @@ makeLensAs ''Schemas
    ("sc_instantiated", "instantiated")]
 
 instance_ :: Ord fun => Term fun -> Lens (Schemas testcase result fun) (Terms testcase result (Term fun))
-instance_ t =
-  lens
-    (\Schemas{..} -> Map.findWithDefault sc_empty t sc_instances)
-    (\x s -> modL instances (Map.insert t x) s)
+instance_ t = reading (\Schemas{..} -> keyDefault t sc_empty # instances)
 
 initialState ::
   (Term fun -> Bool) ->

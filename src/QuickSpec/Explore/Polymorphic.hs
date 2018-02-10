@@ -108,6 +108,7 @@ exploreNoMGU t = do
   schemas1 <- access schemas
   (res, schemas2) <-
     flip runReaderT (Set.toList univ) $ runPruner $ runTester $
+    -- XXX but surely we also have to oneTypeVar the variables?
     runStateT (Schemas.explore (fmap Spec t)) schemas1
   schemas ~= schemas2
   return res { result_props = map regeneralise (result_props res) }
@@ -161,8 +162,8 @@ defaultTypes = typeSubst (const (Twee.build (Twee.app (Twee.fun tc) ty)))
     tc = tyCon (Proxy :: Proxy Abstract)
 
 instance (Given DefaultType, Typed fun) => Typed (Specialised fun) where
-  typ = defaultTypes . typ
-  otherTypesDL = fmap defaultTypes . otherTypesDL
+  typ = defaultTypes . typ . spec_fun
+  otherTypesDL = fmap defaultTypes . otherTypesDL . spec_fun
   typeSubst_ _ fun = fun -- typ fun is ground
 
 -- Given a property which only contains one type variable,

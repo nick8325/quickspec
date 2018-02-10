@@ -72,6 +72,10 @@ occ x t = length (filter (== x) (funs t))
 occVar :: Symbolic f a => Var -> a -> Int
 occVar x t = length (filter (== x) (vars t))
 
+mapVar :: (Var -> Var) -> Term f -> Term f
+mapVar f (Var x) = Var (f x)
+mapVar f (App g xs) = App g (map (mapVar f) xs)
+
 subterms, properSubterms :: Term f -> [Term f]
 subterms t = t:properSubterms t
 properSubterms (App _ ts) = concatMap subterms ts

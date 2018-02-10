@@ -27,6 +27,9 @@ key x = lens (Map.lookup x) (\my m -> Map.alter (const my) x m)
 keyDefault :: Ord a => a -> b -> Lens (Map a b) b
 keyDefault x y = lens (Map.findWithDefault y x) (\y m -> Map.insert x y m)
 
+reading :: (a -> Lens a b) -> Lens a b
+reading f = lens (\x -> getL (f x) x) (\y x -> setL (f x) y x)
+
 fstLens :: Lens (a, b) a
 fstLens = lens fst (\x (_, y) -> (x, y))
 
