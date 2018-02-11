@@ -67,7 +67,7 @@ explore t = do
         treeForType ty %= addTestCase tc
         exp norm $
           error "returned counterexample failed to falsify property"
-          
+
   where
     ty = typ t
     exp norm found = do

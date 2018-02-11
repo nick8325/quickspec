@@ -27,7 +27,6 @@ normalise t = do
   norm <- normaliser
   return (norm t)
 
-
 newtype ReadOnlyPruner m a = ReadOnlyPruner { withReadOnlyPruner :: m a }
   deriving (Functor, Applicative, Monad, MonadIO, MonadTester testcase term)
 

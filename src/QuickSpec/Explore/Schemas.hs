@@ -1,5 +1,5 @@
 -- Theory exploration which works on a schema at a time.
-{-# LANGUAGE RecordWildCards, FlexibleContexts, PatternGuards, TupleSections, TemplateHaskell #-}
+{-# LANGUAGE RecordWildCards, FlexibleContexts, PatternGuards, TupleSections, TemplateHaskell, MultiParamTypeClasses, FlexibleInstances #-}
 module QuickSpec.Explore.Schemas where
 
 import qualified Data.Map.Strict as Map
@@ -21,26 +21,36 @@ import Data.Set(Set)
 import Data.Maybe
 import Control.Monad
 
-data Schemas testcase result fun =
+data Schemas testcase result schema =
   Schemas {
-    sc_instantiate_singleton :: Term fun -> Bool,
-    sc_empty :: Terms testcase result (Term fun),
-    sc_classes :: Terms testcase result (Term fun),
-    sc_instantiated :: Set (Term fun),
-    sc_instances :: Map (Term fun) (Terms testcase result (Term fun)) }
+    sc_instantiate_singleton :: schema -> Bool,
+    sc_empty :: Terms testcase result schema,
+    sc_classes :: Terms testcase result schema,
+    sc_instantiated :: Set schema,
+    sc_instances :: Map schema (Terms testcase result schema) }
 
 makeLensAs ''Schemas
   [("sc_classes", "classes"),
    ("sc_instances", "instances"),
    ("sc_instantiated", "instantiated")]
 
-instance_ :: Ord fun => Term fun -> Lens (Schemas testcase result fun) (Terms testcase result (Term fun))
+instance_ :: Ord schema => schema -> Lens (Schemas testcase result schema) (Terms testcase result schema)
 instance_ t = reading (\Schemas{..} -> keyDefault t sc_empty # instances)
 
+class Symbolic fun a => Schematic fun a where
+  term :: a -> Term fun
+  mostGeneral :: a -> a
+  mostSpecific :: a -> a
+  mostSpecific = subst (\(V ty _) -> Var (V ty 0))
+
+instance Schematic fun (Term fun) where
+  term = id
+  mostGeneral = mostGeneralTerm
+
 initialState ::
-  (Term fun -> Bool) ->
-  (Term fun -> testcase -> result) ->
-  Schemas testcase result fun
+  (schema -> Bool) ->
+  (schema -> testcase -> result) ->
+  Schemas testcase result schema
 initialState inst eval =
   Schemas {
     sc_instantiate_singleton = inst,
@@ -49,16 +59,17 @@ initialState inst eval =
     sc_instantiated = Set.empty,
     sc_instances = Map.empty }
 
-data Result fun =
-    Accepted { result_props :: [Prop (Term fun)] }
-  | Rejected { result_props :: [Prop (Term fun)] }
+data Result schema =
+    Accepted { result_props :: [Prop schema] }
+  | Rejected { result_props :: [Prop schema] }
 
 -- The schema is represented as a term where there is only one distinct variable of each type
 explore ::
-  (Ord result, Sized fun, Typed fun, Ord fun, PrettyTerm fun,
-  MonadTester testcase (Term fun) m, MonadPruner (Term fun) m) =>
-  Term fun -> StateT (Schemas testcase result fun) m (Result fun)
-explore t = do
+  (Ord result, Ord schema, Typed schema, Schematic fun schema,
+  MonadTester testcase schema m, MonadPruner schema m) =>
+  schema -> StateT (Schemas testcase result schema) m (Result schema)
+explore t0 = do
+  let t = mostSpecific t0
   res <- zoom classes (Terms.explore t)
   case res of
     Terms.Singleton -> do
@@ -77,10 +88,10 @@ explore t = do
 
 {-# INLINEABLE exploreIn #-}
 exploreIn ::
-  (Ord result, Sized fun, Typed fun, Ord fun, PrettyTerm fun,
-  MonadTester testcase (Term fun) m, MonadPruner (Term fun) m) =>
-  Term fun -> Term fun ->
-  StateT (Schemas testcase result fun) m (Result fun)
+  (Ord result, Ord schema, Typed schema, Schematic fun schema,
+  MonadTester testcase schema m, MonadPruner schema m) =>
+  schema -> schema ->
+  StateT (Schemas testcase result schema) m (Result schema)
 exploreIn rep t = do
   -- First check if schema is redundant
   res <- zoom (instance_ rep) (Terms.explore (mostGeneral t))
@@ -102,20 +113,20 @@ exploreIn rep t = do
 
 {-# INLINEABLE instantiateRep #-}
 instantiateRep ::
-  (Ord result, Sized fun, Typed fun, Ord fun, PrettyTerm fun,
-  MonadTester testcase (Term fun) m, MonadPruner (Term fun) m) =>
-  Term fun ->
-  StateT (Schemas testcase result fun) m (Result fun)
+  (Ord result, Ord schema, Typed schema, Schematic fun schema,
+  MonadTester testcase schema m, MonadPruner schema m) =>
+  schema ->
+  StateT (Schemas testcase result schema) m (Result schema)
 instantiateRep t = do
   instantiated %= Set.insert t
   instantiate t t
 
 {-# INLINEABLE instantiate #-}
 instantiate ::
-  (Ord result, Sized fun, Typed fun, Ord fun, PrettyTerm fun,
-  MonadTester testcase (Term fun) m, MonadPruner (Term fun) m) =>
-  Term fun -> Term fun ->
-  StateT (Schemas testcase result fun) m (Result fun)
+  (Ord result, Ord schema, Typed schema, Schematic fun schema,
+  MonadTester testcase schema m, MonadPruner schema m) =>
+  schema -> schema ->
+  StateT (Schemas testcase result schema) m (Result schema)
 instantiate rep t = zoom (instance_ rep) $ do
   let instances = sortBy (comparing generality) (allUnifications (mostGeneral t))
   Accepted <$> catMaybes <$> forM instances (\t -> do
@@ -127,12 +138,12 @@ instantiate rep t = zoom (instance_ rep) $ do
       _ -> return Nothing)
 
 -- sortBy (comparing generality) should give most general instances first.
-generality :: Term f -> (Int, [Var])
+generality :: Symbolic fun a => a -> (Int, [Var])
 generality t = (-length (usort (vars t)), vars t)
 
 -- | Instantiate a schema by making all the variables different.
-mostGeneral :: Term f -> Term f
-mostGeneral s = evalState (aux s) Map.empty
+mostGeneralTerm :: Term f -> Term f
+mostGeneralTerm s = evalState (aux s) Map.empty
   where
     aux (Var (V ty _)) = do
       m <- get
@@ -141,7 +152,7 @@ mostGeneral s = evalState (aux s) Map.empty
       return (Var (V ty n))
     aux (App f xs) = fmap (App f) (mapM aux xs)
 
-allUnifications :: Term f -> [Term f]
+allUnifications :: Symbolic fun a => a -> [a]
 allUnifications t = map f ss
   where
     vs = [ map (x,) (take (varCount x) xs) | xs <- partitionBy typ (usort (vars t)), x <- xs ]

@@ -11,7 +11,6 @@ import GHC.Generics
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Control.Monad.Trans.State.Strict
-import Text.PrettyPrint
 
 data Prop a =
   (:=>:) {
@@ -106,7 +105,7 @@ prettyProp cands =
 
 data Named fun = Name String | Fun fun
 instance Pretty fun => Pretty (Named fun) where
-  pPrintPrec l p (Name name) = text name
+  pPrintPrec _ _ (Name name) = text name
   pPrintPrec l p (Fun fun) = pPrintPrec l p fun
 instance PrettyTerm fun => PrettyTerm (Named fun) where
   termStyle Name{} = uncurried

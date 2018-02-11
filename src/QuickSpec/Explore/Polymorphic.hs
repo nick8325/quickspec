@@ -27,11 +27,10 @@ import Data.Maybe
 import Data.Reflection
 import Test.QuickCheck(Arbitrary, CoArbitrary)
 import Data.Proxy
-import Debug.Trace
 
 data Polymorphic testcase result fun =
   Polymorphic {
-    pm_schemas :: Schemas testcase result (Specialised fun),
+    pm_schemas :: Schemas testcase result (Term (Specialised fun)),
     pm_unifiable :: Map (Poly Type) ([Poly Type], [(Poly Type, Poly Type)]),
     pm_accepted :: Map (Poly Type) [Term fun],
     pm_universe :: Set Type }
@@ -48,7 +47,7 @@ makeLensAs ''Polymorphic
 
 initialState ::
   (Given DefaultType, Typed fun) =>
-  [Type] -> 
+  [Type] ->
   (Term fun -> Bool) ->
   (Term fun -> testcase -> result) ->
   Polymorphic testcase result fun
@@ -66,7 +65,7 @@ explore ::
   (Given DefaultType, Ord result, Sized fun, Typed fun, Ord fun, PrettyTerm fun,
   MonadTester testcase (Term fun) m, MonadPruner (Term fun) m) =>
   Term fun ->
-  StateT (Polymorphic testcase result fun) m (Result fun)
+  StateT (Polymorphic testcase result fun) m (Result (Term fun))
 explore t = do
   univ <- access universe
   when (oneTypeVar (typ t) `notElem` univ) $
@@ -76,7 +75,7 @@ explore t = do
     Accepted{} -> do
       let ty = polyTyp (poly t)
       addPolyType ty
-      
+
       unif <- access unifiable
       let (here, there) = Map.findWithDefault undefined ty unif
       acc <- access accepted
@@ -88,7 +87,7 @@ explore t = do
         forM there (\(ty', mgu) ->
           forM (Map.findWithDefault undefined ty' acc) (\u ->
             exploreNoMGU (u `at` mgu)))
-        
+
       accepted %= Map.insertWith (++) ty [t]
       return res { result_props = concatMap result_props (res:ress1 ++ ress2) }
     Rejected{} ->
@@ -101,7 +100,7 @@ exploreNoMGU ::
   (Given DefaultType, Ord result, Sized fun, Typed fun, Ord fun, PrettyTerm fun,
   MonadTester testcase (Term fun) m, MonadPruner (Term fun) m) =>
   Term fun ->
-  StateT (Polymorphic testcase result fun) m (Result fun)
+  StateT (Polymorphic testcase result fun) m (Result (Term fun))
 exploreNoMGU t = do
   --traceM ("exploring " ++ prettyShow t ++ " :: " ++ prettyShow (typ t))
   univ <- access universe
