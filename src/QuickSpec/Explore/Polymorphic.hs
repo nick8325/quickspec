@@ -147,7 +147,11 @@ instance (Symbolic fun schema, Ord fun, Typed fun, Typed schema, MonadPruner sch
   normaliser =
     Pruner $ do
       norm <- normaliser
-      return (makeSchema . norm . polySchema)
+      -- A bit dubious to use monoSchema here, since it results in the
+      -- normalised schema getting all its type variables unified.
+      -- We rely on the fact that normalised schemas never get returned
+      -- in the properties produced by the lower layers.
+      return (makeSchema . norm . monoSchema)
   add prop = Pruner $ do
     univ <- ask
     let insts = typeInstances univ (regeneralise (fmap polySchema prop))
