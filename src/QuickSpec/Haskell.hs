@@ -165,10 +165,10 @@ instance Ord (Value Ordy) where
         let Ordy yv = reunwrap w y in
         compare xv yv
 
-evalHaskell :: (Given Type, PrettyTerm f, Eval f (Value Maybe)) => (Var -> Value Maybe, Value Identity -> Maybe TestResult) -> Term f -> Either TestResult (Term f)
+evalHaskell :: (Given Type, Typed f, PrettyTerm f, Eval f (Value Maybe)) => (Var -> Value Maybe, Value Identity -> Maybe TestResult) -> Term f -> Either TestResult (Term f)
 evalHaskell (env, obs) t =
   case unwrap (eval env t) of
-    Nothing `In` _ -> trace ("couldn't evaluate " ++ prettyShow t) $ Right t
+    Nothing `In` _ -> trace ("couldn't evaluate " ++ prettyShow t ++ " :: " ++ prettyShow (typ t)) $ Right t
     Just val `In` w ->
       case obs (wrap w (Identity val)) of
         Nothing -> trace ("no observer for " ++ prettyShow t) $ Right t

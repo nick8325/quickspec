@@ -29,7 +29,7 @@ moreTerms univ measure tss =
       t <- tss !! i,
       u <- tss !! (n-i),
       Just v <- [tryApply (poly t) (poly u)],
-      and [ typ x `Set.member` univ | x <- subterms (unPoly v) ] ]
+      and [ oneTypeVar (typ x) `Set.member` univ | x <- subterms (unPoly v) ] ]
   where
     n = length tss
 
