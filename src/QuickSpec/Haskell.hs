@@ -28,6 +28,7 @@ import QuickSpec.Terminal
 import QuickSpec.Explore.Polymorphic
 import Text.Printf
 import Debug.Trace
+import Data.Reflection hiding (D)
 
 baseInstances :: Instances
 baseInstances =
@@ -71,10 +72,6 @@ baseInstances =
     inst (Sub Dict :: Ord A :- Ord (Maybe A)),
     inst (Sub Dict :: Arbitrary A :- Arbitrary (Maybe A)),
     inst (Sub Dict :: CoArbitrary A :- CoArbitrary (Maybe A)),
-    inst (Sub Dict :: Eq A :- Eq (Abstract A)),
-    inst (Sub Dict :: Ord A :- Ord (Abstract A)),
-    inst (Sub Dict :: Arbitrary A :- Arbitrary (Abstract A)),
-    inst (Sub Dict :: CoArbitrary A :- CoArbitrary (Abstract A)),
     inst (Sub Dict :: (Arbitrary A, CoArbitrary B) :- CoArbitrary (A -> B)),
     inst (Sub Dict :: Ord A :- Eq A),
     -- From Arbitrary to Gen
@@ -111,8 +108,11 @@ names insts ty =
     (x:_) -> ofValue getNames x
     [] -> error "don't know how to name variables"
 
-arbitraryVal :: Instances -> Gen (Var -> Value Maybe, Value Identity -> Maybe TestResult)
-arbitraryVal insts =
+defaultTo :: Typed a => Type -> a -> a
+defaultTo def = typeSubst (const def)
+
+arbitraryVal :: Type -> Instances -> Gen (Var -> Value Maybe, Value Identity -> Maybe TestResult)
+arbitraryVal def insts =
   MkGen $ \g n ->
     let (g1, g2) = split g in
     (memo $ \(V ty x) ->
@@ -122,17 +122,17 @@ arbitraryVal insts =
          Just gen ->
            forValue gen $ \gen ->
              Just (unGen (coarbitrary x gen) g1 n),
-     unGen (ordyVal insts) g2 n) 
+     unGen (ordyVal def insts) g2 n) 
   where
     typ :: Type -> Maybe (Value Gen)
     typ = memo $ \ty ->
-      case findInstance insts ty of
+      case findInstance insts (defaultTo def ty) of
         [] -> Nothing
         (gen:_) ->
           Just (mapValue (coarbitrary ty) gen)
 
-ordyVal :: Instances -> Gen (Value Identity -> Maybe TestResult)
-ordyVal insts =
+ordyVal :: Type -> Instances -> Gen (Value Identity -> Maybe TestResult)
+ordyVal def insts =
   MkGen $ \g n -> \x ->
     case ordyTy (typ x) of
       Nothing -> Nothing
@@ -140,7 +140,7 @@ ordyVal insts =
   where
     ordyTy :: Type -> Maybe (Gen (Value Identity -> Value Ordy))
     ordyTy = memo $ \ty ->
-      case findInstance insts ty :: [Value Observe1] of
+      case findInstance insts (defaultTo def ty) :: [Value Observe1] of
         [] -> Nothing
         (val:_) ->
           case unwrap val of
@@ -165,7 +165,7 @@ instance Ord (Value Ordy) where
         let Ordy yv = reunwrap w y in
         compare xv yv
 
-evalHaskell :: (PrettyTerm f, Eval f (Value Maybe)) => (Var -> Value Maybe, Value Identity -> Maybe TestResult) -> Term f -> Either TestResult (Term f)
+evalHaskell :: (Given Type, PrettyTerm f, Eval f (Value Maybe)) => (Var -> Value Maybe, Value Identity -> Maybe TestResult) -> Term f -> Either TestResult (Term f)
 evalHaskell (env, obs) t =
   case unwrap (eval env t) of
     Nothing `In` _ -> trace ("couldn't evaluate " ++ prettyShow t) $ Right t
@@ -243,8 +243,8 @@ instance Sized Constant where
 instance Arity Constant where
   arity = typeArity . typ
 
-instance Applicative f => Eval Constant (Value f) where
-  eval _ = mapValue (pure . runIdentity) . con_value
+instance (Given Type, Applicative f) => Eval Constant (Value f) where
+  eval _ = mapValue (pure . runIdentity) . defaultTo given . con_value
 
 data Config =
   Config {
@@ -262,7 +262,7 @@ defaultConfig =
     cfg_instances = mempty }
 
 quickSpec :: Config -> [Constant] -> Type -> [Type] -> IO ()
-quickSpec Config{..} funs ty tys = do
+quickSpec Config{..} funs ty tys = give ty $ do
   let
     instances = cfg_instances `mappend` baseInstances
     present prop = do
@@ -272,7 +272,7 @@ quickSpec Config{..} funs ty tys = do
   join $
     fmap withStdioTerminal $
     generate $
-    QuickCheck.run cfg_quickCheck (arbitraryVal instances) evalHaskell $
+    QuickCheck.run cfg_quickCheck (arbitraryVal ty instances) evalHaskell $
     Twee.run cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size } $
     flip evalStateT 1 $
     QuickSpec.Explore.quickSpec present measure (flip evalHaskell) cfg_max_size

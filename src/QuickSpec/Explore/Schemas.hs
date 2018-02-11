@@ -38,14 +38,12 @@ instance_ :: Ord schema => schema -> Lens (Schemas testcase result schema) (Term
 instance_ t = reading (\Schemas{..} -> keyDefault t sc_empty # instances)
 
 class Symbolic fun a => Schematic fun a where
-  term :: a -> Term fun
   mostGeneral :: a -> a
   mostSpecific :: a -> a
   mostSpecific = subst (\(V ty _) -> Var (V ty 0))
 
 instance Schematic fun (Term fun) where
-  term = id
-  mostGeneral = mostGeneralTerm
+  mostGeneral = mostGeneralTerm id
 
 initialState ::
   (schema -> Bool) ->
@@ -142,13 +140,13 @@ generality :: Symbolic fun a => a -> (Int, [Var])
 generality t = (-length (usort (vars t)), vars t)
 
 -- | Instantiate a schema by making all the variables different.
-mostGeneralTerm :: Term f -> Term f
-mostGeneralTerm s = evalState (aux s) Map.empty
+mostGeneralTerm :: Ord a => (Type -> a) -> Term f -> Term f
+mostGeneralTerm f s = evalState (aux s) Map.empty
   where
     aux (Var (V ty _)) = do
       m <- get
-      let n = Map.findWithDefault 0 ty m
-      put $! Map.insert ty (n+1) m
+      let n = Map.findWithDefault 0 (f ty) m
+      put $! Map.insert (f ty) (n+1) m
       return (Var (V ty n))
     aux (App f xs) = fmap (App f) (mapM aux xs)
 

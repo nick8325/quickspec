@@ -40,7 +40,7 @@ quickSpec ::
   (Term fun -> measure) ->
   (Term fun -> testcase -> result) ->
   Int -> [fun] -> Type -> [Type] -> m ()
-quickSpec present measure eval maxSize funs ty tys = withDefaultType ty $ do
+quickSpec present measure eval maxSize funs ty tys = do
   let
     univ = Set.fromList tys
     state0 = initialState tys (\t -> size t <= 5) eval

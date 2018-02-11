@@ -5,7 +5,7 @@
 module QuickSpec.Type(
   -- Types.
   Typeable,
-  Type, TyCon(..), tyCon, fromTyCon, A, B, C, D, E, ClassA, ClassB, ClassC, ClassD, ClassE, typeVar,
+  Type, TyCon(..), tyCon, fromTyCon, A, B, C, D, E, ClassA, ClassB, ClassC, ClassD, ClassE, typeVar, isTypeVar,
   typeOf, typeRep, applyType, fromTypeRep,
   arrowType, typeArgs, typeRes, typeDrop, typeArity, oneTypeVar, skolemiseTypeVars,
   isDictionary, getDictionary,
@@ -97,6 +97,9 @@ typeVars =
 
 typeVar :: Type
 typeVar = typeRep (Proxy :: Proxy A)
+
+isTypeVar :: Type -> Bool
+isTypeVar = isVar
 
 typeOf :: Typeable a => a -> Type
 typeOf x = fromTypeRep (Ty.typeOf x)
