@@ -32,7 +32,7 @@ data Polymorphic testcase result schema =
   Polymorphic {
     pm_schemas :: Schemas testcase result (PolySchema schema),
     pm_unifiable :: Map (Poly Type) ([Poly Type], [(Poly Type, Poly Type)]),
-    pm_accepted :: Map (Poly Type) [schema],
+    pm_accepted :: Map (Poly Type) (Set schema),
     pm_universe :: Set Type }
 
 data PolySchema schema =
@@ -97,10 +97,9 @@ explore t = do
       ress2 <-
         concat <$>
         forM there (\(ty', mgu) ->
-          forM (Map.findWithDefault undefined ty' acc) (\u ->
+          forM (Set.toList (Map.findWithDefault undefined ty' acc)) (\u ->
             exploreNoMGU (u `at` mgu)))
 
-      accepted %= Map.insertWith (++) ty [t]
       return res { result_props = concatMap result_props (res:ress1 ++ ress2) }
     Rejected{} ->
       return res
@@ -109,19 +108,22 @@ explore t = do
       fromMaybe undefined (cast (unPoly ty) t)
 
 exploreNoMGU ::
-  (schema ~ Term fun, Ord result, Schematic fun schema, Typed schema, Typed fun, Ord fun,
+  (PrettyTerm fun, schema ~ Term fun, Ord result, Schematic fun schema, Typed schema, Typed fun, Ord fun,
   MonadTester testcase schema m, MonadPruner schema m) =>
   schema ->
   StateT (Polymorphic testcase result schema) m (Result schema)
 exploreNoMGU t = do
-  --traceM ("exploring " ++ prettyShow t ++ " :: " ++ prettyShow (typ t))
-  univ <- access universe
-  schemas1 <- access schemas
-  (res, schemas2) <-
-    flip runReaderT (Set.toList univ) $ runPruner $ runTester $
-    runStateT (Schemas.explore (makeSchema t)) schemas1
-  schemas ~= schemas2
-  return res { result_props = map (regeneralise . fmap polySchema) (result_props res) }
+  let ty = polyTyp (poly t)
+  acc <- access accepted
+  if (t `Set.member` Map.findWithDefault Set.empty ty acc) then return (Rejected []) else do
+    accepted %= Map.insertWith Set.union ty (Set.singleton t)
+    univ <- access universe
+    schemas1 <- access schemas
+    (res, schemas2) <-
+      flip runReaderT (Set.toList univ) $ runPruner $ runTester $
+      runStateT (Schemas.explore (makeSchema t)) schemas1
+    schemas ~= schemas2
+    return res { result_props = map (regeneralise . fmap polySchema) (result_props res) }
 
 addPolyType :: Monad m => Poly Type -> StateT (Polymorphic testcase result fun) m ()
 addPolyType ty = do
