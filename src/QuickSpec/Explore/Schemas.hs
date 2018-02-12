@@ -38,6 +38,7 @@ instance_ :: Ord schema => schema -> Lens (Schemas testcase result schema norm) 
 instance_ t = reading (\Schemas{..} -> keyDefault t sc_empty # instances)
 
 class Symbolic fun a => Schematic fun a where
+  term :: a -> Term fun
   mostGeneralWith :: Ord b => (Type -> b) -> a -> a
   mostSpecific :: a -> a
   mostSpecific = subst (\(V ty _) -> Var (V ty 0))
@@ -46,6 +47,7 @@ mostGeneral :: Schematic fun a => a -> a
 mostGeneral = mostGeneralWith id
 
 instance Schematic fun (Term fun) where
+  term = id
   mostGeneralWith = mostGeneralTerm
 
 initialState ::
@@ -129,7 +131,7 @@ instantiate ::
   schema -> schema ->
   StateT (Schemas testcase result schema norm) m (Result schema)
 instantiate rep t = zoom (instance_ rep) $ do
-  let instances = sortBy (comparing generality) (allUnifications (mostGeneral t))
+  let instances = sortBy (comparing (generality . term)) (allUnifications (mostGeneral t))
   Accepted <$> catMaybes <$> forM instances (\t -> do
     res <- Terms.explore t
     case res of
@@ -139,7 +141,7 @@ instantiate rep t = zoom (instance_ rep) $ do
       _ -> return Nothing)
 
 -- sortBy (comparing generality) should give most general instances first.
-generality :: Symbolic fun a => a -> (Int, [Var])
+generality :: Term f -> (Int, [Var])
 generality t = (-length (usort (vars t)), vars t)
 
 -- | Instantiate a schema by making all the variables different.
@@ -153,10 +155,10 @@ mostGeneralTerm f s = evalState (aux s) Map.empty
       return (Var (V ty n))
     aux (App f xs) = fmap (App f) (mapM aux xs)
 
-allUnifications :: Symbolic fun a => a -> [a]
+allUnifications :: Schematic fun a => a -> [a]
 allUnifications t = map f ss
   where
-    vs = [ map (x,) (take (varCount x) xs) | xs <- partitionBy typ (usort (vars t)), x <- xs ]
+    vs = [ map (x,) (take (varCount x) xs) | xs <- partitionBy typ (usort (vars (term t))), x <- xs ]
     ss = map Map.fromList (sequence vs)
     go s x = Map.findWithDefault undefined x s
     f s = subst (Var . go s) t

@@ -68,6 +68,7 @@ instance (Typed schema, Symbolic fun schema) => Symbolic fun (PolySchema schema)
   subst sub = makeSchema . subst sub . polySchema
 
 instance (Typed schema, Schematic fun schema) => Schematic fun (PolySchema schema) where
+  term = term . polySchema
   mostGeneralWith f = makeSchema . mostGeneralWith (f . oneTypeVar) . polySchema
 
 instance Typed schema => Typed (PolySchema schema) where
@@ -189,8 +190,7 @@ typeInstances univ prop =
     cs =
       foldr intersection [Map.empty]
         (map constrain
-          (filter (\x -> isApp x)
-            (usort (terms prop >>= subterms))))
+          (usort (terms prop >>= subterms)))
 
     constrain t =
       usort [ Map.fromList (Twee.substToList sub) | u <- univ, Just sub <- [Twee.match (typ t) u] ]
@@ -206,7 +206,7 @@ universe xs = Universe (close add (Set.fromList base))
     add tys = concatMap subterms tys
     subterms (Twee.App _ ts) = Twee.unpack ts
     subterms _ = []
-    base = map (oneTypeVar . typ) xs
+    base = typeVar:map (oneTypeVar . typ) xs
     close f x
       | x == y = x
       | otherwise = close f y
