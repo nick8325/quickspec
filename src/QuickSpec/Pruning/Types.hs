@@ -103,7 +103,7 @@ encode :: Typed fun => TypedTerm fun -> UntypedTerm fun
 -- by rewriting using the typing axioms.
 encode (Var x) = tag (typ x) (Var x)
 encode (App f ts) =
-  tag (typeRes (typ f)) (App (Func f) (map encode ts))
+  tag (typeDrop (length ts) (typ f)) (App (Func f) (map encode ts))
 
 decode :: Typed fun => UntypedTerm fun -> TypedTerm fun
 decode = dec Nothing
