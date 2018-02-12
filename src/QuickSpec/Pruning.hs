@@ -9,20 +9,20 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Reader
 
-class Monad m => MonadPruner term m | m -> term where
-  normaliser :: m (term -> term)
+class Monad m => MonadPruner term norm m | m -> term norm where
+  normaliser :: m (term -> norm)
   add :: Prop term -> m ()
 
-  default normaliser :: (MonadTrans t, MonadPruner term m', m ~ t m') => m (term -> term)
+  default normaliser :: (MonadTrans t, MonadPruner term norm m', m ~ t m') => m (term -> norm)
   normaliser = lift normaliser
 
-  default add :: (MonadTrans t, MonadPruner term m', m ~ t m') => Prop term -> m ()
+  default add :: (MonadTrans t, MonadPruner term norm m', m ~ t m') => Prop term -> m ()
   add = lift . add
 
-instance MonadPruner term m => MonadPruner term (StateT s m)
-instance MonadPruner term m => MonadPruner term (ReaderT r m)
+instance MonadPruner term norm m => MonadPruner term norm (StateT s m)
+instance MonadPruner term norm m => MonadPruner term norm (ReaderT r m)
 
-normalise :: MonadPruner term m => term -> m term
+normalise :: MonadPruner term norm m => term -> m norm
 normalise t = do
   norm <- normaliser
   return (norm t)
@@ -33,14 +33,14 @@ newtype ReadOnlyPruner m a = ReadOnlyPruner { withReadOnlyPruner :: m a }
 instance MonadTrans ReadOnlyPruner where
   lift = ReadOnlyPruner
 
-instance MonadPruner term m => MonadPruner term (ReadOnlyPruner m) where
+instance MonadPruner term norm m => MonadPruner term norm (ReadOnlyPruner m) where
   normaliser = ReadOnlyPruner normaliser
   add _ = return ()
 
 newtype WatchPruner term m a = WatchPruner (StateT [Prop term] m a)
   deriving (Functor, Applicative, Monad, MonadTrans, MonadIO, MonadTester testcase term)
 
-instance MonadPruner term m => MonadPruner term (WatchPruner term m) where
+instance MonadPruner term norm m => MonadPruner term norm (WatchPruner term m) where
   normaliser = lift normaliser
   add prop = do
     WatchPruner (modify (prop:))

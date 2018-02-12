@@ -28,9 +28,9 @@ import Data.Reflection
 import Test.QuickCheck(Arbitrary, CoArbitrary)
 import Data.Proxy
 
-data Polymorphic testcase result schema =
+data Polymorphic testcase result schema norm =
   Polymorphic {
-    pm_schemas :: Schemas testcase result (PolySchema schema),
+    pm_schemas :: Schemas testcase result (PolySchema schema) norm,
     pm_unifiable :: Map (Poly Type) ([Poly Type], [(Poly Type, Poly Type)]),
     pm_accepted :: Map (Poly Type) (Set schema),
     pm_universe :: Set Type }
@@ -50,7 +50,7 @@ initialState ::
   [Type] ->
   (schema -> Bool) ->
   (schema -> testcase -> result) ->
-  Polymorphic testcase result schema
+  Polymorphic testcase result schema norm
 initialState univ inst eval =
   Polymorphic {
     pm_schemas = Schemas.initialState (inst . monoSchema) (eval . monoSchema),
@@ -74,10 +74,10 @@ instance Typed schema => Typed (PolySchema schema) where
   typeSubst_ _ x = x -- because it's suppose to be monomorphic
 
 explore ::
-  (schema ~ Term fun, Ord result, Schematic fun schema, Typed schema, Typed fun, Ord fun, PrettyTerm fun,
-  MonadTester testcase schema m, MonadPruner schema m) =>
+  (schema ~ Term fun, Ord result, Ord norm, Schematic fun schema, Typed schema, Typed fun, Ord fun, PrettyTerm fun,
+  MonadTester testcase schema m, MonadPruner schema norm m) =>
   schema ->
-  StateT (Polymorphic testcase result schema) m (Result schema)
+  StateT (Polymorphic testcase result schema norm) m (Result schema)
 explore t = do
   univ <- access universe
   when (oneTypeVar (typ t) `notElem` univ) $
@@ -108,10 +108,10 @@ explore t = do
       fromMaybe undefined (cast (unPoly ty) t)
 
 exploreNoMGU ::
-  (PrettyTerm fun, schema ~ Term fun, Ord result, Schematic fun schema, Typed schema, Typed fun, Ord fun,
-  MonadTester testcase schema m, MonadPruner schema m) =>
+  (PrettyTerm fun, schema ~ Term fun, Ord result, Ord norm, Schematic fun schema, Typed schema, Typed fun, Ord fun,
+  MonadTester testcase schema m, MonadPruner schema norm m) =>
   schema ->
-  StateT (Polymorphic testcase result schema) m (Result schema)
+  StateT (Polymorphic testcase result schema norm) m (Result schema)
 exploreNoMGU t = do
   let ty = polyTyp (poly t)
   acc <- access accepted
@@ -125,7 +125,7 @@ exploreNoMGU t = do
     schemas ~= schemas2
     return res { result_props = map (regeneralise . fmap polySchema) (result_props res) }
 
-addPolyType :: Monad m => Poly Type -> StateT (Polymorphic testcase result fun) m ()
+addPolyType :: Monad m => Poly Type -> StateT (Polymorphic testcase result fun norm) m ()
 addPolyType ty = do
   unif <- access unifiable
   univ <- access universe
@@ -142,23 +142,19 @@ addPolyType ty = do
 newtype Pruner term m a = Pruner { runPruner :: ReaderT [Type] m a }
   deriving (Functor, Applicative, Monad, MonadTrans, MonadIO, MonadTester testcase result, MonadTerminal)
 
-instance (Symbolic fun schema, Ord fun, Typed fun, Typed schema, MonadPruner schema m) =>
-  MonadPruner (PolySchema schema) (Pruner schema m) where
+instance (Symbolic fun schema, Ord fun, Typed fun, Typed schema, MonadPruner schema norm m) =>
+  MonadPruner (PolySchema schema) norm (Pruner schema m) where
   normaliser =
     Pruner $ do
       norm <- normaliser
-      -- A bit dubious to use monoSchema here, since it results in the
-      -- normalised schema getting all its type variables unified.
-      -- We rely on the fact that normalised schemas never get returned
-      -- in the properties produced by the lower layers.
-      return (makeSchema . norm . monoSchema)
+      return (norm . monoSchema)
   add prop = Pruner $ do
     univ <- ask
     let insts = typeInstances univ (regeneralise (fmap polySchema prop))
     mapM_ add insts
 
 newtype Tester m a = Tester { runTester :: m a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadPruner term, MonadTerminal)
+  deriving (Functor, Applicative, Monad, MonadIO, MonadPruner term norm, MonadTerminal)
 
 instance MonadTrans Tester where
   lift = Tester

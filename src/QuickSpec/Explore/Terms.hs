@@ -13,7 +13,7 @@ import Control.Monad.Trans.State.Strict hiding (State)
 import Data.Lens.Light
 import QuickSpec.Utils
 
-data Terms testcase result term =
+data Terms testcase result term norm =
   Terms {
     -- Empty decision tree.
     tm_empty :: DecisionTree testcase result term,
@@ -21,7 +21,7 @@ data Terms testcase result term =
     -- The keys are those terms but normalised.
     -- We do it like this so that explore can guarantee to always return
     -- the same representative for each equivalence class (see below).
-    tm_terms  :: Map term term,
+    tm_terms  :: Map norm term,
     -- Decision tree mapping test case results to terms.
     -- Terms are not stored normalised.
     -- Terms of different types must not be equal, because that results in
@@ -30,12 +30,12 @@ data Terms testcase result term =
 
 makeLensAs ''Terms [("tm_tree", "tree")]
 
-treeForType :: Type -> Lens (Terms testcase result term) (DecisionTree testcase result term)
+treeForType :: Type -> Lens (Terms testcase result term norm) (DecisionTree testcase result term)
 treeForType ty = reading (\Terms{..} -> keyDefault ty tm_empty # tree)
 
 initialState ::
   (term -> testcase -> result) ->
-  Terms testcase result term
+  Terms testcase result term norm
 initialState eval =
   Terms {
     tm_empty = empty eval,
@@ -54,8 +54,8 @@ data Result term =
 -- The representatives of the equivalence classes are guaranteed not to change.
 --
 -- Discovered properties are not added to the pruner.
-explore :: (Typed term, Ord term, Ord result, MonadTester testcase term m, MonadPruner term m) =>
-  term -> StateT (Terms testcase result term) m (Result term)
+explore :: (Typed term, Ord norm, Ord result, MonadTester testcase term m, MonadPruner term norm m) =>
+  term -> StateT (Terms testcase result term norm) m (Result term)
 explore t = do
   norm <- normaliser
   exp norm $ \prop -> do

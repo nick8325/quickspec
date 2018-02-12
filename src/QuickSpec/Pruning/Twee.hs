@@ -16,7 +16,7 @@ import QuickSpec.Pruning.UntypedTwee(Config(..))
 
 newtype Pruner fun m a =
   Pruner (Background.Pruner fun (Types.Pruner fun (Untyped.Pruner (Types.Tagged fun) m)) a)
-  deriving (Functor, Applicative, Monad, MonadIO, MonadTester testcase term, MonadPruner (Term fun), MonadTerminal)
+  deriving (Functor, Applicative, Monad, MonadIO, MonadTester testcase term, MonadPruner (Term fun) (Term fun), MonadTerminal)
 
 instance MonadTrans (Pruner fun) where
   lift = Pruner . lift . lift . lift

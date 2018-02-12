@@ -26,14 +26,14 @@ run :: (Monad m, Background fun) => Pruner fun m a -> m a
 run (Pruner x) =
   evalStateT x Set.empty
 
-instance (Ord fun, Background fun, MonadPruner (Term fun) m) =>
-  MonadPruner (Term fun) (Pruner fun m) where
+instance (Ord fun, Background fun, MonadPruner (Term fun) norm m) =>
+  MonadPruner (Term fun) norm (Pruner fun m) where
   normaliser = lift normaliser
   add prop = do
     mapM_ addFunction (funs prop)
     lift (add prop)
 
-addFunction :: (Ord fun, Background fun, MonadPruner (Term fun) m) => fun -> Pruner fun m ()
+addFunction :: (Ord fun, Background fun, MonadPruner (Term fun) norm m) => fun -> Pruner fun m ()
 addFunction f = do
   funcs <- Pruner get
   unless (f `Set.member` funcs) $ do

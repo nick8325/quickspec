@@ -21,20 +21,20 @@ import Data.Set(Set)
 import Data.Maybe
 import Control.Monad
 
-data Schemas testcase result schema =
+data Schemas testcase result schema norm =
   Schemas {
     sc_instantiate_singleton :: schema -> Bool,
-    sc_empty :: Terms testcase result schema,
-    sc_classes :: Terms testcase result schema,
+    sc_empty :: Terms testcase result schema norm,
+    sc_classes :: Terms testcase result schema norm,
     sc_instantiated :: Set schema,
-    sc_instances :: Map schema (Terms testcase result schema) }
+    sc_instances :: Map schema (Terms testcase result schema norm) }
 
 makeLensAs ''Schemas
   [("sc_classes", "classes"),
    ("sc_instances", "instances"),
    ("sc_instantiated", "instantiated")]
 
-instance_ :: Ord schema => schema -> Lens (Schemas testcase result schema) (Terms testcase result schema)
+instance_ :: Ord schema => schema -> Lens (Schemas testcase result schema norm) (Terms testcase result schema norm)
 instance_ t = reading (\Schemas{..} -> keyDefault t sc_empty # instances)
 
 class Symbolic fun a => Schematic fun a where
@@ -48,7 +48,7 @@ instance Schematic fun (Term fun) where
 initialState ::
   (schema -> Bool) ->
   (schema -> testcase -> result) ->
-  Schemas testcase result schema
+  Schemas testcase result schema norm
 initialState inst eval =
   Schemas {
     sc_instantiate_singleton = inst,
@@ -63,9 +63,9 @@ data Result schema =
 
 -- The schema is represented as a term where there is only one distinct variable of each type
 explore ::
-  (Ord result, Ord schema, Typed schema, Schematic fun schema,
-  MonadTester testcase schema m, MonadPruner schema m) =>
-  schema -> StateT (Schemas testcase result schema) m (Result schema)
+  (Ord result, Ord schema, Ord norm, Typed schema, Schematic fun schema,
+  MonadTester testcase schema m, MonadPruner schema norm m) =>
+  schema -> StateT (Schemas testcase result schema norm) m (Result schema)
 explore t0 = do
   let t = mostSpecific t0
   res <- zoom classes (Terms.explore t)
@@ -86,10 +86,10 @@ explore t0 = do
 
 {-# INLINEABLE exploreIn #-}
 exploreIn ::
-  (Ord result, Ord schema, Typed schema, Schematic fun schema,
-  MonadTester testcase schema m, MonadPruner schema m) =>
+  (Ord result, Ord schema, Ord norm, Typed schema, Schematic fun schema,
+  MonadTester testcase schema m, MonadPruner schema norm m) =>
   schema -> schema ->
-  StateT (Schemas testcase result schema) m (Result schema)
+  StateT (Schemas testcase result schema norm) m (Result schema)
 exploreIn rep t = do
   -- First check if schema is redundant
   res <- zoom (instance_ rep) (Terms.explore (mostGeneral t))
@@ -111,20 +111,20 @@ exploreIn rep t = do
 
 {-# INLINEABLE instantiateRep #-}
 instantiateRep ::
-  (Ord result, Ord schema, Typed schema, Schematic fun schema,
-  MonadTester testcase schema m, MonadPruner schema m) =>
+  (Ord result, Ord schema, Ord norm, Typed schema, Schematic fun schema,
+  MonadTester testcase schema m, MonadPruner schema norm m) =>
   schema ->
-  StateT (Schemas testcase result schema) m (Result schema)
+  StateT (Schemas testcase result schema norm) m (Result schema)
 instantiateRep t = do
   instantiated %= Set.insert t
   instantiate t t
 
 {-# INLINEABLE instantiate #-}
 instantiate ::
-  (Ord result, Ord schema, Typed schema, Schematic fun schema,
-  MonadTester testcase schema m, MonadPruner schema m) =>
+  (Ord result, Ord schema, Ord norm, Typed schema, Schematic fun schema,
+  MonadTester testcase schema m, MonadPruner schema norm m) =>
   schema -> schema ->
-  StateT (Schemas testcase result schema) m (Result schema)
+  StateT (Schemas testcase result schema norm) m (Result schema)
 instantiate rep t = zoom (instance_ rep) $ do
   let instances = sortBy (comparing generality) (allUnifications (mostGeneral t))
   Accepted <$> catMaybes <$> forM instances (\t -> do

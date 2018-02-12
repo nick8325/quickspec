@@ -34,8 +34,8 @@ moreTerms univ measure tss =
     n = length tss
 
 quickSpec ::
-  (Ord measure, Ord fun, Typeable fun, Sized fun, Typed fun, Ord result, Apply (Term fun), PrettyTerm fun, PrettyArity fun,
-   MonadPruner (Term fun) m, MonadTester testcase (Term fun) m) =>
+  (Ord measure, Ord fun, Ord norm, Typeable fun, Sized fun, Typed fun, Ord result, Apply (Term fun), PrettyTerm fun, PrettyArity fun,
+   MonadPruner (Term fun) norm m, MonadTester testcase (Term fun) m) =>
   (Prop (Term fun) -> m ()) ->
   (Term fun -> measure) ->
   (Term fun -> testcase -> result) ->

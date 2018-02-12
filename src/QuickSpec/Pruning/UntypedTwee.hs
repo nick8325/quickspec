@@ -47,7 +47,7 @@ run Config{..} (Pruner x) =
         Twee.cfg_max_cp_depth = cfg_max_cp_depth }
 
 instance (Ord fun, Typeable fun, Arity fun, Sized fun, PrettyTerm fun, EqualsBonus fun, MonadTerminal m) =>
-  MonadPruner (Term fun) (Pruner fun m) where
+  MonadPruner (Term fun) (Term fun) (Pruner fun m) where
   normaliser = Pruner $ do
     state <- lift get
     return (normaliseTwee state)
