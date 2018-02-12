@@ -66,6 +66,9 @@ funs x = [ f | t <- terms x, App f _ <- subterms t ]
 vars :: Symbolic f a => a -> [Var]
 vars x = [ v | t <- terms x, Var v <- subterms t ]
 
+freeVar :: Symbolic f a => a -> Int
+freeVar x = maximum (0:map (succ . var_id) (vars x))
+
 occ :: (Eq f, Symbolic f a) => f -> a -> Int
 occ x t = length (filter (== x) (funs t))
 

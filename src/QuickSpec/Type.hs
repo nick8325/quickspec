@@ -39,10 +39,11 @@ import Data.Char
 -- A (possibly polymorphic) type.
 type Type = Term TyCon
 
-data TyCon = Arrow | TyCon Ty.TyCon deriving (Eq, Ord, Show)
+data TyCon = Arrow | String String | TyCon Ty.TyCon deriving (Eq, Ord, Show)
 
 instance Pretty TyCon where
   pPrint Arrow = text "->"
+  pPrint (String x) = text (show x)
   pPrint (TyCon x) = text (show x)
 instance PrettyTerm TyCon where
   termStyle Arrow =
@@ -51,6 +52,8 @@ instance PrettyTerm TyCon where
       maybeParens (p > 8) $
         pPrintPrec l 9 x <+> d <+>
         pPrintPrec l 0 y
+
+  termStyle (String _) = curried
 
   termStyle (TyCon con)
     | con == listTyCon =
