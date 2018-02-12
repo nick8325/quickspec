@@ -63,9 +63,11 @@ simpleApply t u =
   App (Apply (typ t)) [t, u]
 
 instance (Arity f, Typed f, Background f) => Background (PartiallyApplied f) where
-  background (Partial f _) =
-    [ simpleApply (partial i) (vs !! i) === partial (i+1)
-    | i <- [0..arity f-1] ]
+  background (Partial f n)
+    | n < arity f =
+      [ simpleApply (partial n) (vs !! n) === partial (n+1) ]
+    | otherwise =
+      map (mapFun (\f -> Partial f (arity f))) (background f)
     where
       partial i =
         App (Partial f i) (take i vs)
