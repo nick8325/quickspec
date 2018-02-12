@@ -22,7 +22,7 @@ class Background f where
   background :: f -> [Prop (Term f)]
   background _ = []
 
-run :: (Monad m, Background fun) => Pruner fun m a -> m a
+run :: Monad m => Pruner fun m a -> m a
 run (Pruner x) =
   evalStateT x Set.empty
 

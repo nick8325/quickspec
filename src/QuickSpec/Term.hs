@@ -83,7 +83,7 @@ properSubterms _ = []
 
 -- Introduces variables in a canonical order.
 -- Also makes sure that variables of different types have different numbers
-canonicalise :: (Symbolic fun a, Typed fun) => a -> a
+canonicalise :: Symbolic fun a => a -> a
 canonicalise t = subst (\x -> Map.findWithDefault undefined x sub) t
   where
     sub =
@@ -123,7 +123,7 @@ instance Typed f => Typed (Term f) where
 -- Satisfies the property:
 -- if measure (schema t) < measure (schema u) then t < u.
 type Measure f = (Int, Int, MeasureFuns f, Int, [Var])
-measure :: (Sized f, Ord f) => Term f -> Measure f
+measure :: Sized f => Term f -> Measure f
 measure t =
   (size t, -length (vars t), MeasureFuns (skel t),
    -length (usort (vars t)), vars t)

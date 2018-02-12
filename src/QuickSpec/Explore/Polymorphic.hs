@@ -46,7 +46,6 @@ makeLensAs ''Polymorphic
    ("pm_universe", "universe")]
 
 initialState ::
-  Typed schema =>
   [Type] ->
   (schema -> Bool) ->
   (schema -> testcase -> result) ->
@@ -65,8 +64,8 @@ instance (Typed schema, Symbolic fun schema) => Symbolic fun (PolySchema schema)
   termsDL = termsDL . polySchema
   subst sub = makeSchema . subst sub . polySchema
 
-instance (schema ~ Term fun, Typed fun, Schematic fun schema) => Schematic fun (PolySchema schema) where
-  mostGeneral = makeSchema . Schemas.mostGeneralTerm oneTypeVar . polySchema
+instance (Typed schema, Schematic fun schema) => Schematic fun (PolySchema schema) where
+  mostGeneralWith f = makeSchema . mostGeneralWith (f . oneTypeVar) . polySchema
 
 instance Typed schema => Typed (PolySchema schema) where
   typ = typ . monoSchema
@@ -74,7 +73,7 @@ instance Typed schema => Typed (PolySchema schema) where
   typeSubst_ _ x = x -- because it's suppose to be monomorphic
 
 explore ::
-  (schema ~ Term fun, Ord result, Ord norm, Schematic fun schema, Typed schema, Typed fun, Ord fun, PrettyTerm fun,
+  (Ord schema, Ord result, Ord norm, Schematic fun schema, Typed schema, Typed fun, Ord fun, Pretty schema,
   MonadTester testcase schema m, MonadPruner schema norm m) =>
   schema ->
   StateT (Polymorphic testcase result schema norm) m (Result schema)
@@ -108,7 +107,7 @@ explore t = do
       fromMaybe undefined (cast (unPoly ty) t)
 
 exploreNoMGU ::
-  (PrettyTerm fun, schema ~ Term fun, Ord result, Ord norm, Schematic fun schema, Typed schema, Typed fun, Ord fun,
+  (Ord schema, Ord result, Ord norm, Schematic fun schema, Typed schema, Typed fun, Ord fun,
   MonadTester testcase schema m, MonadPruner schema norm m) =>
   schema ->
   StateT (Polymorphic testcase result schema norm) m (Result schema)

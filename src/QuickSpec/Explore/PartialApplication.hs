@@ -22,7 +22,7 @@ instance Sized f => Sized (PartiallyApplied f) where
   size (Partial f _) = size f
   size (Apply _) = 0
 
-instance Arity f => Arity (PartiallyApplied f) where
+instance Arity (PartiallyApplied f) where
   arity (Partial _ n) = n
   arity (Apply _) = 2
 

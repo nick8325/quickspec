@@ -21,6 +21,6 @@ newtype Pruner fun m a =
 instance MonadTrans (Pruner fun) where
   lift = Pruner . lift . lift . lift
 
-run :: (Background fun, Monad m) => Config -> Pruner fun m a -> m a
+run :: Monad m => Config -> Pruner fun m a -> m a
 run config (Pruner x) =
   Untyped.run config (Types.run (Background.run x))

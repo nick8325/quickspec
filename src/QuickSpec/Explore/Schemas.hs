@@ -38,12 +38,15 @@ instance_ :: Ord schema => schema -> Lens (Schemas testcase result schema norm) 
 instance_ t = reading (\Schemas{..} -> keyDefault t sc_empty # instances)
 
 class Symbolic fun a => Schematic fun a where
-  mostGeneral :: a -> a
+  mostGeneralWith :: Ord b => (Type -> b) -> a -> a
   mostSpecific :: a -> a
   mostSpecific = subst (\(V ty _) -> Var (V ty 0))
 
+mostGeneral :: Schematic fun a => a -> a
+mostGeneral = mostGeneralWith id
+
 instance Schematic fun (Term fun) where
-  mostGeneral = mostGeneralTerm id
+  mostGeneralWith = mostGeneralTerm
 
 initialState ::
   (schema -> Bool) ->

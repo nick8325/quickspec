@@ -15,7 +15,7 @@ import Control.Monad.Trans.State.Strict
 import qualified Data.Set as Set
 import Data.Set(Set)
 
-baseTerms :: (Ord f, Typeable f, Ord a) => (Term f -> a) -> [f] -> [Term f]
+baseTerms :: Ord a => (Term f -> a) -> [f] -> [Term f]
 baseTerms measure funs =
   sortBy' measure $
     [App f [] | f <- funs] ++
@@ -34,7 +34,7 @@ moreTerms univ measure tss =
     n = length tss
 
 quickSpec ::
-  (Ord measure, Ord fun, Ord norm, Typeable fun, Sized fun, Typed fun, Ord result, Apply (Term fun), PrettyTerm fun, PrettyArity fun,
+  (Ord measure, Ord fun, Ord norm, Sized fun, Typed fun, Ord result, Apply (Term fun), PrettyTerm fun,
    MonadPruner (Term fun) norm m, MonadTester testcase (Term fun) m) =>
   (Prop (Term fun) -> m ()) ->
   (Term fun -> measure) ->

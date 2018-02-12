@@ -47,7 +47,7 @@ newtype Pruner fun pruner a =
 instance MonadTrans (Pruner fun) where
   lift = Pruner
 
-instance (Ord fun, Typed fun, Arity fun, MonadPruner (UntypedTerm fun) (UntypedTerm fun) pruner) => MonadPruner (TypedTerm fun) (TypedTerm fun) (Pruner fun pruner) where
+instance (Typed fun, MonadPruner (UntypedTerm fun) (UntypedTerm fun) pruner) => MonadPruner (TypedTerm fun) (TypedTerm fun) (Pruner fun pruner) where
   normaliser =
     Pruner $ do
       norm <- normaliser :: pruner (UntypedTerm fun -> UntypedTerm fun)
@@ -62,11 +62,11 @@ instance (Ord fun, Typed fun, Arity fun, MonadPruner (UntypedTerm fun) (UntypedT
 
   add prop = lift (add (encode <$> canonicalise prop))
 
-instance (Ord fun, Typed fun, Arity fun) => Background (Tagged fun) where
+instance (Typed fun, Arity fun) => Background (Tagged fun) where
   background = typingAxioms
 
 -- Compute the typing axioms for a function or type tag.
-typingAxioms :: (Ord fun, Typed fun, Arity fun) =>
+typingAxioms :: (Typed fun, Arity fun) =>
   Tagged fun -> [Prop (UntypedTerm fun)]
 typingAxioms (Tag ty) =
   [tag ty (tag ty x) === tag ty x]

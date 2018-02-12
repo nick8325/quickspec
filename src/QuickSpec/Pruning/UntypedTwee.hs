@@ -92,8 +92,7 @@ skolemise = Twee.build . sk
     sk (App f ts) =
       Twee.app (Twee.fun (Function f)) (map sk ts)
 
-fromTwee :: (Ord f, Typeable f) =>
-  Twee.Term (Extended f) -> Term f
+fromTwee :: Twee.Term (Extended f) -> Term f
 fromTwee = unsk
   where
     unsk (Twee.App (F Minimal) Empty) =
