@@ -75,6 +75,9 @@ instance Typed schema => Typed (PolySchema schema) where
   otherTypesDL = otherTypesDL . monoSchema
   typeSubst_ _ x = x -- because it's suppose to be monomorphic
 
+newtype PolyM testcase result schema norm m a = PolyM { unPolyM :: StateT (Polymorphic testcase result schema norm) m a }
+  deriving (Functor, Applicative, Monad)
+
 explore ::
   (Ord schema, Ord result, Ord norm, Schematic fun schema, Typed schema, Typed fun, Ord fun, Pretty schema,
   MonadTester testcase schema m, MonadPruner schema norm m) =>
@@ -121,9 +124,7 @@ exploreNoMGU t = do
     accepted %= Map.insertWith Set.union ty (Set.singleton t)
     univ <- access univ
     schemas1 <- access schemas
-    (res, schemas2) <-
-      flip runReaderT univ $ runPruner $ runTester $
-      runStateT (Schemas.explore (makeSchema t)) schemas1
+    (res, schemas2) <- unPolyM (runStateT (Schemas.explore (makeSchema t)) schemas1)
     schemas ~= schemas2
     return res { result_props = map (regeneralise . fmap polySchema) (result_props res) }
 
@@ -141,29 +142,19 @@ addPolyType ty = do
     forM_ there $ \(ty', sub) ->
       sndLens # keyDefault ty' undefined # unifiable %= (there ++)
 
-newtype Pruner term m a = Pruner { runPruner :: ReaderT Universe m a }
-  deriving (Functor, Applicative, Monad, MonadTrans, MonadIO, MonadTester testcase result, MonadTerminal)
-
 instance (Symbolic fun schema, Ord fun, Typed fun, Typed schema, MonadPruner schema norm m) =>
-  MonadPruner (PolySchema schema) norm (Pruner schema m) where
-  normaliser =
-    Pruner $ do
-      norm <- normaliser
-      return (norm . monoSchema)
-  add prop = Pruner $ do
-    Universe univ <- ask
+  MonadPruner (PolySchema schema) norm (PolyM testcase result schema norm m) where
+  normaliser = PolyM $ do
+    norm <- normaliser
+    return (norm . monoSchema)
+  add prop = PolyM $ do
+    Universe univ <- access univ
     let insts = typeInstances (Set.toList univ) (regeneralise (fmap polySchema prop))
     mapM_ add insts
 
-newtype Tester m a = Tester { runTester :: m a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadPruner term norm, MonadTerminal)
-
-instance MonadTrans Tester where
-  lift = Tester
-
 instance MonadTester testcase schema m =>
-  MonadTester testcase (PolySchema schema) (Tester m) where
-  test prop = lift (test (fmap monoSchema prop))
+  MonadTester testcase (PolySchema schema) (PolyM testcase result schema norm m) where
+  test prop = PolyM $ lift (test (fmap monoSchema prop))
 
 -- Given a property which only contains one type variable,
 -- add as much polymorphism to the property as possible.
