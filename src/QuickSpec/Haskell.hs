@@ -261,8 +261,8 @@ defaultConfig =
     cfg_max_size = 7,
     cfg_instances = mempty }
 
-quickSpec :: Config -> [Constant] -> Type -> [Type] -> IO ()
-quickSpec Config{..} funs ty tys = give ty $ do
+quickSpec :: Config -> [Constant] -> Type -> IO ()
+quickSpec Config{..} funs ty = give ty $ do
   let
     instances = cfg_instances `mappend` baseInstances
     present prop = do
@@ -278,4 +278,3 @@ quickSpec Config{..} funs ty tys = give ty $ do
     QuickSpec.Explore.quickSpec present measure (flip evalHaskell) cfg_max_size
       [Partial f 0 | f <- funs]
       ty
-      tys

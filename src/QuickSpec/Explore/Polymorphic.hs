@@ -27,26 +27,29 @@ import Data.Maybe
 import Data.Reflection
 import Test.QuickCheck(Arbitrary, CoArbitrary)
 import Data.Proxy
+import qualified Twee.Base as Twee
 
 data Polymorphic testcase result schema norm =
   Polymorphic {
     pm_schemas :: Schemas testcase result (PolySchema schema) norm,
     pm_unifiable :: Map (Poly Type) ([Poly Type], [(Poly Type, Poly Type)]),
     pm_accepted :: Map (Poly Type) (Set schema),
-    pm_universe :: Set Type }
+    pm_universe :: Universe }
 
 data PolySchema schema =
   PolySchema { polySchema :: schema, monoSchema :: schema }
   deriving (Eq, Ord)
 
+newtype Universe = Universe (Set Type)
+
 makeLensAs ''Polymorphic
   [("pm_schemas", "schemas"),
    ("pm_unifiable", "unifiable"),
    ("pm_accepted", "accepted"),
-   ("pm_universe", "universe")]
+   ("pm_universe", "univ")]
 
 initialState ::
-  [Type] ->
+  Universe ->
   (schema -> Bool) ->
   (schema -> testcase -> result) ->
   Polymorphic testcase result schema norm
@@ -55,7 +58,7 @@ initialState univ inst eval =
     pm_schemas = Schemas.initialState (inst . monoSchema) (eval . monoSchema),
     pm_unifiable = Map.empty,
     pm_accepted = Map.empty,
-    pm_universe = Set.fromList univ }
+    pm_universe = univ }
 
 makeSchema :: Typed schema => schema -> PolySchema schema
 makeSchema x = PolySchema x (oneTypeVar x)
@@ -78,8 +81,8 @@ explore ::
   schema ->
   StateT (Polymorphic testcase result schema norm) m (Result schema)
 explore t = do
-  univ <- access universe
-  when (oneTypeVar (typ t) `notElem` univ) $
+  univ <- access univ
+  unless (typ t `inUniverse` univ) $
     error ("Type " ++ prettyShow (typ t) ++ " not in universe for " ++ prettyShow t)
   res <- exploreNoMGU t
   case res of
@@ -116,10 +119,10 @@ exploreNoMGU t = do
   acc <- access accepted
   if (t `Set.member` Map.findWithDefault Set.empty ty acc) then return (Rejected []) else do
     accepted %= Map.insertWith Set.union ty (Set.singleton t)
-    univ <- access universe
+    univ <- access univ
     schemas1 <- access schemas
     (res, schemas2) <-
-      flip runReaderT (Set.toList univ) $ runPruner $ runTester $
+      flip runReaderT univ $ runPruner $ runTester $
       runStateT (Schemas.explore (makeSchema t)) schemas1
     schemas ~= schemas2
     return res { result_props = map (regeneralise . fmap polySchema) (result_props res) }
@@ -127,18 +130,18 @@ exploreNoMGU t = do
 addPolyType :: Monad m => Poly Type -> StateT (Polymorphic testcase result fun norm) m ()
 addPolyType ty = do
   unif <- access unifiable
-  univ <- access universe
+  univ <- access univ
   unless (ty `Map.member` unif) $ do
     let
       tys = [(ty', mgu) | ty' <- Map.keys unif, Just mgu <- [polyMgu ty ty']]
-      ok ty mgu = oneTypeVar ty /= mgu && unPoly mgu `Set.member` univ
+      ok ty mgu = oneTypeVar ty /= mgu && unPoly mgu `inUniverse` univ
       here = [mgu | (_, mgu) <- tys, ok mgu ty]
       there = [(ty', mgu) | (ty', mgu) <- tys, ok mgu ty']
     key ty # unifiable ~= Just (here, there)
     forM_ there $ \(ty', sub) ->
       sndLens # keyDefault ty' undefined # unifiable %= (there ++)
 
-newtype Pruner term m a = Pruner { runPruner :: ReaderT [Type] m a }
+newtype Pruner term m a = Pruner { runPruner :: ReaderT Universe m a }
   deriving (Functor, Applicative, Monad, MonadTrans, MonadIO, MonadTester testcase result, MonadTerminal)
 
 instance (Symbolic fun schema, Ord fun, Typed fun, Typed schema, MonadPruner schema norm m) =>
@@ -148,8 +151,8 @@ instance (Symbolic fun schema, Ord fun, Typed fun, Typed schema, MonadPruner sch
       norm <- normaliser
       return (norm . monoSchema)
   add prop = Pruner $ do
-    univ <- ask
-    let insts = typeInstances univ (regeneralise (fmap polySchema prop))
+    Universe univ <- ask
+    let insts = typeInstances (Set.toList univ) (regeneralise (fmap polySchema prop))
     mapM_ add insts
 
 newtype Tester m a = Tester { runTester :: m a }
@@ -205,3 +208,20 @@ intersection :: [Map Twee.Var Type] -> [Map Twee.Var Type] -> [Map Twee.Var Type
 ms1 `intersection` ms2 = usort [ Map.union m1 m2 | m1 <- ms1, m2 <- ms2, ok m1 m2 ]
   where
     ok m1 m2 = and [ Map.lookup x m1 == Map.lookup x m2 | x <- Map.keys (Map.intersection m1 m2) ]
+
+universe :: Typed a => [a] -> Universe
+universe xs = Universe (close add (Set.fromList base))
+  where
+    add tys = concatMap subterms tys
+    subterms (Twee.App _ ts) = Twee.unpack ts
+    subterms _ = []
+    base = map (oneTypeVar . typ) xs
+    close f x
+      | x == y = x
+      | otherwise = close f y
+      where
+        y = x `Set.union` Set.fromList (f (Set.toList x))
+
+inUniverse :: Type -> Universe -> Bool
+ty `inUniverse` Universe x =
+  oneTypeVar ty `Set.member` x

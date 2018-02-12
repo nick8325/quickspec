@@ -21,7 +21,7 @@ baseTerms measure funs =
     [App f [] | f <- funs] ++
     [Var (V typeVar 0)]
 
-moreTerms :: (Ord a, Apply (Term f)) => Set Type -> (Term f -> a) -> [[Term f]] -> [Term f]
+moreTerms :: (Ord a, Apply (Term f)) => Universe -> (Term f -> a) -> [[Term f]] -> [Term f]
 moreTerms univ measure tss =
   sortBy' measure $
     [ unPoly v
@@ -29,7 +29,7 @@ moreTerms univ measure tss =
       t <- tss !! i,
       u <- tss !! (n-i),
       Just v <- [tryApply (poly t) (poly u)],
-      and [ oneTypeVar (typ x) `Set.member` univ | x <- subterms (unPoly v) ] ]
+      and [ typ x `inUniverse` univ | x <- subterms (unPoly v) ] ]
   where
     n = length tss
 
@@ -39,11 +39,11 @@ quickSpec ::
   (Prop (Term fun) -> m ()) ->
   (Term fun -> measure) ->
   (Term fun -> testcase -> result) ->
-  Int -> [fun] -> Type -> [Type] -> m ()
-quickSpec present measure eval maxSize funs ty tys = do
+  Int -> [fun] -> Type -> m ()
+quickSpec present measure eval maxSize funs ty = do
   let
-    univ = Set.fromList tys
-    state0 = initialState tys (\t -> size t <= 5) eval
+    univ = universe funs
+    state0 = initialState univ (\t -> size t <= 5) eval
 
     loop 1 _ _ [] = return ()
     loop n tss ts [] =
