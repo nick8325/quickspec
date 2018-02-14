@@ -169,9 +169,9 @@ instance Ord (Value Ordy) where
         let Ordy yv = reunwrap w y in
         compare xv yv
 
-evalHaskell :: (Typed f, PrettyTerm f, Eval f (Value Maybe)) => (Var -> Value Maybe, Value Identity -> Maybe TestResult) -> Term f -> Either TestResult (Term f)
-evalHaskell (env, obs) t =
-  case unwrap (eval env t) of
+evalHaskell :: (Typed f, PrettyTerm f, Eval f (Value Maybe)) => Type -> (Var -> Value Maybe, Value Identity -> Maybe TestResult) -> Term f -> Either TestResult (Term f)
+evalHaskell ty (env, obs) t =
+  case unwrap (eval env (defaultTo ty t)) of
     Nothing `In` _ -> trace ("couldn't evaluate " ++ prettyShow t ++ " :: " ++ prettyShow (typ t)) $ Right t
     Just val `In` w ->
       case obs (wrap w (Identity val)) of
@@ -276,9 +276,9 @@ quickSpec Config{..} funs ty = give ty $ do
   join $
     fmap withStdioTerminal $
     generate $
-    QuickCheck.run cfg_quickCheck (arbitraryVal ty instances) evalHaskell $
+    QuickCheck.run cfg_quickCheck (arbitraryVal ty instances) (evalHaskell ty) $
     Twee.run cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size } $
     flip evalStateT 1 $
-    QuickSpec.Explore.quickSpec present measure (flip evalHaskell) cfg_max_size
+    QuickSpec.Explore.quickSpec present measure (flip (evalHaskell ty)) cfg_max_size
       [Partial f 0 | f <- funs]
       ty
