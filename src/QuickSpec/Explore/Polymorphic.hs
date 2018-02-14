@@ -9,25 +9,17 @@ import QuickSpec.Type
 import QuickSpec.Testing
 import QuickSpec.Pruning
 import QuickSpec.Utils
-import QuickSpec.Terminal
 import QuickSpec.Prop
-import QuickSpec.Pruning.Background(Background(..))
 import qualified Data.Map.Strict as Map
 import Data.Map(Map)
 import qualified Data.Set as Set
 import Data.Set(Set)
 import Data.Lens.Light
 import Control.Monad.Trans.State.Strict
-import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class
-import Control.Monad.IO.Class
 import qualified Twee.Base as Twee
 import Control.Monad
 import Data.Maybe
-import Data.Reflection
-import Test.QuickCheck(Arbitrary, CoArbitrary)
-import Data.Proxy
-import qualified Twee.Base as Twee
 
 data Polymorphic testcase result schema norm =
   Polymorphic {
@@ -123,7 +115,6 @@ exploreNoMGU t = do
   acc <- access accepted
   if (t `Set.member` Map.findWithDefault Set.empty ty acc) then return (Rejected []) else do
     accepted %= Map.insertWith Set.union ty (Set.singleton t)
-    univ <- access univ
     schemas1 <- access schemas
     (res, schemas2) <- unPolyM (runStateT (Schemas.explore (makeSchema t)) schemas1)
     schemas ~= schemas2
@@ -140,7 +131,7 @@ addPolyType ty = do
       here = [mgu | (_, mgu) <- tys, ok mgu ty]
       there = [(ty', mgu) | (ty', mgu) <- tys, ok mgu ty']
     key ty # unifiable ~= Just (here, there)
-    forM_ there $ \(ty', sub) ->
+    forM_ there $ \(ty', _) ->
       sndLens # keyDefault ty' undefined # unifiable %= (there ++)
 
 instance (Symbolic fun schema, Ord fun, Typed fun, Typed schema, MonadPruner schema norm m) =>
