@@ -115,8 +115,8 @@ names insts ty =
 defaultTo :: Typed a => Type -> a -> a
 defaultTo def = typeSubst (const def)
 
-arbitraryVal :: Type -> Instances -> Gen (Var -> Value Maybe, Value Identity -> Maybe TestResult)
-arbitraryVal def insts =
+arbitraryVal :: Instances -> Gen (Var -> Value Maybe, Value Identity -> Maybe TestResult)
+arbitraryVal insts =
   MkGen $ \g n ->
     let (g1, g2) = split g in
     (memo $ \(V ty x) ->
@@ -126,17 +126,17 @@ arbitraryVal def insts =
          Just gen ->
            forValue gen $ \gen ->
              Just (unGen (coarbitrary x gen) g1 n),
-     unGen (ordyVal def insts) g2 n) 
+     unGen (ordyVal insts) g2 n)
   where
     typ :: Type -> Maybe (Value Gen)
     typ = memo $ \ty ->
-      case findInstance insts (defaultTo def ty) of
+      case findInstance insts ty of
         [] -> Nothing
         (gen:_) ->
           Just (mapValue (coarbitrary ty) gen)
 
-ordyVal :: Type -> Instances -> Gen (Value Identity -> Maybe TestResult)
-ordyVal def insts =
+ordyVal :: Instances -> Gen (Value Identity -> Maybe TestResult)
+ordyVal insts =
   MkGen $ \g n -> \x ->
     case ordyTy (typ x) of
       Nothing -> Nothing
@@ -144,7 +144,7 @@ ordyVal def insts =
   where
     ordyTy :: Type -> Maybe (Gen (Value Identity -> Value Ordy))
     ordyTy = memo $ \ty ->
-      case findInstance insts (defaultTo def ty) :: [Value Observe1] of
+      case findInstance insts ty :: [Value Observe1] of
         [] -> Nothing
         (val:_) ->
           case unwrap val of
@@ -276,7 +276,7 @@ quickSpec Config{..} funs ty = give ty $ do
   join $
     fmap withStdioTerminal $
     generate $
-    QuickCheck.run cfg_quickCheck (arbitraryVal ty instances) (evalHaskell ty) $
+    QuickCheck.run cfg_quickCheck (arbitraryVal instances) (evalHaskell ty) $
     Twee.run cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size } $
     flip evalStateT 1 $
     QuickSpec.Explore.quickSpec present measure (flip (evalHaskell ty)) cfg_max_size
