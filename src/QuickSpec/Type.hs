@@ -7,7 +7,7 @@ module QuickSpec.Type(
   Typeable,
   Type, TyCon(..), tyCon, fromTyCon, A, B, C, D, E, ClassA, ClassB, ClassC, ClassD, ClassE, typeVar, isTypeVar,
   typeOf, typeRep, applyType, fromTypeRep,
-  arrowType, typeArgs, typeRes, typeDrop, typeArity, oneTypeVar, skolemiseTypeVars,
+  arrowType, unpackArrow, typeArgs, typeRes, typeDrop, typeArity, oneTypeVar, skolemiseTypeVars,
   isDictionary, getDictionary,
   -- Things that have types.
   Typed(..), typeSubst, typesDL, tyVars, cast,
@@ -118,6 +118,12 @@ arrowType :: [Type] -> Type -> Type
 arrowType [] res = res
 arrowType (arg:args) res =
   build (app (fun Arrow) [arg, arrowType args res])
+
+unpackArrow :: Type -> Maybe (Type, Type)
+unpackArrow (App (F Arrow) (Cons t (Cons u Empty))) =
+  Just (t, u)
+unpackArrow _ =
+  Nothing
 
 typeArgs :: Type -> [Type]
 typeArgs (App (F Arrow) (Cons arg (Cons res Empty))) =

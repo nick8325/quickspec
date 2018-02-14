@@ -192,17 +192,29 @@ ms1 `intersection` ms2 = usort [ Map.union m1 m2 | m1 <- ms1, m2 <- ms2, ok m1 m
     ok m1 m2 = and [ Map.lookup x m1 == Map.lookup x m2 | x <- Map.keys (Map.intersection m1 m2) ]
 
 universe :: Typed a => [a] -> Universe
-universe xs = Universe (close add (Set.fromList base))
+universe xs = Universe (Set.fromList (withFunctions base))
   where
-    add tys = concatMap subterms tys
-    subterms (Twee.App _ ts) = Twee.unpack ts
-    subterms _ = []
-    base = typeVar:map (oneTypeVar . typ) xs
-    close f x
-      | x == y = x
-      | otherwise = close f y
-      where
-        y = x `Set.union` Set.fromList (f (Set.toList x))
+    -- The universe initially contains the type variable "a", the argument and
+    -- result type of every function (with all type variables unified), and all
+    -- subterms of these types
+    base = usort $ typeVar:concatMap (oneTypeVar . typs . typ) xs
+    typs ty = (typeRes ty:typeArgs ty) >>= Twee.subterms
+
+    -- We then add function types, according to the rule:
+    -- if f : A1 -> ... -> An -> B is a function in the signature,
+    -- and s(A1)...s(An), s(B) are in the universe where s is a substitution,
+    -- then s(A1 -> ... -> An -> B) is in the universe, together with all subterms
+    withFunctions tys =
+      tys ++
+      concat [func Twee.emptySubst (typ f) tys >>= Twee.subterms | f <- xs]
+
+    func sub ty tys =
+      oneTypeVar ty:
+      [ arrowType [t'] u'
+      | Just (t, u) <- [unpackArrow ty],
+        t' <- tys,
+        Just sub <- [Twee.matchIn sub t t'],
+        u' <- func sub u tys ]
 
 inUniverse :: Type -> Universe -> Bool
 ty `inUniverse` Universe x =
