@@ -3,7 +3,7 @@
 module QuickSpec.Explore.Polymorphic(module QuickSpec.Explore.Polymorphic, Result(..)) where
 
 import qualified QuickSpec.Explore.Schemas as Schemas
-import QuickSpec.Explore.Schemas(Schemas, Result(..), Schematic(..))
+import QuickSpec.Explore.Schemas(Schemas, Result(..))
 import QuickSpec.Term
 import QuickSpec.Type
 import QuickSpec.Testing
@@ -21,19 +21,22 @@ import qualified Twee.Base as Twee
 import Control.Monad
 import Data.Maybe
 
-data Polymorphic testcase result schema norm =
+data Polymorphic testcase result fun norm =
   Polymorphic {
-    pm_schemas :: Schemas testcase result (PolySchema schema) norm,
+    pm_schemas :: Schemas testcase result (PolyFun fun) norm,
     pm_unifiable :: Map (Poly Type) ([Poly Type], [(Poly Type, Poly Type)]),
-    pm_accepted :: Map (Poly Type) (Set schema),
+    pm_accepted :: Map (Poly Type) (Set (Term fun)),
     pm_universe :: Universe }
 
-data PolySchema schema =
-  PolySchema { polySchema :: schema, monoSchema :: schema }
+data PolyFun fun =
+  PolyFun { fun_original :: fun, fun_specialised :: fun }
   deriving (Eq, Ord)
 
-instance Pretty schema => Pretty (PolySchema schema) where
-  pPrint = pPrint . monoSchema
+instance Pretty fun => Pretty (PolyFun fun) where
+  pPrint = pPrint . fun_specialised
+
+instance PrettyTerm fun => PrettyTerm (PolyFun fun) where
+  termStyle = termStyle . fun_specialised
 
 newtype Universe = Universe (Set Type)
 
@@ -45,40 +48,35 @@ makeLensAs ''Polymorphic
 
 initialState ::
   Universe ->
-  (schema -> Bool) ->
-  (schema -> testcase -> result) ->
-  Polymorphic testcase result schema norm
+  (Term fun -> Bool) ->
+  (Term fun -> testcase -> result) ->
+  Polymorphic testcase result fun norm
 initialState univ inst eval =
   Polymorphic {
-    pm_schemas = Schemas.initialState (inst . monoSchema) (eval . monoSchema),
+    pm_schemas = Schemas.initialState (inst . fmap fun_specialised) (eval . fmap fun_specialised),
     pm_unifiable = Map.empty,
     pm_accepted = Map.empty,
     pm_universe = univ }
 
-makeSchema :: Typed schema => schema -> PolySchema schema
-makeSchema x = PolySchema x (oneTypeVar x)
+polyFun :: Typed fun => fun -> PolyFun fun
+polyFun x = PolyFun x (oneTypeVar x)
 
-instance (Typed schema, Symbolic fun schema) => Symbolic fun (PolySchema schema) where
-  termsDL = termsDL . polySchema
-  subst sub = makeSchema . subst sub . polySchema
+polyTerm :: Typed fun => Term fun -> Term (PolyFun fun)
+polyTerm = oneTypeVar . fmap polyFun
 
-instance (Typed schema, Schematic fun schema) => Schematic fun (PolySchema schema) where
-  term = term . polySchema
-  mostGeneralWith f = makeSchema . mostGeneralWith (f . oneTypeVar) . polySchema
+instance Typed fun => Typed (PolyFun fun) where
+  typ = typ . fun_specialised
+  otherTypesDL = otherTypesDL . fun_specialised
+  typeSubst_ _ x = x -- because it's supposed to be monomorphic
 
-instance Typed schema => Typed (PolySchema schema) where
-  typ = typ . monoSchema
-  otherTypesDL = otherTypesDL . monoSchema
-  typeSubst_ _ x = x -- because it's suppose to be monomorphic
-
-newtype PolyM testcase result schema norm m a = PolyM { unPolyM :: StateT (Polymorphic testcase result schema norm) m a }
+newtype PolyM testcase result fun norm m a = PolyM { unPolyM :: StateT (Polymorphic testcase result fun norm) m a }
   deriving (Functor, Applicative, Monad)
 
 explore ::
-  (Pretty schema, Ord schema, Ord result, Ord norm, Schematic fun schema, Typed schema, Typed fun, Ord fun, Pretty schema,
-  MonadTester testcase schema m, MonadPruner schema norm m) =>
-  schema ->
-  StateT (Polymorphic testcase result schema norm) m (Result schema)
+  (PrettyTerm fun, Ord result, Ord norm, Typed fun, Ord fun, Apply (Term fun),
+  MonadTester testcase (Term fun) m, MonadPruner (Term fun) norm m) =>
+  Term fun ->
+  StateT (Polymorphic testcase result fun norm) m (Result fun)
 explore t = do
   univ <- access univ
   unless (typ t `inUniverse` univ) $
@@ -109,19 +107,22 @@ explore t = do
       fromMaybe undefined (cast (unPoly ty) t)
 
 exploreNoMGU ::
-  (Pretty schema, Ord schema, Ord result, Ord norm, Schematic fun schema, Typed schema, Typed fun, Ord fun,
-  MonadTester testcase schema m, MonadPruner schema norm m) =>
-  schema ->
-  StateT (Polymorphic testcase result schema norm) m (Result schema)
+  (PrettyTerm fun, Ord result, Ord norm, Typed fun, Ord fun, Apply (Term fun),
+  MonadTester testcase (Term fun) m, MonadPruner (Term fun) norm m) =>
+  Term fun ->
+  StateT (Polymorphic testcase result fun norm) m (Result fun)
 exploreNoMGU t = do
   let ty = polyTyp (poly t)
   acc <- access accepted
   if (t `Set.member` Map.findWithDefault Set.empty ty acc) then return (Rejected []) else do
     accepted %= Map.insertWith Set.union ty (Set.singleton t)
     schemas1 <- access schemas
-    (res, schemas2) <- unPolyM (runStateT (Schemas.explore (makeSchema t)) schemas1)
+    (res, schemas2) <- unPolyM (runStateT (Schemas.explore (polyTerm t)) schemas1)
     schemas ~= schemas2
-    return res { result_props = map (regeneralise . fmap polySchema) (result_props res) }
+    return (mapProps (regeneralise . mapFun fun_original) res)
+  where
+    mapProps f (Accepted props) = Accepted (map f props)
+    mapProps f (Rejected props) = Rejected (map f props)
 
 addPolyType :: Monad m => Poly Type -> StateT (Polymorphic testcase result fun norm) m ()
 addPolyType ty = do
@@ -137,34 +138,44 @@ addPolyType ty = do
     forM_ there $ \(ty', _) ->
       sndLens # keyDefault ty' undefined # unifiable %= (there ++)
 
-instance (Symbolic fun schema, Ord fun, Typed fun, Typed schema, MonadPruner schema norm m) =>
-  MonadPruner (PolySchema schema) norm (PolyM testcase result schema norm m) where
+instance (PrettyTerm fun, Ord fun, Typed fun, Apply (Term fun), MonadPruner (Term fun) norm m) =>
+  MonadPruner (Term (PolyFun fun)) norm (PolyM testcase result fun norm m) where
   normaliser = PolyM $ do
     norm <- normaliser
-    return (norm . monoSchema)
+    return (norm . fmap fun_specialised)
   add prop = PolyM $ do
     Universe univ <- access univ
-    let insts = typeInstances (Set.toList univ) (regeneralise (fmap polySchema prop))
+    let insts = typeInstances (Set.toList univ) (regeneralise (mapFun fun_original prop))
     mapM_ add insts
 
-instance MonadTester testcase schema m =>
-  MonadTester testcase (PolySchema schema) (PolyM testcase result schema norm m) where
-  test prop = PolyM $ lift (test (fmap monoSchema prop))
+instance MonadTester testcase (Term fun) m =>
+  MonadTester testcase (Term (PolyFun fun)) (PolyM testcase result fun norm m) where
+  test prop = PolyM $ lift (test (mapFun fun_original prop))
 
 -- Given a property which only contains one type variable,
 -- add as much polymorphism to the property as possible.
 -- e.g.    map (f :: a -> a) (xs++ys) = map f xs++map f ys
 -- becomes map (f :: a -> b) (xs++ys) = map f xs++map f ys.
-regeneralise :: (Symbolic fun schema, Typed schema) => Prop schema -> Prop schema
-regeneralise =
+regeneralise :: (PrettyTerm fun, Typed fun, Apply (Term fun)) => Prop (Term fun) -> Prop (Term fun)
+regeneralise t =
   -- First replace each type variable occurrence with a fresh
   -- type variable (generalise), then unify type variables
   -- where necessary to preserve well-typedness (restrict).
-  restrict . unPoly . generalise
+  let res = restrict . unPoly . generalise $ t
   where
     generalise (lhs :=>: rhs) =
       polyApply (:=>:) (polyList (map genLit lhs)) (genLit rhs)
-    genLit (t :=: u) = polyApply (:=:) (poly t) (poly u)
+    genLit (t :=: u) = polyApply (:=:) (genTerm t) (genTerm u)
+    genTerm (Var x) = poly (Var x)
+    genTerm (App f ts) =
+      let
+        us = map genTerm ts
+        Just ty = fmap unPoly (polyMgu (polyTyp (poly f)) (polyApply arrowType (polyList (map polyTyp us)) (poly typeVar)))
+        tys = take (length us) (typeArgs ty)
+        Just f' = cast ty f
+        Just us' = sequence (zipWith cast tys (map unPoly us))
+      in
+        poly (App f' us')
 
     restrict prop = typeSubst sub prop
       where
@@ -172,13 +183,13 @@ regeneralise =
         cs = [(var_ty x, var_ty y) | x:xs <- vs, y <- xs] ++ concatMap litCs (lhs prop) ++ litCs (rhs prop)
         -- Two variables that were equal before generalisation must have the
         -- same type afterwards
-        vs = partitionBy skel (concatMap vars (terms prop))
+        vs = partitionBy skel (concatMap vars (terms prop >>= subterms))
         skel (V ty x) = V (oneTypeVar ty) x
     litCs (t :=: u) = [(typ t, typ u)]
 
-typeInstances :: (Symbolic fun a, Ord fun, Typed fun, Typed a) => [Type] -> Prop a -> [Prop a]
+typeInstances :: (Pretty a, PrettyTerm fun, Symbolic fun a, Ord fun, Typed fun, Typed a) => [Type] -> Prop a -> [Prop a]
 typeInstances univ prop =
-  [ fmap (typeSubst (\x -> Map.findWithDefault undefined x sub)) prop
+  [ fmap (typeSubst (\x -> Map.findWithDefault (error ("not found: " ++ prettyShow x)) x sub)) prop
   | sub <- cs ]
   where
     cs =
