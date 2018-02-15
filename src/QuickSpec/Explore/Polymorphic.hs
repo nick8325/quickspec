@@ -157,11 +157,11 @@ instance MonadTester testcase (Term fun) m =>
 -- e.g.    map (f :: a -> a) (xs++ys) = map f xs++map f ys
 -- becomes map (f :: a -> b) (xs++ys) = map f xs++map f ys.
 regeneralise :: (PrettyTerm fun, Typed fun, Apply (Term fun)) => Prop (Term fun) -> Prop (Term fun)
-regeneralise t =
+regeneralise =
   -- First replace each type variable occurrence with a fresh
   -- type variable (generalise), then unify type variables
   -- where necessary to preserve well-typedness (restrict).
-  let res = restrict . unPoly . generalise $ t
+  restrict . unPoly . generalise
   where
     generalise (lhs :=>: rhs) =
       polyApply (:=>:) (polyList (map genLit lhs)) (genLit rhs)
