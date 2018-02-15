@@ -4,6 +4,7 @@ module QuickSpec.Explore.Terms where
 
 import qualified Data.Map.Strict as Map
 import Data.Map(Map)
+import QuickSpec.Term
 import QuickSpec.Prop
 import QuickSpec.Type
 import QuickSpec.Pruning
@@ -54,7 +55,7 @@ data Result term =
 -- The representatives of the equivalence classes are guaranteed not to change.
 --
 -- Discovered properties are not added to the pruner.
-explore :: (Typed term, Ord norm, Ord result, MonadTester testcase term m, MonadPruner term norm m) =>
+explore :: (Pretty term, Typed term, Ord norm, Ord result, MonadTester testcase term m, MonadPruner term norm m) =>
   term -> StateT (Terms testcase result term norm) m (Result term)
 explore t = do
   norm <- normaliser

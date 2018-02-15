@@ -32,6 +32,9 @@ data PolySchema schema =
   PolySchema { polySchema :: schema, monoSchema :: schema }
   deriving (Eq, Ord)
 
+instance Pretty schema => Pretty (PolySchema schema) where
+  pPrint = pPrint . monoSchema
+
 newtype Universe = Universe (Set Type)
 
 makeLensAs ''Polymorphic
@@ -72,7 +75,7 @@ newtype PolyM testcase result schema norm m a = PolyM { unPolyM :: StateT (Polym
   deriving (Functor, Applicative, Monad)
 
 explore ::
-  (Ord schema, Ord result, Ord norm, Schematic fun schema, Typed schema, Typed fun, Ord fun, Pretty schema,
+  (Pretty schema, Ord schema, Ord result, Ord norm, Schematic fun schema, Typed schema, Typed fun, Ord fun, Pretty schema,
   MonadTester testcase schema m, MonadPruner schema norm m) =>
   schema ->
   StateT (Polymorphic testcase result schema norm) m (Result schema)
@@ -106,7 +109,7 @@ explore t = do
       fromMaybe undefined (cast (unPoly ty) t)
 
 exploreNoMGU ::
-  (Ord schema, Ord result, Ord norm, Schematic fun schema, Typed schema, Typed fun, Ord fun,
+  (Pretty schema, Ord schema, Ord result, Ord norm, Schematic fun schema, Typed schema, Typed fun, Ord fun,
   MonadTester testcase schema m, MonadPruner schema norm m) =>
   schema ->
   StateT (Polymorphic testcase result schema norm) m (Result schema)

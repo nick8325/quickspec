@@ -43,7 +43,7 @@ instance Sized f => Sized (Term f) where
   size (App f ts) = size f + sum (map size ts)
 
 instance Pretty Var where
-  pPrint x = text "X" <> pPrint (var_id x+1)
+  pPrint x = parens $ text "X" <> pPrint (var_id x+1) <+> text "::" <+> pPrint (var_ty x)
 
 instance PrettyTerm f => Pretty (Term f) where
   pPrintPrec l p (Var x) = pPrintPrec l p x

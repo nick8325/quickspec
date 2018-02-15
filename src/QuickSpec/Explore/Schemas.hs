@@ -68,7 +68,7 @@ data Result schema =
 
 -- The schema is represented as a term where there is only one distinct variable of each type
 explore ::
-  (Ord result, Ord schema, Ord norm, Typed schema, Schematic fun schema,
+  (Pretty schema, Ord result, Ord schema, Ord norm, Typed schema, Schematic fun schema,
   MonadTester testcase schema m, MonadPruner schema norm m) =>
   schema -> StateT (Schemas testcase result schema norm) m (Result schema)
 explore t0 = do
@@ -91,7 +91,7 @@ explore t0 = do
 
 {-# INLINEABLE exploreIn #-}
 exploreIn ::
-  (Ord result, Ord schema, Ord norm, Typed schema, Schematic fun schema,
+  (Pretty schema, Ord result, Ord schema, Ord norm, Typed schema, Schematic fun schema,
   MonadTester testcase schema m, MonadPruner schema norm m) =>
   schema -> schema ->
   StateT (Schemas testcase result schema norm) m (Result schema)
@@ -116,7 +116,7 @@ exploreIn rep t = do
 
 {-# INLINEABLE instantiateRep #-}
 instantiateRep ::
-  (Ord result, Ord schema, Ord norm, Typed schema, Schematic fun schema,
+  (Pretty schema, Ord result, Ord schema, Ord norm, Typed schema, Schematic fun schema,
   MonadTester testcase schema m, MonadPruner schema norm m) =>
   schema ->
   StateT (Schemas testcase result schema norm) m (Result schema)
@@ -126,7 +126,7 @@ instantiateRep t = do
 
 {-# INLINEABLE instantiate #-}
 instantiate ::
-  (Ord result, Ord schema, Ord norm, Typed schema, Schematic fun schema,
+  (Pretty schema, Ord result, Ord schema, Ord norm, Typed schema, Schematic fun schema,
   MonadTester testcase schema m, MonadPruner schema norm m) =>
   schema -> schema ->
   StateT (Schemas testcase result schema norm) m (Result schema)
