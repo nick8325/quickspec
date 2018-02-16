@@ -13,11 +13,11 @@ import QuickSpec.Utils
 import QuickSpec.Type
 import QuickSpec.Term
 
-newtype Sig = Sig (Haskell.Config -> Haskell.Config)
+newtype Sig = Sig (Int -> Haskell.Config -> Haskell.Config)
 
 instance Monoid Sig where
-  mempty = Sig id
-  Sig sig1 `mappend` Sig sig2 = Sig (sig2 . sig1)
+  mempty = Sig (\_ -> id)
+  Sig sig1 `mappend` Sig sig2 = Sig (\n -> sig2 n . sig1 n)
 
 class Signature sig where
   toSig :: sig -> Sig
@@ -36,43 +36,54 @@ baseType _ =
 
 inst :: Typeable a => a -> Sig
 inst x =
-  Sig (modL Haskell.lens_instances (`mappend` Haskell.inst x))
+  Sig (\_ -> modL Haskell.lens_instances (`mappend` Haskell.inst x))
+
+appendAt :: Int -> a -> [[a]] -> [[a]]
+appendAt n x [] = appendAt n x [[]]
+appendAt 0 x (xs:xss) = (xs ++ [x]):xss
+appendAt n x (xs:xss) = xs:appendAt (n-1) x xss
 
 constant :: Typeable a => String -> a -> Sig
 constant name x =
-  Sig (modL Haskell.lens_constants (++ [Haskell.constant name x]))
+  Sig (\n -> modL Haskell.lens_constants (appendAt n (Haskell.constant name x)))
 
 predicate :: ( Predicateable a
              , Typeable a
              , Typeable (TestCase a))
              => String -> a -> Sig
 predicate name x =
-  Sig (modL Haskell.lens_predicates (++ [Haskell.predicate name x]))
+  Sig (\n -> modL Haskell.lens_predicates (appendAt n (Haskell.predicate name x)))
+
+first :: Signature sig => sig -> Sig
+first signature =
+  Sig (\n -> sig (n+1))
+  where
+    Sig sig = toSig signature
 
 withMaxTests :: Int -> Sig
 withMaxTests n =
-  Sig (setL (QuickCheck.lens_num_tests # Haskell.lens_quickCheck) n)
+  Sig (\_ -> setL (QuickCheck.lens_num_tests # Haskell.lens_quickCheck) n)
 
 withMaxTestSize :: Int -> Sig
 withMaxTestSize n =
-  Sig (setL (QuickCheck.lens_max_test_size # Haskell.lens_quickCheck) n)
+  Sig (\_ -> setL (QuickCheck.lens_max_test_size # Haskell.lens_quickCheck) n)
 
 withPruningDepth :: Int -> Sig
 withPruningDepth n =
-  Sig (setL (Twee.lens_max_cp_depth # Haskell.lens_twee) n)
+  Sig (\_ -> setL (Twee.lens_max_cp_depth # Haskell.lens_twee) n)
 
 withPruningTermSize :: Int -> Sig
 withPruningTermSize n =
-  Sig (setL (Twee.lens_max_term_size # Haskell.lens_twee) n)
+  Sig (\_ -> setL (Twee.lens_max_term_size # Haskell.lens_twee) n)
 
 withMaxTermSize :: Int -> Sig
-withMaxTermSize n = Sig (setL Haskell.lens_max_size n)
+withMaxTermSize n = Sig (\_ -> setL Haskell.lens_max_size n)
 
 defaultTo :: Typeable a => proxy a -> Sig
-defaultTo proxy = Sig (setL Haskell.lens_default_to (typeRep proxy))
+defaultTo proxy = Sig (\_ -> setL Haskell.lens_default_to (typeRep proxy))
 
 quickSpec :: Signature sig => sig -> IO ()
 quickSpec signature =
-  Haskell.quickSpec (sig Haskell.defaultConfig)
+  Haskell.quickSpec (sig 0 Haskell.defaultConfig)
   where
     Sig sig = toSig signature

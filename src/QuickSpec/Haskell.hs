@@ -294,6 +294,7 @@ genSuchThat :: (Predicateable a, Arbitrary (TestCase a)) => a -> Gen (TestCaseWr
 genSuchThat p = TestCaseWrapped <$> arbitrary `suchThat` uncrry p
 
 data PredRep = PredRep { predInstances :: Instances
+                       , predCon :: Constant
                        , predCons :: [Constant] }
 
 true :: Constant
@@ -333,7 +334,7 @@ predicate name pred =
 
         ty = typeRep (Proxy :: Proxy (TestCaseWrapped sym (TestCase a)))
       in
-        PredRep instances (conPred:conSels)
+        PredRep instances conPred (conPred:conSels)
 
 data Config =
   Config {
@@ -341,8 +342,8 @@ data Config =
     cfg_twee :: Twee.Config,
     cfg_max_size :: Int,
     cfg_instances :: Instances,
-    cfg_constants :: [Constant],
-    cfg_predicates :: [PredRep],
+    cfg_constants :: [[Constant]],
+    cfg_predicates :: [[PredRep]],
     cfg_default_to :: Type }
 
 makeLensAs ''Config
@@ -368,31 +369,42 @@ defaultConfig =
 quickSpec :: Config -> IO ()
 quickSpec Config{..} = give cfg_default_to $ do
   let
-    constants = true:cfg_constants ++ concatMap predCons cfg_predicates
+    constantsOf f = true:f cfg_constants ++ f (map (concatMap predCons) cfg_predicates)
+    constants = constantsOf concat
     univ = conditionalsUniverse constants
-    instances = mconcat (cfg_instances:baseInstances:map predInstances cfg_predicates)
+    instances = mconcat (cfg_instances:baseInstances:map predInstances (concat cfg_predicates))
     eval = evalHaskell cfg_default_to
 
     present prop = do
       n :: Int <- get
       put (n+1)
       putLine (printf "%3d. %s" n (show (prettyProp (names instances) (conditionalise prop))))
+
+    mainOf f g = do
+      printConstants (f cfg_constants ++ f (map (map predCon) cfg_predicates))
+      putLine ""
+      putLine "== Laws =="
+      QuickSpec.Explore.quickSpec present measure (flip eval) cfg_max_size univ
+        [ Partial fun 0 | fun <- constantsOf g ]
+      putLine ""
+
+    main = mapM_ round [0..rounds-1]
+      where
+        round n = mainOf ((!! n) . reverse) (concat . take (n+1) . reverse)
+        rounds = max (length cfg_constants) (length cfg_predicates)
+
   join $
     fmap withStdioTerminal $
     generate $
     QuickCheck.run cfg_quickCheck (arbitraryVal cfg_default_to instances) eval $
     Twee.run cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size } $
     runConditionals (map total constants) $
-    flip evalStateT 1 $ do
-      printConstants cfg_constants
-      putLine ""
-      putLine "== Laws =="
-      QuickSpec.Explore.quickSpec present measure (flip eval) cfg_max_size univ
-        [ Partial f 0 | f <- constants ]
+    flip evalStateT 1 $
+      main
 
 printConstants :: MonadTerminal m => [Constant] -> m ()
 printConstants cs = do
-  putLine "== Signature =="
+  putLine "== Functions =="
   let
     decls = [ (show (pPrint (App (Partial c 0) [])), pPrintType (typ c)) | c <- cs ]
     maxWidth = maximum (0:map (length . fst) decls)
