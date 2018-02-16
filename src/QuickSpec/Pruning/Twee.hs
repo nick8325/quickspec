@@ -8,7 +8,6 @@ import QuickSpec.Term
 import QuickSpec.Terminal
 import qualified QuickSpec.Pruning.Types as Types
 import qualified QuickSpec.Pruning.Background as Background
-import QuickSpec.Pruning.Background(Background)
 import Control.Monad.Trans.Class
 import Control.Monad.IO.Class
 import qualified QuickSpec.Pruning.UntypedTwee as Untyped

@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric, TypeFamilies, DeriveFunctor, FlexibleInstances, MultiParamTypeClasses, UndecidableInstances, FlexibleContexts #-}
+{-# LANGUAGE DeriveGeneric, TypeFamilies, DeriveFunctor, FlexibleInstances, MultiParamTypeClasses, UndecidableInstances, FlexibleContexts, TypeOperators #-}
 module QuickSpec.Prop where
 
 import Control.Monad
@@ -7,7 +7,7 @@ import Data.Ord
 import QuickSpec.Type
 import QuickSpec.Utils
 import QuickSpec.Term
-import GHC.Generics
+import GHC.Generics(Generic)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Control.Monad.Trans.State.Strict
@@ -78,6 +78,10 @@ x === y = [] :=>: x :=: y
 class PrettyArity fun where
   prettyArity :: fun -> Int
   prettyArity _ = 0
+
+instance (PrettyArity fun1, PrettyArity fun2) => PrettyArity (fun1 :+: fun2) where
+  prettyArity (Inl x) = prettyArity x
+  prettyArity (Inr x) = prettyArity x
 
 prettyProp ::
   (Typed fun, Apply (Term fun), PrettyTerm fun, PrettyArity fun) =>

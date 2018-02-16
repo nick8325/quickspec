@@ -67,8 +67,11 @@ library
   ghc-options: -W
   hs-source-dirs: src
   Exposed-modules:
+    QuickSpec
     QuickSpec.Explore
+    QuickSpec.Explore.Conditionals
     QuickSpec.Explore.PartialApplication
+    QuickSpec.Explore.Polymorphic
     QuickSpec.Explore.Schemas
     QuickSpec.Explore.Terms
     QuickSpec.Haskell

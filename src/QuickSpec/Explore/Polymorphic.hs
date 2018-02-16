@@ -20,6 +20,7 @@ import Control.Monad.Trans.Class
 import qualified Twee.Base as Twee
 import Control.Monad
 import Data.Maybe
+import qualified Data.DList as DList
 
 data Polymorphic testcase result fun norm =
   Polymorphic {
@@ -187,15 +188,15 @@ regeneralise =
         skel (V ty x) = V (oneTypeVar ty) x
     litCs (t :=: u) = [(typ t, typ u)]
 
-typeInstances :: (Pretty a, PrettyTerm fun, Symbolic fun a, Ord fun, Typed fun, Typed a) => [Type] -> Prop a -> [Prop a]
+typeInstances :: (Pretty a, PrettyTerm fun, Symbolic fun a, Ord fun, Typed fun, Typed a) => [Type] -> a -> [a]
 typeInstances univ prop =
-  [ fmap (typeSubst (\x -> Map.findWithDefault (error ("not found: " ++ prettyShow x)) x sub)) prop
+  [ typeSubst (\x -> Map.findWithDefault (error ("not found: " ++ prettyShow x)) x sub) prop
   | sub <- cs ]
   where
     cs =
       foldr intersection [Map.empty]
         (map constrain
-          (usort (terms prop >>= subterms)))
+          (usort (DList.toList (termsDL prop) >>= subterms)))
 
     constrain t =
       usort [ Map.fromList (Twee.substToList sub) | u <- univ, Just sub <- [Twee.match (typ t) u] ]

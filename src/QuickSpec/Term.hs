@@ -152,7 +152,7 @@ compareFuns (App f ts) (App g us) =
 -- Data types a la carte-ish.
 ----------------------------------------------------------------------
 
-data a :+: b = Inl a | Inr b
+data a :+: b = Inl a | Inr b deriving (Eq, Ord)
 
 instance (Eval fun1 a, Eval fun2 a) => Eval (fun1 :+: fun2) a where
   eval env (Inl x) = eval env x
@@ -162,6 +162,10 @@ instance (Sized fun1, Sized fun2) => Sized (fun1 :+: fun2) where
   size (Inl x) = size x
   size (Inr x) = size x
 
+instance (Arity fun1, Arity fun2) => Arity (fun1 :+: fun2) where
+  arity (Inl x) = arity x
+  arity (Inr x) = arity x
+
 instance (Typed fun1, Typed fun2) => Typed (fun1 :+: fun2) where
   typ (Inl x) = typ x
   typ (Inr x) = typ x
@@ -169,3 +173,11 @@ instance (Typed fun1, Typed fun2) => Typed (fun1 :+: fun2) where
   otherTypesDL (Inr x) = otherTypesDL x
   typeSubst_ sub (Inl x) = Inl (typeSubst_ sub x)
   typeSubst_ sub (Inr x) = Inr (typeSubst_ sub x)
+
+instance (Pretty fun1, Pretty fun2) => Pretty (fun1 :+: fun2) where
+  pPrintPrec l p (Inl x) = pPrintPrec l p x
+  pPrintPrec l p (Inr x) = pPrintPrec l p x
+  
+instance (PrettyTerm fun1, PrettyTerm fun2) => PrettyTerm (fun1 :+: fun2) where
+  termStyle (Inl x) = termStyle x
+  termStyle (Inr x) = termStyle x

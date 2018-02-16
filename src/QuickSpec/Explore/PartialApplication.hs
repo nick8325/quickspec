@@ -56,6 +56,13 @@ instance (Arity f, Typed f) => Apply (Term (PartiallyApplied f)) where
         _ ->
           simpleApply t u
 
+getTotal :: Arity f => PartiallyApplied f -> Maybe f
+getTotal (Partial f n) | arity f == n = Just f
+getTotal _ = Nothing
+
+total :: Arity f => f -> PartiallyApplied f
+total f = Partial f (arity f)
+
 simpleApply ::
   Typed f =>
   Term (PartiallyApplied f) -> Term (PartiallyApplied f) -> Term (PartiallyApplied f)

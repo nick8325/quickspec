@@ -1,11 +1,11 @@
 -- Polymorphic types and dynamic values.
-{-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances, GeneralizedNewtypeDeriving, Rank2Types, ExistentialQuantification, PolyKinds, TypeFamilies, FlexibleContexts, StandaloneDeriving, PatternGuards, MultiParamTypeClasses, ConstraintKinds #-}
+{-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances, GeneralizedNewtypeDeriving, Rank2Types, ExistentialQuantification, PolyKinds, TypeFamilies, FlexibleContexts, StandaloneDeriving, PatternGuards, MultiParamTypeClasses, ConstraintKinds, DataKinds #-}
 -- To avoid a warning about TyVarNumber's constructor being unused:
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
 module QuickSpec.Type(
   -- Types.
   Typeable,
-  Type, TyCon(..), tyCon, fromTyCon, A, B, C, D, E, ClassA, ClassB, ClassC, ClassD, ClassE, typeVar, isTypeVar,
+  Type, TyCon(..), tyCon, fromTyCon, A, B, C, D, E, ClassA, ClassB, ClassC, ClassD, ClassE, SymA, typeVar, isTypeVar,
   typeOf, typeRep, applyType, fromTypeRep,
   arrowType, unpackArrow, typeArgs, typeRes, typeDrop, typeArity, oneTypeVar, skolemiseTypeVars,
   isDictionary, getDictionary,
@@ -85,6 +85,8 @@ deriving instance Typeable ClassD
 class ClassE
 deriving instance Typeable ClassE
 
+type SymA = "__polymorphic_symbol__"
+
 typeVars :: [Ty.TypeRep]
 typeVars =
   [Ty.typeRep (Proxy :: Proxy A),
@@ -96,7 +98,8 @@ typeVars =
    Ty.typeRep (Proxy :: Proxy ClassB),
    Ty.typeRep (Proxy :: Proxy ClassC),
    Ty.typeRep (Proxy :: Proxy ClassD),
-   Ty.typeRep (Proxy :: Proxy ClassE)]
+   Ty.typeRep (Proxy :: Proxy ClassE),
+   Ty.typeRep (Proxy :: Proxy SymA)]
 
 typeVar :: Type
 typeVar = typeRep (Proxy :: Proxy A)

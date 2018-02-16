@@ -7,13 +7,9 @@ import QuickSpec.Pruning
 import QuickSpec.Term
 import QuickSpec.Type
 import QuickSpec.Utils
-import QuickSpec.Terminal
 import QuickSpec.Prop
-import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.State.Strict
-import qualified Data.Set as Set
-import Data.Set(Set)
 
 baseTerms :: Ord a => (Term f -> a) -> [f] -> [Term f]
 baseTerms measure funs =

@@ -10,7 +10,6 @@ import QuickSpec.Term
 import QuickSpec.Type
 import QuickSpec.Prop
 import QuickSpec.Terminal
-import QuickSpec.Utils
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
 

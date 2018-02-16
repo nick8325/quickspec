@@ -1,10 +1,13 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ScopedTypeVariables, TypeOperators, GADTs, FlexibleInstances, FlexibleContexts, MultiParamTypeClasses, RecordWildCards, TemplateHaskell #-}
 module QuickSpec.Haskell where
 
 import QuickSpec.Haskell.Resolve
 import QuickSpec.Type
 import QuickSpec.Prop
-import Test.QuickCheck
+import Test.QuickCheck hiding (total)
 import Data.Constraint
 import Data.Proxy
 import qualified Twee.Base as B
@@ -22,14 +25,15 @@ import qualified QuickSpec.Explore
 import QuickSpec.Explore.PartialApplication
 import QuickSpec.Pruning.Background(Background)
 import Control.Monad
-import Control.Monad.Trans.Class
 import Control.Monad.Trans.State.Strict
 import QuickSpec.Terminal
-import QuickSpec.Explore.Polymorphic
 import Text.Printf
 import Debug.Trace
 import Data.Reflection hiding (D)
 import QuickSpec.Utils
+import GHC.TypeLits
+import QuickSpec.Explore.Conditionals
+import Control.Monad.Trans.Class
 
 baseInstances :: Instances
 baseInstances =
@@ -184,7 +188,9 @@ data Constant =
     con_name  :: String,
     con_style :: TermStyle,
     con_pretty_arity :: Int,
-    con_value :: Value Identity }
+    con_value :: Value Identity,
+    con_size :: Int,
+    con_classify :: Classification Constant }
 
 instance Eq Constant where
   x == y =
@@ -204,6 +210,10 @@ instance Background Constant
 
 constant :: Typeable a => String -> a -> Constant
 constant name val =
+  constant' name (toValue (Identity val))
+
+constant' :: String -> Value Identity -> Constant
+constant' name val =
   Constant {
     con_name = name,
     con_style =
@@ -211,15 +221,17 @@ constant name val =
         _ | name == "()" -> curried
           | take 1 name == "," -> fixedArity (length name+1) tupleStyle
           | take 2 name == "(," -> fixedArity (length name-1) tupleStyle
-          | isOp name && typeArity (typeOf val) >= 2 -> infixStyle 5
+          | isOp name && typeArity (typ val) >= 2 -> infixStyle 5
           | isOp name -> prefix
           | otherwise -> curried,
     con_pretty_arity =
       case () of
-        _ | isOp name && typeArity (typeOf val) >= 2 -> 2
+        _ | isOp name && typeArity (typ val) >= 2 -> 2
           | isOp name -> 1
-          | otherwise -> 0,
-    con_value = toValue (Identity val) }
+          | otherwise -> typeArity (typ val),
+    con_value = val,
+    con_size = 1,
+    con_classify = Function }
 
 isOp :: String -> Bool
 isOp "[]" = False
@@ -243,13 +255,78 @@ instance PrettyArity Constant where
   prettyArity = con_pretty_arity
 
 instance Sized Constant where
-  size _ = 1
+  size = con_size
 
 instance Arity Constant where
   arity = typeArity . typ
 
+instance Predicate Constant where
+  classify = con_classify
+
 instance (Given Type, Applicative f) => Eval Constant (Value f) where
   eval _ = mapValue (pure . runIdentity) . defaultTo given . con_value
+
+class Predicateable a where
+  uncrry :: a -> TestCase a -> Bool
+
+instance Predicateable Bool where
+  uncrry = const
+
+instance forall a b. (Predicateable b, Typeable a, TestCase (a -> b) ~ (a, TestCase b)) => Predicateable (a -> b) where
+  uncrry f (a, b) = uncrry (f a) b
+
+-- Foldr over functions
+type family (Foldr f b fun) :: * where
+  Foldr f def (a -> b) = f a (Foldr f def b)
+  Foldr f def b        = def
+
+-- A test case for predicates of type a
+-- if `a ~ A -> B -> C -> Bool` we get `TestCase a ~ (A, (B, (C, ())))`
+--
+-- Some speedup should be possible by using unboxed tuples instead...
+type TestCase a = Foldr (,) () a
+
+data TestCaseWrapped (t :: Symbol) a = TestCaseWrapped { unTestCaseWrapped :: a }
+
+-- A `suchThat` generator for a predicate
+genSuchThat :: (Predicateable a, Arbitrary (TestCase a)) => a -> Gen (TestCaseWrapped x (TestCase a))
+genSuchThat p = TestCaseWrapped <$> arbitrary `suchThat` uncrry p
+
+data PredRep = PredRep { predInstances :: Instances
+                       , predCons :: [Constant] }
+
+-- | Declare a predicate with a given name and value.
+-- The predicate should have type @... -> Bool@.
+predicate :: forall a. ( Predicateable a
+             , Typeable a
+             , Typeable (TestCase a))
+             => String -> a -> PredRep
+predicate name pred =
+  case someSymbolVal name of
+    SomeSymbol (proxy :: Proxy sym) ->
+      let
+        instances =
+          inst (\(dict :: Dict (Arbitrary (TestCase a))) -> (withDict dict genSuchThat) pred :: Gen (TestCaseWrapped sym (TestCase a)))
+          `mappend`
+          inst (Names [name ++ "_var"] :: Names (TestCaseWrapped sym (TestCase a)))
+
+        conPred = (constant name pred) { con_classify = Predicate conSels ty }
+        conSels = [ (constant' (name ++ "_" ++ show i) (select i)) { con_classify = Selector i conPred, con_size = 0 } | i <- [0..typeArity (typeOf pred)-1] ]
+
+        select i =
+          fromJust (cast (arrowType [ty] (typeArgs (typeOf pred) !! i)) (unPoly (compose (sel i) unwrapV)))
+          where
+            compose f g = apply (apply cmpV f) g
+            sel 0 = fstV
+            sel n = compose (sel (n-1)) sndV
+            fstV = toPolyValue (fst :: (A, B) -> A)
+            sndV = toPolyValue (snd :: (A, B) -> B)
+            cmpV = toPolyValue ((.) :: (B -> C) -> (A -> B) -> A -> C)
+            unwrapV = toPolyValue (unTestCaseWrapped :: TestCaseWrapped SymA A -> A)
+
+        ty = typeRep (Proxy :: Proxy (TestCaseWrapped sym (TestCase a)))
+      in
+        PredRep instances (conPred:conSels)
 
 data Config =
   Config {
@@ -280,17 +357,22 @@ defaultConfig =
 
 quickSpec :: Config -> IO ()
 quickSpec Config{..} = give cfg_default_to $ do
+  forM_ cfg_constants $ \c -> putStrLn (prettyShow c ++ " :: " ++ prettyShow (typ c))
   let
     instances = cfg_instances `mappend` baseInstances
+    true = constant "true" True
     present prop = do
       n :: Int <- get
       put (n+1)
-      putLine (printf "%3d. %s" n (show (prettyProp (names instances) prop)))
+      putLine (printf "%3d. %s" n (show (prettyProp (names instances) (conditionalise (App (total true) []) prop))))
+      -- putLine (printf "%3d. %s" n (show (prettyProp (names instances) prop)))
+      lift $ considerConditionalising (App (total true) []) prop
   join $
     fmap withStdioTerminal $
     generate $
     QuickCheck.run cfg_quickCheck (arbitraryVal instances) (evalHaskell cfg_default_to) $
     Twee.run cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size } $
+    runConditionals $
     flip evalStateT 1 $
     QuickSpec.Explore.quickSpec present measure (flip (evalHaskell cfg_default_to)) cfg_max_size
-      [Partial f 0 | f <- cfg_constants]
+      [ Partial f 0 | f <- true:cfg_constants ]

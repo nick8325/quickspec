@@ -13,7 +13,6 @@ import Control.Monad.Trans.Reader
 import Data.List
 import System.Random
 import QuickSpec.Terminal
-import QuickSpec.Term
 import QuickSpec.Utils
 
 data Config =
