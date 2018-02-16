@@ -1,11 +1,12 @@
-{-# LANGUAGE TypeApplication #-}
+{-# LANGUAGE TypeApplications #-}
 import QuickSpec
 
-eqLen :: [A] -> [B] -> Bool
+eqLen :: [a] -> [b] -> Bool
 eqLen xs ys = length xs == length ys
 
 main = quickSpec [
   withMaxTermSize 8,
-  con "++" ((++) @ A),
-  con "zip" (zip @ A @ B),
+  withPruningDepth 10,
+  con "++" ((++) @ Int),
+  con "zip" (zip @ Int @ Int),
   predicate "eqLen" (eqLen @ Int @ Int) ]
