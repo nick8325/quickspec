@@ -61,11 +61,18 @@ instance (Ord fun, Typeable fun, Arity fun, Sized fun, PrettyTerm fun, EqualsBon
       u
       -- traceShow (text "normalise:" <+> pPrint t <+> text "->" <+> pPrint u) u
 
-  add prop = Pruner $ do
-    config <- ask
-    state <- lift get
-    -- traceShowM (text "add:" <+> pPrint prop)
-    lift (put $! addTwee config prop state)
+  add ([] :=>: t :=: u) = do
+    t' <- normalise t
+    u' <- normalise u
+    if t' == u' then return False else Pruner $ do
+      config <- ask
+      state <- lift get
+      -- traceShowM (text "add:" <+> pPrint prop)
+      lift (put $! addTwee config t' u' state)
+      return True
+
+  add _ =
+    error "twee pruner doesn't support non-unit equalities"
 
 normaliseTwee :: (Ord fun, Typeable fun, Arity fun, Sized fun, PrettyTerm fun, EqualsBonus fun) =>
   State (Extended fun) -> Term fun -> Term fun
@@ -74,15 +81,12 @@ normaliseTwee state t =
     result (normaliseTerm state (simplifyTerm state (skolemise t)))
 
 addTwee :: (Ord fun, Typeable fun, Arity fun, Sized fun, PrettyTerm fun, EqualsBonus fun) =>
-  Twee.Config -> Prop (Term fun) -> State (Extended fun) -> State (Extended fun)
-addTwee config ([] :=>: t :=: u) state =
+  Twee.Config -> Term fun -> Term fun -> State (Extended fun) -> State (Extended fun)
+addTwee config t u state =
   completePure config $
     addAxiom config state axiom
   where
     axiom = Axiom 0 (prettyShow (t :=: u)) (toTwee t Twee.:=: toTwee u)
-
-addTwee _ _ _ =
-  error "twee pruner doesn't support non-unit equalities"
 
 toTwee :: (Ord f, Typeable f) =>
   Term f -> Twee.Term (Extended f)

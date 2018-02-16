@@ -25,17 +25,29 @@ import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.IO.Class
 
-newtype Conditionals m a = Conditionals { runConditionals :: m a }
+newtype Conditionals m a = Conditionals (m a)
   deriving (Functor, Applicative, Monad, MonadIO, MonadTester testcase term, MonadTerminal)
 instance MonadTrans Conditionals where
   lift = Conditionals
-instance MonadPruner (Term (WithConstructor fun)) norm m =>
+instance (Typed fun, Ord fun, PrettyTerm fun, Ord norm, MonadPruner (Term (WithConstructor fun)) norm m, Predicate fun, MonadTerminal m) =>
   MonadPruner (Term fun) norm (Conditionals m) where
   normaliser = lift $ do
     norm <- normaliser
     return (norm . fmap Normal)
-  add prop = lift $ do
-    add (mapFun Normal prop)
+  add prop = do
+    redundant <- conditionallyRedundant prop
+    if redundant then return False else do
+      res <- lift (add (mapFun Normal prop))
+      when res (considerConditionalising prop)
+      return res
+
+runConditionals ::
+  (PrettyTerm fun, Ord norm, MonadPruner (Term (WithConstructor fun)) norm m, Predicate fun, MonadTerminal m) =>
+  [fun] -> Conditionals m a -> m a
+runConditionals preds mx =
+  run (mapM_ considerPredicate preds >> mx)
+  where
+    run (Conditionals mx) = mx
 
 class Predicate fun where
   classify :: fun -> Classification fun
@@ -105,29 +117,27 @@ considerPredicate f =
         eqns =
           [App (Constructor f ty) [App (Normal sel) [x] | sel <- sels] === x,
            App (Normal f) [App (Normal sel) [x] | sel <- sels] === fmap Normal true]
-      mapM_ (putLine . prettyShow) eqns
       mapM_ (lift . add) eqns
     _ -> return ()
 
 considerConditionalising ::
-  (PrettyTerm fun, Ord norm, MonadPruner (Term (WithConstructor fun)) norm m, Predicate fun, MonadTerminal m) =>
-  Term fun -> Prop (Term fun) -> Conditionals m ()
-considerConditionalising true (lhs :=>: t :=: u) = do
+  (Typed fun, Ord fun, PrettyTerm fun, Ord norm, MonadPruner (Term (WithConstructor fun)) norm m, Predicate fun, MonadTerminal m) =>
+  Prop (Term fun) -> Conditionals m ()
+considerConditionalising (lhs :=>: t :=: u) = do
   norm <- normaliser
   -- If we have discovered that "somePredicate x_1 x_2 ... x_n = True"
   -- we should add the axiom "get_x_n (toSomePredicate x_1 x_2 ... x_n) = x_n"
   -- to the set of known equations
-  when (norm u == norm true) $
-    case t of
-      App f ts | Predicate{} <- classify f -> -- It is an interesting predicate, i.e. it was added by the user
+  case t of
+    App f ts | Predicate{..} <- classify f -> -- It is an interesting predicate, i.e. it was added by the user
+      when (norm u == norm clas_true) $
         addPredicate lhs f ts
-      _ -> return ()
+    _ -> return ()
 
 conditionallyRedundant ::
   (Typed fun, Ord fun, PrettyTerm fun, Ord norm, MonadPruner (Term (WithConstructor fun)) norm m, Predicate fun, MonadTerminal m) =>
   Prop (Term fun) -> Conditionals m Bool
 conditionallyRedundant (lhs :=>: t :=: u) = do
-  putLine ("CHECKING: " ++ prettyShow (lhs :=>: t :=: u))
   t' <- normalise t
   u' <- normalise u
   conditionallyRedundant' lhs t u t' u'
@@ -173,7 +183,6 @@ addPredicate lhs f ts = do
       equations = [ lhs' :=>: App (Normal (clas_selectors !! i)) [construction] :=: x | (x, i) <- zip ts' [0..]]
 
   -- Declare the relevant equations as axioms
-  mapM_ (putLine . prettyShow) equations
   mapM_ (lift . add) equations
 
 conditionalise :: (PrettyTerm fun, Typed fun, Ord fun, Predicate fun) => Term fun -> Prop (Term fun) -> Prop (Term fun)

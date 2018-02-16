@@ -4,6 +4,7 @@ module QuickSpec.Pruning where
 
 import QuickSpec.Prop
 import QuickSpec.Testing
+import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.IO.Class
 import Control.Monad.Trans.State.Strict
@@ -11,12 +12,12 @@ import Control.Monad.Trans.Reader
 
 class Monad m => MonadPruner term norm m | m -> term norm where
   normaliser :: m (term -> norm)
-  add :: Prop term -> m ()
+  add :: Prop term -> m Bool
 
   default normaliser :: (MonadTrans t, MonadPruner term norm m', m ~ t m') => m (term -> norm)
   normaliser = lift normaliser
 
-  default add :: (MonadTrans t, MonadPruner term norm m', m ~ t m') => Prop term -> m ()
+  default add :: (MonadTrans t, MonadPruner term norm m', m ~ t m') => Prop term -> m Bool
   add = lift . add
 
 instance MonadPruner term norm m => MonadPruner term norm (StateT s m)
@@ -35,7 +36,7 @@ instance MonadTrans ReadOnlyPruner where
 
 instance MonadPruner term norm m => MonadPruner term norm (ReadOnlyPruner m) where
   normaliser = ReadOnlyPruner normaliser
-  add _ = return ()
+  add _ = return True
 
 newtype WatchPruner term m a = WatchPruner (StateT [Prop term] m a)
   deriving (Functor, Applicative, Monad, MonadTrans, MonadIO, MonadTester testcase term)
@@ -43,8 +44,9 @@ newtype WatchPruner term m a = WatchPruner (StateT [Prop term] m a)
 instance MonadPruner term norm m => MonadPruner term norm (WatchPruner term m) where
   normaliser = lift normaliser
   add prop = do
-    WatchPruner (modify (prop:))
-    lift (add prop)
+    res <- lift (add prop)
+    when res (WatchPruner (modify (prop:)))
+    return res
 
 watchPruner :: Monad m => WatchPruner term m a -> m (a, [Prop term])
 watchPruner (WatchPruner mx) = do

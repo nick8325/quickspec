@@ -367,21 +367,15 @@ quickSpec Config{..} = give cfg_default_to $ do
     univ = universe $ map Normal (true:cfg_constants) ++ [ Constructor con clas_test_case | con@Constant{con_classify = Predicate{..}} <- cfg_constants ]
     instances = cfg_instances `mappend` baseInstances
     present prop = do
-      redundant <- lift $ conditionallyRedundant prop
-      when redundant (putLine ("REDUNDANT: " ++ prettyShow prop))
-      unless redundant $ do
-        n :: Int <- get
-        put (n+1)
-        putLine (printf "%3d. %s" n (show (prettyProp (names instances) (conditionalise (App (total true) []) prop))))
-        putLine (printf "BEFORE: %s" (prettyShow prop))
-        lift $ considerConditionalising (App (total true) []) prop
+      n :: Int <- get
+      put (n+1)
+      putLine (printf "%3d. %s" n (show (prettyProp (names instances) (conditionalise (App (total true) []) prop))))
   join $
     fmap withStdioTerminal $
     generate $
     QuickCheck.run cfg_quickCheck (arbitraryVal cfg_default_to instances) (evalHaskell cfg_default_to) $
     Twee.run cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size } $
-    runConditionals $
-    flip evalStateT 1 $ do
-      lift $ mapM_ (considerPredicate . total) cfg_constants
+    runConditionals (map total cfg_constants) $
+    flip evalStateT 1 $
       QuickSpec.Explore.quickSpec present measure (flip (evalHaskell cfg_default_to)) cfg_max_size univ
         [ Partial f 0 | f <- true:cfg_constants ]
