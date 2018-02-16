@@ -19,6 +19,7 @@ import QuickSpec.Testing
 import QuickSpec.Terminal
 import QuickSpec.Utils
 import QuickSpec.Explore.PartialApplication
+import QuickSpec.Explore.Polymorphic
 import qualified Twee.Base as Twee
 import Data.List
 import Control.Monad
@@ -40,6 +41,12 @@ instance (Typed fun, Ord fun, PrettyTerm fun, Ord norm, MonadPruner (Term (WithC
       res <- lift (add (mapFun Normal prop))
       when res (considerConditionalising prop)
       return res
+
+conditionalsUniverse :: (Typed fun, Predicate fun) => [fun] -> Universe
+conditionalsUniverse funs =
+  universe $
+    map Normal funs ++
+    [ Constructor pred clas_test_case | pred <- funs, Predicate{..} <- [classify pred] ]
 
 runConditionals ::
   (PrettyTerm fun, Ord norm, MonadPruner (Term (WithConstructor fun)) norm m, Predicate fun, MonadTerminal m) =>
@@ -185,15 +192,15 @@ addPredicate lhs f ts = do
   -- Declare the relevant equations as axioms
   mapM_ (lift . add) equations
 
-conditionalise :: (PrettyTerm fun, Typed fun, Ord fun, Predicate fun) => Term fun -> Prop (Term fun) -> Prop (Term fun)
-conditionalise true (lhs :=>: t :=: u) =
+conditionalise :: (PrettyTerm fun, Typed fun, Ord fun, Predicate fun) => Prop (Term fun) -> Prop (Term fun)
+conditionalise (lhs :=>: t :=: u) =
   go lhs t u
   where
     -- Replace one predicate with a conditional
     go lhs t u =
-      case [ (p, x, clas_selectors) | (App f [Var x]) <- subterms t ++ subterms u, Selector i p _ <- [classify f], Predicate{..} <- [classify p] ] of
+      case [ (p, x, clas_selectors, clas_true) | (App f [Var x]) <- subterms t ++ subterms u, Selector i p _ <- [classify f], Predicate{..} <- [classify p] ] of
         [] -> sort lhs :=>: t :=: u
-        ((p, x, sels):_) ->
+        ((p, x, sels, true):_) ->
           let
             n = freeVar [t, u]
             tys = typeArgs (typ p)

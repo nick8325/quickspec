@@ -8,7 +8,7 @@ module QuickSpec.Type(
   Type, TyCon(..), tyCon, fromTyCon, A, B, C, D, E, ClassA, ClassB, ClassC, ClassD, ClassE, SymA, typeVar, isTypeVar,
   typeOf, typeRep, applyType, fromTypeRep,
   arrowType, unpackArrow, typeArgs, typeRes, typeDrop, typeArity, oneTypeVar, defaultTo, skolemiseTypeVars,
-  isDictionary, getDictionary,
+  isDictionary, getDictionary, pPrintType,
   -- Things that have types.
   Typed(..), typeSubst, typesDL, tyVars, cast,
   TypeView(..),
@@ -43,7 +43,7 @@ data TyCon = Arrow | String String | TyCon Ty.TyCon deriving (Eq, Ord, Show)
 
 instance Pretty TyCon where
   pPrint Arrow = text "->"
-  pPrint (String x) = text (show x)
+  pPrint (String x) = text x
   pPrint (TyCon x) = text (show x)
 instance PrettyTerm TyCon where
   termStyle Arrow =
@@ -201,6 +201,11 @@ instance CoArbitrary (TermList TyCon) where
     variant 1 . coarbitrary x . coarbitrary ts
   coarbitrary (ConsSym (App f _) ts) =
     variant 2 . coarbitrary (fun_id f) . coarbitrary ts
+
+pPrintType :: Type -> Doc
+pPrintType = pPrint . typeSubst (\(V x) -> build (con (fun (String (as !! x))))) . canonicalise
+  where
+    as = supply [[x] | x <- ['a'..'z']]
 
 -- Things with types.
 class Typed a where

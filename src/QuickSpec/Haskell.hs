@@ -176,10 +176,10 @@ instance Ord (Value Ordy) where
 evalHaskell :: (Given Type, Typed f, PrettyTerm f, Eval f (Value Maybe)) => Type -> (Var -> Value Maybe, Value Identity -> Maybe TestResult) -> Term f -> Either TestResult (Term f)
 evalHaskell def (env, obs) t =
   case unwrap (eval env t) of
-    Nothing `In` _ -> trace ("couldn't evaluate " ++ prettyShow t ++ " :: " ++ prettyShow (typ t)) $ Right t
+    Nothing `In` _ -> Right t
     Just val `In` w ->
       case obs (wrap w (Identity val)) of
-        Nothing -> trace ("no observer for " ++ prettyShow t) $ Right t
+        Nothing -> trace ("No observation function for " ++ prettyShow t) $ Right t
         Just ordy -> Left ordy
 
 data Constant =
@@ -299,6 +299,9 @@ data PredRep = PredRep { predInstances :: Instances
 true :: Constant
 true = constant "True" True
 
+trueTerm :: Term (PartiallyApplied Constant)
+trueTerm = App (total true) []
+
 -- | Declare a predicate with a given name and value.
 -- The predicate should have type @... -> Bool@.
 predicate :: forall a. ( Predicateable a
@@ -339,6 +342,7 @@ data Config =
     cfg_max_size :: Int,
     cfg_instances :: Instances,
     cfg_constants :: [Constant],
+    cfg_predicates :: [PredRep],
     cfg_default_to :: Type }
 
 makeLensAs ''Config
@@ -347,6 +351,7 @@ makeLensAs ''Config
    ("cfg_max_size", "lens_max_size"),
    ("cfg_instances", "lens_instances"),
    ("cfg_constants", "lens_constants"),
+   ("cfg_predicates", "lens_predicates"),
    ("cfg_default_to", "lens_default_to")]
 
 defaultConfig :: Config
@@ -357,25 +362,42 @@ defaultConfig =
     cfg_max_size = 7,
     cfg_instances = mempty,
     cfg_constants = [],
+    cfg_predicates = [],
     cfg_default_to = typeRep (Proxy :: Proxy Int) }
 
 quickSpec :: Config -> IO ()
 quickSpec Config{..} = give cfg_default_to $ do
-  forM_ cfg_constants $ \c -> putStrLn (prettyShow c ++ " :: " ++ prettyShow (typ c))
   let
-    -- XXX fix by passing universe into runConditionals, which can modify it
-    univ = universe $ map Normal (true:cfg_constants) ++ [ Constructor con clas_test_case | con@Constant{con_classify = Predicate{..}} <- cfg_constants ]
-    instances = cfg_instances `mappend` baseInstances
+    constants = true:cfg_constants ++ concatMap predCons cfg_predicates
+    univ = conditionalsUniverse constants
+    instances = mconcat (cfg_instances:baseInstances:map predInstances cfg_predicates)
+    eval = evalHaskell cfg_default_to
+
     present prop = do
       n :: Int <- get
       put (n+1)
-      putLine (printf "%3d. %s" n (show (prettyProp (names instances) (conditionalise (App (total true) []) prop))))
+      putLine (printf "%3d. %s" n (show (prettyProp (names instances) (conditionalise prop))))
   join $
     fmap withStdioTerminal $
     generate $
-    QuickCheck.run cfg_quickCheck (arbitraryVal cfg_default_to instances) (evalHaskell cfg_default_to) $
+    QuickCheck.run cfg_quickCheck (arbitraryVal cfg_default_to instances) eval $
     Twee.run cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size } $
-    runConditionals (map total cfg_constants) $
-    flip evalStateT 1 $
-      QuickSpec.Explore.quickSpec present measure (flip (evalHaskell cfg_default_to)) cfg_max_size univ
-        [ Partial f 0 | f <- true:cfg_constants ]
+    runConditionals (map total constants) $
+    flip evalStateT 1 $ do
+      printConstants cfg_constants
+      putLine ""
+      putLine "== Laws =="
+      QuickSpec.Explore.quickSpec present measure (flip eval) cfg_max_size univ
+        [ Partial f 0 | f <- constants ]
+
+printConstants :: MonadTerminal m => [Constant] -> m ()
+printConstants cs = do
+  putLine "== Signature =="
+  let
+    decls = [ (show (pPrint (App (Partial c 0) [])), pPrintType (typ c)) | c <- cs ]
+    maxWidth = maximum (0:map (length . fst) decls)
+    pad xs = replicate (maxWidth - length xs) ' ' ++ xs
+    pPrintDecl (name, ty) =
+      hang (text (pad name) <+> text "::") 2 ty
+
+  mapM_ (putLine . show . pPrintDecl) decls

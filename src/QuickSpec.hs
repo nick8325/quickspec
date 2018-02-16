@@ -47,10 +47,7 @@ predicate :: ( Predicateable a
              , Typeable (TestCase a))
              => String -> a -> Sig
 predicate name x =
-  Sig (modL Haskell.lens_constants (++ Haskell.predCons pred) .
-       modL Haskell.lens_instances (`mappend` Haskell.predInstances pred))
-  where
-    pred = Haskell.predicate name x
+  Sig (modL Haskell.lens_predicates (++ [Haskell.predicate name x]))
 
 withMaxTests :: Int -> Sig
 withMaxTests n =
