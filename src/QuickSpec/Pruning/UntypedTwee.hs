@@ -21,7 +21,6 @@ import Control.Monad.Trans.State.Strict hiding (State)
 import Control.Monad.Trans.Class
 import Control.Monad.IO.Class
 import QuickSpec.Terminal
-import Debug.Trace
 
 data Config =
   Config {

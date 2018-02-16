@@ -22,19 +22,16 @@ import Data.Ord
 import qualified QuickSpec.Testing.QuickCheck as QuickCheck
 import qualified QuickSpec.Pruning.Twee as Twee
 import qualified QuickSpec.Explore
-import QuickSpec.Explore.Polymorphic(universe)
 import QuickSpec.Explore.PartialApplication
 import QuickSpec.Pruning.Background(Background)
 import Control.Monad
 import Control.Monad.Trans.State.Strict
 import QuickSpec.Terminal
 import Text.Printf
-import Debug.Trace
 import Data.Reflection hiding (D)
 import QuickSpec.Utils
 import GHC.TypeLits
 import QuickSpec.Explore.Conditionals
-import Control.Monad.Trans.Class
 
 baseInstances :: Instances
 baseInstances =
@@ -178,8 +175,8 @@ instance Ord (Value Ordy) where
         let Ordy yv = reunwrap w y in
         compare xv yv
 
-evalHaskell :: (Given Type, Typed f, PrettyTerm f, Eval f (Value Maybe)) => Type -> (Var -> Value Maybe, Value Identity -> Maybe TestResult) -> Term f -> Either TestResult (Term f)
-evalHaskell def (env, obs) t =
+evalHaskell :: (Given Type, Typed f, PrettyTerm f, Eval f (Value Maybe)) => (Var -> Value Maybe, Value Identity -> Maybe TestResult) -> Term f -> Either TestResult (Term f)
+evalHaskell (env, obs) t =
   case unwrap (eval env t) of
     Nothing `In` _ -> Right t
     Just val `In` w ->
@@ -316,7 +313,7 @@ predicate :: forall a. ( Predicateable a
              => String -> a -> PredRep
 predicate name pred =
   case someSymbolVal name of
-    SomeSymbol (proxy :: Proxy sym) ->
+    SomeSymbol (_ :: Proxy sym) ->
       let
         instances =
           inst (\(dict :: Dict (Arbitrary (TestCase a))) -> (withDict dict genSuchThat) pred :: Gen (TestCaseWrapped sym (TestCase a)))
@@ -378,7 +375,6 @@ quickSpec Config{..} = give cfg_default_to $ do
     constants = constantsOf concat
     univ = conditionalsUniverse constants
     instances = mconcat (cfg_instances:map predInstances (concat cfg_predicates) ++ [baseInstances])
-    eval = evalHaskell cfg_default_to
 
     present prop = do
       n :: Int <- get
@@ -389,7 +385,7 @@ quickSpec Config{..} = give cfg_default_to $ do
       printConstants (f cfg_constants ++ f (map (map predCon) cfg_predicates))
       putLine ""
       putLine "== Laws =="
-      QuickSpec.Explore.quickSpec present measure (flip eval) cfg_max_size univ
+      QuickSpec.Explore.quickSpec present measure (flip evalHaskell) cfg_max_size univ
         [ Partial fun 0 | fun <- constantsOf g ]
       putLine ""
 
@@ -401,7 +397,7 @@ quickSpec Config{..} = give cfg_default_to $ do
   join $
     fmap withStdioTerminal $
     generate $
-    QuickCheck.run cfg_quickCheck (arbitraryVal cfg_default_to instances) eval $
+    QuickCheck.run cfg_quickCheck (arbitraryVal cfg_default_to instances) evalHaskell $
     Twee.run cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size } $
     runConditionals (map total constants) $
     flip evalStateT 1 $

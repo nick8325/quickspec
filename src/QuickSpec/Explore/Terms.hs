@@ -13,7 +13,6 @@ import QuickSpec.Testing.DecisionTree hiding (Result, Singleton)
 import Control.Monad.Trans.State.Strict hiding (State)
 import Data.Lens.Light
 import QuickSpec.Utils
-import Debug.Trace
 
 data Terms testcase result term norm =
   Terms {

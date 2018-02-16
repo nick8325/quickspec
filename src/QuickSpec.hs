@@ -11,7 +11,6 @@ import Data.Constraint
 import Data.Lens.Light
 import QuickSpec.Utils
 import QuickSpec.Type
-import QuickSpec.Term
 
 newtype Sig = Sig (Int -> Haskell.Config -> Haskell.Config)
 

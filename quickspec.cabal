@@ -42,16 +42,12 @@ Extra-source-files:
   examples/Combinators.hs
   examples/Composition.hs
   examples/Conditionals.hs
-  examples/ConditionalsPruning.hs
   examples/Const.hs
   examples/Geometry.hs
   examples/HugeLists.hs
   examples/ListMonad.hs
   examples/Lists.hs
-  examples/MinMax.hs
-  examples/OctonionsComplicated.hs
   examples/Octonions.hs
-  examples/Pairs.hs
   examples/Parsing.hs
   examples/PrettyPrinting.hs
   examples/PrettyPrintingModel.hs

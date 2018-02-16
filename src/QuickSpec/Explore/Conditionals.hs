@@ -89,11 +89,11 @@ instance Pretty fun => Pretty (WithConstructor fun) where
   pPrintPrec l p (Normal f) = pPrintPrec l p f
 
 instance PrettyTerm fun => PrettyTerm (WithConstructor fun) where
-  termStyle (Constructor f _) = curried
+  termStyle (Constructor _ _) = curried
   termStyle (Normal f) = termStyle f
 
 instance PrettyArity fun => PrettyArity (WithConstructor fun) where
-  prettyArity (Constructor f _) = 1
+  prettyArity (Constructor _ _) = 1
   prettyArity (Normal f) = prettyArity f
 
 instance (Predicate fun, Background fun) => Background (WithConstructor fun) where
@@ -104,7 +104,7 @@ instance Typed fun => Typed (WithConstructor fun) where
   typ (Constructor pred ty) =
     arrowType (typeArgs (typ pred)) ty
   typ (Normal f) = typ f
-  otherTypesDL (Constructor pred ty) = typesDL pred
+  otherTypesDL (Constructor pred _) = typesDL pred
   otherTypesDL (Normal f) = otherTypesDL f
   typeSubst_ sub (Constructor pred ty) = Constructor (typeSubst_ sub pred) (typeSubst_ sub ty)
   typeSubst_ sub (Normal f) = Normal (typeSubst_ sub f)
@@ -198,7 +198,7 @@ conditionalise (lhs :=>: t :=: u) =
   where
     -- Replace one predicate with a conditional
     go lhs t u =
-      case [ (p, x, clas_selectors, clas_true) | (App f [Var x]) <- subterms t ++ subterms u, Selector i p _ <- [classify f], Predicate{..} <- [classify p] ] of
+      case [ (p, x, clas_selectors, clas_true) | (App f [Var x]) <- subterms t ++ subterms u, Selector _ p _ <- [classify f], Predicate{..} <- [classify p] ] of
         [] -> sort lhs :=>: t :=: u
         ((p, x, sels, true):_) ->
           let
