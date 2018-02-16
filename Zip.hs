@@ -1,9 +1,8 @@
 import QuickSpec
 
 main = quickSpec [
-  withMaxTermSize 6,
+  withMaxTermSize 8,
   withPruningDepth 10,
-  withPruningTermSize 8,
   constant "zip" (zip :: [Int] -> [Int] -> [(Int,Int)]),
   constant "++" ((++) :: [Int] -> [Int] -> [Int]),
   predicate "eqLen" ((\xs ys -> length xs == length ys) :: [Int] -> [Int] -> Bool) ]
