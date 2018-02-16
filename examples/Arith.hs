@@ -1,12 +1,7 @@
 import QuickSpec
 
-sig =
-  signature {
-    maxTermSize = Just 7,
-    constants = [
-       constant "0" (0 :: Int),
-       constant "1" (1 :: Int),
-       constant "+" ((+) :: Int -> Int -> Int),
-       constant "*" ((*) :: Int -> Int -> Int) ]}
-
-main = quickSpec sig
+main = quickSpec [
+  con "0" (0 :: Int),
+  con "1" (1 :: Int),
+  con "+" ((+) :: Int -> Int -> Int),
+  con "*" ((*) :: Int -> Int -> Int) ]

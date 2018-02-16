@@ -1,8 +1,10 @@
 {-# LANGUAGE DeriveDataTypeable, TypeOperators, StandaloneDeriving #-}
 import Control.Monad
 import Test.QuickCheck
-import QuickSpec hiding (background, (<>), text, nest, ($$))
+import QuickSpec
 import Text.PrettyPrint.HughesPJ
+import Data.Proxy
+import Data.Constraint
 
 deriving instance Typeable Doc
 
@@ -20,32 +22,21 @@ instance Arbitrary Doc where
 arbString :: Gen String
 arbString = listOf (elements "ab")
 
-background =
-  signature {
-    maxTermSize = Just 9,
-    maxTests = Just 1000,
-    constants = [
-       constant "[]" ([] :: [A]),
-       constant "++" ((++) :: [A] -> [A] -> [A]),
-       constant "0" (0 :: Int),
-       constant "+" ((+) :: Int -> Int -> Int),
-       constant "length" (length :: String -> Int) ]}
+obsDoc :: Context -> Doc -> String
+obsDoc (Context ctx) d = render (ctx d)
 
--- obsDoc :: Doc -> Gen String
--- obsDoc d = do
---   n <- arbitrary
---   return (render (nest n d))
+newtype Context = Context (Doc -> Doc)
 
-obsDoc :: Doc -> Gen String
-obsDoc d = fmap render ctx
-  where
-    ctx =
-      sized $ \n ->
-      oneof $
-        [ return d ] ++
-        [ liftM2 op (resize (n `div` 2) ctx) (resize (n `div` 2) arbitrary) | n > 0, op <- [(<>), ($$)] ] ++
-        [ liftM2 op (resize (n `div` 2) arbitrary) (resize (n `div` 2) ctx) | n > 0, op <- [(<>), ($$)] ] ++
-        [ liftM2 nest arbitrary (resize (n-1) ctx) | n > 0 ]
+instance Arbitrary Context where
+  arbitrary = Context <$> ctx
+    where
+      ctx =
+        sized $ \n ->
+        oneof $
+          [ return id ] ++
+          [ liftM2 (\x y d -> op (x d) y) (resize (n `div` 2) ctx) (resize (n `div` 2) arbitrary) | n > 0, op <- [(<>), ($$)] ] ++
+          [ liftM2 (\x y d -> op x (y d)) (resize (n `div` 2) arbitrary) (resize (n `div` 2) ctx) | n > 0, op <- [(<>), ($$)] ] ++
+          [ liftM2 (\x y d -> nest x (y d)) arbitrary (resize (n-1) ctx) | n > 0 ]
 
 unindented :: Doc -> Bool
 unindented d = render (nest 100 (text "" <> d)) == render (nest 100 d)
@@ -55,19 +46,25 @@ nesting d = head [ i | i <- nums, unindented (nest (-i) d) ]
   where
     nums = 0:concat [ [i, -i] | i <- [1..] ]
 
-sig =
-  signature {
-    maxTests = Just 1000,
-    constants = [
-       constant "text" text,
-       constant "nest" nest,
-       --constant "nesting" nesting,
-       constant "<>" (<>),
-       constant "$$" ($$) ],
-    instances = [
-      makeInstance (\() -> arbString),
-      makeInstance (\() -> observe obsDoc),
-      inst (Sub Dict :: () :- Arbitrary Doc) ],
-    defaultTo = Just (typeOf (undefined :: Bool)) }
+main = quickSpec [
+  withMaxTermSize 9,
+  
+  background [
+    con "[]" ([] :: [A]),
+    con "++" ((++) :: [A] -> [A] -> [A]),
+    con "0" (0 :: Int),
+    con "+" ((+) :: Int -> Int -> Int),
+    con "length" (length :: [A] -> Int) ],
 
-main = quickSpecWithBackground background sig
+
+  con "text" text,
+  con "nest" nest,
+  --con "nesting" nesting,
+  con "<>" (<>),
+  con "$$" ($$),
+
+  inst arbString,
+  inst (\gen -> observe gen obsDoc),
+  inst (Sub Dict :: () :- Arbitrary Doc),
+  inst (Sub Dict :: () :- Arbitrary Context),
+  defaultTo (Proxy :: Proxy Bool)]

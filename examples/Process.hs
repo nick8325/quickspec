@@ -7,7 +7,9 @@ import Data.Char
 import Test.QuickCheck hiding ((><))
 import System.IO.Unsafe
 import System.Timeout
-import QuickSpec hiding (New, In, Name, Event)
+import QuickSpec
+import QuickSpec.Utils
+import Data.Proxy
 
 --------------------------------------------------------------------------------
 
@@ -336,43 +338,33 @@ instance Arbitrary Name_ where
        b <- arbitrary `suchThat` (/=a)
        return (Name_ [a,b])
 
-sig =
-  signature
-  { constants =
-    -- Event
-    [ -- con "in"  In
-    -- , con "out" Out
-    -- , con "tau" Tau
-    
-    -- Restricted processes
-      con "/"    (\(P_ p) a -> p // a)
-    
-    -- Restricted names
-    , con "#"    (\(Name_ as) b -> head (filter (/=b) as))
-    
-    -- P
-    , con "0"    Nil
-    -- , con "."    Act
-    , con "?"    (Act . In)
-    , con "!"    (Act . Out)
-    , con "tau"  (Act Tau)
-    , con "+"    (:+:)
-    , con "|"    (:|:)
-    , (con "*"   Star){ conStyle = Postfix }
-    , con "new"  New
-    ]
-    
-  , instances =
-    [ baseTypeNames ["a","b","c"] (undefined :: Name)
-    , baseTypeNames ["c"] (undefined :: Name_)
-    -- , baseTypeNames ["e"]         (undefined :: Event)
-    , baseTypeNames ["p","q","r"] (undefined :: P)
-    , baseTypeNames ["r"] (undefined :: P_)
-    ]
-    
-  , defaultTo = Just (typeOf (undefined :: Bool))
-  }
- where
-  con op f = constant op f
-
-main = quickSpec sig
+main = quickSpec [
+  -- Event
+  -- con "in"  In
+  -- , con "out" Out
+  -- , con "tau" Tau
+  
+  -- Restricted processes
+    con "/"    (\(P_ p) a -> p // a)
+  
+  -- Restricted names
+  , con "#"    (\(Name_ as) b -> head (filter (/=b) as))
+  
+  -- P
+  , con "0"    Nil
+  -- , con "."    Act
+  , con "?"    (Act . In)
+  , con "!"    (Act . Out)
+  , con "tau"  (Act Tau)
+  , con "+"    (:+:)
+  , con "|"    (:|:)
+  , con "*"   Star
+  , con "new"  New
+  
+  , baseTypeNames ["a","b","c"] (Proxy :: Proxy Name)
+  , baseTypeNames ["c"] (Proxy :: Proxy Name_)
+  -- , baseTypeNames ["e"]         (Proxy :: Proxy Event)
+  , baseTypeNames ["p","q","r"] (Proxy :: Proxy P)
+  , baseTypeNames ["r"] (Proxy :: Proxy P_)
+  
+  , defaultTo (Proxy :: Proxy Bool) ]

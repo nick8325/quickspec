@@ -1,17 +1,11 @@
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeApplication #-}
 import QuickSpec
-import GHC.TypeLits
 
-sig =
-  signature {
-    maxTermSize = Just 8,
-    constants = [
-       constant "++" ((++) :: [Int] -> [Int] -> [Int]),
-       constant "zip" (zip :: [Int] -> [Int] -> [(Int,Int)])
-    ],
-    predicates = [ predicate (undefined :: Proxy "eqLen")
-                  ((\xs ys -> length xs == length ys) :: [Int] -> [Int] -> Bool)
-                 ]
-   }
+eqLen :: [A] -> [B] -> Bool
+eqLen xs ys = length xs == length ys
 
-main = quickSpec sig
+main = quickSpec [
+  withMaxTermSize 8,
+  con "++" ((++) @ A),
+  con "zip" (zip @ A @ B),
+  predicate "eqLen" (eqLen @ Int @ Int) ]

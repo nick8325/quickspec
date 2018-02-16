@@ -4,6 +4,7 @@ import QuickSpec
 import Test.QuickCheck
 import Twee.Pretty
 import Control.Monad
+import Data.Proxy
 
 class Fractional a => Conj a where
   conj :: a -> a
@@ -36,19 +37,11 @@ newtype Octonion = Octonion (Quaternion, Quaternion) deriving (Eq, Ord, Num, Typ
 
 type It = Octonion
 
-sig =
-  signature {
-    constants = [
-      constant "*" ((*) :: It -> It -> It),
-      (constant "^-1" (recip :: It -> It)) { conStyle = postfix },
-      constant "1" (1 :: It)
-    ],
-    maxTermSize = Just 7,
-    maxPruningSize = Just 9,
-    maxTests = Just 1,
-    --extraPruner = Just (Waldmeister 5),
-    instances = [
-      baseType (undefined :: It),
-      makeInstance (\() -> arbitrary `suchThat` (/= 0) :: Gen It)]}
-
-main = quickSpec sig
+main = quickSpec [
+  withPruningTermSize 9,
+  withMaxTests 1,
+  con "*" ((*) :: It -> It -> It),
+  (con "inv" (recip :: It -> It)),
+  con "1" (1 :: It),
+  baseType (Proxy :: Proxy It),
+  inst (arbitrary `suchThat` (/= 0) :: Gen It) ]

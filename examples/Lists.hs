@@ -2,19 +2,12 @@
 import QuickSpec
 import Data.List
 
-sig =
-  signature {
-    maxTermSize = Just 9,
-    constants = [
-      constant "reverse" (reverse :: [A] -> [A]),
-      constant "++" ((++) :: [A] -> [A] -> [A]),
-      constant "[]" ([] :: [A]),
-      constant "map" (map :: (A -> B) -> [A] -> [B]),
-      constant "length" (length :: [A] -> Int),
-      constant "sort" (typeclass sort :: Dict (Ord A) -> [A] -> [A]),
-      constant "concat" (concat :: [[A]] -> [A]) ]}
-
-typeclass :: (c => a) -> Dict c -> a
-typeclass x Dict = x
+main = quickSpec [
+  con "reverse" (reverse :: [A] -> [A]),
+  con "++" ((++) :: [A] -> [A] -> [A]),
+  con "[]" ([] :: [A]),
+  con "map" (map :: (A -> B) -> [A] -> [B]),
+  con "length" (length :: [A] -> Int),
+  con "concat" (concat :: [[A]] -> [A]) ]
 
 main = quickSpec sig

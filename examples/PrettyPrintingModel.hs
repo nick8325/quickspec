@@ -1,11 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable, TypeOperators #-}
 import Control.Monad
 import Test.QuickCheck
-import QuickSpec.Haskell
-import QuickSpec.Haskell.Resolve
-import QuickSpec.Testing.QuickCheck
-import QuickSpec.Pruning.Twee
-import QuickSpec.Type
+import QuickSpec
 import Data.Proxy
 
 newtype Layout = Layout [(Int, String)]
@@ -35,20 +31,16 @@ Layout xs <> Layout ys =
 nesting :: Layout -> Int
 nesting (Layout ((i,_):_)) = i
 
-main =
-  quickSpec
-    defaultConfig {
-      cfg_max_size = 9,
-      cfg_instances = baseType (Proxy :: Proxy Layout) }
-    [constant "\"\"" "",
-     constant "++" ((++) :: String -> String -> String),
-     constant "0" (0 :: Int),
-     constant "+" ((+) :: Int -> Int -> Int),
-     constant "length" (length :: String -> Int),
-     constant "text" text,
-     constant "nest" nest,
-     constant "$$" ($$),
-     constant "<>" (<>) ]
-    [typeRep (Proxy :: Proxy Int),
-     typeRep (Proxy :: Proxy String),
-     typeRep (Proxy :: Proxy Layout)]
+main = quickSpec [
+  withMaxTermSize 9,
+  baseType (Proxy :: Proxy Layout),
+  background [
+    con "\"\"" "",
+    con "++" ((++) :: String -> String -> String),
+    con "0" (0 :: Int),
+    con "+" ((+) :: Int -> Int -> Int),
+    con "length" (length :: String -> Int) ],
+  con "text" text,
+  con "nest" nest,
+  con "$$" ($$),
+  con "<>" (<>) ]

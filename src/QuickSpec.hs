@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables, FlexibleContexts #-}
-module QuickSpec(module QuickSpec, Typeable, A, B, C, D, E, Predicateable, TestCase) where
+module QuickSpec(module QuickSpec, Typeable, A, B, C, D, E, Predicateable, TestCase, observe, Names(..), (:-)(..), Dict(..)) where
 
-import QuickSpec.Haskell(Predicateable, TestCase)
+import QuickSpec.Haskell(Predicateable, TestCase, Names(..), observe)
 import qualified QuickSpec.Haskell as Haskell
 import qualified QuickSpec.Haskell.Resolve as Haskell
 import qualified QuickSpec.Testing.QuickCheck as QuickCheck
@@ -34,6 +34,10 @@ baseType _ =
     inst (Dict :: Dict (Ord a)),
     inst (Dict :: Dict (Arbitrary a))]
 
+baseTypeNames :: forall proxy a. (Ord a, Arbitrary a, Typeable a) => [String] -> proxy a -> Sig
+baseTypeNames names proxy =
+  baseType proxy `mappend` inst (Names names :: Names a)
+
 inst :: Typeable a => a -> Sig
 inst x =
   Sig (\_ -> modL Haskell.lens_instances (`mappend` Haskell.inst x))
@@ -43,9 +47,9 @@ appendAt n x [] = appendAt n x [[]]
 appendAt 0 x (xs:xss) = (xs ++ [x]):xss
 appendAt n x (xs:xss) = xs:appendAt (n-1) x xss
 
-constant :: Typeable a => String -> a -> Sig
-constant name x =
-  Sig (\n -> modL Haskell.lens_constants (appendAt n (Haskell.constant name x)))
+con :: Typeable a => String -> a -> Sig
+con name x =
+  Sig (\n -> modL Haskell.lens_constants (appendAt n (Haskell.con name x)))
 
 predicate :: ( Predicateable a
              , Typeable a
@@ -54,11 +58,16 @@ predicate :: ( Predicateable a
 predicate name x =
   Sig (\n -> modL Haskell.lens_predicates (appendAt n (Haskell.predicate name x)))
 
-first :: Signature sig => sig -> Sig
-first signature =
+background :: Signature sig => sig -> Sig
+background signature =
   Sig (\n -> sig (n+1))
   where
     Sig sig = toSig signature
+
+series :: Signature sig => [sig] -> Sig
+series = foldl op mempty . map toSig
+  where
+    op sigs sig = toSig [background sigs, sig]
 
 withMaxTests :: Int -> Sig
 withMaxTests n =

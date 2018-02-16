@@ -1,9 +1,10 @@
-{-# LANGUAGE DeriveDataTypeable, TypeOperators, ScopedTypeVariables, StandaloneDeriving #-}
+{-# LANGUAGE DeriveDataTypeable, TypeOperators, ScopedTypeVariables, StandaloneDeriving, TypeApplications #-}
 import Control.Monad
 import Test.QuickCheck
-import QuickSpec hiding (background, (<>), text, nest, ($$))
+import QuickSpec
 import Data.List
 import Text.ParserCombinators.ReadP
+import Data.Constraint
 
 deriving instance Typeable ReadP
 
@@ -15,38 +16,31 @@ arbReadS = fmap convert (liftM2 (,) (elements [0..5]) arbitrary)
   where
     convert (n, parse) xs = take n [(x, drop n xs) | (x, n) <- parse xs]
 
-obsReadP :: Ord a => ReadP a -> Gen [(a, String)]
-obsReadP parser = do
-  input <- arbitrary
-  return (sort (readP_to_S parser input))
+obsReadP :: Ord a => String -> ReadP a -> [(a, String)]
+obsReadP input parser =
+  sort (readP_to_S parser input)
 
 peek :: ReadP Char
 peek = do
   (x:_) <- look
   return x
 
-bg =
-  signature {
-    instances = [
-      inst (Sub Dict :: Arbitrary A :- Arbitrary (ReadP A)),
-      makeInstance (\(Dict :: Dict (Ord A)) -> Observe Dict (\(p :: ReadP A) -> obsReadP p)) ],
+main = quickSpec [
+  inst (Sub Dict :: Arbitrary A :- Arbitrary (ReadP A)),
+  inst (\(Dict :: Dict (Ord A)) gen -> observe gen (obsReadP @ A)),
 
-    constants = [
-      constant "return" (return :: A -> ReadP A),
-      constant "()" (),
-      constant "void" (void :: ReadP A -> ReadP ()),
-      constant "id" (id :: ReadP () -> ReadP ()),
-      constant ">>=" ((>>=) :: ReadP A -> (A -> ReadP B) -> ReadP B),
-      constant ">=>" ((>=>) :: (A -> ReadP B) -> (B -> ReadP C) -> A -> ReadP C) ]}
+  background [
+    con "return" (return :: A -> ReadP A),
+    con "()" (),
+    con "void" (void :: ReadP A -> ReadP ()),
+    con "id" (id :: ReadP () -> ReadP ()),
+    con ">>=" ((>>=) :: ReadP A -> (A -> ReadP B) -> ReadP B),
+    con ">=>" ((>=>) :: (A -> ReadP B) -> (B -> ReadP C) -> A -> ReadP C) ],
 
-sig =
-  signature {
-    constants = [
-      constant "get" get,
-      constant "peek" peek,
-      constant "+++" ((+++) :: ReadP A -> ReadP A -> ReadP A),
-      constant "<++" ((<++) :: ReadP A -> ReadP A -> ReadP A),
-      constant "pfail" (pfail :: ReadP A),
-      constant "eof" eof ]}
+  con "get" get,
+  con "peek" peek,
+  con "+++" ((+++) :: ReadP A -> ReadP A -> ReadP A),
+  con "<++" ((<++) :: ReadP A -> ReadP A -> ReadP A),
+  con "pfail" (pfail :: ReadP A),
+  con "eof" eof ]
 
-main = quickSpecWithBackground bg sig

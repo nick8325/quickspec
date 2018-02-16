@@ -5,7 +5,7 @@ import qualified Data.Map as M
 import Data.List
 import Data.Map(Map)
 import Data.Typeable
-import QuickSpec hiding (M)
+import QuickSpec
 import Test.QuickCheck
 import Test.QuickCheck.Random
 import Test.QuickCheck.Gen
@@ -109,18 +109,13 @@ epsilonClosed nfa s = s:M.findWithDefault [] s (epsilons nfa)
 nub' :: Ord a => [a] -> [a]
 nub' = map head . group . sort
 
-sig =
-  signature {
-    constants = [
-      constant "char" (Char :: Sym -> Regex Sym),
-      constant "any" (AnyChar :: Regex Sym),
-      constant "e" (Epsilon :: Regex Sym),
-      constant "0" (Zero :: Regex Sym),
-      constant ";" (Concat :: Regex Sym -> Regex Sym -> Regex Sym),
-      constant "|" (Choice :: Regex Sym -> Regex Sym -> Regex Sym),
-      constant "*" (star :: Regex Sym -> Regex Sym) ],
-    instances = [
-      baseType (undefined :: Regex Sym),
-      baseType (undefined :: Sym) ]}
-
-main = quickSpec sig
+main = quickSpec [
+  con "char" (Char :: Sym -> Regex Sym),
+  con "any" (AnyChar :: Regex Sym),
+  con "e" (Epsilon :: Regex Sym),
+  con "0" (Zero :: Regex Sym),
+  con ";" (Concat :: Regex Sym -> Regex Sym -> Regex Sym),
+  con "|" (Choice :: Regex Sym -> Regex Sym -> Regex Sym),
+  con "*" (star :: Regex Sym -> Regex Sym),
+  baseType (Proxy :: Proxy (Regex Sym)),
+  baseType (Proxy :: Proxy Sym) ]

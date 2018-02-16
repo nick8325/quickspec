@@ -57,7 +57,7 @@ baseInstances =
       Names (map (++ "s") names) :: Names [A],
     inst (Names ["p", "q", "r"] :: Names (A -> Bool)),
     inst (Names ["f", "g", "h"] :: Names (A -> B)),
-    inst (Names ["x", "y", "z"] :: Names A),
+    inst (Names ["x", "y", "z", "w"] :: Names A),
     -- Standard instances
     baseType (Proxy :: Proxy ()),
     baseType (Proxy :: Proxy Int),
@@ -99,6 +99,11 @@ data Observe a b where
   Observe :: Ord b => Gen (a -> b) -> Observe a b
   deriving Typeable
 data Observe1 a = Observe1 (Value (Observe a)) deriving Typeable
+
+observe :: Ord res => Gen env -> (env -> val -> res) -> Observe val res
+observe gen f =
+  Observe (do { env <- gen; return (\x -> f env x) })
+  
 
 -- data SomeObserve a = forall args res. (Ord res, Arbitrary args) => SomeObserve (a -> args -> res) deriving Typeable
 
@@ -179,7 +184,7 @@ evalHaskell def (env, obs) t =
     Nothing `In` _ -> Right t
     Just val `In` w ->
       case obs (wrap w (Identity val)) of
-        Nothing -> trace ("No observation function for " ++ prettyShow t) $ Right t
+        Nothing -> Right t
         Just ordy -> Left ordy
 
 data Constant =
@@ -207,8 +212,8 @@ instance Ord Constant where
 
 instance Background Constant
 
-constant :: Typeable a => String -> a -> Constant
-constant name val =
+con :: Typeable a => String -> a -> Constant
+con name val =
   constant' name (toValue (Identity val))
 
 constant' :: String -> Value Identity -> Constant
@@ -298,7 +303,7 @@ data PredRep = PredRep { predInstances :: Instances
                        , predCons :: [Constant] }
 
 true :: Constant
-true = constant "True" True
+true = con "True" True
 
 trueTerm :: Term (PartiallyApplied Constant)
 trueTerm = App (total true) []
@@ -318,7 +323,7 @@ predicate name pred =
           `mappend`
           inst (Names [name ++ "_var"] :: Names (TestCaseWrapped sym (TestCase a)))
 
-        conPred = (constant name pred) { con_classify = Predicate conSels ty (App true []) }
+        conPred = (con name pred) { con_classify = Predicate conSels ty (App true []) }
         conSels = [ (constant' (name ++ "_" ++ show i) (select i)) { con_classify = Selector i conPred ty, con_size = 0 } | i <- [0..typeArity (typeOf pred)-1] ]
 
         select i =
@@ -372,7 +377,7 @@ quickSpec Config{..} = give cfg_default_to $ do
     constantsOf f = true:f cfg_constants ++ f (map (concatMap predCons) cfg_predicates)
     constants = constantsOf concat
     univ = conditionalsUniverse constants
-    instances = mconcat (cfg_instances:baseInstances:map predInstances (concat cfg_predicates))
+    instances = mconcat (cfg_instances:map predInstances (concat cfg_predicates) ++ [baseInstances])
     eval = evalHaskell cfg_default_to
 
     present prop = do
@@ -390,7 +395,7 @@ quickSpec Config{..} = give cfg_default_to $ do
 
     main = mapM_ round [0..rounds-1]
       where
-        round n = mainOf ((!! n) . reverse) (concat . take (n+1) . reverse)
+        round n = mainOf (concat . drop n . take (n+1) . reverse) (concat . take (n+1) . reverse)
         rounds = max (length cfg_constants) (length cfg_predicates)
 
   join $

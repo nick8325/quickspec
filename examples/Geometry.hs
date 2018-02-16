@@ -7,6 +7,7 @@ import Prelude hiding (flip, cycle)
 import Data.Monoid
 import Control.Monad
 import Data.Word
+import Data.Constraint
 
 class Half a where
   zero :: a
@@ -96,61 +97,27 @@ cycle, cycle' :: Drawing -> Drawing
 cycle x = quartet x (rot (rot (rot x))) (rot x) (rot (rot x))
 cycle' x = quartet' x (rot (rot (rot x))) (rot x) (rot (rot x))
 
-obsDrawing :: Drawing -> Gen Objs
-obsDrawing (Drawing d) = do
-  (a, b, c) <- arbitrary
-  return (d a b c)
+obsDrawing :: (Vector, Vector, Vector) -> Drawing -> Objs
+obsDrawing (a, b, c) (Drawing d) = d a b c
 
-sig1 =
-  signature {
-    maxTermSize = Just 7,
-    instances = [
-      makeInstance (\() -> NamesFor ["x", "y", "z", "w"] :: NamesFor Drawing),
-      inst (Sub Dict :: () :- Arbitrary Drawing),
-      makeInstance (\() -> observe obsDrawing) ],
-    constants = [
-      constant "over" over ]}
-
-sig2 =
-  signature {
-    constants = [
-      constant "beside" beside,
-      -- constant "above" above' ]}
-      constant "above" above ]}
-
-sig3 =
-  signature {
-    constants = [
-      constant "rot" rot ]}
-
-sig4 =
-  signature {
-    constants = [
-      constant "flip" flip ]}
-
-sig5 =
-  signature {
-    constants = [
-      constant "cycle" cycle,
-      -- constant "cycle" cycle',
-      constant "quartet" quartet ]}
-
-sig6 =
-  signature {
-    constants = [
-      constant "rot45" rot45 ]}
-
-sig7 =
-  signature {
-    constants = [
-      constant "blank" blank ]}
-
-main = do
-  thy1 <- quickSpec sig1
-  thy2 <- quickSpec (thy1 `mappend` sig2)
-  thy3 <- quickSpec (thy2 `mappend` sig3)
-  thy4 <- quickSpec (thy3 `mappend` sig4)
-  thy5 <- quickSpec (thy4 `mappend` sig5)
-  {-thy6 <- quickSpec (thy5 `mappend` sig6)
-  quickSpec (thy6 `mappend` sig7)-}
-  return ()
+main =
+  quickSpec [
+    inst (Sub Dict :: () :- Arbitrary Drawing),
+    inst (\gen -> observe gen obsDrawing),
+    inst (Sub Dict :: () :- Arbitrary (Vector, Vector, Vector)),
+    inst (Sub Dict :: () :- Ord Objs),
+    series [sig1, sig2, sig3, sig4, sig5, sig6, sig7] ]
+  where
+    sig1 = [con "over" over]
+    sig2 = [
+      con "beside" beside,
+      -- con "above" above',
+      con "above" above]
+    sig3 = [con "rot" rot]
+    sig4 = [con "flip" flip]
+    sig5 = [
+      con "cycle" cycle,
+      -- con "cycle" cycle',
+      con "quartet" quartet]
+    sig6 = [con "rot45" rot45]
+    sig7 = [con "blank" blank]
