@@ -1,9 +1,7 @@
 import Data.Proxy
-import QuickSpec.Haskell
-import QuickSpec.Type
+import QuickSpec
 
-constants :: [Constant]
-constants = [
+main = quickSpec [
   --constant "[]" ([] :: [A]),
   --constant "[]'" ([] :: [Int]),
   constant "+" ((+) :: Int -> Int -> Int),
@@ -11,7 +9,3 @@ constants = [
   constant "++" ((++) :: [A] -> [A] -> [A])]
   --constant "blah" ([1] :: [Int]),
   --constant "1" (1 :: Int),
-
-main = do
-  quickSpec defaultConfig constants
-    (typeRep (Proxy :: Proxy Int))

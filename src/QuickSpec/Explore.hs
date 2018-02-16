@@ -39,8 +39,8 @@ quickSpec ::
   (Prop (Term fun) -> m ()) ->
   (Term fun -> measure) ->
   (Term fun -> testcase -> result) ->
-  Int -> [fun] -> Type -> m ()
-quickSpec present measure eval maxSize funs ty = do
+  Int -> [fun] -> m ()
+quickSpec present measure eval maxSize funs = do
   let
     univ = universe funs
     state0 = initialState univ (\t -> size t <= 5) eval

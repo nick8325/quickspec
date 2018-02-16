@@ -1,5 +1,5 @@
 -- Testing conjectures using QuickCheck.
-{-# LANGUAGE FlexibleContexts, FlexibleInstances, RecordWildCards, MultiParamTypeClasses, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE FlexibleContexts, FlexibleInstances, RecordWildCards, MultiParamTypeClasses, GeneralizedNewtypeDeriving, TemplateHaskell #-}
 module QuickSpec.Testing.QuickCheck where
 
 import QuickSpec.Testing
@@ -14,12 +14,17 @@ import Data.List
 import System.Random
 import QuickSpec.Terminal
 import QuickSpec.Term
+import QuickSpec.Utils
 
 data Config =
   Config {
     cfg_num_tests :: Int,
     cfg_max_test_size :: Int }
   deriving Show
+
+makeLensAs ''Config
+  [("cfg_num_tests", "lens_num_tests"),
+   ("cfg_max_test_size", "lens_max_test_size")]
 
 data Environment testcase term result =
   Environment {

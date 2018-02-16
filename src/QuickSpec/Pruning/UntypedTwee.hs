@@ -1,5 +1,5 @@
 -- A pruner that uses twee. Does not respect types.
-{-# LANGUAGE RecordWildCards, FlexibleContexts, FlexibleInstances, GADTs, PatternSynonyms, GeneralizedNewtypeDeriving, MultiParamTypeClasses, UndecidableInstances #-}
+{-# LANGUAGE RecordWildCards, FlexibleContexts, FlexibleInstances, GADTs, PatternSynonyms, GeneralizedNewtypeDeriving, MultiParamTypeClasses, UndecidableInstances, TemplateHaskell #-}
 module QuickSpec.Pruning.UntypedTwee where
 
 import QuickSpec.Testing
@@ -7,6 +7,7 @@ import QuickSpec.Pruning
 import QuickSpec.Prop
 import QuickSpec.Term
 import QuickSpec.Type
+import QuickSpec.Utils
 import qualified Twee
 import qualified Twee.Equation as Twee
 import qualified Twee.KBO as KBO
@@ -25,6 +26,10 @@ data Config =
   Config {
     cfg_max_term_size :: Int,
     cfg_max_cp_depth :: Int }
+
+makeLensAs ''Config
+  [("cfg_max_term_size", "lens_max_term_size"),
+   ("cfg_max_cp_depth", "lens_max_cp_depth")]
 
 instance (Pretty fun, PrettyTerm fun, Ord fun, Typeable fun, Sized fun, Arity fun, EqualsBonus fun) => Ordered (Extended fun) where
   lessEq = KBO.lessEq

@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, TypeOperators, GADTs, FlexibleInstances, FlexibleContexts, MultiParamTypeClasses, RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables, TypeOperators, GADTs, FlexibleInstances, FlexibleContexts, MultiParamTypeClasses, RecordWildCards, TemplateHaskell #-}
 module QuickSpec.Haskell where
 
 import QuickSpec.Haskell.Resolve
@@ -29,6 +29,7 @@ import QuickSpec.Explore.Polymorphic
 import Text.Printf
 import Debug.Trace
 import Data.Reflection hiding (D)
+import QuickSpec.Utils
 
 baseInstances :: Instances
 baseInstances =
@@ -255,7 +256,17 @@ data Config =
     cfg_quickCheck :: QuickCheck.Config,
     cfg_twee :: Twee.Config,
     cfg_max_size :: Int,
-    cfg_instances :: Instances }
+    cfg_instances :: Instances,
+    cfg_constants :: [Constant],
+    cfg_default_to :: Type }
+
+makeLensAs ''Config
+  [("cfg_quickCheck", "lens_quickCheck"),
+   ("cfg_twee", "lens_twee"),
+   ("cfg_max_size", "lens_max_size"),
+   ("cfg_instances", "lens_instances"),
+   ("cfg_constants", "lens_constants"),
+   ("cfg_default_to", "lens_default_to")]
 
 defaultConfig :: Config
 defaultConfig =
@@ -263,10 +274,12 @@ defaultConfig =
     cfg_quickCheck = QuickCheck.Config { QuickCheck.cfg_num_tests = 1000, QuickCheck.cfg_max_test_size = 20 },
     cfg_twee = Twee.Config { Twee.cfg_max_term_size = minBound, Twee.cfg_max_cp_depth = 2 },
     cfg_max_size = 7,
-    cfg_instances = mempty }
+    cfg_instances = mempty,
+    cfg_constants = [],
+    cfg_default_to = typeRep (Proxy :: Proxy Int) }
 
-quickSpec :: Config -> [Constant] -> Type -> IO ()
-quickSpec Config{..} funs ty = give ty $ do
+quickSpec :: Config -> IO ()
+quickSpec Config{..} = give cfg_default_to $ do
   let
     instances = cfg_instances `mappend` baseInstances
     present prop = do
@@ -276,9 +289,8 @@ quickSpec Config{..} funs ty = give ty $ do
   join $
     fmap withStdioTerminal $
     generate $
-    QuickCheck.run cfg_quickCheck (arbitraryVal instances) (evalHaskell ty) $
+    QuickCheck.run cfg_quickCheck (arbitraryVal instances) (evalHaskell cfg_default_to) $
     Twee.run cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size } $
     flip evalStateT 1 $
-    QuickSpec.Explore.quickSpec present measure (flip (evalHaskell ty)) cfg_max_size
-      [Partial f 0 | f <- funs]
-      ty
+    QuickSpec.Explore.quickSpec present measure (flip (evalHaskell cfg_default_to)) cfg_max_size
+      [Partial f 0 | f <- cfg_constants]
