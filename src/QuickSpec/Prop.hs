@@ -20,7 +20,7 @@ data Prop a =
 
 instance Symbolic f a => Symbolic f (Prop a) where
   termsDL (lhs :=>: rhs) =
-    termsDL lhs `mplus` termsDL rhs
+    termsDL rhs `mplus` termsDL lhs
   subst sub (lhs :=>: rhs) =
     subst sub lhs :=>: subst sub rhs
 

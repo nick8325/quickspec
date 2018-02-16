@@ -21,6 +21,7 @@ import Control.Monad.Trans.State.Strict hiding (State)
 import Control.Monad.Trans.Class
 import Control.Monad.IO.Class
 import QuickSpec.Terminal
+import Debug.Trace
 
 data Config =
   Config {
@@ -51,15 +52,19 @@ run Config{..} (Pruner x) =
         Twee.cfg_max_term_size = cfg_max_term_size,
         Twee.cfg_max_cp_depth = cfg_max_cp_depth }
 
-instance (Ord fun, Typeable fun, Arity fun, Sized fun, PrettyTerm fun, EqualsBonus fun, MonadTerminal m) =>
+instance (Ord fun, Typeable fun, Arity fun, Sized fun, PrettyTerm fun, EqualsBonus fun, Monad m) =>
   MonadPruner (Term fun) (Term fun) (Pruner fun m) where
   normaliser = Pruner $ do
     state <- lift get
-    return (normaliseTwee state)
+    return $ \t ->
+      let u = normaliseTwee state t in
+      u
+      -- traceShow (text "normalise:" <+> pPrint t <+> text "->" <+> pPrint u) u
 
-  add prop = withStatus "filtering redundant laws" $ Pruner $ do
+  add prop = Pruner $ do
     config <- ask
     state <- lift get
+    -- traceShowM (text "add:" <+> pPrint prop)
     lift (put $! addTwee config prop state)
 
 normaliseTwee :: (Ord fun, Typeable fun, Arity fun, Sized fun, PrettyTerm fun, EqualsBonus fun) =>

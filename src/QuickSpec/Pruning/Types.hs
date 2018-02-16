@@ -28,7 +28,7 @@ instance Sized fun => Sized (Tagged fun) where
 
 instance Pretty fun => Pretty (Tagged fun) where
   pPrint (Func f) = pPrint f
-  pPrint (Tag ty) = pPrint ty
+  pPrint (Tag ty) = text "tag[" <> pPrint ty <> text "]"
 
 instance PrettyTerm fun => PrettyTerm (Tagged fun) where
   termStyle (Func f) = termStyle f

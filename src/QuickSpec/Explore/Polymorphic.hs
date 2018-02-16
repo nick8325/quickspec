@@ -224,7 +224,7 @@ universe xs = Universe (Set.fromList (withFunctions base))
       concat [func Twee.emptySubst (typ f) tys >>= Twee.subterms | f <- xs]
 
     func sub ty tys =
-      oneTypeVar ty:
+      oneTypeVar (typeSubst sub ty):
       [ arrowType [t'] u'
       | Just (t, u) <- [unpackArrow ty],
         t' <- tys,

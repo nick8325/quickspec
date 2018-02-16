@@ -17,6 +17,7 @@ import QuickSpec.Pruning
 import QuickSpec.Pruning.Background(Background(..))
 import QuickSpec.Testing
 import QuickSpec.Terminal
+import QuickSpec.Utils
 import QuickSpec.Explore.PartialApplication
 import qualified Twee.Base as Twee
 import Data.List
@@ -77,22 +78,8 @@ instance PrettyArity fun => PrettyArity (WithConstructor fun) where
   prettyArity (Normal f) = prettyArity f
 
 instance (Predicate fun, Background fun) => Background (WithConstructor fun) where
-  background f@(Constructor pred _) =
-    case classify pred of
-      Predicate sels ty true ->
-        let x = Var (V ty 0)
-        in [App f [App (Normal sel) [x] | sel <- sels] === x,
-            App (Normal pred) [App (Normal sel) [x] | sel <- sels] === fmap Normal true]
-      _ -> error "constructor of non-predicate"
-  background (Normal f) =
-    map (mapFun Normal) (background f) ++
-    case classify f of
-      Predicate _ ty _ ->
-        background (Constructor f ty)
-      Selector _ pred ty ->
-        background (Constructor pred ty)
-      Function ->
-        []
+  background (Normal f) = map (mapFun Normal) (background f)
+  background _ = []
 
 instance Typed fun => Typed (WithConstructor fun) where
   typ (Constructor pred ty) =
@@ -107,8 +94,23 @@ predType :: TyCon -> [Type] -> Type
 predType name tys =
   Twee.build (Twee.app (Twee.fun name) tys)
 
+considerPredicate ::
+  (PrettyTerm fun, Ord norm, MonadPruner (Term (WithConstructor fun)) norm m, Predicate fun, MonadTerminal m) =>
+  fun -> Conditionals m ()
+considerPredicate f =
+  case classify f of
+    Predicate sels ty true -> do
+      let
+        x = Var (V ty 0)
+        eqns =
+          [App (Constructor f ty) [App (Normal sel) [x] | sel <- sels] === x,
+           App (Normal f) [App (Normal sel) [x] | sel <- sels] === fmap Normal true]
+      mapM_ (putLine . prettyShow) eqns
+      mapM_ (lift . add) eqns
+    _ -> return ()
+
 considerConditionalising ::
-  (Ord norm, MonadPruner (Term (WithConstructor fun)) norm m, Predicate fun) =>
+  (PrettyTerm fun, Ord norm, MonadPruner (Term (WithConstructor fun)) norm m, Predicate fun, MonadTerminal m) =>
   Term fun -> Prop (Term fun) -> Conditionals m ()
 considerConditionalising true (lhs :=>: t :=: u) = do
   norm <- normaliser
@@ -117,37 +119,85 @@ considerConditionalising true (lhs :=>: t :=: u) = do
   -- to the set of known equations
   when (norm u == norm true) $
     case t of
-      App f ts | Predicate{..} <- classify f -> do -- It is an interesting predicate, i.e. it was added by the user
-        let ts' = map (fmap Normal) ts
-            lhs' = map (fmap (fmap Normal)) lhs
-            -- The "to_p x1 x2 ... xm" term
-            construction = App (Constructor f clas_test_case) ts'
-            -- The "p_n (to_p x1 x2 ... xn ... xm) = xn"
-            -- equations
-            equations = [ lhs' :=>: App (Normal (clas_selectors !! i)) [construction] :=: x | (x, i) <- zip ts' [0..]]
-
-        -- Declare the relevant equations as axioms
-        mapM_ (lift . add) equations
+      App f ts | Predicate{} <- classify f -> -- It is an interesting predicate, i.e. it was added by the user
+        addPredicate lhs f ts
       _ -> return ()
 
-conditionalise :: (Typed fun, Ord fun, Predicate fun) => Term fun -> Prop (Term fun) -> Prop (Term fun)
+conditionallyRedundant ::
+  (Typed fun, Ord fun, PrettyTerm fun, Ord norm, MonadPruner (Term (WithConstructor fun)) norm m, Predicate fun, MonadTerminal m) =>
+  Prop (Term fun) -> Conditionals m Bool
+conditionallyRedundant (lhs :=>: t :=: u) = do
+  putLine ("CHECKING: " ++ prettyShow (lhs :=>: t :=: u))
+  t' <- normalise t
+  u' <- normalise u
+  conditionallyRedundant' lhs t u t' u'
+
+conditionallyRedundant' ::
+  (Typed fun, Ord fun, PrettyTerm fun, Ord norm, MonadPruner (Term (WithConstructor fun)) norm m, Predicate fun, MonadTerminal m) =>
+  [Equation (Term fun)] -> Term fun -> Term fun -> norm -> norm -> Conditionals m Bool
+conditionallyRedundant' lhs t u t' u' = do
+  forM_ (usort (funs [t, u])) $ \f ->
+    case classify f of
+      Selector{..} -> do
+        let
+          Predicate{..} = classify clas_pred
+          tys = typeArgs (typ clas_pred)
+          argss = sequence [ [ arg | arg <- terms [t, u] >>= subterms, typ arg == ty ] | ty <- tys ]
+        forM_ argss $ \args -> do
+          norm <- normaliser
+          let p = App clas_pred args
+          when (norm p == norm clas_true) $ do
+            addPredicate lhs clas_pred args
+      _ -> return ()
+
+  t'' <- normalise t
+  u'' <- normalise u
+  if t'' == u'' then
+    return True
+   else if t'' == t' && u'' == u' then
+     return False
+    else
+     conditionallyRedundant' lhs t u t'' u''
+
+addPredicate ::
+  (PrettyTerm fun, Ord norm, MonadPruner (Term (WithConstructor fun)) norm m, Predicate fun, MonadTerminal m) =>
+  [Equation (Term fun)] -> fun -> [Term fun] -> Conditionals m ()
+addPredicate lhs f ts = do
+  let Predicate{..} = classify f
+      ts' = map (fmap Normal) ts
+      lhs' = map (fmap (fmap Normal)) lhs
+      -- The "to_p x1 x2 ... xm" term
+      construction = App (Constructor f clas_test_case) ts'
+      -- The "p_n (to_p x1 x2 ... xn ... xm) = xn"
+      -- equations
+      equations = [ lhs' :=>: App (Normal (clas_selectors !! i)) [construction] :=: x | (x, i) <- zip ts' [0..]]
+
+  -- Declare the relevant equations as axioms
+  mapM_ (putLine . prettyShow) equations
+  mapM_ (lift . add) equations
+
+conditionalise :: (PrettyTerm fun, Typed fun, Ord fun, Predicate fun) => Term fun -> Prop (Term fun) -> Prop (Term fun)
 conditionalise true (lhs :=>: t :=: u) =
   go lhs t u
   where
-    -- Replace one predicate selector with a conditional
+    -- Replace one predicate with a conditional
     go lhs t u =
-      case [ (v, i, p) | v@(App f [Var _]) <- subterms t ++ subterms u, Selector i p _ <- [classify f] ] of
+      case [ (p, x, clas_selectors) | (App f [Var x]) <- subterms t ++ subterms u, Selector i p _ <- [classify f], Predicate{..} <- [classify p] ] of
         [] -> sort lhs :=>: t :=: u
-        ((v, i, p):_) ->
+        ((p, x, sels):_) ->
           let
             n = freeVar [t, u]
             tys = typeArgs (typ p)
             xs = map Var (zipWith V tys [n..])
+            subs = [(App (sels !! i) [Var x], xs !! i) | i <- [0..length tys-1]]
           in
-            go ((App p xs :=: true):lhs) (replace v (xs !! i) t) (replace v (xs !! i) u)
+            go ((App p xs :=: true):lhs) (replaceMany subs t) (replaceMany subs u)
 
     replace from to t
       | t == from = to
     replace from to (App f ts) =
       App f (map (replace from to) ts)
     replace _ _ (Var x) = Var x
+
+    replaceMany subs t =
+      foldr (uncurry replace) t subs

@@ -22,6 +22,7 @@ import Data.Ord
 import qualified QuickSpec.Testing.QuickCheck as QuickCheck
 import qualified QuickSpec.Pruning.Twee as Twee
 import qualified QuickSpec.Explore
+import QuickSpec.Explore.Polymorphic(universe)
 import QuickSpec.Explore.PartialApplication
 import QuickSpec.Pruning.Background(Background)
 import Control.Monad
@@ -117,35 +118,33 @@ names insts ty =
     (x:_) -> ofValue getNames x
     [] -> error "don't know how to name variables"
 
-defaultTo :: Typed a => Type -> a -> a
-defaultTo def = typeSubst (const def)
-
-arbitraryVal :: Instances -> Gen (Var -> Value Maybe, Value Identity -> Maybe TestResult)
-arbitraryVal insts =
+arbitraryVal :: Type -> Instances -> Gen (Var -> Value Maybe, Value Identity -> Maybe TestResult)
+arbitraryVal def insts =
   MkGen $ \g n ->
     let (g1, g2) = split g in
     (memo $ \(V ty x) ->
        case typ ty of
          Nothing ->
-           fromJust $ cast ty (toValue (Nothing :: Maybe A))
+           fromJust $ cast (defaultTo def ty) (toValue (Nothing :: Maybe A))
          Just gen ->
            forValue gen $ \gen ->
              Just (unGen (coarbitrary x gen) g1 n),
-     unGen (ordyVal insts) g2 n)
+     unGen (ordyVal def insts) g2 n)
   where
     typ :: Type -> Maybe (Value Gen)
     typ = memo $ \ty ->
-      case findInstance insts ty of
+      case findInstance insts (defaultTo def ty) of
         [] -> Nothing
         (gen:_) ->
           Just (mapValue (coarbitrary ty) gen)
 
-ordyVal :: Instances -> Gen (Value Identity -> Maybe TestResult)
-ordyVal insts =
+ordyVal :: Type -> Instances -> Gen (Value Identity -> Maybe TestResult)
+ordyVal def insts =
   MkGen $ \g n -> \x ->
-    case ordyTy (typ x) of
+    let ty = defaultTo def (typ x) in
+    case ordyTy ty of
       Nothing -> Nothing
-      Just f -> Just (TestResult (typ x) (unGen f g n x))
+      Just f -> Just (TestResult ty (unGen f g n x))
   where
     ordyTy :: Type -> Maybe (Gen (Value Identity -> Value Ordy))
     ordyTy = memo $ \ty ->
@@ -174,9 +173,9 @@ instance Ord (Value Ordy) where
         let Ordy yv = reunwrap w y in
         compare xv yv
 
-evalHaskell :: (Typed f, PrettyTerm f, Eval f (Value Maybe)) => Type -> (Var -> Value Maybe, Value Identity -> Maybe TestResult) -> Term f -> Either TestResult (Term f)
-evalHaskell ty (env, obs) t =
-  case unwrap (eval env (defaultTo ty t)) of
+evalHaskell :: (Given Type, Typed f, PrettyTerm f, Eval f (Value Maybe)) => Type -> (Var -> Value Maybe, Value Identity -> Maybe TestResult) -> Term f -> Either TestResult (Term f)
+evalHaskell def (env, obs) t =
+  case unwrap (eval env t) of
     Nothing `In` _ -> trace ("couldn't evaluate " ++ prettyShow t ++ " :: " ++ prettyShow (typ t)) $ Right t
     Just val `In` w ->
       case obs (wrap w (Identity val)) of
@@ -243,7 +242,9 @@ isOp xs = not (all isIdent xs)
 
 instance Typed Constant where
   typ = typ . con_value
-  typeSubst_ sub con = con { con_value = typeSubst_ sub (con_value con) }
+  typeSubst_ sub con =
+    con { con_value = typeSubst_ sub (con_value con),
+          con_classify = fmap (typeSubst_ sub) (con_classify con) }
 
 instance Pretty Constant where
   pPrint = text . con_name
@@ -264,7 +265,7 @@ instance Predicate Constant where
   classify = con_classify
 
 instance (Given Type, Applicative f) => Eval Constant (Value f) where
-  eval _ = mapValue (pure . runIdentity) . defaultTo given . con_value
+  eval _ = mapValue (pure . runIdentity) . con_value
 
 class Predicateable a where
   uncrry :: a -> TestCase a -> Bool
@@ -314,7 +315,7 @@ predicate name pred =
           inst (Names [name ++ "_var"] :: Names (TestCaseWrapped sym (TestCase a)))
 
         conPred = (constant name pred) { con_classify = Predicate conSels ty (App true []) }
-        conSels = [ (constant' (name ++ "_" ++ show i) (select i)) { con_classify = Selector i conPred ty } | i <- [0..typeArity (typeOf pred)-1] ]
+        conSels = [ (constant' (name ++ "_" ++ show i) (select i)) { con_classify = Selector i conPred ty, con_size = 0 } | i <- [0..typeArity (typeOf pred)-1] ]
 
         select i =
           fromJust (cast (arrowType [ty] (typeArgs (typeOf pred) !! i)) (unPoly (compose (sel i) unwrapV)))
@@ -352,7 +353,7 @@ defaultConfig :: Config
 defaultConfig =
   Config {
     cfg_quickCheck = QuickCheck.Config { QuickCheck.cfg_num_tests = 1000, QuickCheck.cfg_max_test_size = 20 },
-    cfg_twee = Twee.Config { Twee.cfg_max_term_size = minBound, Twee.cfg_max_cp_depth = 2 },
+    cfg_twee = Twee.Config { Twee.cfg_max_term_size = minBound, Twee.cfg_max_cp_depth = 3 },
     cfg_max_size = 7,
     cfg_instances = mempty,
     cfg_constants = [],
@@ -362,19 +363,25 @@ quickSpec :: Config -> IO ()
 quickSpec Config{..} = give cfg_default_to $ do
   forM_ cfg_constants $ \c -> putStrLn (prettyShow c ++ " :: " ++ prettyShow (typ c))
   let
+    -- XXX fix by passing universe into runConditionals, which can modify it
+    univ = universe $ map Normal (true:cfg_constants) ++ [ Constructor con clas_test_case | con@Constant{con_classify = Predicate{..}} <- cfg_constants ]
     instances = cfg_instances `mappend` baseInstances
     present prop = do
-      n :: Int <- get
-      put (n+1)
-      putLine (printf "%3d. %s" n (show (prettyProp (names instances) (conditionalise (App (total true) []) prop))))
-      -- putLine (printf "%3d. %s" n (show (prettyProp (names instances) prop)))
-      lift $ considerConditionalising (App (total true) []) prop
+      redundant <- lift $ conditionallyRedundant prop
+      when redundant (putLine ("REDUNDANT: " ++ prettyShow prop))
+      unless redundant $ do
+        n :: Int <- get
+        put (n+1)
+        putLine (printf "%3d. %s" n (show (prettyProp (names instances) (conditionalise (App (total true) []) prop))))
+        putLine (printf "BEFORE: %s" (prettyShow prop))
+        lift $ considerConditionalising (App (total true) []) prop
   join $
     fmap withStdioTerminal $
     generate $
-    QuickCheck.run cfg_quickCheck (arbitraryVal instances) (evalHaskell cfg_default_to) $
+    QuickCheck.run cfg_quickCheck (arbitraryVal cfg_default_to instances) (evalHaskell cfg_default_to) $
     Twee.run cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size } $
     runConditionals $
-    flip evalStateT 1 $
-    QuickSpec.Explore.quickSpec present measure (flip (evalHaskell cfg_default_to)) cfg_max_size
-      [ Partial f 0 | f <- true:cfg_constants ]
+    flip evalStateT 1 $ do
+      lift $ mapM_ (considerPredicate . total) cfg_constants
+      QuickSpec.Explore.quickSpec present measure (flip (evalHaskell cfg_default_to)) cfg_max_size univ
+        [ Partial f 0 | f <- true:cfg_constants ]

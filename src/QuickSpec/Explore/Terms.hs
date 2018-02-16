@@ -13,6 +13,7 @@ import QuickSpec.Testing.DecisionTree hiding (Result, Singleton)
 import Control.Monad.Trans.State.Strict hiding (State)
 import Data.Lens.Light
 import QuickSpec.Utils
+import Debug.Trace
 
 data Terms testcase result term norm =
   Terms {
@@ -58,6 +59,15 @@ data Result term =
 explore :: (Pretty term, Typed term, Ord norm, Ord result, MonadTester testcase term m, MonadPruner term norm m) =>
   term -> StateT (Terms testcase result term norm) m (Result term)
 explore t = do
+  res <- explore' t
+  -- case res of
+  --   Discovered prop -> traceM ("discovered " ++ prettyShow prop)
+  --   Knew prop -> traceM ("knew " ++ prettyShow prop)
+  --   Singleton -> traceM ("singleton " ++ prettyShow t)
+  return res
+explore' :: (Pretty term, Typed term, Ord norm, Ord result, MonadTester testcase term m, MonadPruner term norm m) =>
+  term -> StateT (Terms testcase result term norm) m (Result term)
+explore' t = do
   norm <- normaliser
   exp norm $ \prop -> do
     res <- test prop

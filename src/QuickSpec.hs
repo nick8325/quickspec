@@ -64,6 +64,10 @@ withPruningDepth :: Int -> Sig
 withPruningDepth n =
   Sig (setL (Twee.lens_max_cp_depth # Haskell.lens_twee) n)
 
+withPruningTermSize :: Int -> Sig
+withPruningTermSize n =
+  Sig (setL (Twee.lens_max_term_size # Haskell.lens_twee) n)
+
 withMaxTermSize :: Int -> Sig
 withMaxTermSize n = Sig (setL Haskell.lens_max_size n)
 

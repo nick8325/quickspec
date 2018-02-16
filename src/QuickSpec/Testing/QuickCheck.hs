@@ -55,7 +55,6 @@ run config@Config{..} gen eval (Tester x) = do
 
 instance (MonadTerminal m, Eq result) => MonadTester testcase term (Tester testcase term result m) where
   test prop =
-    withStatus "running QuickCheck" $
     Tester $ do
       env <- ask
       return $! quickCheckTest env prop

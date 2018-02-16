@@ -9,9 +9,10 @@ import QuickSpec.Type
 import QuickSpec.Utils
 import QuickSpec.Prop
 import QuickSpec.Terminal
+import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.State.Strict
-import Debug.Trace
+import Text.Printf
 
 moreTerms :: (Ord a, Apply (Term f), Sized f) => Universe -> [f] -> (Term f -> a) -> [[Term f]] -> [Term f]
 moreTerms univ funs measure tss =
@@ -36,24 +37,27 @@ quickSpec ::
   (Prop (Term fun) -> m ()) ->
   (Term fun -> measure) ->
   (Term fun -> testcase -> result) ->
-  Int -> [fun] -> m ()
-quickSpec present measure eval maxSize funs = do
+  Int -> Universe -> [fun] -> m ()
+quickSpec present measure eval maxSize univ funs = do
   let
-    univ = universe funs
     state0 = initialState univ (\t -> size t <= 5) eval
 
-    loop m n _ _ _ | m > n = return ()
-    loop m n tss ts [] = do
-      loop (m+1) n uss [] (moreTerms univ funs measure uss)
-      where
-        uss = tss ++ [ts]
-    loop m n tss us (t:ts) = do
-      res <- explore t
-      lift $ mapM_ present (result_props res)
-      case res of
-        Accepted _ ->
-          loop m n tss (t:us) ts
-        Rejected _ ->
-          loop m n tss us ts
+    loop m n _ | m > n = return ()
+    loop m n tss = do
+      putStatus (printf "enumerating terms of size %d" m)
+      let
+        ts = moreTerms univ funs measure tss
+        total = length ts
+        consider (i, t) = do
+          putStatus (printf "testing terms of size %d: %d/%d" m i total)
+          res <- explore t
+          putStatus (printf "testing terms of size %d: %d/%d" m i total)
+          lift $ mapM_ present (result_props res)
+          case res of
+            Accepted _ -> return True
+            Rejected _ -> return False
+      us <- map snd <$> filterM consider (zip [1 :: Int ..] ts)
+      clearStatus
+      loop (m+1) n (tss ++ [us])
 
-  evalStateT (loop 0 maxSize [] [] (moreTerms univ funs measure [])) state0
+  evalStateT (loop 0 maxSize []) state0

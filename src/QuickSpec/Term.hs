@@ -1,5 +1,5 @@
 -- Typed terms.
-{-# LANGUAGE PatternSynonyms, ViewPatterns, TypeSynonymInstances, FlexibleInstances, TypeFamilies, ConstraintKinds, DeriveGeneric, DeriveAnyClass, MultiParamTypeClasses, FunctionalDependencies, UndecidableInstances, TypeOperators, DeriveFunctor #-}
+{-# LANGUAGE PatternSynonyms, ViewPatterns, TypeSynonymInstances, FlexibleInstances, TypeFamilies, ConstraintKinds, DeriveGeneric, DeriveAnyClass, MultiParamTypeClasses, FunctionalDependencies, UndecidableInstances, TypeOperators, DeriveFunctor, FlexibleContexts #-}
 module QuickSpec.Term(module QuickSpec.Term, module Twee.Base, module Twee.Pretty) where
 
 import QuickSpec.Type
@@ -13,6 +13,7 @@ import Twee.Base(Sized(..), Arity(..), Pretty(..), PrettyTerm(..), TermStyle(..)
 import Twee.Pretty
 import qualified Data.Map.Strict as Map
 import Data.List
+import Data.Reflection
 
 data Term f = Var {-# UNPACK #-} !Var | App !f ![Term f]
   deriving (Eq, Ord, Show, Functor)
@@ -43,7 +44,8 @@ instance Sized f => Sized (Term f) where
   size (App f ts) = size f + sum (map size ts)
 
 instance Pretty Var where
-  pPrint x = parens $ text "X" <> pPrint (var_id x+1) <+> text "::" <+> pPrint (var_ty x)
+  --pPrint x = parens $ text "X" <> pPrint (var_id x+1) <+> text "::" <+> pPrint (var_ty x)
+  pPrint x = text "X" <> pPrint (var_id x+1)
 
 instance PrettyTerm f => Pretty (Term f) where
   pPrintPrec l p (Var x) = pPrintPrec l p x
@@ -97,15 +99,15 @@ canonicalise t = subst (\x -> Map.findWithDefault undefined x sub) t
 class Eval term val where
   eval :: (Var -> val) -> term -> val
 
-instance (Apply a, Eval fun a) => Eval (Term fun) a where
+instance (Typed fun, Given Type, Apply a, Eval fun a) => Eval (Term fun) a where
   eval env = evaluateTerm (eval env) env
 
-evaluateTerm :: Apply a => (fun -> a) -> (Var -> a) -> Term fun -> a
+evaluateTerm :: (Typed fun, Given Type, Apply a) => (fun -> a) -> (Var -> a) -> Term fun -> a
 evaluateTerm fun var = eval
   where
     eval (Var x) = var x
     eval (App f ts) =
-      foldl apply (fun f) (map eval ts)
+      foldl apply (fun (defaultTo given f)) (map eval ts)
 
 instance Typed f => Typed (Term f) where
   typ (Var x) = typ x

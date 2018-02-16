@@ -7,7 +7,7 @@ module QuickSpec.Type(
   Typeable,
   Type, TyCon(..), tyCon, fromTyCon, A, B, C, D, E, ClassA, ClassB, ClassC, ClassD, ClassE, SymA, typeVar, isTypeVar,
   typeOf, typeRep, applyType, fromTypeRep,
-  arrowType, unpackArrow, typeArgs, typeRes, typeDrop, typeArity, oneTypeVar, skolemiseTypeVars,
+  arrowType, unpackArrow, typeArgs, typeRes, typeDrop, typeArity, oneTypeVar, defaultTo, skolemiseTypeVars,
   isDictionary, getDictionary,
   -- Things that have types.
   Typed(..), typeSubst, typesDL, tyVars, cast,
@@ -150,6 +150,9 @@ typeArity = length . typeArgs
 
 oneTypeVar :: Typed a => a -> a
 oneTypeVar = typeSubst (const (var (V 0)))
+
+defaultTo :: Typed a => Type -> a -> a
+defaultTo def = typeSubst (const def)
 
 skolemiseTypeVars :: Typed a => a -> a
 skolemiseTypeVars = typeSubst (const aTy)
