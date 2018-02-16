@@ -40,8 +40,8 @@ class Predicate fun where
   classify :: fun -> Classification fun
 
 data Classification fun =
-    Predicate { clas_selectors :: [fun], clas_test_case :: Type }
-  | Selector { clas_index :: Int, clas_pred :: fun }
+    Predicate { clas_selectors :: [fun], clas_test_case :: Type, clas_true :: Term fun }
+  | Selector { clas_index :: Int, clas_pred :: fun, clas_test_case :: Type }
   | Function
   deriving (Eq, Ord, Functor)
 
@@ -76,9 +76,23 @@ instance PrettyArity fun => PrettyArity (WithConstructor fun) where
   prettyArity (Constructor f _) = 1
   prettyArity (Normal f) = prettyArity f
 
-instance Background fun => Background (WithConstructor fun) where
-  background Constructor{} = []
-  background (Normal f) = map (mapFun Normal) (background f)
+instance (Predicate fun, Background fun) => Background (WithConstructor fun) where
+  background f@(Constructor pred _) =
+    case classify pred of
+      Predicate sels ty true ->
+        let x = Var (V ty 0)
+        in [App f [App (Normal sel) [x] | sel <- sels] === x,
+            App (Normal pred) [App (Normal sel) [x] | sel <- sels] === fmap Normal true]
+      _ -> error "constructor of non-predicate"
+  background (Normal f) =
+    map (mapFun Normal) (background f) ++
+    case classify f of
+      Predicate _ ty _ ->
+        background (Constructor f ty)
+      Selector _ pred ty ->
+        background (Constructor pred ty)
+      Function ->
+        []
 
 instance Typed fun => Typed (WithConstructor fun) where
   typ (Constructor pred ty) =
@@ -122,7 +136,7 @@ conditionalise true (lhs :=>: t :=: u) =
   where
     -- Replace one predicate selector with a conditional
     go lhs t u =
-      case [ (v, i, p) | v@(App f [Var _]) <- subterms t ++ subterms u, Selector i p <- [classify f] ] of
+      case [ (v, i, p) | v@(App f [Var _]) <- subterms t ++ subterms u, Selector i p _ <- [classify f] ] of
         [] -> sort lhs :=>: t :=: u
         ((v, i, p):_) ->
           let

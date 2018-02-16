@@ -46,7 +46,7 @@ newtype Pruner fun pruner a =
 instance MonadTrans (Pruner fun) where
   lift = Pruner
 
-instance (Typed fun, MonadPruner (UntypedTerm fun) (UntypedTerm fun) pruner) => MonadPruner (TypedTerm fun) (TypedTerm fun) (Pruner fun pruner) where
+instance (PrettyTerm fun, Typed fun, MonadPruner (UntypedTerm fun) (UntypedTerm fun) pruner) => MonadPruner (TypedTerm fun) (TypedTerm fun) (Pruner fun pruner) where
   normaliser =
     Pruner $ do
       norm <- normaliser :: pruner (UntypedTerm fun -> UntypedTerm fun)

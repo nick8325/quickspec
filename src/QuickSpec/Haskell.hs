@@ -295,6 +295,9 @@ genSuchThat p = TestCaseWrapped <$> arbitrary `suchThat` uncrry p
 data PredRep = PredRep { predInstances :: Instances
                        , predCons :: [Constant] }
 
+true :: Constant
+true = constant "True" True
+
 -- | Declare a predicate with a given name and value.
 -- The predicate should have type @... -> Bool@.
 predicate :: forall a. ( Predicateable a
@@ -310,8 +313,8 @@ predicate name pred =
           `mappend`
           inst (Names [name ++ "_var"] :: Names (TestCaseWrapped sym (TestCase a)))
 
-        conPred = (constant name pred) { con_classify = Predicate conSels ty }
-        conSels = [ (constant' (name ++ "_" ++ show i) (select i)) { con_classify = Selector i conPred, con_size = 0 } | i <- [0..typeArity (typeOf pred)-1] ]
+        conPred = (constant name pred) { con_classify = Predicate conSels ty (App true []) }
+        conSels = [ (constant' (name ++ "_" ++ show i) (select i)) { con_classify = Selector i conPred ty } | i <- [0..typeArity (typeOf pred)-1] ]
 
         select i =
           fromJust (cast (arrowType [ty] (typeArgs (typeOf pred) !! i)) (unPoly (compose (sel i) unwrapV)))
@@ -360,7 +363,6 @@ quickSpec Config{..} = give cfg_default_to $ do
   forM_ cfg_constants $ \c -> putStrLn (prettyShow c ++ " :: " ++ prettyShow (typ c))
   let
     instances = cfg_instances `mappend` baseInstances
-    true = constant "true" True
     present prop = do
       n :: Int <- get
       put (n+1)
