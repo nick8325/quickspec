@@ -98,5 +98,5 @@ library
                 spoon,
                 template-haskell,
                 transformers,
-                twee-lib >= 2,
+                twee-lib >= 2.1.1,
                 uglymemo
