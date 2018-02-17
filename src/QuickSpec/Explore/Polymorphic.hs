@@ -116,9 +116,11 @@ exploreNoMGU ::
   Term fun ->
   StateT (Polymorphic testcase result fun norm) m (Result fun)
 exploreNoMGU t = do
+  univ <- access univ
   let ty = polyTyp (poly t)
   acc <- access accepted
-  if (t `Set.member` Map.findWithDefault Set.empty ty acc) then return (Rejected []) else do
+  if (t `Set.member` Map.findWithDefault Set.empty ty acc ||
+      not (t `inUniverse` univ)) then return (Rejected []) else do
     accepted %= Map.insertWith Set.union ty (Set.singleton t)
     schemas1 <- access schemas
     (res, schemas2) <- unPolyM (runStateT (Schemas.explore (polyTerm t)) schemas1)
