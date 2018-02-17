@@ -9,5 +9,3 @@ main = quickSpec [
   con "map" (map :: (A -> B) -> [A] -> [B]),
   con "length" (length :: [A] -> Int),
   con "concat" (concat :: [[A]] -> [A]) ]
-
-main = quickSpec sig
