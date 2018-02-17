@@ -16,6 +16,7 @@ import Data.Functor.Identity
 import Data.Maybe
 import Data.MemoUgly
 import Test.QuickCheck.Gen
+import Test.QuickCheck.Random
 import System.Random
 import Data.Char
 import Data.Ord
@@ -120,34 +121,33 @@ names insts ty =
     (x:_) -> ofValue getNames x
     [] -> error "don't know how to name variables"
 
-arbitraryVal :: Type -> Instances -> Gen (Var -> Value Maybe, Value Identity -> Maybe TestResult)
+arbitraryVal :: Type -> Instances -> Gen (Var -> Value Maybe, Value Identity -> Maybe (Value Ordy))
 arbitraryVal def insts =
   MkGen $ \g n ->
     let (g1, g2) = split g in
     (memo $ \(V ty x) ->
-       case typ ty of
+       case genType ty of
          Nothing ->
            fromJust $ cast (defaultTo def ty) (toValue (Nothing :: Maybe A))
          Just gen ->
            forValue gen $ \gen ->
              Just (unGen (coarbitrary x gen) g1 n),
-     unGen (ordyVal def insts) g2 n)
+     ordyVal g2 n)
   where
-    typ :: Type -> Maybe (Value Gen)
-    typ = memo $ \ty ->
+    genType :: Type -> Maybe (Value Gen)
+    genType = memo $ \ty ->
       case findInstance insts (defaultTo def ty) of
         [] -> Nothing
         (gen:_) ->
           Just (mapValue (coarbitrary ty) gen)
 
-ordyVal :: Type -> Instances -> Gen (Value Identity -> Maybe TestResult)
-ordyVal def insts =
-  MkGen $ \g n -> \x ->
-    let ty = defaultTo def (typ x) in
-    case ordyTy ty of
-      Nothing -> Nothing
-      Just f -> Just (TestResult ty (unGen f g n x))
-  where
+    ordyVal :: QCGen -> Int -> Value Identity -> Maybe (Value Ordy)
+    ordyVal g n x =
+      let ty = defaultTo def (typ x) in
+      case ordyTy ty of
+        Nothing -> Nothing
+        Just f -> Just (unGen f g n x)
+
     ordyTy :: Type -> Maybe (Gen (Value Identity -> Value Ordy))
     ordyTy = memo $ \ty ->
       case findInstance insts ty :: [Value Observe1] of
@@ -162,8 +162,6 @@ ordyVal def insts =
                       let observe = unGen obs g n in
                       \x -> wrap w2 (Ordy (observe (runIdentity (reunwrap w1 x))))
 
-data TestResult = TestResult Type (Value Ordy) deriving (Eq, Ord, Show)
-
 data Ordy a where Ordy :: Ord a => a -> Ordy a
 instance Eq (Value Ordy) where x == y = compare x y == EQ
 
@@ -175,7 +173,7 @@ instance Ord (Value Ordy) where
         let Ordy yv = reunwrap w y in
         compare xv yv
 
-evalHaskell :: (Given Type, Typed f, PrettyTerm f, Eval f (Value Maybe)) => (Var -> Value Maybe, Value Identity -> Maybe TestResult) -> Term f -> Either TestResult (Term f)
+evalHaskell :: (Given Type, Typed f, PrettyTerm f, Eval f (Value Maybe)) => (Var -> Value Maybe, Value Identity -> Maybe (Value Ordy)) -> Term f -> Either (Value Ordy) (Term f)
 evalHaskell (env, obs) t =
   case unwrap (eval env t) of
     Nothing `In` _ -> Right t
