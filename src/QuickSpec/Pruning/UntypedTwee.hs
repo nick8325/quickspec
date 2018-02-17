@@ -13,7 +13,7 @@ import qualified Twee.Equation as Twee
 import qualified Twee.KBO as KBO
 import qualified Twee.Base as Twee
 import Twee hiding (Config(..))
-import Twee.Rule
+import Twee.Rule hiding (normalForms)
 import Twee.Proof hiding (Config, defaultConfig)
 import Twee.Base(Ordered(..), Extended(..), EqualsBonus, pattern F, pattern Empty, unpack)
 import Control.Monad.Trans.Reader
@@ -21,6 +21,8 @@ import Control.Monad.Trans.State.Strict hiding (State)
 import Control.Monad.Trans.Class
 import Control.Monad.IO.Class
 import QuickSpec.Terminal
+import qualified Data.Set as Set
+import Data.Set(Set)
 
 data Config =
   Config {
@@ -60,15 +62,16 @@ instance (Ord fun, Typeable fun, Arity fun, Sized fun, PrettyTerm fun, EqualsBon
       u
       -- traceShow (text "normalise:" <+> pPrint t <+> text "->" <+> pPrint u) u
 
-  add ([] :=>: t :=: u) = do
-    t' <- normalise t
-    u' <- normalise u
-    if t' == u' then return False else Pruner $ do
-      config <- ask
-      state <- lift get
-      -- traceShowM (text "add:" <+> pPrint prop)
-      lift (put $! addTwee config t' u' state)
-      return True
+  add ([] :=>: t :=: u) = Pruner $ do
+    state <- lift get
+    config <- ask
+    let
+      t' = normalFormsTwee state t
+      u' = normalFormsTwee state u
+    -- Add the property anyway in case it could only be joined
+    -- by considering all normal forms
+    lift (put $! addTwee config t u state)
+    return (Set.null (Set.intersection t' u'))
 
   add _ =
     error "twee pruner doesn't support non-unit equalities"
@@ -78,6 +81,12 @@ normaliseTwee :: (Ord fun, Typeable fun, Arity fun, Sized fun, PrettyTerm fun, E
 normaliseTwee state t =
   fromTwee $
     result (normaliseTerm state (simplifyTerm state (skolemise t)))
+
+normalFormsTwee :: (Ord fun, Typeable fun, Arity fun, Sized fun, PrettyTerm fun, EqualsBonus fun) =>
+  State (Extended fun) -> Term fun -> Set (Term fun)
+normalFormsTwee state t =
+  Set.map fromTwee $
+    Set.map result (normalForms state (skolemise t))
 
 addTwee :: (Ord fun, Typeable fun, Arity fun, Sized fun, PrettyTerm fun, EqualsBonus fun) =>
   Twee.Config -> Term fun -> Term fun -> State (Extended fun) -> State (Extended fun)
