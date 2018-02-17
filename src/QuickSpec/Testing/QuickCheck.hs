@@ -45,8 +45,17 @@ run config@Config{..} gen eval (Tester x) = do
   seed <- arbitrary
   let
     seeds = unfoldr (Just . split) seed
-    sizes = cycle [0, 2..cfg_max_test_size]
-    tests = take cfg_num_tests (zipWith (unGen gen) seeds sizes)
+    n = cfg_num_tests
+    k = cfg_max_test_size
+    -- Divide tests equally between all sizes.
+    -- There are n total tests of k+1 different sizes.
+    -- If it doesn't divide equally, the biggest size gets the
+    -- left-overs.
+    sizes =
+      concat [replicate (n `div` (k+1)) i | i <- [0..k-1]] ++
+      replicate (n `divRoundUp` (k+1)) k
+    m `divRoundUp` n = (m-1) `div` n + 1
+    tests = zipWith (unGen gen) seeds sizes
   return $ runReaderT x
     Environment {
       env_config = config,
