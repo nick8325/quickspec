@@ -14,7 +14,7 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.State.Strict
 import Text.Printf
 
-moreTerms :: (Ord a, Apply (Term f), Sized f) => Universe -> [f] -> (Term f -> a) -> [[Term f]] -> [Term f]
+moreTerms :: (Ord a, Apply (Term f), Sized f, Typed f) => Universe -> [f] -> (Term f -> a) -> [[Term f]] -> [Term f]
 moreTerms univ funs measure tss =
   sortBy' measure $
     atomic ++
@@ -23,7 +23,7 @@ moreTerms univ funs measure tss =
       t <- uss !! i,
       u <- uss !! (n-i),
       Just v <- [tryApply (poly t) (poly u)],
-      and [ typ x `inUniverse` univ | x <- subterms (unPoly v) ] ]
+      unPoly v `inUniverse` univ ]
   where
     n = length tss
     atomic =

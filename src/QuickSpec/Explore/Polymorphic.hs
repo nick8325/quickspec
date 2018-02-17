@@ -1,5 +1,5 @@
 -- Theory exploration which handles polymorphism.
-{-# LANGUAGE TemplateHaskell, FlexibleContexts, GeneralizedNewtypeDeriving, FlexibleInstances, MultiParamTypeClasses, BangPatterns, UndecidableInstances, RankNTypes, GADTs #-}
+{-# LANGUAGE TemplateHaskell, FlexibleContexts, GeneralizedNewtypeDeriving, FlexibleInstances, MultiParamTypeClasses, BangPatterns, UndecidableInstances, RankNTypes, GADTs, RecordWildCards #-}
 module QuickSpec.Explore.Polymorphic(module QuickSpec.Explore.Polymorphic, Result(..)) where
 
 import qualified QuickSpec.Explore.Schemas as Schemas
@@ -39,7 +39,10 @@ instance Pretty fun => Pretty (PolyFun fun) where
 instance PrettyTerm fun => PrettyTerm (PolyFun fun) where
   termStyle = termStyle . fun_specialised
 
-newtype Universe = Universe (Set Type)
+-- univ_inner: the type universe, with all type variables unified
+-- univ_root: the set of types allowed for partially applied functions, only at
+-- the root of a term
+data Universe = Universe { univ_inner :: Set Type, univ_root :: Set Type }
 
 makeLensAs ''Polymorphic
   [("pm_schemas", "schemas"),
@@ -80,7 +83,7 @@ explore ::
   StateT (Polymorphic testcase result fun norm) m (Result fun)
 explore t = do
   univ <- access univ
-  unless (typ t `inUniverse` univ) $
+  unless (t `inUniverse` univ) $
     error ("Type " ++ prettyShow (typ t) ++ " not in universe for " ++ prettyShow t)
   res <- exploreNoMGU t
   case res of
@@ -132,7 +135,7 @@ addPolyType ty = do
   unless (ty `Map.member` unif) $ do
     let
       tys = [(ty', mgu) | ty' <- Map.keys unif, Just mgu <- [polyMgu ty ty']]
-      ok ty mgu = oneTypeVar ty /= mgu && unPoly mgu `inUniverse` univ
+      ok ty mgu = oneTypeVar ty /= mgu && oneTypeVar (unPoly mgu) `Set.member` univ_root univ
       here = [mgu | (_, mgu) <- tys, ok mgu ty]
       there = [(ty', mgu) | (ty', mgu) <- tys, ok mgu ty']
     key ty # unifiable ~= Just (here, there)
@@ -145,8 +148,8 @@ instance (PrettyTerm fun, Ord fun, Typed fun, Apply (Term fun), MonadPruner (Ter
     norm <- normaliser
     return (norm . fmap fun_specialised)
   add prop = PolyM $ do
-    Universe univ <- access univ
-    let insts = typeInstances (Set.toList univ) (regeneralise (mapFun fun_original prop))
+    univ <- access univ
+    let insts = typeInstances univ (regeneralise (mapFun fun_original prop))
     or <$> mapM add insts
 
 instance MonadTester testcase (Term fun) m =>
@@ -188,18 +191,20 @@ regeneralise =
         skel (V ty x) = V (oneTypeVar ty) x
     litCs (t :=: u) = [(typ t, typ u)]
 
-typeInstances :: (Pretty a, PrettyTerm fun, Symbolic fun a, Ord fun, Typed fun, Typed a) => [Type] -> a -> [a]
-typeInstances univ prop =
+typeInstances :: (Pretty a, PrettyTerm fun, Symbolic fun a, Ord fun, Typed fun, Typed a) => Universe -> a -> [a]
+typeInstances Universe{..} prop =
   [ typeSubst (\x -> Map.findWithDefault (error ("not found: " ++ prettyShow x)) x sub) prop
   | sub <- cs ]
   where
     cs =
       foldr intersection [Map.empty]
-        (map constrain
-          (usort (DList.toList (termsDL prop) >>= subterms)))
+        (map (constrain (Set.toList univ_inner))
+          (usort (DList.toList (termsDL prop) >>= properSubterms)) ++
+         map (constrain (Set.toList univ_root))
+          (usort (DList.toList (termsDL prop))))
 
-    constrain t =
-      usort [ Map.fromList (Twee.substToList sub) | u <- univ, Just sub <- [Twee.match (typ t) u] ]
+    constrain tys t =
+      usort [ Map.fromList (Twee.substToList sub) | u <- tys, Just sub <- [Twee.match (typ t) u] ]
 
 intersection :: [Map Twee.Var Type] -> [Map Twee.Var Type] -> [Map Twee.Var Type]
 ms1 `intersection` ms2 = usort [ Map.union m1 m2 | m1 <- ms1, m2 <- ms2, ok m1 m2 ]
@@ -207,15 +212,15 @@ ms1 `intersection` ms2 = usort [ Map.union m1 m2 | m1 <- ms1, m2 <- ms2, ok m1 m
     ok m1 m2 = and [ Map.lookup x m1 == Map.lookup x m2 | x <- Map.keys (Map.intersection m1 m2) ]
 
 universe :: Typed a => [a] -> Universe
-universe xs = Universe (Set.fromList (withFunctions base))
+universe xs = Universe (Set.fromList base) (Set.fromList (withFunctions base))
   where
-    -- The universe initially contains the type variable "a", the argument and
+    -- The universe contains the type variable "a", the argument and
     -- result type of every function (with all type variables unified), and all
     -- subterms of these types
     base = usort $ typeVar:concatMap (oneTypeVar . typs . typ) xs
     typs ty = (typeRes ty:typeArgs ty) >>= Twee.subterms
 
-    -- We then add function types, according to the rule:
+    -- We then add partial applications, according to the rule:
     -- if f : A1 -> ... -> An -> B is a function in the signature,
     -- and s(A1)...s(An), s(B) are in the universe where s is a substitution,
     -- then s(A1 -> ... -> An -> B) is in the universe, together with all subterms
@@ -224,13 +229,13 @@ universe xs = Universe (Set.fromList (withFunctions base))
       concat [func Twee.emptySubst (typ f) tys >>= Twee.subterms | f <- xs]
 
     func sub ty tys =
-      oneTypeVar (typeSubst sub ty):
+      filter (`elem` tys) [oneTypeVar (typeSubst sub ty)] ++
       [ arrowType [t'] u'
       | Just (t, u) <- [unpackArrow ty],
         t' <- tys,
         Just sub <- [Twee.matchIn sub t t'],
         u' <- func sub u tys ]
 
-inUniverse :: Type -> Universe -> Bool
-ty `inUniverse` Universe x =
-  oneTypeVar ty `Set.member` x
+inUniverse :: Typed fun => Term fun -> Universe -> Bool
+t `inUniverse` Universe{..} =
+  oneTypeVar (typ t) `Set.member` univ_root && and [oneTypeVar (typ u) `Set.member` univ_inner | u <- properSubterms t]
