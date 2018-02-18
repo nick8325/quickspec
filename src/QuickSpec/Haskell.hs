@@ -98,6 +98,12 @@ data Observe a b where
   deriving Typeable
 data Observe1 a = Observe1 (Value (Observe a)) deriving Typeable
 
+-- | Declare that values of a particular type should be compared by observational equality.
+--
+-- See @examples/PrettyPrinting.hs@ for an example.
+--
+-- XXX mention what instances must be in scope
+-- XXX remove constraints etc
 observe :: Ord res => Gen env -> (env -> val -> res) -> Observe val res
 observe gen f =
   Observe (do { env <- gen; return (\x -> f env x) })
@@ -113,6 +119,7 @@ baseType _ =
     inst (Dict :: Dict (Ord a)),
     inst (Dict :: Dict (Arbitrary a))]
 
+-- | Declare what variable names you would like to use for values of a particular type. See also `baseTypeNames`.
 newtype Names a = Names { getNames :: [String] }
 
 names :: Instances -> Type -> [String]
