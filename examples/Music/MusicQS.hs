@@ -6,7 +6,7 @@ import Perform
 import Test.QuickCheck
 import Data.Ratio
 import Control.Monad
-import QuickSpec hiding ((:=:), background)
+import QuickSpec
 import Data.Monoid
 
 deriving instance Typeable Positive
@@ -59,8 +59,8 @@ rest (Positive x) = Rest x
 tempo :: Positive Rational -> Music -> Music
 tempo (Positive x) m = Tempo x m
 
-obsMusic :: Music -> Gen Performance
-obsMusic m = liftM2 perform arbitrary (return (m :+: c 1 tn)) 
+obsMusic :: Context -> Music -> Performance
+obsMusic ctx m = perform ctx (m :+: c 1 tn)
 
 prop_com :: Context -> Music -> Music -> Property
 prop_com c m1 m2 = perform c (m1 :=: m2) === perform c (m2 :=: m1)
@@ -70,83 +70,47 @@ prop_rest c (Positive x) (Positive y) = perform c ((Rest x :=: Rest y) :+: Note 
 
 prop_assoc :: Context -> Music -> Music -> Music -> Property
 prop_assoc c m1 m2 m3 = perform c ((m1 :+: m2) :+: m3) === perform c (m1 :+: (m2 :+: m3))
-bg =
-  signature {
-    maxTermSize = Just 7,
-    maxTests = Just 2000,
-    instances = [
-      makeInstance (\() -> observe obsMusic),
-      inst (Sub Dict :: () :- Arbitrary Music),
-      baseTypeNames ["i"] (undefined :: IName),
-      baseTypeNames ["p"] (undefined :: PitchClass),
-      baseType (undefined :: Rational),
-      baseType (undefined :: Positive Rational),
-      names (NamesFor ["m"] :: NamesFor Music),
-      names (NamesFor ["p"] :: NamesFor Mp),
-      makeInstance (\() -> arb)
-      ],
-    constants = [
-      constant "x" x,
-      constant "y" y,
-      constant "+" (\(Positive x) (Positive y) -> Positive (x+y) :: Positive Rational),
-      constant "+'" ((+) :: Int -> Int -> Int),
-      constant "max" (\(Positive x) (Positive y) -> Positive (max x y) :: Positive Rational),
-      constant "*" (\(Positive x) (Positive y) -> Positive (x*y) :: Positive Rational),
-      constant "1" (Positive 1 :: Positive Rational),
-      constant "recip" (\(Positive x) -> Positive (1/x) :: Positive Rational) ]
-    --extraPruner = Just (QuickSpec.E 1)
-    }
 
-sig1 =
-  signature {
-    constants = [
-      constant ":+:" (:+:),
-      constant ":=:" (:=:) ]}
+main = quickSpec [
+  inst (observe arbitrary obsMusic),
+  inst (Sub Dict :: () :- Arbitrary Music),
+  baseTypeNames ["i"] (Proxy :: Proxy IName),
+  baseTypeNames ["p"] (Proxy :: Proxy PitchClass),
+  baseType (Proxy :: Proxy Rational),
+  baseType (Proxy :: Proxy (Positive Rational)),
+  inst (Names ["m"] :: Names Music),
+  inst (Names ["p"] :: Names Mp),
 
-sig2 =
-  signature {
-    constants = [
-      constant "tempo" tempo,
-      constant "Trans" Trans,
-      constant "Instr" Instr ]}
+  series [bg, sig1, sig2, sig3, sig4, sig5, sig6] ]
+  where
+    bg = [
+      con "x" x,
+      con "y" y,
+      con "+" (\(Positive x) (Positive y) -> Positive (x+y) :: Positive Rational),
+      con "+'" ((+) :: Int -> Int -> Int),
+      con "max" (\(Positive x) (Positive y) -> Positive (max x y) :: Positive Rational),
+      con "*" (\(Positive x) (Positive y) -> Positive (x*y) :: Positive Rational),
+      con "1" (Positive 1 :: Positive Rational),
+      con "recip" (\(Positive x) -> Positive (1/x) :: Positive Rational) ]
 
-sig3 =
-  signature {
-    constants = [
-      constant "note" note,
-      constant "rest" rest ]}
+    sig1 = [
+      con ":+:" (:+:),
+      con ":=:" (:=:) ]
 
-sig4 =
-  signature {
-    constants = [
-      constant "dur" (Positive . dur) ]}
+    sig2 = [
+      con "tempo" tempo,
+      con "Trans" Trans,
+      con "Instr" Instr ]
 
-sig5 =
-  signature {
-    constants = [
-      constant "cut" (\(Positive x) m -> cut x m) ]}
+    sig3 = [
+      con "note" note,
+      con "rest" rest ]
 
-sig6 =
-  signature {
-    constants = [
-      constant "/=:" (/=:) ]}
+    sig4 = [
+      con "dur" (Positive . dur) ]
 
-main = do
-  thy <- quickSpec bg
-  thy <- quickSpec (thy `mappend` sig1)
-  thy <- quickSpec (thy `mappend` sig2)
-  thy <- quickSpec (thy `mappend` sig3)
-  thy <- quickSpec (thy `mappend` sig4)
-  thy <- quickSpec (thy `mappend` sig5)
-  quickSpec (thy `mappend` sig6)
+    sig5 = [
+      con "cut" (\(Positive x) m -> cut x m) ]
 
--- Weird bugs:
--- Why do we get
---   ((m :=: m) :+: m2) :=: m = m :=: (m :=: (m :+: m2))
--- and not
---   (m :=: m) :+: m2 = m :=: (m :+: m2)?
--- Why don't we get
---   Rest x :=: Rest y = Rest (max x y)?
-
--- TO DO:
--- Make it so we don't have to use the silly Positive type
+    sig6 = [
+      con "/=:" (/=:) ]
