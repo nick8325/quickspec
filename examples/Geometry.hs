@@ -125,10 +125,10 @@ obsDrawing (Drawing d) = do
 sig1 =
   signature {
     maxTermSize = Just 7,
-    instances = [
-      makeInstance (\() -> NamesFor ["x", "y", "z", "w"] :: NamesFor Drawing),
+    instances = mconcat [
+      inst (\() -> NamesFor ["x", "y", "z", "w"] :: NamesFor Drawing),
       inst (Sub Dict :: () :- Arbitrary Drawing),
-      makeInstance (\() -> observe obsDrawing) ],
+      inst (\() -> observe obsDrawing) ],
     constants = [
       constant "over" over ]}
 

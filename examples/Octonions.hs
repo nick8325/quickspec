@@ -52,9 +52,9 @@ sig =
     -- One test suffices :)
     maxTests = Just 1,
     --extraPruner = Just (Waldmeister 5),
-    instances = [
+    instances = mconcat [
       baseType (undefined :: It),
       -- Division is undefined on zero octonions.
-      makeInstance (\() -> arbitrary `suchThat` (/= 0) :: Gen It)]}
+      inst (arbitrary `suchThat` (/= 0) :: Gen It)]}
 
 main = quickSpec sig

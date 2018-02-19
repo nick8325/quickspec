@@ -51,7 +51,7 @@ sig =
       constant "nest" nest,
       constant "$$" ($$),
       constant "<>" (<>) ],
-    instances = [baseType (undefined :: Layout) ]}
+    instances = baseType (undefined :: Layout)}
 
 sig' =
   signature {

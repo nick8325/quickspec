@@ -33,9 +33,9 @@ peek = do
 
 bg =
   signature {
-    instances = [
+    instances = mconcat [
       inst (Sub Dict :: Arbitrary A :- Arbitrary (ReadP A)),
-      makeInstance (\(Dict :: Dict (Ord A)) -> observe (obsReadP :: ReadP A -> Gen [(A, String)]))],
+      inst (\(Dict :: Dict (Ord A)) -> observe (obsReadP :: ReadP A -> Gen [(A, String)]))],
 
     constants = [
       constant "return" (return :: A -> ReadP A),
