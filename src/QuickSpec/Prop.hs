@@ -65,7 +65,12 @@ instance Typed a => Typed (Equation a) where
   typeSubst_ sub (x :=: y) = typeSubst_ sub x :=: typeSubst_ sub y
 
 instance Pretty a => Pretty (Equation a) where
-  pPrintPrec _ _ (x :=: y) = pPrint x <+> text "=" <+> pPrint y
+  pPrintPrec _ _ (x :=: y)
+    | isTrue x = pPrint y
+    | isTrue y = pPrint x
+    | otherwise = pPrint x <+> text "=" <+> pPrint y
+    where
+      isTrue x = show (pPrint x) `elem` ["true", "True"]
 
 infix 4 ===
 (===) :: a -> a -> Prop a
