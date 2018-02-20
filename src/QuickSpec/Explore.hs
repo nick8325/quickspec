@@ -23,7 +23,7 @@ moreTerms univ funs measure tss =
       t <- uss !! i,
       u <- uss !! (n-i),
       Just v <- [tryApply (poly t) (poly u)],
-      unPoly v `inUniverse` univ ]
+      unPoly v `usefulForUniverse` univ ]
   where
     n = length tss
     atomic =
