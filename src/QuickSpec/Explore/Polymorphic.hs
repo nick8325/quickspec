@@ -83,32 +83,35 @@ explore ::
   StateT (Polymorphic testcase result fun norm) m (Result fun)
 explore t = do
   univ <- access univ
-  unless (t `inUniverse` univ) $
+  unless (t `usefulForUniverse` univ) $
     error ("Type " ++ prettyShow (typ t) ++ " not in universe for " ++ prettyShow t)
-  res <- exploreNoMGU t
-  case res of
-    Accepted{} -> do
-      let ty = polyTyp (poly t)
-      addPolyType ty
+  if not (t `inUniverse` univ) then
+    return (Accepted [])
+   else do
+    res <- exploreNoMGU t
+    case res of
+      Accepted{} -> do
+        let ty = polyTyp (poly t)
+        addPolyType ty
 
-      unif <- access unifiable
-      let (here, there) = Map.findWithDefault undefined ty unif
-      acc <- access accepted
-      ress1 <-
-        forM here (\mgu ->
-          exploreNoMGU (t `at` mgu))
-      ress2 <-
-        concat <$>
-        forM there (\(ty', mgu) ->
-          forM (Set.toList (Map.findWithDefault undefined ty' acc)) (\u ->
-            exploreNoMGU (u `at` mgu)))
+        unif <- access unifiable
+        let (here, there) = Map.findWithDefault undefined ty unif
+        acc <- access accepted
+        ress1 <-
+          forM here (\mgu ->
+            exploreNoMGU (t `at` mgu))
+        ress2 <-
+          concat <$>
+          forM there (\(ty', mgu) ->
+            forM (Set.toList (Map.findWithDefault undefined ty' acc)) (\u ->
+              exploreNoMGU (u `at` mgu)))
 
-      return res { result_props = concatMap result_props (res:ress1 ++ ress2) }
-    Rejected{} ->
-      return res
-  where
-    t `at` ty =
-      fromMaybe undefined (cast (unPoly ty) t)
+        return res { result_props = concatMap result_props (res:ress1 ++ ress2) }
+      Rejected{} ->
+        return res
+    where
+      t `at` ty =
+        fromMaybe undefined (cast (unPoly ty) t)
 
 exploreNoMGU ::
   (PrettyTerm fun, Ord result, Ord norm, Typed fun, Ord fun, Apply (Term fun),
@@ -240,4 +243,8 @@ universe xs = Universe (Set.fromList base) (Set.fromList (withFunctions base))
 
 inUniverse :: Typed fun => Term fun -> Universe -> Bool
 t `inUniverse` Universe{..} =
+  and [oneTypeVar (typ u) `Set.member` univ_inner | u <- subterms t]
+
+usefulForUniverse :: Typed fun => Term fun -> Universe -> Bool
+t `usefulForUniverse` Universe{..} =
   oneTypeVar (typ t) `Set.member` univ_root && and [oneTypeVar (typ u) `Set.member` univ_inner | u <- properSubterms t]
