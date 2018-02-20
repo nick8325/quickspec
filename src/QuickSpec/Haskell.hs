@@ -365,7 +365,7 @@ makeLensAs ''Config
 defaultConfig :: Config
 defaultConfig =
   Config {
-    cfg_quickCheck = QuickCheck.Config { QuickCheck.cfg_num_tests = 1000, QuickCheck.cfg_max_test_size = 20 },
+    cfg_quickCheck = QuickCheck.Config { QuickCheck.cfg_num_tests = 1000, QuickCheck.cfg_max_test_size = 20, QuickCheck.cfg_fixed_seed = Nothing },
     cfg_twee = Twee.Config { Twee.cfg_max_term_size = minBound, Twee.cfg_max_cp_depth = maxBound },
     cfg_max_size = 7,
     cfg_instances = mempty,

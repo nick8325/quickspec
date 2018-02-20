@@ -6,6 +6,7 @@ import QuickSpec.Testing
 import QuickSpec.Prop
 import Test.QuickCheck
 import Test.QuickCheck.Gen
+import Test.QuickCheck.Random
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
@@ -18,12 +19,14 @@ import QuickSpec.Utils
 data Config =
   Config {
     cfg_num_tests :: Int,
-    cfg_max_test_size :: Int }
+    cfg_max_test_size :: Int,
+    cfg_fixed_seed :: Maybe QCGen}
   deriving Show
 
 makeLensAs ''Config
   [("cfg_num_tests", "lens_num_tests"),
-   ("cfg_max_test_size", "lens_max_test_size")]
+   ("cfg_max_test_size", "lens_max_test_size"),
+   ("cfg_fixed_seed", "lens_fixed_seed")]
 
 data Environment testcase term result =
   Environment {
@@ -42,7 +45,7 @@ run ::
   Config -> Gen testcase -> (testcase -> term -> result) ->
   Tester testcase term result m a -> Gen (m a)
 run config@Config{..} gen eval (Tester x) = do
-  seed <- arbitrary
+  seed <- maybe arbitrary return cfg_fixed_seed
   let
     seeds = unfoldr (Just . split) seed
     n = cfg_num_tests

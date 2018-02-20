@@ -21,7 +21,7 @@ module QuickSpec(
   background, series,
 
   -- * Customising QuickSpec
-  withMaxTests, withMaxTestSize, withPruningDepth, withPruningTermSize, withMaxTermSize, defaultTo) where
+  withMaxTests, withMaxTestSize, withPruningDepth, withPruningTermSize, withMaxTermSize, defaultTo, withFixedSeed) where
 
 import QuickSpec.Haskell(Predicateable, TestCase, Names(..), observe)
 import qualified QuickSpec.Haskell as Haskell
@@ -29,11 +29,14 @@ import qualified QuickSpec.Haskell.Resolve as Haskell
 import qualified QuickSpec.Testing.QuickCheck as QuickCheck
 import qualified QuickSpec.Pruning.UntypedTwee as Twee
 import Test.QuickCheck
+import Test.QuickCheck.Random
+import System.Random.TF.Gen
 import Data.Constraint
 import Data.Lens.Light
 import QuickSpec.Utils
 import QuickSpec.Type hiding (defaultTo)
 import Data.Proxy
+import Data.Word
 
 -- | The entire QuickSpec configuration.
 -- The only fields you will probably need are
@@ -169,6 +172,10 @@ withMaxTests n =
 withMaxTestSize :: Int -> Sig
 withMaxTestSize n =
   Sig (\_ -> setL (QuickCheck.lens_max_test_size # Haskell.lens_quickCheck) n)
+
+-- | Set a fixed seed
+withFixedSeed :: (Word64, Word64, Word64, Word64) -> Sig
+withFixedSeed s = Sig (\_ -> setL (QuickCheck.lens_fixed_seed # Haskell.lens_quickCheck) (Just . QCGen . seedTFGen $ s))
 
 -- | Choose how hard QuickSpec tries to filter out redundant equations (default: no limit).
 --
