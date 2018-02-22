@@ -11,6 +11,7 @@ import GHC.Generics(Generic)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Control.Monad.Trans.State.Strict
+import Data.List
 
 data Prop a =
   (:=>:) {
@@ -92,7 +93,7 @@ prettyProp ::
   (Typed fun, Apply (Term fun), PrettyTerm fun, PrettyArity fun) =>
   (Type -> [String]) -> Prop (Term fun) -> Doc
 prettyProp cands =
-  pPrint . nameVars cands . eta . canonicalise
+  pPrint . nameVars cands . eta
   where
     eta prop =
       case filter isPretty (etaExpand prop) of
@@ -124,7 +125,7 @@ nameVars :: (Type -> [String]) -> Prop (Term fun) -> Prop (Term (Named fun))
 nameVars cands p =
   subst (\x -> Map.findWithDefault undefined x sub) (fmap (fmap Fun) p)
   where
-    sub = Map.fromList (evalState (mapM assign (usort (vars p))) Set.empty)
+    sub = Map.fromList (evalState (mapM assign (nub (vars p))) Set.empty)
     assign x = do
       s <- get
       let names = supply (cands (typ x))
