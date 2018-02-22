@@ -43,7 +43,11 @@ newtype Complex = Complex (SmallRational, SmallRational) deriving (Eq, Ord, Num,
 newtype Quaternion = Quaternion (Complex, Complex) deriving (Eq, Ord, Num, Typeable, Fractional, Conj, Arbitrary, CoArbitrary, Show)
 newtype Octonion = Octonion (Quaternion, Quaternion) deriving (Eq, Ord, Num, Typeable, Fractional, Conj, Arbitrary, CoArbitrary, Show)
 
-type It = Octonion
+newtype It = It Octonion deriving (Eq, Ord, Num, Typeable, Fractional, Conj, CoArbitrary, Show)
+
+instance Arbitrary It where
+  -- Division is undefined on zero octonions.
+  arbitrary = It <$> arbitrary `suchThat` (/= 0)
 
 main = quickSpec [
   -- Make the pruner more powerful, which is helpful when Doing Maths
@@ -53,6 +57,4 @@ main = quickSpec [
   con "*" ((*) :: It -> It -> It),
   (con "inv" (recip :: It -> It)),
   con "1" (1 :: It),
-  baseType (Proxy :: Proxy It),
-  -- Division is undefined on zero octonions.
-  inst (arbitrary `suchThat` (/= 0) :: Gen It) ]
+  baseType (Proxy :: Proxy It)]

@@ -175,7 +175,7 @@ regeneralise =
     generalise (lhs :=>: rhs) =
       polyApply (:=>:) (polyList (map genLit lhs)) (genLit rhs)
     genLit (t :=: u) = polyApply (:=:) (genTerm t) (genTerm u)
-    genTerm (Var v@(V _ x)) =
+    genTerm (Var (V _ x)) =
       poly (Var (V typeVar x))
     genTerm (App f ts) =
       let

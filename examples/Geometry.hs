@@ -62,7 +62,6 @@ type Vector = (Rat, Rat)
 -- I forget what they mean :)
 -- I think two of them represent the direction of the x-axis and y-axis.
 -- The word represents an abstract "drawing command".
->>>>>>> 140f248... Change examples.
 type Object = (Vector, Vector, Vector, Word)
 
 -- A drawing takes size and rotation information and returns a set of objects.
@@ -122,7 +121,7 @@ obsDrawing (a, b, c) (Drawing d) = d a b c
 main =
   quickSpec [
     inst (Sub Dict :: () :- Arbitrary Drawing),
-    inst (\gen -> observe gen obsDrawing),
+    inst (Sub Dict :: () :- Observe (Vector, Vector, Vector)\gen -> observe gen obsDrawing),
     inst (Sub Dict :: () :- Arbitrary (Vector, Vector, Vector)),
     inst (Sub Dict :: () :- Ord Objs),
     series [sig1, sig2, sig3, sig4, sig5, sig6, sig7] ]

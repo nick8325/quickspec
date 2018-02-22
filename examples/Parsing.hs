@@ -1,6 +1,6 @@
 -- Parser combinators.
 -- Illustrates observational equality with polymorphic types.
-{-# LANGUAGE DeriveDataTypeable, TypeOperators, ScopedTypeVariables, StandaloneDeriving, TypeApplications #-}
+{-# LANGUAGE DeriveDataTypeable, TypeOperators, ScopedTypeVariables, StandaloneDeriving, TypeApplications, TypeSynonymInstances, FlexibleInstances, MultiParamTypeClasses #-}
 import Control.Monad
 import Test.QuickCheck
 import QuickSpec
@@ -20,9 +20,8 @@ arbReadS = fmap convert (liftM2 (,) (elements [0..5]) arbitrary)
     convert (n, parse) xs = take n [(x, drop n xs) | (x, n) <- parse xs]
 
 -- Observational equality for parsers.
-obsReadP :: Ord a => String -> ReadP a -> [(a, String)]
-obsReadP input parser =
-  sort (readP_to_S parser input)
+instance Ord a => Observe String [(a, String)] (ReadP a) where
+  observe input parser = sort (readP_to_S parser input)
 
 peek :: ReadP Char
 peek = do
@@ -31,7 +30,7 @@ peek = do
 
 main = quickSpec [
   inst (Sub Dict :: Arbitrary A :- Arbitrary (ReadP A)),
-  inst (\(Dict :: Dict (Ord A)) gen -> observe gen (obsReadP @ A)),
+  inst (Sub Dict :: Ord A :- Observe String [(A, String)] (ReadP A)),
 
   background [
     con "return" (return :: A -> ReadP A),

@@ -3,7 +3,7 @@
 -- For many examples of use, see the @examples@ directory in the source distribution,
 -- which you can also find at <https://github.com/nick8325/quickspec/blob/master/examples>.
 
-{-# LANGUAGE ScopedTypeVariables, FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables, FlexibleContexts, TypeOperators, MultiParamTypeClasses, FunctionalDependencies #-}
 module QuickSpec(
   -- * Running QuickSpec
   quickSpec,
@@ -13,7 +13,7 @@ module QuickSpec(
   con, predicate, Predicateable, TestCase,
 
   -- * Declaring types
-  baseType, baseTypeNames, inst, Names(..), observe,
+  baseType, baseTypeNames, inst, Names(..), Observe(..),
   Typeable, (:-)(..), Dict(..), A, B, C, D, E, Proxy(..),
 
   -- * Exploring functions in series
@@ -22,7 +22,7 @@ module QuickSpec(
   -- * Customising QuickSpec
   withMaxTests, withMaxTestSize, withPruningDepth, withPruningTermSize, withMaxTermSize, defaultTo, withFixedSeed) where
 
-import QuickSpec.Haskell(Predicateable, TestCase, Names(..), observe)
+import QuickSpec.Haskell(Predicateable, TestCase, Names(..), Observe(..))
 import qualified QuickSpec.Haskell as Haskell
 import qualified QuickSpec.Haskell.Resolve as Haskell
 import qualified QuickSpec.Testing.QuickCheck as QuickCheck
@@ -105,17 +105,23 @@ instance Signature sig => Signature [sig] where
 baseType :: forall proxy a. (Ord a, Arbitrary a, Typeable a) => proxy a -> Sig
 baseType _ =
   mconcat [
-    inst (Dict :: Dict (Ord a)),
-    inst (Dict :: Dict (Arbitrary a))]
+    inst (Sub Dict :: () :- Ord a),
+    inst (Sub Dict :: () :- Arbitrary a)]
 
 -- | Declare a new monomorphic type, saying how you want variables of that type to be named.
 baseTypeNames :: forall proxy a. (Ord a, Arbitrary a, Typeable a) => [String] -> proxy a -> Sig
-baseTypeNames names proxy =
-  baseType proxy `mappend` inst (Names names :: Names a)
+baseTypeNames xs proxy =
+  baseType proxy `mappend` names xs proxy
 
-inst :: Typeable a => a -> Sig
-inst x =
+names :: forall proxy a. Typeable a => [String] -> proxy a -> Sig
+names xs _ = instFun (Names xs :: Names a)
+
+instFun :: Typeable a => a -> Sig
+instFun x =
   Sig (\_ -> modL Haskell.lens_instances (`mappend` Haskell.inst x))
+
+inst :: (Typeable c1, Typeable c2) => c1 :- c2 -> Sig
+inst = instFun
 
 appendAt :: Int -> a -> [[a]] -> [[a]]
 appendAt n x [] = appendAt n x [[]]
