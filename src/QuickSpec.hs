@@ -30,13 +30,11 @@ import qualified QuickSpec.Testing.QuickCheck as QuickCheck
 import qualified QuickSpec.Pruning.UntypedTwee as Twee
 import Test.QuickCheck
 import Test.QuickCheck.Random
-import System.Random.TF.Gen
 import Data.Constraint
 import Data.Lens.Light
 import QuickSpec.Utils
 import QuickSpec.Type hiding (defaultTo)
 import Data.Proxy
-import Data.Word
 
 -- | The entire QuickSpec configuration.
 -- The only fields you will probably need are
@@ -174,8 +172,8 @@ withMaxTestSize n =
   Sig (\_ -> setL (QuickCheck.lens_max_test_size # Haskell.lens_quickCheck) n)
 
 -- | Set a fixed seed
-withFixedSeed :: (Word64, Word64, Word64, Word64) -> Sig
-withFixedSeed s = Sig (\_ -> setL (QuickCheck.lens_fixed_seed # Haskell.lens_quickCheck) (Just . QCGen . seedTFGen $ s))
+withFixedSeed :: Int -> Sig
+withFixedSeed s = Sig (\_ -> setL (QuickCheck.lens_fixed_seed # Haskell.lens_quickCheck) (Just . mkQCGen $ s))
 
 -- | Choose how hard QuickSpec tries to filter out redundant equations (default: no limit).
 --
