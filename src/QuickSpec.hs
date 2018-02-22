@@ -21,7 +21,7 @@ module QuickSpec(
   background, series,
 
   -- * Customising QuickSpec
-  withMaxTests, withMaxTestSize, withPruningDepth, withPruningTermSize, withMaxTermSize, defaultTo) where
+  withMaxTests, withMaxTestSize, withPruningDepth, withPruningTermSize, withMaxTermSize, defaultTo, withFixedSeed) where
 
 import QuickSpec.Haskell(Predicateable, TestCase, Names(..), observe)
 import qualified QuickSpec.Haskell as Haskell
@@ -29,6 +29,7 @@ import qualified QuickSpec.Haskell.Resolve as Haskell
 import qualified QuickSpec.Testing.QuickCheck as QuickCheck
 import qualified QuickSpec.Pruning.UntypedTwee as Twee
 import Test.QuickCheck
+import Test.QuickCheck.Random
 import Data.Constraint
 import Data.Lens.Light
 import QuickSpec.Utils
@@ -169,6 +170,10 @@ withMaxTests n =
 withMaxTestSize :: Int -> Sig
 withMaxTestSize n =
   Sig (\_ -> setL (QuickCheck.lens_max_test_size # Haskell.lens_quickCheck) n)
+
+-- | Set a fixed seed
+withFixedSeed :: Int -> Sig
+withFixedSeed s = Sig (\_ -> setL (QuickCheck.lens_fixed_seed # Haskell.lens_quickCheck) (Just . mkQCGen $ s))
 
 -- | Choose how hard QuickSpec tries to filter out redundant equations (default: no limit).
 --
