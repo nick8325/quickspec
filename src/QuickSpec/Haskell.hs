@@ -249,6 +249,13 @@ isOp xs = not (all isIdent xs)
 
 instance Typed Constant where
   typ = typ . con_value
+  otherTypesDL con =
+    case con_classify con of
+      Predicate{..} ->
+        typesDL clas_selectors `mplus` typesDL clas_test_case `mplus` typesDL clas_true
+      Selector{..} ->
+        typesDL clas_pred `mplus` typesDL clas_test_case
+      Function -> mzero
   typeSubst_ sub con =
     con { con_value = typeSubst_ sub (con_value con),
           con_classify = fmap (typeSubst_ sub) (con_classify con) }

@@ -175,16 +175,19 @@ regeneralise =
     generalise (lhs :=>: rhs) =
       polyApply (:=>:) (polyList (map genLit lhs)) (genLit rhs)
     genLit (t :=: u) = polyApply (:=:) (genTerm t) (genTerm u)
-    genTerm (Var x) = poly (Var x)
+    genTerm (Var v@(V _ x)) =
+      poly (Var (V typeVar x))
     genTerm (App f ts) =
       let
-        us = map genTerm ts
-        Just ty = fmap unPoly (polyMgu (polyTyp (poly f)) (polyApply arrowType (polyList (map polyTyp us)) (poly typeVar)))
+        -- Need to polymorphise all of ts together so that type variables which
+        -- only occur in subterms of ts don't get unified
+        (f', us) = unPoly (polyPair (poly f) (polyList (map genTerm ts)))
+        Just ty = fmap unPoly (polyMgu (polyTyp (poly f')) (polyApply arrowType (poly (map typ us)) (poly typeVar)))
         tys = take (length us) (typeArgs ty)
-        Just f' = cast ty f
-        Just us' = sequence (zipWith cast tys (map unPoly us))
+        Just f'' = cast ty f'
+        Just us' = sequence (zipWith cast tys us)
       in
-        poly (App f' us')
+        poly (App f'' us')
 
     restrict prop = typeSubst sub prop
       where
@@ -247,4 +250,5 @@ t `inUniverse` Universe{..} =
 
 usefulForUniverse :: Typed fun => Term fun -> Universe -> Bool
 t `usefulForUniverse` Universe{..} =
-  oneTypeVar (typ t) `Set.member` univ_root && and [oneTypeVar (typ u) `Set.member` univ_inner | u <- properSubterms t]
+  oneTypeVar (typ t) `Set.member` univ_root &&
+  and [oneTypeVar (typ u) `Set.member` univ_inner | u <- properSubterms t]
