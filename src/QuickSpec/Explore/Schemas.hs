@@ -152,5 +152,5 @@ allUnifications t = map f ss
     ss = map Map.fromList (sequence vs)
     go s x = Map.findWithDefault undefined x s
     f s = subst (Var . go s) t
-    select [Var ty x] = [Var ty x, Var ty (succ x)]
+    select [V ty x] = [V ty x, V ty (succ x)]
     select xs = take 4 xs
