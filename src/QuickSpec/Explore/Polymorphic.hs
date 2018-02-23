@@ -175,8 +175,12 @@ regeneralise =
     generalise (lhs :=>: rhs) =
       polyApply (:=>:) (polyList (map genLit lhs)) (genLit rhs)
     genLit (t :=: u) = polyApply (:=:) (genTerm t) (genTerm u)
-    genTerm (Var (V _ x)) =
-      poly (Var (V typeVar x))
+    genTerm (Var (V ty x)) =
+      -- It's tempting to return Var (V typeVar x) here.
+      -- But this is wrong!
+      -- In the case of the type (), we get the law x == y :: (),
+      -- which we must not generalise to x == y :: a.
+      poly (Var (V (genType ty) x))
     genTerm (App f ts) =
       let
         -- Need to polymorphise all of ts together so that type variables which
@@ -188,6 +192,15 @@ regeneralise =
         Just us' = sequence (zipWith cast tys us)
       in
         poly (App f'' us')
+
+    genType = Twee.build . aux 0 . Twee.singleton
+      where
+        aux !_ Twee.Empty = mempty
+        aux n (Twee.Cons (Twee.Var _) ts) =
+          Twee.var (Twee.V n) `mappend` aux (n+1) ts
+        aux n (Twee.Cons (Twee.App f ts) us) =
+          Twee.app f (aux n ts) `mappend`
+          aux (n+Twee.lenList ts) us
 
     restrict prop = typeSubst sub prop
       where
