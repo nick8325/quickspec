@@ -362,10 +362,10 @@ main = quickSpec [
   , con "*"   Star
   , con "new"  New
   
-  , monoTypeNames ["a","b","c"] (Proxy :: Proxy Name)
-  , monoTypeNames ["c"] (Proxy :: Proxy Name_)
-  -- , monoTypeNames ["e"]         (Proxy :: Proxy Event)
-  , monoTypeNames ["p","q","r"] (Proxy :: Proxy P)
-  , monoTypeNames ["r"] (Proxy :: Proxy P_)
+  , monoTypeWithVars ["a","b","c"] (Proxy :: Proxy Name)
+  , monoTypeWithVars ["c"] (Proxy :: Proxy Name_)
+  -- , monoTypeWithVars ["e"]         (Proxy :: Proxy Event)
+  , monoTypeWithVars ["p","q","r"] (Proxy :: Proxy P)
+  , monoTypeWithVars ["r"] (Proxy :: Proxy P_)
   
   , defaultTo (Proxy :: Proxy Bool) ]

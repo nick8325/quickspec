@@ -28,7 +28,6 @@ import Data.Maybe
 import qualified Data.Typeable as Ty
 import Data.Typeable(Typeable)
 import GHC.Exts(Any)
-import GHC.Stack
 import Test.QuickCheck
 import Unsafe.Coerce
 import Data.Constraint
@@ -249,7 +248,7 @@ class Typed a => Apply a where
   tryApply :: a -> a -> Maybe a
 
 infixl `apply`
-apply :: (HasCallStack, Apply a) => a -> a -> a
+apply :: Apply a => a -> a -> a
 apply f x =
   case tryApply f x of
     Nothing ->
