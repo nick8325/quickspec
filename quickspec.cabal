@@ -60,7 +60,6 @@ Extra-source-files:
   examples/Parsing.hs
   examples/PrettyPrinting.hs
   examples/PrettyPrintingModel.hs
-  examples/Process.hs
   examples/Regex.hs
   examples/Sorted.hs
   examples/Zip.hs
@@ -102,12 +101,12 @@ library
     base >= 4 && < 5,
     constraints,
     containers,
-    data-lens-light,
+    data-lens-light >= 0.1.1,
     dlist,
     random,
     reflection,
     spoon,
     template-haskell,
     transformers,
-    twee-lib >= 2.1.1,
+    twee-lib >= 2.1.2,
     uglymemo

@@ -76,10 +76,22 @@ baseInstances =
     inst (Sub Dict :: Ord A :- Ord (Maybe A)),
     inst (Sub Dict :: Arbitrary A :- Arbitrary (Maybe A)),
     inst (Sub Dict :: CoArbitrary A :- CoArbitrary (Maybe A)),
+    inst (Sub Dict :: (Eq A, Eq B) :- Eq (Either A B)),
+    inst (Sub Dict :: (Ord A, Ord B) :- Ord (Either A B)),
+    inst (Sub Dict :: (Arbitrary A, Arbitrary B) :- Arbitrary (Either A B)),
+    inst (Sub Dict :: (CoArbitrary A, CoArbitrary B) :- CoArbitrary (Either A B)),
     inst (Sub Dict :: (Eq A, Eq B) :- Eq (A, B)),
     inst (Sub Dict :: (Ord A, Ord B) :- Ord (A, B)),
     inst (Sub Dict :: (Arbitrary A, Arbitrary B) :- Arbitrary (A, B)),
     inst (Sub Dict :: (CoArbitrary A, CoArbitrary B) :- CoArbitrary (A, B)),
+    inst (Sub Dict :: (Eq A, Eq B, Eq C) :- Eq (A, B, C)),
+    inst (Sub Dict :: (Ord A, Ord B, Ord C) :- Ord (A, B, C)),
+    inst (Sub Dict :: (Arbitrary A, Arbitrary B, Arbitrary C) :- Arbitrary (A, B, C)),
+    inst (Sub Dict :: (CoArbitrary A, CoArbitrary B, CoArbitrary C) :- CoArbitrary (A, B, C)),
+    inst (Sub Dict :: (Eq A, Eq B, Eq C, Eq D) :- Eq (A, B, C, D)),
+    inst (Sub Dict :: (Ord A, Ord B, Ord C, Ord D) :- Ord (A, B, C, D)),
+    inst (Sub Dict :: (Arbitrary A, Arbitrary B, Arbitrary C, Arbitrary D) :- Arbitrary (A, B, C, D)),
+    inst (Sub Dict :: (CoArbitrary A, CoArbitrary B, CoArbitrary C, CoArbitrary D) :- CoArbitrary (A, B, C, D)),
     inst (Sub Dict :: (CoArbitrary A, Arbitrary B) :- Arbitrary (A -> B)),
     inst (Sub Dict :: (Arbitrary A, CoArbitrary B) :- CoArbitrary (A -> B)),
     inst (Sub Dict :: Ord A :- Eq A),
@@ -94,7 +106,22 @@ baseInstances =
       Observe2 (do {x <- xm; obs <- obsm; return (\f -> obs (f x))}) :: Observe2 (A -> B) C),
     inst (\(obs :: Observe2 A B) -> Observe1 (toValue obs))]
 
+-- | A typeclass for types which support observational equality, typically used
+-- for types that have no `Ord` instance.
+--
+-- An instance @Observe test outcome a@ declares that values of type @a@ can be
+-- /tested/ for equality by random testing. You supply a function
+-- @observe :: test -> outcome -> a@. Then, two values @x@ and @y@ are considered
+-- equal, if for many random values of type @test@, @observe test x == observe test y@.
+--
+-- For an example of using observational equality, see @<https://github.com/nick8325/quickspec/tree/master/examples/PrettyPrinting.hs PrettyPrinting.hs>@.
+--
+-- You must use `QuickSpec.inst` to add the @Observe@ instance to your signature.
+-- Note that `QuickSpec.monoType` requires an `Ord` instance, so this even applies for
+-- monomorphic types. Don't forget to add the `Arbitrary` instance too in that case.
 class (Arbitrary test, Ord outcome) => Observe test outcome a | a -> test outcome where
+  -- | Make an observation on a value. Should satisfy the following law: if
+  -- @x /= y@, then there exists a value of @test@ such that @observe test x /= observe test y@.
   observe :: test -> a -> outcome
 
   default observe :: (test ~ (), outcome ~ a) => test -> a -> outcome
