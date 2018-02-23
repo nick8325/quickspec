@@ -60,7 +60,6 @@ Extra-source-files:
   examples/Parsing.hs
   examples/PrettyPrinting.hs
   examples/PrettyPrintingModel.hs
-  examples/Process.hs
   examples/Regex.hs
   examples/Sorted.hs
   examples/Zip.hs
