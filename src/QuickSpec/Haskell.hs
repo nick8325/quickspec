@@ -416,9 +416,9 @@ quickSpec Config{..} = give cfg_default_to $ do
         [ Partial fun 0 | fun <- constantsOf g ]
       putLine ""
 
-    main = mapM_ round [0..rounds-1]
+    main = mapM_ round [1..rounds]
       where
-        round n = mainOf (concat . drop n . take (n+1) . reverse) (concat . take (n+1) . reverse)
+        round n = mainOf (concat . take 1 . drop (rounds-n)) (concat . drop (rounds-n))
         rounds = max (length cfg_constants) (length cfg_predicates)
 
   join $
