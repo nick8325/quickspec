@@ -36,8 +36,13 @@ Description:
   automatic.
   .
   For information on how to use QuickSpec, see the documentation in the main
-  module, "QuickSpec". You can also look in the @examples@ directory, for
-  example at @List.hs@, @IntSet.hs@, or @Parsing.hs@. To read about how
+  module, "QuickSpec". You can also look in the
+  @<https://github.com/nick8325/quickspec/tree/master/examples examples>@
+  directory, for example at
+  @<https://github.com/nick8325/quickspec/tree/master/examples/Lists.hs Lists.hs>@,
+  @<https://github.com/nick8325/quickspec/tree/master/examples/IntSet.hs IntSet.hs>@, or
+  @<https://github.com/nick8325/quickspec/tree/master/examples/Parsing.hs Parsing.hs>@.
+  To read about how
   QuickSpec works, see our paper,
   <http://www.cse.chalmers.se/~nicsma/papers/quickspec2.pdf Quick specifications for the busy programmer>.
 
