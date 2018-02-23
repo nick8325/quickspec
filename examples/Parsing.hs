@@ -36,7 +36,6 @@ main = quickSpec [
     con "return" (return :: A -> ReadP A),
     con "()" (),
     con "void" (void :: ReadP A -> ReadP ()),
-    con "id" (id :: ReadP () -> ReadP ()),
     con ">>=" ((>>=) :: ReadP A -> (A -> ReadP B) -> ReadP B),
     con ">=>" ((>=>) :: (A -> ReadP B) -> (B -> ReadP C) -> A -> ReadP C) ],
 
