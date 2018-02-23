@@ -15,39 +15,45 @@ Category:            Testing
 
 Synopsis:            Equational laws for free!
 Description:
-  QuickSpec automatically finds equational laws about your program.
+  QuickSpec takes your Haskell code and, as if by magic, discovers laws
+  about it. You give QuickSpec a collection of Haskell functions;
+  QuickSpec tests your functions with QuickCheck and prints out laws which
+  seem to hold.
   .
-  Give it an API, i.e. a collection of functions, and it will spit out
-  equations about those functions. For example, given @reverse@, @++@
-  and @[]@, QuickSpec finds six laws, which are exactly the ones you
-  might write by hand:
+  For example, give QuickSpec the functions @reverse@, @++@ and @[]@, and
+  it will find six laws:
   .
-  > xs++[] == xs
-  > []++xs == xs
-  > (xs++ys)++zs == xs++(ys++zs)
   > reverse [] == []
+  > xs ++ [] == xs
+  > [] ++ xs == xs
   > reverse (reverse xs) == xs
-  > reverse xs++reverse ys == reverse (ys++xs)
+  > (xs ++ ys) ++ zs == xs ++ (ys ++ zs)
+  > reverse xs ++ reverse ys == reverse (ys ++ xs)
   .
-  The laws that QuickSpec generates are not proved correct, but have
-  passed at least 1000 QuickCheck tests.
+  QuickSpec can find equational laws as well as conditional equations. All
+  you need to supply are the functions to test, as well as @Ord@ and
+  @Arbitrary@ instances for QuickSpec to use in testing; the rest is
+  automatic.
   .
-  For normal use, you will only need the main "QuickSpec" module.
-  .
-  For more information, see the @README@ file at
-  <https://github.com/nick8325/quickspec/blob/master/README.asciidoc>,
-  or look at the @examples@ directory.
+  For information on how to use QuickSpec, see the documentation in the main
+  module, "QuickSpec". You can also look in the
+  @<https://github.com/nick8325/quickspec/tree/master/examples examples>@
+  directory, for example at
+  @<https://github.com/nick8325/quickspec/tree/master/examples/Lists.hs Lists.hs>@,
+  @<https://github.com/nick8325/quickspec/tree/master/examples/IntSet.hs IntSet.hs>@, or
+  @<https://github.com/nick8325/quickspec/tree/master/examples/Parsing.hs Parsing.hs>@.
+  To read about how
+  QuickSpec works, see our paper,
+  <http://www.cse.chalmers.se/~nicsma/papers/quickspec2.pdf Quick specifications for the busy programmer>.
 
 Extra-source-files:
-  README.asciidoc
+  README.md
   examples/Arith.hs
   examples/Bools.hs
-  examples/Combinators.hs
   examples/Composition.hs
-  examples/Conditionals.hs
-  examples/Const.hs
   examples/Geometry.hs
   examples/HugeLists.hs
+  examples/IntSet.hs
   examples/ListMonad.hs
   examples/Lists.hs
   examples/Octonions.hs
@@ -56,6 +62,8 @@ Extra-source-files:
   examples/PrettyPrintingModel.hs
   examples/Process.hs
   examples/Regex.hs
+  examples/Sorted.hs
+  examples/Zip.hs
 
 source-repository head
   type:     git

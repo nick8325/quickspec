@@ -57,4 +57,4 @@ main = quickSpec [
   con "*" ((*) :: It -> It -> It),
   (con "inv" (recip :: It -> It)),
   con "1" (1 :: It),
-  baseType (Proxy :: Proxy It)]
+  monoType (Proxy :: Proxy It)]

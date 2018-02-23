@@ -5,7 +5,7 @@ import qualified Data.IntSet as IntSet
 import Data.IntSet(IntSet)
 
 main = quickSpec [
-  baseType (Proxy :: Proxy IntSet),
+  monoType (Proxy :: Proxy IntSet),
 
   series [sig1, sig2, sig3]]
   where
