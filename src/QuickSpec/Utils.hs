@@ -1,5 +1,5 @@
 -- | Miscellaneous utility functions.
-
+{-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE CPP #-}
 module QuickSpec.Utils where
 

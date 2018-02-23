@@ -1,3 +1,4 @@
+{-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving, DefaultSignatures, GADTs #-}
 module QuickSpec.Terminal where
 

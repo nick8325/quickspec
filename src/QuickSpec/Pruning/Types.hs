@@ -1,4 +1,5 @@
 -- Encode monomorphic types during pruning.
+{-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE RecordWildCards, FlexibleInstances, GeneralizedNewtypeDeriving, MultiParamTypeClasses, FlexibleContexts, ScopedTypeVariables, UndecidableInstances #-}
 module QuickSpec.Pruning.Types where
 

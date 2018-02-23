@@ -1,4 +1,5 @@
 -- Decision trees for testing terms for equality.
+{-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE RecordWildCards #-}
 module QuickSpec.Testing.DecisionTree where
 

@@ -1,4 +1,5 @@
 -- A pruner that uses twee. Does not respect types.
+{-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE RecordWildCards, FlexibleContexts, FlexibleInstances, GADTs, PatternSynonyms, GeneralizedNewtypeDeriving, MultiParamTypeClasses, UndecidableInstances, TemplateHaskell #-}
 module QuickSpec.Pruning.UntypedTwee where
 

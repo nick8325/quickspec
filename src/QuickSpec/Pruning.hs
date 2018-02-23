@@ -1,4 +1,5 @@
 -- A type of pruners.
+{-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, GeneralizedNewtypeDeriving, FlexibleInstances, UndecidableInstances, DefaultSignatures, GADTs #-}
 module QuickSpec.Pruning where
 

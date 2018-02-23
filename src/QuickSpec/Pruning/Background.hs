@@ -1,4 +1,5 @@
 -- A pruning layer which automatically adds axioms about functions as they appear.
+{-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, FlexibleContexts, GeneralizedNewtypeDeriving, UndecidableInstances, TypeOperators #-}
 module QuickSpec.Pruning.Background where
 

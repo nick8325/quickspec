@@ -1,4 +1,5 @@
 -- A type of test case generators.
+{-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, DefaultSignatures, GADTs, FlexibleInstances, UndecidableInstances #-}
 module QuickSpec.Testing where
 

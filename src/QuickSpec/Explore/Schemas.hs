@@ -1,4 +1,5 @@
 -- Theory exploration which works on a schema at a time.
+{-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE RecordWildCards, FlexibleContexts, PatternGuards, TupleSections, TemplateHaskell, MultiParamTypeClasses, FlexibleInstances #-}
 module QuickSpec.Explore.Schemas where
 

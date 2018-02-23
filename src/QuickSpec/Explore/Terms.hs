@@ -1,4 +1,5 @@
 -- Theory exploration which accepts one term at a time.
+{-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE RecordWildCards, FlexibleContexts, PatternGuards, TemplateHaskell #-}
 module QuickSpec.Explore.Terms where
 
