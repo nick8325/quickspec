@@ -119,5 +119,5 @@ main = quickSpec [
   con ";" (Concat :: Regex Sym -> Regex Sym -> Regex Sym),
   con "|" (Choice :: Regex Sym -> Regex Sym -> Regex Sym),
   con "*" (star :: Regex Sym -> Regex Sym),
-  baseType (Proxy :: Proxy (Regex Sym)),
-  baseType (Proxy :: Proxy Sym) ]
+  monoType (Proxy :: Proxy (Regex Sym)),
+  monoType (Proxy :: Proxy Sym) ]

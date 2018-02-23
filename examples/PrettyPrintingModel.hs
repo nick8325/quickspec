@@ -36,7 +36,7 @@ nesting (Layout ((i,_):_)) = i
 
 main = quickSpec [
   withMaxTermSize 9,
-  baseType (Proxy :: Proxy Layout),
+  monoType (Proxy :: Proxy Layout),
   background [
     con "\"\"" "",
     con "++" ((++) :: String -> String -> String),
