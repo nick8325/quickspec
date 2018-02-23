@@ -9,7 +9,7 @@ Maintainer:          nicsma@chalmers.se
 
 License:             BSD3
 License-file:        LICENSE
-Copyright:           2009-2016 Nick Smallbone
+Copyright:           2009-2018 Nick Smallbone
 
 Category:            Testing
 
@@ -90,16 +90,16 @@ library
     QuickSpec.Utils
 
   Build-depends:
-                QuickCheck >= 2.10,
-                base >= 4 && < 5,
-                constraints,
-                containers,
-                data-lens-light,
-                dlist,
-                random,
-                reflection,
-                spoon,
-                template-haskell,
-                transformers,
-                twee-lib >= 2.1.1,
-                uglymemo
+    QuickCheck >= 2.10,
+    base >= 4 && < 5,
+    constraints,
+    containers,
+    data-lens-light,
+    dlist,
+    random,
+    reflection,
+    spoon,
+    template-haskell,
+    transformers,
+    twee-lib >= 2.1.1,
+    uglymemo
