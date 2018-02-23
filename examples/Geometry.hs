@@ -3,7 +3,7 @@
 -- Illustrates:
 --   * Observational equality
 --   * Running QuickSpec on a progressively larger set of signatures
-{-# LANGUAGE DeriveDataTypeable, TypeOperators, FlexibleInstances, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DeriveDataTypeable, TypeOperators, FlexibleInstances, GeneralizedNewtypeDeriving, MultiParamTypeClasses #-}
 import QuickSpec
 import Test.QuickCheck
 import qualified Data.Set as Set
@@ -115,15 +115,13 @@ cycle x = quartet x (rot (rot (rot x))) (rot x) (rot (rot x))
 cycle' x = quartet' x (rot (rot (rot x))) (rot x) (rot (rot x))
 
 -- Observational equality for drawings.
-obsDrawing :: (Vector, Vector, Vector) -> Drawing -> Objs
-obsDrawing (a, b, c) (Drawing d) = d a b c
+instance Observe (Vector, Vector, Vector) Objs Drawing where
+  observe (a, b, c) (Drawing d) = d a b c
 
 main =
   quickSpec [
     inst (Sub Dict :: () :- Arbitrary Drawing),
-    inst (Sub Dict :: () :- Observe (Vector, Vector, Vector)\gen -> observe gen obsDrawing),
-    inst (Sub Dict :: () :- Arbitrary (Vector, Vector, Vector)),
-    inst (Sub Dict :: () :- Ord Objs),
+    inst (Sub Dict :: () :- Observe (Vector, Vector, Vector) Objs Drawing),
     series [sig1, sig2, sig3, sig4, sig5, sig6, sig7] ]
   where
     -- A series of bigger and bigger signatures.
