@@ -1,4 +1,5 @@
 -- Theory exploration which handles polymorphism.
+{-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE TemplateHaskell, FlexibleContexts, GeneralizedNewtypeDeriving, FlexibleInstances, MultiParamTypeClasses, BangPatterns, UndecidableInstances, RankNTypes, GADTs, RecordWildCards #-}
 module QuickSpec.Explore.Polymorphic(module QuickSpec.Explore.Polymorphic, Result(..)) where
 
@@ -88,27 +89,22 @@ explore t = do
   if not (t `inUniverse` univ) then
     return (Accepted [])
    else do
+    let ty = polyTyp (poly t)
+    addPolyType ty
+
+    unif <- access unifiable
+    let (here, there) = Map.findWithDefault undefined ty unif
+    acc <- access accepted
+    ress1 <-
+      concat <$>
+      forM there (\(ty', mgu) ->
+        forM (Set.toList (Map.findWithDefault undefined ty' acc)) (\u ->
+          exploreNoMGU (u `at` mgu)))
     res <- exploreNoMGU t
-    case res of
-      Accepted{} -> do
-        let ty = polyTyp (poly t)
-        addPolyType ty
-
-        unif <- access unifiable
-        let (here, there) = Map.findWithDefault undefined ty unif
-        acc <- access accepted
-        ress1 <-
-          forM here (\mgu ->
-            exploreNoMGU (t `at` mgu))
-        ress2 <-
-          concat <$>
-          forM there (\(ty', mgu) ->
-            forM (Set.toList (Map.findWithDefault undefined ty' acc)) (\u ->
-              exploreNoMGU (u `at` mgu)))
-
-        return res { result_props = concatMap result_props (res:ress1 ++ ress2) }
-      Rejected{} ->
-        return res
+    ress2 <-
+      forM here (\mgu ->
+        exploreNoMGU (t `at` mgu))
+    return res { result_props = concatMap result_props (ress1 ++ [res] ++ ress2) }
     where
       t `at` ty =
         fromMaybe undefined (cast (unPoly ty) t)
@@ -175,8 +171,12 @@ regeneralise =
     generalise (lhs :=>: rhs) =
       polyApply (:=>:) (polyList (map genLit lhs)) (genLit rhs)
     genLit (t :=: u) = polyApply (:=:) (genTerm t) (genTerm u)
-    genTerm (Var v@(V _ x)) =
-      poly (Var (V typeVar x))
+    genTerm (Var (V ty x)) =
+      -- It's tempting to return Var (V typeVar x) here.
+      -- But this is wrong!
+      -- In the case of the type (), we get the law x == y :: (),
+      -- which we must not generalise to x == y :: a.
+      poly (Var (V (genType ty) x))
     genTerm (App f ts) =
       let
         -- Need to polymorphise all of ts together so that type variables which
@@ -188,6 +188,15 @@ regeneralise =
         Just us' = sequence (zipWith cast tys us)
       in
         poly (App f'' us')
+
+    genType = Twee.build . aux 0 . Twee.singleton
+      where
+        aux !_ Twee.Empty = mempty
+        aux n (Twee.Cons (Twee.Var _) ts) =
+          Twee.var (Twee.V n) `mappend` aux (n+1) ts
+        aux n (Twee.Cons (Twee.App f ts) us) =
+          Twee.app f (aux n ts) `mappend`
+          aux (n+Twee.lenList ts) us
 
     restrict prop = typeSubst sub prop
       where

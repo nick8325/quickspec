@@ -1,4 +1,5 @@
 -- Testing conjectures using QuickCheck.
+{-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE FlexibleContexts, FlexibleInstances, RecordWildCards, MultiParamTypeClasses, GeneralizedNewtypeDeriving, TemplateHaskell #-}
 module QuickSpec.Testing.QuickCheck where
 

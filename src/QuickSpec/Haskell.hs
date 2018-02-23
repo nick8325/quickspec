@@ -1,7 +1,8 @@
+{-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ScopedTypeVariables, TypeOperators, GADTs, FlexibleInstances, FlexibleContexts, MultiParamTypeClasses, RecordWildCards, TemplateHaskell #-}
+{-# LANGUAGE ScopedTypeVariables, TypeOperators, GADTs, FlexibleInstances, FlexibleContexts, MultiParamTypeClasses, RecordWildCards, TemplateHaskell, UndecidableInstances, DefaultSignatures, FunctionalDependencies #-}
 module QuickSpec.Haskell where
 
 import QuickSpec.Haskell.Resolve
@@ -85,18 +86,27 @@ baseInstances =
     -- From Arbitrary to Gen
     inst $ \(Dict :: Dict (Arbitrary A)) -> arbitrary :: Gen A,
     inst $ \(dict :: Dict ClassA) -> return dict :: Gen (Dict ClassA),
-    -- From Dict to OrdDict
-    inst (OrdDict :: Dict (Ord A) -> OrdDict A),
     -- Observe
-    inst (\(Dict :: Dict (Ord A)) -> Observe (return id) :: Observe A A),
-    inst (\(Observe obsm :: Observe B C) (xm :: Gen A) ->
-      Observe (do {x <- xm; obs <- obsm; return (\f -> obs (f x))}) :: Observe (A -> B) C),
-    inst (\(obs :: Observe A B) -> Observe1 (toValue obs))]
+    inst (\(Dict :: Dict (Observe A B C)) -> Observe2 (do { env <- arbitrary; return (\x -> observe env (x :: C)) })),
+    inst (Sub Dict :: (Arbitrary A, Observe B C D) :- Observe (A, B) C (A -> D)),
+    inst (\(Dict :: Dict (Ord A)) -> Observe2 (return id) :: Observe2 A A),
+    inst (\(Observe2 obsm :: Observe2 B C) (xm :: Gen A) ->
+      Observe2 (do {x <- xm; obs <- obsm; return (\f -> obs (f x))}) :: Observe2 (A -> B) C),
+    inst (\(obs :: Observe2 A B) -> Observe1 (toValue obs))]
 
-data Observe a b where
-  Observe :: Ord b => Gen (a -> b) -> Observe a b
+class (Arbitrary test, Ord outcome) => Observe test outcome a | a -> test outcome where
+  observe :: test -> a -> outcome
+
+  default observe :: (test ~ (), outcome ~ a) => test -> a -> outcome
+  observe _ x = x
+
+instance (Arbitrary a, Observe test outcome b) => Observe (a, test) outcome (a -> b) where
+  observe (x, obs) f = observe obs (f x)
+
+data Observe2 a b where
+  Observe2 :: Ord b => Gen (a -> b) -> Observe2 a b
   deriving Typeable
-data Observe1 a = Observe1 (Value (Observe a)) deriving Typeable
+data Observe1 a = Observe1 (Value (Observe2 a)) deriving Typeable
 
 -- | Declare that values of a particular type should be compared by observational equality.
 --
@@ -104,14 +114,12 @@ data Observe1 a = Observe1 (Value (Observe a)) deriving Typeable
 --
 -- XXX mention what instances must be in scope
 -- XXX remove constraints etc
-observe :: Ord res => Gen env -> (env -> val -> res) -> Observe val res
-observe gen f =
-  Observe (do { env <- gen; return (\x -> f env x) })
+-- observe :: Ord res => Gen env -> (env -> val -> res) -> Observe val res
+-- observe gen f =
+--   Observe (do { env <- gen; return (\x -> f env x) })
   
 
 -- data SomeObserve a = forall args res. (Ord res, Arbitrary args) => SomeObserve (a -> args -> res) deriving Typeable
-
-newtype OrdDict a = OrdDict (Dict (Ord a)) deriving Typeable
 
 baseType :: forall proxy a. (Ord a, Arbitrary a, Typeable a) => proxy a -> Instances
 baseType _ =
@@ -163,7 +171,7 @@ arbitraryVal def insts =
           case unwrap val of
             Observe1 val `In` w1 ->
               case unwrap val of
-                Observe obs `In` w2 ->
+                Observe2 obs `In` w2 ->
                   Just $
                     MkGen $ \g n ->
                       let observe = unGen obs g n in
@@ -252,7 +260,9 @@ instance Typed Constant where
   otherTypesDL con =
     case con_classify con of
       Predicate{..} ->
-        typesDL clas_selectors `mplus` typesDL clas_test_case `mplus` typesDL clas_true
+        -- Don't call typesDL on clas_selectors because it in turn
+        -- contains a reference to the predicate
+        typesDL (map con_value clas_selectors) `mplus` typesDL clas_test_case `mplus` typesDL clas_true
       Selector{..} ->
         typesDL clas_pred `mplus` typesDL clas_test_case
       Function -> mzero
@@ -391,7 +401,12 @@ quickSpec Config{..} = give cfg_default_to $ do
     present prop = do
       n :: Int <- get
       put (n+1)
-      putLine (printf "%3d. %s" n (show (prettyProp (names instances) (conditionalise prop))))
+      putLine (printf "%3d. %s" n (show (prettyProp (names instances) (conditionalise prop) <+> maybeType prop)))
+
+    -- Add a type signature when printing the equation x = y.
+    maybeType (_ :=>: x@(Var _) :=: Var _) =
+      text "::" <+> pPrintType (typ x)
+    maybeType _ = pPrintEmpty
 
     mainOf f g = do
       printConstants (f cfg_constants ++ f (map (map predCon) cfg_predicates))
@@ -401,9 +416,9 @@ quickSpec Config{..} = give cfg_default_to $ do
         [ Partial fun 0 | fun <- constantsOf g ]
       putLine ""
 
-    main = mapM_ round [0..rounds-1]
+    main = mapM_ round [1..rounds]
       where
-        round n = mainOf (concat . drop n . take (n+1) . reverse) (concat . take (n+1) . reverse)
+        round n = mainOf (concat . take 1 . drop (rounds-n)) (concat . drop (rounds-n))
         rounds = max (length cfg_constants) (length cfg_predicates)
 
   join $

@@ -1,4 +1,5 @@
 -- Pruning support for partial application and the like.
+{-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE FlexibleInstances, TypeSynonymInstances, RecordWildCards, MultiParamTypeClasses, FlexibleContexts, GeneralizedNewtypeDeriving, UndecidableInstances #-}
 module QuickSpec.Explore.PartialApplication where
 

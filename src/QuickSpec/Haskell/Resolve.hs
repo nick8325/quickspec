@@ -12,6 +12,7 @@
 -- The instances can in fact be arbitrary Haskell functions - though
 -- their types must be such that the instance search will terminate.
 
+{-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE RankNTypes, ScopedTypeVariables #-}
 module QuickSpec.Haskell.Resolve(Instances, inst, findInstance, findValue) where
 

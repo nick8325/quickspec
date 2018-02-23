@@ -13,7 +13,6 @@ main = quickSpec [
   con ">>=" ((>>=) :: [A] -> (A -> [B]) -> [B]),
   con "snd" (snd :: (A, B) -> B),
   con "reverse" (reverse :: [A] -> [A]),
-  con "id" (id :: ([A], [B]) -> ([A], [B])),
   con "0" (0 :: Int),
   con "," ((,) :: A -> B -> (A, B)),
   con ">=>" ((>=>) :: (A -> [B]) -> (B -> [C]) -> A -> [C]),

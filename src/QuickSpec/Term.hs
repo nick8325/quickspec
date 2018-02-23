@@ -1,4 +1,5 @@
 -- Typed terms.
+{-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE PatternSynonyms, ViewPatterns, TypeSynonymInstances, FlexibleInstances, TypeFamilies, ConstraintKinds, DeriveGeneric, DeriveAnyClass, MultiParamTypeClasses, FunctionalDependencies, UndecidableInstances, TypeOperators, DeriveFunctor, FlexibleContexts #-}
 module QuickSpec.Term(module QuickSpec.Term, module Twee.Base, module Twee.Pretty) where
 
