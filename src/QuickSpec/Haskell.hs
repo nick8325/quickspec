@@ -260,7 +260,9 @@ instance Typed Constant where
   otherTypesDL con =
     case con_classify con of
       Predicate{..} ->
-        typesDL clas_selectors `mplus` typesDL clas_test_case `mplus` typesDL clas_true
+        -- Don't call typesDL on clas_selectors because it in turn
+        -- contains a reference to the predicate
+        typesDL (map con_value clas_selectors) `mplus` typesDL clas_test_case `mplus` typesDL clas_true
       Selector{..} ->
         typesDL clas_pred `mplus` typesDL clas_test_case
       Function -> mzero
