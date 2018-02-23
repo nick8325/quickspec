@@ -1,5 +1,6 @@
--- Typed terms.
-{-# OPTIONS_HADDOCK hide #-}
+-- | This module is internal to QuickSpec.
+--
+-- Typed terms and operations on them.
 {-# LANGUAGE PatternSynonyms, ViewPatterns, TypeSynonymInstances, FlexibleInstances, TypeFamilies, ConstraintKinds, DeriveGeneric, DeriveAnyClass, MultiParamTypeClasses, FunctionalDependencies, UndecidableInstances, TypeOperators, DeriveFunctor, FlexibleContexts #-}
 module QuickSpec.Term(module QuickSpec.Term, module Twee.Base, module Twee.Pretty) where
 
@@ -16,9 +17,11 @@ import qualified Data.Map.Strict as Map
 import Data.List
 import Data.Reflection
 
+-- | A typed term.
 data Term f = Var {-# UNPACK #-} !Var | App !f ![Term f]
   deriving (Eq, Ord, Show, Functor)
 
+-- | A variable, which has a type and a number.
 data Var = V { var_ty :: !Type, var_id :: {-# UNPACK #-} !Int }
   deriving (Eq, Ord, Show, Generic, CoArbitrary)
 
@@ -27,8 +30,11 @@ instance Typed Var where
   otherTypesDL _ = mzero
   typeSubst_ sub (V ty x) = V (typeSubst_ sub ty) x
 
+-- | A class for things that contain terms.
 class Symbolic f a | a -> f where
+  -- | A different list of all terms contained in the thing.
   termsDL :: a -> DList (Term f)
+  -- | Apply a substitution to all terms in the thing.
   subst :: (Var -> Term f) -> a -> a
 
 instance Symbolic f (Term f) where
@@ -53,42 +59,57 @@ instance PrettyTerm f => Pretty (Term f) where
   pPrintPrec l p (App f xs) =
     pPrintTerm (termStyle f) l p (pPrint f) xs
 
+-- | Is a term an application (i.e. not a variable)?
 isApp :: Term f -> Bool
 isApp App{} = True
 isApp Var{} = False
 
+-- | Is a term a variable?
 isVar :: Term f -> Bool
 isVar = not . isApp
 
+-- | All terms contained in a `Symbolic`.
 terms :: Symbolic f a => a -> [Term f]
 terms = DList.toList . termsDL
 
+-- | All function symbols appearing in a `Symbolic`, in order of appearance,
+-- with duplicates included.
 funs :: Symbolic f a => a -> [f]
 funs x = [ f | t <- terms x, App f _ <- subterms t ]
 
+-- | All variables appearing in a `Symbolic`, in order of appearance,
+-- with duplicates included.
 vars :: Symbolic f a => a -> [Var]
 vars x = [ v | t <- terms x, Var v <- subterms t ]
 
+-- | Compute the number of a variable which does /not/ appear in the `Symbolic`.
 freeVar :: Symbolic f a => a -> Int
 freeVar x = maximum (0:map (succ . var_id) (vars x))
 
+-- | Count how many times a given function symbol occurs.
 occ :: (Eq f, Symbolic f a) => f -> a -> Int
 occ x t = length (filter (== x) (funs t))
 
+-- | Count how many times a given variable occurs.
 occVar :: Symbolic f a => Var -> a -> Int
 occVar x t = length (filter (== x) (vars t))
 
+-- | Map a function over variables.
 mapVar :: (Var -> Var) -> Term f -> Term f
 mapVar f (Var x) = Var (f x)
 mapVar f (App g xs) = App g (map (mapVar f) xs)
 
-subterms, properSubterms :: Term f -> [Term f]
+-- | Find all subterms of a term. Includes the term itself.
+subterms :: Term f -> [Term f]
 subterms t = t:properSubterms t
+
+-- | Find all subterms of a term. Does not include the term itself.
+properSubterms :: Term f -> [Term f]
 properSubterms (App _ ts) = concatMap subterms ts
 properSubterms _ = []
 
--- Introduces variables in a canonical order.
--- Also makes sure that variables of different types have different numbers
+-- | Renames variables so that they appear in a canonical order.
+-- Also makes sure that variables of different types have different numbers.
 canonicalise :: Symbolic fun a => a -> a
 canonicalise t = subst (\x -> Map.findWithDefault undefined x sub) t
   where
@@ -97,12 +118,15 @@ canonicalise t = subst (\x -> Map.findWithDefault undefined x sub) t
         [(x, Var (V ty n))
         | (x@(V ty _), n) <- zip (nub (vars t)) [0..]]
 
+-- | A class for things which can be evaluated to a value, given a valuation for variables.
 class Eval term val where
+  -- | Evaluate something, given a valuation for variables.
   eval :: (Var -> val) -> term -> val
 
 instance (Typed fun, Given Type, Apply a, Eval fun a) => Eval (Term fun) a where
   eval env = evaluateTerm (eval env) env
 
+-- | Evaluate a term, given a valuation for variables and function symbols.
 evaluateTerm :: (Typed fun, Given Type, Apply a) => (fun -> a) -> (Var -> a) -> Term fun -> a
 evaluateTerm fun var = eval
   where
@@ -125,10 +149,11 @@ instance Typed f => Typed (Term f) where
       tsub (App f ts) =
         App (typeSubst_ sub f) (map tsub ts)
 
--- A standard term ordering - size, skeleton, generality.
+-- | A standard term ordering - size, skeleton, generality.
 -- Satisfies the property:
 -- if measure (schema t) < measure (schema u) then t < u.
 type Measure f = (Int, Int, MeasureFuns f, Int, [Var])
+-- | Compute the term ordering for a term.
 measure :: Sized f => Term f -> Measure f
 measure t =
   (size t, -length (vars t), MeasureFuns (skel t),
@@ -137,12 +162,14 @@ measure t =
     skel (Var (V ty _)) = Var (V ty 0)
     skel (App f ts) = App f (map skel ts)
 
+-- | A helper for `Measure`.
 newtype MeasureFuns f = MeasureFuns (Term f)
 instance Ord f => Eq (MeasureFuns f) where
   t == u = compare t u == EQ
 instance Ord f => Ord (MeasureFuns f) where
   compare (MeasureFuns t) (MeasureFuns u) = compareFuns t u
 
+-- | A helper for `Measure`.
 compareFuns :: Ord f => Term f -> Term f -> Ordering
 compareFuns (Var x) (Var y) = compare x y
 compareFuns Var{} App{} = LT
@@ -152,9 +179,11 @@ compareFuns (App f ts) (App g us) =
   compare (map MeasureFuns ts) (map MeasureFuns us)
 
 ----------------------------------------------------------------------
--- Data types a la carte-ish.
+-- * Data types a la carte-ish.
 ----------------------------------------------------------------------
 
+-- | A sum type. Intended to be used to build the type of function
+-- symbols. Comes with instances that are useful for QuickSpec.
 data a :+: b = Inl a | Inr b deriving (Eq, Ord)
 
 instance (Eval fun1 a, Eval fun2 a) => Eval (fun1 :+: fun2) a where
