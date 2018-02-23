@@ -398,7 +398,12 @@ quickSpec Config{..} = give cfg_default_to $ do
     present prop = do
       n :: Int <- get
       put (n+1)
-      putLine (printf "%3d. %s" n (show (prettyProp (names instances) (conditionalise prop))))
+      putLine (printf "%3d. %s" n (show (prettyProp (names instances) (conditionalise prop) <+> maybeType prop)))
+
+    -- Add a type signature when printing the equation x = y.
+    maybeType (_ :=>: x@(Var _) :=: Var _) =
+      text "::" <+> pPrintType (typ x)
+    maybeType _ = pPrintEmpty
 
     mainOf f g = do
       printConstants (f cfg_constants ++ f (map (map predCon) cfg_predicates))
