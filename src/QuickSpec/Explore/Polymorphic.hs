@@ -88,27 +88,22 @@ explore t = do
   if not (t `inUniverse` univ) then
     return (Accepted [])
    else do
+    let ty = polyTyp (poly t)
+    addPolyType ty
+
+    unif <- access unifiable
+    let (here, there) = Map.findWithDefault undefined ty unif
+    acc <- access accepted
+    ress1 <-
+      concat <$>
+      forM there (\(ty', mgu) ->
+        forM (Set.toList (Map.findWithDefault undefined ty' acc)) (\u ->
+          exploreNoMGU (u `at` mgu)))
     res <- exploreNoMGU t
-    case res of
-      Accepted{} -> do
-        let ty = polyTyp (poly t)
-        addPolyType ty
-
-        unif <- access unifiable
-        let (here, there) = Map.findWithDefault undefined ty unif
-        acc <- access accepted
-        ress1 <-
-          forM here (\mgu ->
-            exploreNoMGU (t `at` mgu))
-        ress2 <-
-          concat <$>
-          forM there (\(ty', mgu) ->
-            forM (Set.toList (Map.findWithDefault undefined ty' acc)) (\u ->
-              exploreNoMGU (u `at` mgu)))
-
-        return res { result_props = concatMap result_props (res:ress1 ++ ress2) }
-      Rejected{} ->
-        return res
+    ress2 <-
+      forM here (\mgu ->
+        exploreNoMGU (t `at` mgu))
+    return res { result_props = concatMap result_props (ress1 ++ [res] ++ ress2) }
     where
       t `at` ty =
         fromMaybe undefined (cast (unPoly ty) t)
