@@ -105,6 +105,7 @@ library
     dlist,
     random,
     reflection,
+    spoon,
     template-haskell,
     transformers,
     twee-lib >= 2.1.2,

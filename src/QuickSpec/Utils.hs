@@ -5,6 +5,7 @@ module QuickSpec.Utils where
 
 import Control.Arrow((&&&))
 import Control.Exception
+import Control.Spoon
 import Data.List(groupBy, sortBy)
 #if !MIN_VERSION_base(4,8,0)
 import Data.Monoid
@@ -83,6 +84,9 @@ unbuffered x = do
     (hSetBuffering stdout NoBuffering)
     (hSetBuffering stdout buf)
     x
+
+spoony :: Eq a => a -> Maybe a
+spoony x = teaspoon ((x == x) `seq` x)
 
 newtype Max a = Max { getMax :: Maybe a }
 
