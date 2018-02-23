@@ -1,12 +1,11 @@
 QuickSpec: equational laws for free!
 ====================================
 
-Ever get that nagging feeling that your code must satisfy some equational laws,
-but not sure what they are? Want to write some QuickCheck properties, but not
-sure where to start? QuickSpec might be for you! QuickSpec takes any set of
-Haskell functions and tries to discover laws about those functions.
+QuickSpec takes your Haskell code and, as if by magic, discovers laws about it.
+You give QuickSpec a collection of Haskell functions; QuickSpec tests your functions
+with QuickCheck and prints out laws which seem to hold.
 
-Give QuickSpec the functions `reverse`, `++` and `[]`, for example, and it will
+For example, give QuickSpec the functions `reverse`, `++` and `[]`, and it will
 find six laws:
 
 ```haskell
@@ -18,9 +17,12 @@ reverse (reverse xs) == xs
 reverse xs ++ reverse ys == reverse (ys ++ xs)
 ```
 
-Despite these limitations, QuickSpec works well on many examples. The
-best way to get started with it is to look at the `examples` directory,
-for example `Arith.hs`,`ListMonad.hs`, or `Parsing.hs`. You can also
-look at our paper,
-http://www.cse.chalmers.se/\~nicsma/papers/quickspec2.pdf\[Quick
-specifications for the busy programmer\].
+QuickSpec can find equational laws as well as conditional equations. All you
+need to supply are the functions to test, as well as `Ord` and `Arbitrary`
+instances for QuickSpec to use in testing; the rest is automatic.
+
+For information on how to use QuickSpec, see
+[the documentation](http://hackage.haskell.org/package/quickspec/docs/QuickSpec.html).
+You can also look in the `examples` directory, for example at
+`List.hs`, `IntSet.hs`, or `Parsing.hs`. To read about how QuickSpec works, see
+our paper, [Quick specifications for the busy programmer](http://www.cse.chalmers.se/~nicsma/papers/quickspec2.pdf).
