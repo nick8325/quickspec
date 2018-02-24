@@ -19,6 +19,7 @@ import Data.Functor.Identity
 import Data.Maybe
 import Data.MemoUgly
 import Test.QuickCheck.Gen
+import Test.QuickCheck.Gen.Unsafe
 import Test.QuickCheck.Random
 import System.Random
 import Data.Char
@@ -152,7 +153,7 @@ baseType _ =
     inst (Dict :: Dict (Ord a)),
     inst (Dict :: Dict (Arbitrary a))]
 
--- | Declare what variable names you would like to use for values of a particular type. See also `baseTypeNames`.
+-- Declares what variable names should be used for values of a particular type.
 newtype Names a = Names { getNames :: [String] }
 
 names :: Instances -> Type -> [String]
@@ -161,41 +162,8 @@ names insts ty =
     (x:_) -> ofValue getNames x
     [] -> error "don't know how to name variables"
 
-arbitraryVal :: Type -> Instances -> Gen (Var -> Maybe (Value Identity), Value Identity -> Maybe (Value Ordy))
-arbitraryVal def insts =
-  MkGen $ \g n ->
-    let (g1, g2) = split g in
-    (memo $ \(V ty x) -> do
-       gen <- genType ty
-       return (forValue gen $ \gen -> Identity (unGen (coarbitrary x gen) g1 n)),
-     ordyVal g2 n)
-  where
-    genType :: Type -> Maybe (Value Gen)
-    genType = memo $ \ty ->
-      mapValue (coarbitrary ty) <$>
-        listToMaybe (findInstance insts (defaultTo def ty))
-
-    ordyVal :: QCGen -> Int -> Value Identity -> Maybe (Value Ordy)
-    ordyVal g n x = do
-      f <- ordyTy (defaultTo def (typ x))
-      return (unGen f g n x)
-
-    ordyTy :: Type -> Maybe (Gen (Value Identity -> Value Ordy))
-    ordyTy = memo $ \ty -> do
-      val <- listToMaybe (findInstance insts ty :: [Value WrappedObserveData])
-      case unwrap val of
-        WrappedObserveData val `In` valueWrapper ->
-          case unwrap val of
-            -- This brings Arbitrary and Ord instances into scope
-            ObserveData obs `In` outcomeWrapper ->
-              Just $
-                MkGen $ \g n x ->
-                  let
-                    value = runIdentity (reunwrap valueWrapper x)
-                    test = unGen arbitrary g n
-                    outcome = obs test value
-                  in wrap outcomeWrapper (Ordy outcome)
-
+-- An Ordy a represents a value of type a together with its Ord instance.
+-- A Value Ordy is a value of unknown type which implements Ord.
 data Ordy a where Ordy :: Ord a => a -> Ordy a
 instance Eq (Value Ordy) where x == y = compare x y == EQ
 
@@ -206,8 +174,58 @@ instance Ord (Value Ordy) where
         let Ordy yv = reunwrap w y in
         compare xv yv
 
-evalHaskell :: (Given Type, Typed f, PrettyTerm f, Eval f (Value Identity)) => (Var -> Maybe (Value Identity), Value Identity -> Maybe (Value Ordy)) -> Term f -> Either (Value Ordy) (Term f)
-evalHaskell (env, obs) t =
+-- | A test case is everything you need to evaluate a Haskell term.
+data TestCase =
+  TestCase {
+    -- | Evaluate a variable. Returns @Nothing@ if no `Arbitrary` instance was found.
+    tc_eval_var :: Var -> Maybe (Value Identity),
+    -- | Apply an observation function to get a value implementing `Ord`.
+    -- Returns @Nothing@ if no observer was found.
+    tc_test_result :: Value Identity -> Maybe (Value Ordy) }
+
+-- | Generate a random test case.
+arbitraryTestCase :: Type -> Instances -> Gen TestCase
+arbitraryTestCase def insts =
+  TestCase <$> arbitraryValuation def insts <*> arbitraryObserver def insts
+
+-- | Generate a random variable valuation.
+arbitraryValuation :: Type -> Instances -> Gen (Var -> Maybe (Value Identity))
+arbitraryValuation def insts = do
+  let
+    gen :: Var -> Maybe (Gen (Value Identity))
+    gen x = bringFunctor <$> listToMaybe (findInstance insts (defaultTo def (typ x)) :: [Value Gen])
+  memo <$> arbitraryFunction (sequence . gen)
+
+-- | Generate a random observation.
+arbitraryObserver :: Type -> Instances -> Gen (Value Identity -> Maybe (Value Ordy))
+arbitraryObserver def insts = do
+  find <- arbitraryFunction $ sequence . findObserver
+  return $ \x -> do
+    obs <- find (defaultTo def (typ x))
+    return (obs x)
+  where
+    findObserver :: Type -> Maybe (Gen (Value Identity -> Value Ordy))
+    findObserver ty = do
+      inst <- listToMaybe (findInstance insts ty :: [Value WrappedObserveData])
+      return $
+        case unwrap inst of
+          WrappedObserveData val `In` valueWrapper ->
+            case unwrap val of
+              -- This brings Arbitrary and Ord instances into scope
+              ObserveData obs `In` outcomeWrapper -> do
+                test <- arbitrary
+                return $ \x ->
+                  let value = runIdentity (reunwrap valueWrapper x)
+                      outcome = obs test value
+                  in wrap outcomeWrapper (Ordy outcome)
+
+-- | Generate a random function. Should be in QuickCheck.
+arbitraryFunction :: CoArbitrary a => (a -> Gen b) -> Gen (a -> b)
+arbitraryFunction gen = promote (\x -> coarbitrary x (gen x))
+
+-- | Evaluate a Haskell term in an environment.
+evalHaskell :: (Given Type, Typed f, PrettyTerm f, Eval f (Value Identity)) => TestCase -> Term f -> Either (Value Ordy) (Term f)
+evalHaskell (TestCase env obs) t =
   maybe (Right t) Left $ do
     Identity val `In` w <- unwrap <$> eval env t
     obs (wrap w (Identity val))
@@ -307,29 +325,25 @@ instance (Given Type, Applicative f) => Eval Constant (Value f) where
   eval _ = return . mapValue (pure . runIdentity) . con_value
 
 class Predicateable a where
-  uncrry :: a -> TestCase a -> Bool
+  -- A test case for predicates of type a
+  -- if `a ~ A -> B -> C -> Bool` we get `TestCase a ~ (A, (B, (C, ())))`
+  --
+  -- Some speedup should be possible by using unboxed tuples instead...
+  type PredicateTestCase a
+  uncrry :: a -> PredicateTestCase a -> Bool
 
 instance Predicateable Bool where
+  type PredicateTestCase Bool = ()
   uncrry = const
 
-instance forall a b. (Predicateable b, Typeable a, TestCase (a -> b) ~ (a, TestCase b)) => Predicateable (a -> b) where
+instance forall a b. (Predicateable b, Typeable a) => Predicateable (a -> b) where
+  type PredicateTestCase (a -> b) = (a, PredicateTestCase b)
   uncrry f (a, b) = uncrry (f a) b
-
--- Foldr over functions
-type family (Foldr f b fun) :: * where
-  Foldr f def (a -> b) = f a (Foldr f def b)
-  Foldr f def b        = def
-
--- A test case for predicates of type a
--- if `a ~ A -> B -> C -> Bool` we get `TestCase a ~ (A, (B, (C, ())))`
---
--- Some speedup should be possible by using unboxed tuples instead...
-type TestCase a = Foldr (,) () a
 
 data TestCaseWrapped (t :: Symbol) a = TestCaseWrapped { unTestCaseWrapped :: a }
 
 -- A `suchThat` generator for a predicate
-genSuchThat :: (Predicateable a, Arbitrary (TestCase a)) => a -> Gen (TestCaseWrapped x (TestCase a))
+genSuchThat :: (Predicateable a, Arbitrary (PredicateTestCase a)) => a -> Gen (TestCaseWrapped x (PredicateTestCase a))
 genSuchThat p = TestCaseWrapped <$> arbitrary `suchThat` uncrry p
 
 data PredRep = PredRep { predInstances :: Instances
@@ -346,16 +360,16 @@ trueTerm = App (total true) []
 -- The predicate should have type @... -> Bool@.
 predicate :: forall a. ( Predicateable a
              , Typeable a
-             , Typeable (TestCase a))
+             , Typeable (PredicateTestCase a))
              => String -> a -> PredRep
 predicate name pred =
   case someSymbolVal name of
     SomeSymbol (_ :: Proxy sym) ->
       let
         instances =
-          inst (\(dict :: Dict (Arbitrary (TestCase a))) -> (withDict dict genSuchThat) pred :: Gen (TestCaseWrapped sym (TestCase a)))
+          inst (\(dict :: Dict (Arbitrary (PredicateTestCase a))) -> (withDict dict genSuchThat) pred :: Gen (TestCaseWrapped sym (PredicateTestCase a)))
           `mappend`
-          inst (Names [name ++ "_var"] :: Names (TestCaseWrapped sym (TestCase a)))
+          inst (Names [name ++ "_var"] :: Names (TestCaseWrapped sym (PredicateTestCase a)))
 
         conPred = (con name pred) { con_classify = Predicate conSels ty (App true []) }
         conSels = [ (constant' (name ++ "_" ++ show i) (select i)) { con_classify = Selector i conPred ty, con_size = 0 } | i <- [0..typeArity (typeOf pred)-1] ]
@@ -371,7 +385,7 @@ predicate name pred =
             cmpV = toPolyValue ((.) :: (B -> C) -> (A -> B) -> A -> C)
             unwrapV = toPolyValue (unTestCaseWrapped :: TestCaseWrapped SymA A -> A)
 
-        ty = typeRep (Proxy :: Proxy (TestCaseWrapped sym (TestCase a)))
+        ty = typeRep (Proxy :: Proxy (TestCaseWrapped sym (PredicateTestCase a)))
       in
         PredRep instances conPred (conPred:conSels)
 
@@ -450,7 +464,7 @@ quickSpec Config{..} = give cfg_default_to $ do
   join $
     fmap withStdioTerminal $
     generate $
-    QuickCheck.run cfg_quickCheck (arbitraryVal cfg_default_to instances) evalHaskell $
+    QuickCheck.run cfg_quickCheck (arbitraryTestCase cfg_default_to instances) evalHaskell $
     Twee.run cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size } $
     runConditionals (map total constants) $
     flip evalStateT 1 $

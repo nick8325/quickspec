@@ -78,7 +78,7 @@ module QuickSpec(
   -- * Re-exported functionality
   Typeable, (:-)(..), Dict(..), Proxy(..), Arbitrary) where
 
-import QuickSpec.Haskell(Predicateable, TestCase, Names(..), Observe(..))
+import QuickSpec.Haskell(Predicateable, PredicateTestCase, Names(..), Observe(..))
 import qualified QuickSpec.Haskell as Haskell
 import qualified QuickSpec.Haskell.Resolve as Haskell
 import qualified QuickSpec.Testing.QuickCheck as QuickCheck
@@ -142,7 +142,7 @@ con name x =
 -- @
 predicate :: ( Predicateable a
              , Typeable a
-             , Typeable (TestCase a))
+             , Typeable (PredicateTestCase a))
              => String -> a -> Sig
 predicate name x =
   Sig (\n -> modL Haskell.lens_predicates (appendAt n (Haskell.predicate name x)))

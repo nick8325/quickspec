@@ -22,7 +22,7 @@ module QuickSpec.Type(
   -- * Dynamic values
   Value, toValue, fromValue,
   unwrap, Unwrapped(..), Wrapper(..),
-  mapValue, forValue, ofValue, withValue, pairValues, wrapFunctor, unwrapFunctor) where
+  mapValue, forValue, ofValue, withValue, pairValues, wrapFunctor, unwrapFunctor, bringFunctor) where
 
 import Control.Monad
 import Data.DList(DList)
@@ -37,6 +37,7 @@ import Twee.Base
 import Data.Proxy
 import Data.List
 import Data.Char
+import Data.Functor.Identity
 
 -- | A (possibly polymorphic) type.
 type Type = Term TyCon
@@ -520,3 +521,9 @@ unwrapFunctor f x =
     _ -> error "value of type f a had wrong type"
   where
     ty = typeRep (Proxy :: Proxy g)
+
+bringFunctor :: Functor f => Value f -> f (Value Identity)
+bringFunctor val =
+  case unwrap val of
+    x `In` w ->
+      fmap (wrap w . Identity) x
