@@ -51,6 +51,7 @@ Extra-source-files:
   examples/Arith.hs
   examples/Bools.hs
   examples/Composition.hs
+  examples/Curry.hs
   examples/Geometry.hs
   examples/HugeLists.hs
   examples/IntSet.hs
