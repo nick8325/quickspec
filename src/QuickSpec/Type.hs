@@ -5,22 +5,23 @@
 -- To avoid a warning about TyVarNumber's constructor being unused:
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
 module QuickSpec.Type(
-  -- Types.
+  -- * Types
   Typeable,
   Type, TyCon(..), tyCon, fromTyCon, A, B, C, D, E, ClassA, ClassB, ClassC, ClassD, ClassE, SymA, typeVar, isTypeVar,
   typeOf, typeRep, applyType, fromTypeRep,
-  arrowType, unpackArrow, typeArgs, typeRes, typeDrop, typeArity, oneTypeVar, defaultTo, skolemiseTypeVars,
+  arrowType, unpackArrow, typeArgs, typeRes, typeDrop, typeArity,
   isDictionary, getDictionary, pPrintType,
-  -- Things that have types.
+  -- * Things that have types
   Typed(..), typeSubst, typesDL, tyVars, cast,
   TypeView(..),
   Apply(..), apply, canApply,
-  -- Polymorphic types.
+  oneTypeVar, defaultTo, skolemiseTypeVars,
+  -- * Polymorphic types
   canonicaliseType,
   Poly, toPolyValue, poly, unPoly, polyTyp, polyRename, polyApply, polyPair, polyList, polyMgu,
-  -- Dynamic values.
+  -- * Dynamic values
   Value, toValue, fromValue,
-  Unwrapped(..), unwrap, Wrapper(..),
+  unwrap, Unwrapped(..), Wrapper(..),
   mapValue, forValue, ofValue, withValue, pairValues, wrapFunctor, unwrapFunctor) where
 
 import Control.Monad
@@ -411,8 +412,6 @@ toPolyValue = poly . toValue . pure
 -- | Dynamic values inside an applicative functor.
 --
 -- For example, a value of type @Value Maybe@ represents a @Maybe something@.
--- We will call the @something@ the /underlying type/ of the value,
--- and we will say that @Maybe@ is the functor of the value.
 data Value f =
   Value {
     valueType :: Type,
@@ -445,8 +444,7 @@ instance Applicative f => Apply (Value f) where
     ty <- tryApply (typ f) (typ x)
     return (Value ty (fromAny (value f) <*> value x))
 
--- | Unwrap a value to get at the thing inside, while still being able
--- to wrap it up again.
+-- | Unwrap a value to get at the thing inside, with an existential type.
 unwrap :: Value f -> Unwrapped f
 unwrap x =
   value x `In`
@@ -458,24 +456,15 @@ unwrap x =
         else error "non-matching types")
 
 -- | The unwrapped value. Consists of the value itself (with an existential
--- type) and functions to wrap it up again.
+-- type) and functions to wrap and unwrap other values which have the same type.
 data Unwrapped f = forall a. f a `In` Wrapper a
 
 -- | Functions for re-wrapping an `Unwrapped` value.
 data Wrapper a =
   Wrapper {
-    -- | Wrap the value up again.
-    --
-    -- If the unwrapped value had type @f a@, then the argument to
-    -- wrap must have type @g a@, i.e., the underlying type can change
-    -- but the functor must be the same. This can sometimes be worked
-    -- around using `wrapFunctor` and `unwrappedFunctor`, but it is
-    -- awkward.
+    -- | Wrap up a value which has the same existential type as this one.
     wrap :: forall g. g a -> Value g,
-    -- | Unwrap another value, which must have the same underlying
-    -- type as this one (but can have a different functor).
-    -- Use this when you know that two `Value`s have the same underlying
-    -- type, but the compiler doesn't know.
+    -- | Unwrap a value which has the same existential type as this one.
     reunwrap :: forall g. Value g -> g a }
 
 -- | Apply a polymorphic function to a `Value`.
