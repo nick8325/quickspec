@@ -2,12 +2,14 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE ScopedTypeVariables, TypeOperators, GADTs, FlexibleInstances, FlexibleContexts, MultiParamTypeClasses, RecordWildCards, TemplateHaskell, UndecidableInstances, DefaultSignatures, FunctionalDependencies #-}
 module QuickSpec.Haskell where
 
 import QuickSpec.Haskell.Resolve
 import QuickSpec.Type
 import QuickSpec.Prop
+import QuickSpec.Pruning
 import Test.QuickCheck hiding (total)
 import Data.Constraint
 import Data.Proxy
@@ -428,7 +430,17 @@ quickSpec Config{..} = give cfg_default_to $ do
     present prop = do
       n :: Int <- get
       put (n+1)
-      putLine (printf "%3d. %s" n (show (prettyProp (names instances) (conditionalise prop) <+> maybeType prop)))
+      norm <- normaliser
+      putLine (printf "%3d. %s" n (show (prettyProp (names instances) (ac norm (conditionalise prop)) <+> maybeType prop)))
+
+    -- Transform x+(y+z) = y+(x+z) into associativity, if + is commutative
+    ac norm (lhs :=>: App f [Var x, App f1 [Var y, Var z]] :=: App f2 [Var y1, App f3 [Var x1, Var z1]])
+      | f == f1, f1 == f2, f2 == f3,
+        x == x1, y == y1, z == z1,
+        x /= y, y /= z, x /= z,
+        norm (App f [Var x, Var y]) == norm (App f [Var y, Var x]) =
+          lhs :=>: App f [App f [Var x, Var y], Var z] :=: App f [Var x, App f [Var y, Var z]]
+    ac _ prop = prop
 
     -- Add a type signature when printing the equation x = y.
     maybeType (_ :=>: x@(Var _) :=: Var _) =
