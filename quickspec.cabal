@@ -82,6 +82,7 @@ library
     QuickSpec.Explore.Terms
     QuickSpec.Haskell
     QuickSpec.Haskell.Resolve
+    QuickSpec.Parse
     QuickSpec.Prop
     QuickSpec.Pruning
     QuickSpec.Pruning.Background
