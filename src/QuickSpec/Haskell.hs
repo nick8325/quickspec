@@ -459,14 +459,14 @@ quickSpec Config{..} = give cfg_default_to $ do
     maybeType _ = pPrintEmpty
 
     mainOf f g = do
-      sequence [ putLine . show $ text "WARNING: Missing instance of Arbitrary for type" <+> pPrintType t
-               | t <- (toList . univ_root $ univ), not $ isTypeVar t, typeArity t == 0, not $ checkArbInst t instances ]
-      sequence [ putLine . show $ text "WARNING: Missing instance of Ord for type" <+> pPrintType t
-               | t <- (toList . univ_root $ univ), not $ isTypeVar t, typeArity t == 0, not $ checkOrdInst t instances ]
       putLine $ show $ QuickSpec.Explore.pPrintSignature
         (map partial (f cfg_constants ++ f (map (map predCon) cfg_predicates)))
       putLine ""
       putLine "== Laws =="
+      sequence [ putLine . show $ text "WARNING: Missing instance of Arbitrary for type" <+> pPrintType t
+               | t <- (toList . univ_root $ univ), not $ isTypeVar t, typeArity t == 0, not $ checkArbInst t instances ]
+      sequence [ putLine . show $ text "WARNING: Missing instance of Ord for type" <+> pPrintType t
+               | t <- (toList . univ_root $ univ), not $ isTypeVar t, typeArity t == 0, not $ checkOrdInst t instances ]
       QuickSpec.Explore.quickSpec present measure (flip evalHaskell) cfg_max_size univ
         [ partial fun | fun <- constantsOf g ]
       putLine ""
