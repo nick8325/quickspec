@@ -441,7 +441,7 @@ quickSpec Config{..} = give cfg_default_to $ do
       putLine ""
       putLine "== Laws =="
       QuickSpec.Explore.quickSpec present measure (flip evalHaskell) cfg_max_size univ
-        [ Partial fun 0 | fun <- constantsOf g ]
+        [ partial fun | fun <- constantsOf g ]
       putLine ""
 
     main = mapM_ round [1..rounds]

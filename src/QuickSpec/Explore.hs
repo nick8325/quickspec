@@ -15,7 +15,7 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.State.Strict
 import Text.Printf
 
-moreTerms :: (Ord a, Apply (Term f), Sized f, Typed f) => Universe -> [f] -> (Term f -> a) -> [[Term f]] -> [Term f]
+moreTerms :: (Ord a, Apply (Term f), Sized f, Typed f) => Universe -> [Term f] -> (Term f -> a) -> [[Term f]] -> [Term f]
 moreTerms univ funs measure tss =
   sortBy' measure $
     atomic ++
@@ -28,7 +28,7 @@ moreTerms univ funs measure tss =
   where
     n = length tss
     atomic =
-      [App f [] | f <- funs, size f == n] ++
+      [f | f <- funs, size f == n] ++
       [Var (V typeVar 0) | n == 1]
     uss = tss ++ [atomic]
 
@@ -38,7 +38,7 @@ quickSpec ::
   (Prop (Term fun) -> m ()) ->
   (Term fun -> measure) ->
   (Term fun -> testcase -> result) ->
-  Int -> Universe -> [fun] -> m ()
+  Int -> Universe -> [Term fun] -> m ()
 quickSpec present measure eval maxSize univ funs = do
   let
     state0 = initialState univ (\t -> size t <= 5) eval
@@ -61,7 +61,7 @@ quickSpec present measure eval maxSize univ funs = do
       clearStatus
       loop (m+1) n (tss ++ [us])
 
-  evalStateT (loop 0 maxSize []) state0
+  evalStateT (loop 0 (maximum (maxSize:map size funs)) []) state0
 
 pPrintSignature :: (Pretty a, Typed a) => [a] -> Doc
 pPrintSignature funs =
