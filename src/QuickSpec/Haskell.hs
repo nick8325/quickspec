@@ -224,8 +224,9 @@ evalHaskell :: (Given Type, Typed f, PrettyTerm f, Eval f (Value Maybe))
 evalHaskell (env, obs) t =
   case unwrap (eval env t) of
     Nothing `In` _ -> Right t
-    Just val `In` w ->
-      case obs (wrap w (Identity val)) of
+    Just val `In` w -> case spoon val of
+      Nothing -> Right t
+      Just val -> case obs (wrap w (Identity val)) of
         Nothing -> Right t
         Just ordy -> Left ordy
 
@@ -421,6 +422,12 @@ defaultConfig =
     cfg_constants = [],
     cfg_predicates = [],
     cfg_default_to = typeRep (Proxy :: Proxy Int) }
+
+checkInstances :: Type -> Instances -> Bool
+checkInstances t is =
+  let arbInstances = findInstance is $ typeRep (Proxy :: Proxy Gen) `applyType` t 
+      ordInstances = findInstance is $ typeRep (Proxy :: Proxy WrappedObserveData) `applyType` t
+  in isJust $ arbInstances >> ordInstances
 
 quickSpec :: Config -> IO ()
 quickSpec Config{..} = give cfg_default_to $ do

@@ -1,7 +1,7 @@
 -- | This module is internal to QuickSpec.
 --
 -- Polymorphic types and dynamic values.
-{-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances, GeneralizedNewtypeDeriving, Rank2Types, ExistentialQuantification, PolyKinds, TypeFamilies, FlexibleContexts, StandaloneDeriving, PatternGuards, MultiParamTypeClasses, ConstraintKinds, DataKinds #-}
+{-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances, GeneralizedNewtypeDeriving, Rank2Types, ExistentialQuantification, PolyKinds, TypeFamilies, FlexibleContexts, StandaloneDeriving, PatternGuards, MultiParamTypeClasses, ConstraintKinds, DataKinds, GADTs #-}
 -- To avoid a warning about TyVarNumber's constructor being unused:
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
 module QuickSpec.Type(
@@ -36,6 +36,7 @@ import Twee.Base
 import Data.Proxy
 import Data.List
 import Data.Char
+import Control.DeepSeq
 
 -- | A (possibly polymorphic) type.
 type Type = Term TyCon
@@ -459,7 +460,8 @@ unwrap x =
 
 -- | The unwrapped value. Consists of the value itself (with an existential
 -- type) and functions to wrap it up again.
-data Unwrapped f = forall a. f a `In` Wrapper a
+data Unwrapped f where
+  In :: f a -> Wrapper a -> Unwrapped f
 
 -- | Functions for re-wrapping an `Unwrapped` value.
 data Wrapper a =
