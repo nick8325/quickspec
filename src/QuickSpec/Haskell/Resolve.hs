@@ -67,7 +67,7 @@ inst x = instValue (toPolyValue x)
 -- Construct a value of a particular type.
 -- If the type is polymorphic, may return an instance of it.
 findValue :: Instances -> Type -> Maybe (Value Identity)
-findValue insts = listToMaybe . is_find insts
+findValue insts = listToMaybe . is_find insts . skolemiseTypeVars
 
 -- Given a type a, construct a value of type f a.
 -- If the type is polymorphic, may return an instance of it.
