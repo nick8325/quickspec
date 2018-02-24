@@ -137,19 +137,6 @@ data Observe2 a b where
   deriving Typeable
 data Observe1 a = Observe1 (Value (Observe2 a)) deriving Typeable
 
--- | Declare that values of a particular type should be compared by observational equality.
---
--- See @examples/PrettyPrinting.hs@ for an example.
---
--- XXX mention what instances must be in scope
--- XXX remove constraints etc
--- observe :: Ord res => Gen env -> (env -> val -> res) -> Observe val res
--- observe gen f =
---   Observe (do { env <- gen; return (\x -> f env x) })
-  
-
--- data SomeObserve a = forall args res. (Ord res, Arbitrary args) => SomeObserve (a -> args -> res) deriving Typeable
-
 baseType :: forall proxy a. (Ord a, Arbitrary a, Typeable a) => proxy a -> Instances
 baseType _ =
   mconcat [
@@ -165,66 +152,52 @@ names insts ty =
     (x:_) -> ofValue getNames x
     [] -> error "don't know how to name variables"
 
-arbitraryVal :: Type -> Instances -> Gen (Var -> Value Maybe, Value Identity -> Maybe (Value Ordy))
+arbitraryVal :: Type -> Instances -> Gen (Var -> Maybe (Value Identity), Value Identity -> Maybe (Value Ordy))
 arbitraryVal def insts =
   MkGen $ \g n ->
     let (g1, g2) = split g in
-    (memo $ \(V ty x) ->
-       case genType ty of
-         Nothing ->
-           fromJust $ cast (defaultTo def ty) (toValue (Nothing :: Maybe A))
-         Just gen ->
-           forValue gen $ \gen ->
-             Just (unGen (coarbitrary x gen) g1 n),
+    (memo $ \(V ty x) -> do
+       gen <- genType ty
+       return (forValue gen $ \gen -> Identity (unGen (coarbitrary x gen) g1 n)),
      ordyVal g2 n)
   where
     genType :: Type -> Maybe (Value Gen)
     genType = memo $ \ty ->
-      case findInstance insts (defaultTo def ty) of
-        [] -> Nothing
-        (gen:_) ->
-          Just (mapValue (coarbitrary ty) gen)
+      mapValue (coarbitrary ty) <$>
+        listToMaybe (findInstance insts (defaultTo def ty))
 
     ordyVal :: QCGen -> Int -> Value Identity -> Maybe (Value Ordy)
-    ordyVal g n x =
-      let ty = defaultTo def (typ x) in
-      case ordyTy ty of
-        Nothing -> Nothing
-        Just f -> Just (unGen f g n x)
+    ordyVal g n x = do
+      f <- ordyTy (defaultTo def (typ x))
+      return (unGen f g n x)
 
     ordyTy :: Type -> Maybe (Gen (Value Identity -> Value Ordy))
-    ordyTy = memo $ \ty ->
-      case findInstance insts ty :: [Value Observe1] of
-        [] -> Nothing
-        (val:_) ->
+    ordyTy = memo $ \ty -> do
+      val <- listToMaybe (findInstance insts ty :: [Value Observe1])
+      case unwrap val of
+        Observe1 val `In` w1 ->
           case unwrap val of
-            Observe1 val `In` w1 ->
-              case unwrap val of
-                Observe2 obs `In` w2 ->
-                  Just $
-                    MkGen $ \g n ->
-                      let observe = unGen obs g n in
-                      \x -> wrap w2 (Ordy (observe (runIdentity (reunwrap w1 x))))
+            Observe2 obs `In` w2 ->
+              Just $
+                MkGen $ \g n ->
+                  let observe = unGen obs g n in
+                  \x -> wrap w2 (Ordy (observe (runIdentity (reunwrap w1 x))))
 
 data Ordy a where Ordy :: Ord a => a -> Ordy a
 instance Eq (Value Ordy) where x == y = compare x y == EQ
 
 instance Ord (Value Ordy) where
   compare x y =
-    compare (typ x) (typ y) `mappend`
     case unwrap x of
       Ordy xv `In` w ->
         let Ordy yv = reunwrap w y in
         compare xv yv
 
-evalHaskell :: (Given Type, Typed f, PrettyTerm f, Eval f (Value Maybe)) => (Var -> Value Maybe, Value Identity -> Maybe (Value Ordy)) -> Term f -> Either (Value Ordy) (Term f)
+evalHaskell :: (Given Type, Typed f, PrettyTerm f, Eval f (Value Identity)) => (Var -> Maybe (Value Identity), Value Identity -> Maybe (Value Ordy)) -> Term f -> Either (Value Ordy) (Term f)
 evalHaskell (env, obs) t =
-  case unwrap (eval env t) of
-    Nothing `In` _ -> Right t
-    Just val `In` w ->
-      case obs (wrap w (Identity val)) of
-        Nothing -> Right t
-        Just ordy -> Left ordy
+  maybe (Right t) Left $ do
+    Identity val `In` w <- unwrap <$> eval env t
+    obs (wrap w (Identity val))
 
 data Constant =
   Constant {
@@ -318,7 +291,7 @@ instance Predicate Constant where
   classify = con_classify
 
 instance (Given Type, Applicative f) => Eval Constant (Value f) where
-  eval _ = mapValue (pure . runIdentity) . con_value
+  eval _ = return . mapValue (pure . runIdentity) . con_value
 
 class Predicateable a where
   uncrry :: a -> TestCase a -> Bool

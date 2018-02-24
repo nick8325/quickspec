@@ -87,6 +87,6 @@ instance (Arity f, Typed f, Background f) => Background (PartiallyApplied f) whe
 instance (Applicative f, Eval fun (Value f)) => Eval (PartiallyApplied fun) (Value f) where
   eval var (Partial f _) = eval var f
   eval _ (Apply ty) =
-    fromJust $
+    return $ fromJust $
       cast (Twee.build (Twee.app (Twee.fun Arrow) [ty, ty]))
         (toValue (pure (($) :: (A -> B) -> (A -> B))))
