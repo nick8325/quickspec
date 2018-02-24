@@ -37,6 +37,7 @@ import Data.Reflection hiding (D)
 import QuickSpec.Utils
 import GHC.TypeLits
 import QuickSpec.Explore.Conditionals
+import Control.Spoon
 
 baseInstances :: Instances
 baseInstances =
@@ -228,7 +229,10 @@ evalHaskell :: (Given Type, Typed f, PrettyTerm f, Eval f (Value Identity)) => T
 evalHaskell (TestCase env obs) t =
   maybe (Right t) Left $ do
     Identity val `In` w <- unwrap <$> eval env t
-    obs (wrap w (Identity val))
+    res <- obs (wrap w (Identity val))
+    -- Don't allow partial results to enter the decision tree
+    guard (withValue res (\(Ordy x) -> isJust (teaspoon (x == x))))
+    return res
 
 data Constant =
   Constant {
