@@ -34,6 +34,8 @@ import Data.Reflection hiding (D)
 import QuickSpec.Utils
 import GHC.TypeLits
 import QuickSpec.Explore.Conditionals
+import Control.Spoon
+import Control.DeepSeq
 
 baseInstances :: Instances
 baseInstances =
@@ -215,7 +217,10 @@ instance Ord (Value Ordy) where
         let Ordy yv = reunwrap w y in
         compare xv yv
 
-evalHaskell :: (Given Type, Typed f, PrettyTerm f, Eval f (Value Maybe)) => (Var -> Value Maybe, Value Identity -> Maybe (Value Ordy)) -> Term f -> Either (Value Ordy) (Term f)
+evalHaskell :: (Given Type, Typed f, PrettyTerm f, Eval f (Value Maybe))
+            => (Var -> Value Maybe, Value Identity -> Maybe (Value Ordy))
+            -> Term f
+            -> Either (Value Ordy) (Term f)
 evalHaskell (env, obs) t =
   case unwrap (eval env t) of
     Nothing `In` _ -> Right t
