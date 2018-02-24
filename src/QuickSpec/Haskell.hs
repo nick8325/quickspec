@@ -100,13 +100,11 @@ baseInstances =
     -- From Arbitrary to Gen
     inst $ \(Dict :: Dict (Arbitrary A)) -> arbitrary :: Gen A,
     inst $ \(dict :: Dict ClassA) -> return dict :: Gen (Dict ClassA),
-    -- Observe
-    inst (\(Dict :: Dict (Observe A B C)) -> Observe2 (do { env <- arbitrary; return (\x -> observe env (x :: C)) })),
-    inst (Sub Dict :: (Arbitrary A, Observe B C D) :- Observe (A, B) C (A -> D)),
-    inst (\(Dict :: Dict (Ord A)) -> Observe2 (return id) :: Observe2 A A),
-    inst (\(Observe2 obsm :: Observe2 B C) (xm :: Gen A) ->
-      Observe2 (do {x <- xm; obs <- obsm; return (\f -> obs (f x))}) :: Observe2 (A -> B) C),
-    inst (\(obs :: Observe2 A B) -> Observe1 (toValue obs))]
+    -- Observation functions
+    inst (\(Dict :: Dict (Observe A B C)) -> observeObs :: ObserveData C B),
+    inst (\(Dict :: Dict (Ord A)) -> observeOrd :: ObserveData A A),
+    inst (\(Dict :: Dict (Arbitrary A)) (obs :: ObserveData B C) -> observeFunction obs :: ObserveData (A -> B) C),
+    inst (\(obs :: ObserveData A B) -> WrappedObserveData (toValue obs))]
 
 -- | A typeclass for types which support observational equality, typically used
 -- for types that have no `Ord` instance.
@@ -132,10 +130,21 @@ class (Arbitrary test, Ord outcome) => Observe test outcome a | a -> test outcom
 instance (Arbitrary a, Observe test outcome b) => Observe (a, test) outcome (a -> b) where
   observe (x, obs) f = observe obs (f x)
 
-data Observe2 a b where
-  Observe2 :: Ord b => Gen (a -> b) -> Observe2 a b
-  deriving Typeable
-data Observe1 a = Observe1 (Value (Observe2 a)) deriving Typeable
+-- An observation function along with instances.
+-- The parameters are in this order so that we can use findInstance to get at appropriate Wrappers.
+data ObserveData a outcome where
+  ObserveData :: (Arbitrary test, Ord outcome) => (test -> a -> outcome) -> ObserveData a outcome
+newtype WrappedObserveData a = WrappedObserveData (Value (ObserveData a))
+
+observeOrd :: Ord a => ObserveData a a
+observeOrd = ObserveData (\() x -> x)
+
+observeFunction :: Arbitrary a => ObserveData b outcome -> ObserveData (a -> b) outcome
+observeFunction (ObserveData obs) =
+  ObserveData (\(x, test) f -> obs test (f x))
+
+observeObs :: Observe test outcome a => ObserveData a outcome
+observeObs = ObserveData observe
 
 baseType :: forall proxy a. (Ord a, Arbitrary a, Typeable a) => proxy a -> Instances
 baseType _ =
@@ -173,15 +182,19 @@ arbitraryVal def insts =
 
     ordyTy :: Type -> Maybe (Gen (Value Identity -> Value Ordy))
     ordyTy = memo $ \ty -> do
-      val <- listToMaybe (findInstance insts ty :: [Value Observe1])
+      val <- listToMaybe (findInstance insts ty :: [Value WrappedObserveData])
       case unwrap val of
-        Observe1 val `In` w1 ->
+        WrappedObserveData val `In` valueWrapper ->
           case unwrap val of
-            Observe2 obs `In` w2 ->
+            -- This brings Arbitrary and Ord instances into scope
+            ObserveData obs `In` outcomeWrapper ->
               Just $
-                MkGen $ \g n ->
-                  let observe = unGen obs g n in
-                  \x -> wrap w2 (Ordy (observe (runIdentity (reunwrap w1 x))))
+                MkGen $ \g n x ->
+                  let
+                    value = runIdentity (reunwrap valueWrapper x)
+                    test = unGen arbitrary g n
+                    outcome = obs test value
+                  in wrap outcomeWrapper (Ordy outcome)
 
 data Ordy a where Ordy :: Ord a => a -> Ordy a
 instance Eq (Value Ordy) where x == y = compare x y == EQ
