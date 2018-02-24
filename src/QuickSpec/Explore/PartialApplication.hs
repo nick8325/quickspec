@@ -61,6 +61,9 @@ getTotal :: Arity f => PartiallyApplied f -> Maybe f
 getTotal (Partial f n) | arity f == n = Just f
 getTotal _ = Nothing
 
+partial :: f -> Term (PartiallyApplied f)
+partial f = App (Partial f 0) []
+
 total :: Arity f => f -> PartiallyApplied f
 total f = Partial f (arity f)
 
@@ -84,6 +87,6 @@ instance (Arity f, Typed f, Background f) => Background (PartiallyApplied f) whe
 instance (Applicative f, Eval fun (Value f)) => Eval (PartiallyApplied fun) (Value f) where
   eval var (Partial f _) = eval var f
   eval _ (Apply ty) =
-    fromJust $
+    return $ fromJust $
       cast (Twee.build (Twee.app (Twee.fun Arrow) [ty, ty]))
         (toValue (pure (($) :: (A -> B) -> (A -> B))))

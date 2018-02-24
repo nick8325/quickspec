@@ -4,3 +4,4 @@
 !examples/*.hs
 cabal.sandbox.config
 .cabal-sandbox/
+.stack-work/

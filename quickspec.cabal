@@ -51,6 +51,7 @@ Extra-source-files:
   examples/Arith.hs
   examples/Bools.hs
   examples/Composition.hs
+  examples/Curry.hs
   examples/Geometry.hs
   examples/HugeLists.hs
   examples/IntSet.hs
@@ -82,6 +83,7 @@ library
     QuickSpec.Explore.Terms
     QuickSpec.Haskell
     QuickSpec.Haskell.Resolve
+    QuickSpec.Parse
     QuickSpec.Prop
     QuickSpec.Pruning
     QuickSpec.Pruning.Background

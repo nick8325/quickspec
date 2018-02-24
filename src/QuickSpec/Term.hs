@@ -121,18 +121,20 @@ canonicalise t = subst (\x -> Map.findWithDefault undefined x sub) t
 -- | A class for things which can be evaluated to a value, given a valuation for variables.
 class Eval term val where
   -- | Evaluate something, given a valuation for variables.
-  eval :: (Var -> val) -> term -> val
+  eval :: Monad m => (Var -> m val) -> term -> m val
 
 instance (Typed fun, Given Type, Apply a, Eval fun a) => Eval (Term fun) a where
   eval env = evaluateTerm (eval env) env
 
 -- | Evaluate a term, given a valuation for variables and function symbols.
-evaluateTerm :: (Typed fun, Given Type, Apply a) => (fun -> a) -> (Var -> a) -> Term fun -> a
+evaluateTerm :: (Typed fun, Given Type, Apply a, Monad m) => (fun -> m a) -> (Var -> m a) -> Term fun -> m a
 evaluateTerm fun var = eval
   where
     eval (Var x) = var x
-    eval (App f ts) =
-      foldl apply (fun (defaultTo given f)) (map eval ts)
+    eval (App f ts) = do
+      f <- fun (defaultTo given f)
+      ts <- mapM eval ts
+      return (foldl apply f ts)
 
 instance Typed f => Typed (Term f) where
   typ (Var x) = typ x

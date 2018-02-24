@@ -2,12 +2,14 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE ScopedTypeVariables, TypeOperators, GADTs, FlexibleInstances, FlexibleContexts, MultiParamTypeClasses, RecordWildCards, TemplateHaskell, UndecidableInstances, DefaultSignatures, FunctionalDependencies #-}
 module QuickSpec.Haskell where
 
 import QuickSpec.Haskell.Resolve
 import QuickSpec.Type
 import QuickSpec.Prop
+import QuickSpec.Pruning
 import Test.QuickCheck hiding (total)
 import Data.Constraint
 import Data.Proxy
@@ -16,14 +18,13 @@ import QuickSpec.Term
 import Data.Functor.Identity
 import Data.Maybe
 import Data.MemoUgly
-import Test.QuickCheck.Gen
-import Test.QuickCheck.Random
-import System.Random
+import Test.QuickCheck.Gen.Unsafe
 import Data.Char
 import Data.Ord
 import qualified QuickSpec.Testing.QuickCheck as QuickCheck
 import qualified QuickSpec.Pruning.Twee as Twee
 import qualified QuickSpec.Explore
+import QuickSpec.Explore.Polymorphic
 import QuickSpec.Explore.PartialApplication
 import QuickSpec.Pruning.Background(Background)
 import Control.Monad
@@ -35,7 +36,7 @@ import QuickSpec.Utils
 import GHC.TypeLits
 import QuickSpec.Explore.Conditionals
 import Control.Spoon
-import Control.DeepSeq
+import Data.Set (toList)
 
 baseInstances :: Instances
 baseInstances =
@@ -100,13 +101,11 @@ baseInstances =
     -- From Arbitrary to Gen
     inst $ \(Dict :: Dict (Arbitrary A)) -> arbitrary :: Gen A,
     inst $ \(dict :: Dict ClassA) -> return dict :: Gen (Dict ClassA),
-    -- Observe
-    inst (\(Dict :: Dict (Observe A B C)) -> Observe2 (do { env <- arbitrary; return (\x -> observe env (x :: C)) })),
-    inst (Sub Dict :: (Arbitrary A, Observe B C D) :- Observe (A, B) C (A -> D)),
-    inst (\(Dict :: Dict (Ord A)) -> Observe2 (return id) :: Observe2 A A),
-    inst (\(Observe2 obsm :: Observe2 B C) (xm :: Gen A) ->
-      Observe2 (do {x <- xm; obs <- obsm; return (\f -> obs (f x))}) :: Observe2 (A -> B) C),
-    inst (\(obs :: Observe2 A B) -> Observe1 (toValue obs))]
+    -- Observation functions
+    inst (\(Dict :: Dict (Observe A B C)) -> observeObs :: ObserveData C B),
+    inst (\(Dict :: Dict (Ord A)) -> observeOrd :: ObserveData A A),
+    inst (\(Dict :: Dict (Arbitrary A)) (obs :: ObserveData B C) -> observeFunction obs :: ObserveData (A -> B) C),
+    inst (\(obs :: ObserveData A B) -> WrappedObserveData (toValue obs))]
 
 -- | A typeclass for types which support observational equality, typically used
 -- for types that have no `Ord` instance.
@@ -132,23 +131,21 @@ class (Arbitrary test, Ord outcome) => Observe test outcome a | a -> test outcom
 instance (Arbitrary a, Observe test outcome b) => Observe (a, test) outcome (a -> b) where
   observe (x, obs) f = observe obs (f x)
 
-data Observe2 a b where
-  Observe2 :: Ord b => Gen (a -> b) -> Observe2 a b
-  deriving Typeable
-data Observe1 a = Observe1 (Value (Observe2 a)) deriving Typeable
+-- An observation function along with instances.
+-- The parameters are in this order so that we can use findInstance to get at appropriate Wrappers.
+data ObserveData a outcome where
+  ObserveData :: (Arbitrary test, Ord outcome) => (test -> a -> outcome) -> ObserveData a outcome
+newtype WrappedObserveData a = WrappedObserveData (Value (ObserveData a))
 
--- | Declare that values of a particular type should be compared by observational equality.
---
--- See @examples/PrettyPrinting.hs@ for an example.
---
--- XXX mention what instances must be in scope
--- XXX remove constraints etc
--- observe :: Ord res => Gen env -> (env -> val -> res) -> Observe val res
--- observe gen f =
---   Observe (do { env <- gen; return (\x -> f env x) })
-  
+observeOrd :: Ord a => ObserveData a a
+observeOrd = ObserveData (\() x -> x)
 
--- data SomeObserve a = forall args res. (Ord res, Arbitrary args) => SomeObserve (a -> args -> res) deriving Typeable
+observeFunction :: Arbitrary a => ObserveData b outcome -> ObserveData (a -> b) outcome
+observeFunction (ObserveData obs) =
+  ObserveData (\(x, test) f -> obs test (f x))
+
+observeObs :: Observe test outcome a => ObserveData a outcome
+observeObs = ObserveData observe
 
 baseType :: forall proxy a. (Ord a, Arbitrary a, Typeable a) => proxy a -> Instances
 baseType _ =
@@ -156,79 +153,85 @@ baseType _ =
     inst (Dict :: Dict (Ord a)),
     inst (Dict :: Dict (Arbitrary a))]
 
--- | Declare what variable names you would like to use for values of a particular type. See also `baseTypeNames`.
+-- Declares what variable names should be used for values of a particular type.
 newtype Names a = Names { getNames :: [String] }
 
 names :: Instances -> Type -> [String]
 names insts ty =
   case findInstance insts (skolemiseTypeVars ty) of
-    (x:_) -> ofValue getNames x
-    [] -> error "don't know how to name variables"
+    Just x  -> ofValue getNames x
+    Nothing -> error "don't know how to name variables"
 
-arbitraryVal :: Type -> Instances -> Gen (Var -> Value Maybe, Value Identity -> Maybe (Value Ordy))
-arbitraryVal def insts =
-  MkGen $ \g n ->
-    let (g1, g2) = split g in
-    (memo $ \(V ty x) ->
-       case genType ty of
-         Nothing ->
-           fromJust $ cast (defaultTo def ty) (toValue (Nothing :: Maybe A))
-         Just gen ->
-           forValue gen $ \gen ->
-             Just (unGen (coarbitrary x gen) g1 n),
-     ordyVal g2 n)
-  where
-    genType :: Type -> Maybe (Value Gen)
-    genType = memo $ \ty ->
-      case findInstance insts (defaultTo def ty) of
-        [] -> Nothing
-        (gen:_) ->
-          Just (mapValue (coarbitrary ty) gen)
-
-    ordyVal :: QCGen -> Int -> Value Identity -> Maybe (Value Ordy)
-    ordyVal g n x =
-      let ty = defaultTo def (typ x) in
-      case ordyTy ty of
-        Nothing -> Nothing
-        Just f -> Just (unGen f g n x)
-
-    ordyTy :: Type -> Maybe (Gen (Value Identity -> Value Ordy))
-    ordyTy = memo $ \ty ->
-      case findInstance insts ty :: [Value Observe1] of
-        [] -> Nothing
-        (val:_) ->
-          case unwrap val of
-            Observe1 val `In` w1 ->
-              case unwrap val of
-                Observe2 obs `In` w2 ->
-                  Just $
-                    MkGen $ \g n ->
-                      let observe = unGen obs g n in
-                      \x -> wrap w2 (Ordy (observe (runIdentity (reunwrap w1 x))))
-
+-- An Ordy a represents a value of type a together with its Ord instance.
+-- A Value Ordy is a value of unknown type which implements Ord.
 data Ordy a where Ordy :: Ord a => a -> Ordy a
 instance Eq (Value Ordy) where x == y = compare x y == EQ
 
 instance Ord (Value Ordy) where
   compare x y =
-    compare (typ x) (typ y) `mappend`
     case unwrap x of
       Ordy xv `In` w ->
         let Ordy yv = reunwrap w y in
         compare xv yv
 
-evalHaskell :: (Given Type, Typed f, PrettyTerm f, Eval f (Value Maybe))
-            => (Var -> Value Maybe, Value Identity -> Maybe (Value Ordy))
-            -> Term f
-            -> Either (Value Ordy) (Term f)
-evalHaskell (env, obs) t =
-  case unwrap (eval env t) of
-    Nothing `In` _ -> Right t
-    Just val `In` w -> case spoon val of
-      Nothing -> Right t
-      Just val -> case obs (wrap w (Identity val)) of
-        Nothing -> Right t
-        Just ordy -> Left ordy
+-- | A test case is everything you need to evaluate a Haskell term.
+data TestCase =
+  TestCase {
+    -- | Evaluate a variable. Returns @Nothing@ if no `Arbitrary` instance was found.
+    tc_eval_var :: Var -> Maybe (Value Identity),
+    -- | Apply an observation function to get a value implementing `Ord`.
+    -- Returns @Nothing@ if no observer was found.
+    tc_test_result :: Value Identity -> Maybe (Value Ordy) }
+
+-- | Generate a random test case.
+arbitraryTestCase :: Type -> Instances -> Gen TestCase
+arbitraryTestCase def insts =
+  TestCase <$> arbitraryValuation def insts <*> arbitraryObserver def insts
+
+-- | Generate a random variable valuation.
+arbitraryValuation :: Type -> Instances -> Gen (Var -> Maybe (Value Identity))
+arbitraryValuation def insts = do
+  let
+    gen :: Var -> Maybe (Gen (Value Identity))
+    gen x = bringFunctor <$> (findInstance insts (defaultTo def (typ x)) :: Maybe (Value Gen))
+  memo <$> arbitraryFunction (sequence . gen)
+
+-- | Generate a random observation.
+arbitraryObserver :: Type -> Instances -> Gen (Value Identity -> Maybe (Value Ordy))
+arbitraryObserver def insts = do
+  find <- arbitraryFunction $ sequence . findObserver
+  return $ \x -> do
+    obs <- find (defaultTo def (typ x))
+    return (obs x)
+  where
+    findObserver :: Type -> Maybe (Gen (Value Identity -> Value Ordy))
+    findObserver ty = do
+      inst <- findInstance insts ty :: Maybe (Value WrappedObserveData)
+      return $
+        case unwrap inst of
+          WrappedObserveData val `In` valueWrapper ->
+            case unwrap val of
+              -- This brings Arbitrary and Ord instances into scope
+              ObserveData obs `In` outcomeWrapper -> do
+                test <- arbitrary
+                return $ \x ->
+                  let value = runIdentity (reunwrap valueWrapper x)
+                      outcome = obs test value
+                  in wrap outcomeWrapper (Ordy outcome)
+
+-- | Generate a random function. Should be in QuickCheck.
+arbitraryFunction :: CoArbitrary a => (a -> Gen b) -> Gen (a -> b)
+arbitraryFunction gen = promote (\x -> coarbitrary x (gen x))
+
+-- | Evaluate a Haskell term in an environment.
+evalHaskell :: (Given Type, Typed f, PrettyTerm f, Eval f (Value Identity)) => TestCase -> Term f -> Either (Value Ordy) (Term f)
+evalHaskell (TestCase env obs) t =
+  maybe (Right t) Left $ do
+    Identity val `In` w <- unwrap <$> eval env t
+    res <- obs (wrap w (Identity val))
+    -- Don't allow partial results to enter the decision tree
+    guard (withValue res (\(Ordy x) -> isJust (teaspoon (x == x))))
+    return res
 
 data Constant =
   Constant {
@@ -322,32 +325,28 @@ instance Predicate Constant where
   classify = con_classify
 
 instance (Given Type, Applicative f) => Eval Constant (Value f) where
-  eval _ = mapValue (pure . runIdentity) . con_value
+  eval _ = return . mapValue (pure . runIdentity) . con_value
 
 class Predicateable a where
-  uncrry :: a -> TestCase a -> Bool
+  -- A test case for predicates of type a
+  -- if `a ~ A -> B -> C -> Bool` we get `TestCase a ~ (A, (B, (C, ())))`
+  --
+  -- Some speedup should be possible by using unboxed tuples instead...
+  type PredicateTestCase a
+  uncrry :: a -> PredicateTestCase a -> Bool
 
 instance Predicateable Bool where
+  type PredicateTestCase Bool = ()
   uncrry = const
 
-instance forall a b. (Predicateable b, Typeable a, TestCase (a -> b) ~ (a, TestCase b)) => Predicateable (a -> b) where
+instance forall a b. (Predicateable b, Typeable a) => Predicateable (a -> b) where
+  type PredicateTestCase (a -> b) = (a, PredicateTestCase b)
   uncrry f (a, b) = uncrry (f a) b
-
--- Foldr over functions
-type family (Foldr f b fun) :: * where
-  Foldr f def (a -> b) = f a (Foldr f def b)
-  Foldr f def b        = def
-
--- A test case for predicates of type a
--- if `a ~ A -> B -> C -> Bool` we get `TestCase a ~ (A, (B, (C, ())))`
---
--- Some speedup should be possible by using unboxed tuples instead...
-type TestCase a = Foldr (,) () a
 
 data TestCaseWrapped (t :: Symbol) a = TestCaseWrapped { unTestCaseWrapped :: a }
 
 -- A `suchThat` generator for a predicate
-genSuchThat :: (Predicateable a, Arbitrary (TestCase a)) => a -> Gen (TestCaseWrapped x (TestCase a))
+genSuchThat :: (Predicateable a, Arbitrary (PredicateTestCase a)) => a -> Gen (TestCaseWrapped x (PredicateTestCase a))
 genSuchThat p = TestCaseWrapped <$> arbitrary `suchThat` uncrry p
 
 data PredRep = PredRep { predInstances :: Instances
@@ -364,16 +363,16 @@ trueTerm = App (total true) []
 -- The predicate should have type @... -> Bool@.
 predicate :: forall a. ( Predicateable a
              , Typeable a
-             , Typeable (TestCase a))
+             , Typeable (PredicateTestCase a))
              => String -> a -> PredRep
 predicate name pred =
   case someSymbolVal name of
     SomeSymbol (_ :: Proxy sym) ->
       let
         instances =
-          inst (\(dict :: Dict (Arbitrary (TestCase a))) -> (withDict dict genSuchThat) pred :: Gen (TestCaseWrapped sym (TestCase a)))
+          inst (\(dict :: Dict (Arbitrary (PredicateTestCase a))) -> (withDict dict genSuchThat) pred :: Gen (TestCaseWrapped sym (PredicateTestCase a)))
           `mappend`
-          inst (Names [name ++ "_var"] :: Names (TestCaseWrapped sym (TestCase a)))
+          inst (Names [name ++ "_var"] :: Names (TestCaseWrapped sym (PredicateTestCase a)))
 
         conPred = (con name pred) { con_classify = Predicate conSels ty (App true []) }
         conSels = [ (constant' (name ++ "_" ++ show i) (select i)) { con_classify = Selector i conPred ty, con_size = 0 } | i <- [0..typeArity (typeOf pred)-1] ]
@@ -389,7 +388,7 @@ predicate name pred =
             cmpV = toPolyValue ((.) :: (B -> C) -> (A -> B) -> A -> C)
             unwrapV = toPolyValue (unTestCaseWrapped :: TestCaseWrapped SymA A -> A)
 
-        ty = typeRep (Proxy :: Proxy (TestCaseWrapped sym (TestCase a)))
+        ty = typeRep (Proxy :: Proxy (TestCaseWrapped sym (PredicateTestCase a)))
       in
         PredRep instances conPred (conPred:conSels)
 
@@ -423,11 +422,13 @@ defaultConfig =
     cfg_predicates = [],
     cfg_default_to = typeRep (Proxy :: Proxy Int) }
 
-checkInstances :: Type -> Instances -> Bool
-checkInstances t is =
-  let arbInstances = findInstance is $ typeRep (Proxy :: Proxy Gen) `applyType` t 
-      ordInstances = findInstance is $ typeRep (Proxy :: Proxy WrappedObserveData) `applyType` t
-  in isJust $ arbInstances >> ordInstances
+checkArbInst :: Type -> Instances -> Bool
+checkArbInst t is =
+  isJust (findValue is (typeRep (Proxy :: Proxy Gen) `applyType` t) :: Maybe (Value Identity))
+
+checkOrdInst :: Type -> Instances -> Bool
+checkOrdInst t is =
+  isJust (findValue is (typeRep (Proxy :: Proxy WrappedObserveData) `applyType` t) :: Maybe (Value Identity))
 
 quickSpec :: Config -> IO ()
 quickSpec Config{..} = give cfg_default_to $ do
@@ -440,7 +441,17 @@ quickSpec Config{..} = give cfg_default_to $ do
     present prop = do
       n :: Int <- get
       put (n+1)
-      putLine (printf "%3d. %s" n (show (prettyProp (names instances) (conditionalise prop) <+> maybeType prop)))
+      norm <- normaliser
+      putLine (printf "%3d. %s" n (show (prettyProp (names instances) (ac norm (conditionalise prop)) <+> maybeType prop)))
+
+    -- Transform x+(y+z) = y+(x+z) into associativity, if + is commutative
+    ac norm (lhs :=>: App f [Var x, App f1 [Var y, Var z]] :=: App f2 [Var y1, App f3 [Var x1, Var z1]])
+      | f == f1, f1 == f2, f2 == f3,
+        x == x1, y == y1, z == z1,
+        x /= y, y /= z, x /= z,
+        norm (App f [Var x, Var y]) == norm (App f [Var y, Var x]) =
+          lhs :=>: App f [App f [Var x, Var y], Var z] :=: App f [Var x, App f [Var y, Var z]]
+    ac _ prop = prop
 
     -- Add a type signature when printing the equation x = y.
     maybeType (_ :=>: x@(Var _) :=: Var _) =
@@ -448,11 +459,16 @@ quickSpec Config{..} = give cfg_default_to $ do
     maybeType _ = pPrintEmpty
 
     mainOf f g = do
-      printConstants (f cfg_constants ++ f (map (map predCon) cfg_predicates))
+      sequence [ putLine . show $ text "WARNING: Missing instance of Arbitrary for type" <+> pPrintType t
+               | t <- (toList . univ_root $ univ), not $ isTypeVar t, typeArity t == 0, not $ checkArbInst t instances ]
+      sequence [ putLine . show $ text "WARNING: Missing instance of Ord for type" <+> pPrintType t
+               | t <- (toList . univ_root $ univ), not $ isTypeVar t, typeArity t == 0, not $ checkOrdInst t instances ]
+      putLine $ show $ QuickSpec.Explore.pPrintSignature
+        (map partial (f cfg_constants ++ f (map (map predCon) cfg_predicates)))
       putLine ""
       putLine "== Laws =="
       QuickSpec.Explore.quickSpec present measure (flip evalHaskell) cfg_max_size univ
-        [ Partial fun 0 | fun <- constantsOf g ]
+        [ partial fun | fun <- constantsOf g ]
       putLine ""
 
     main = mapM_ round [1..rounds]
@@ -463,20 +479,8 @@ quickSpec Config{..} = give cfg_default_to $ do
   join $
     fmap withStdioTerminal $
     generate $
-    QuickCheck.run cfg_quickCheck (arbitraryVal cfg_default_to instances) evalHaskell $
+    QuickCheck.run cfg_quickCheck (arbitraryTestCase cfg_default_to instances) evalHaskell $
     Twee.run cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size } $
     runConditionals (map total constants) $
     flip evalStateT 1 $
       main
-
-printConstants :: MonadTerminal m => [Constant] -> m ()
-printConstants cs = do
-  putLine "== Functions =="
-  let
-    decls = [ (show (pPrint (App (Partial c 0) [])), pPrintType (typ c)) | c <- cs ]
-    maxWidth = maximum (0:map (length . fst) decls)
-    pad xs = replicate (maxWidth - length xs) ' ' ++ xs
-    pPrintDecl (name, ty) =
-      hang (text (pad name) <+> text "::") 2 ty
-
-  mapM_ (putLine . show . pPrintDecl) decls
