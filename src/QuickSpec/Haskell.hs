@@ -436,7 +436,8 @@ quickSpec Config{..} = give cfg_default_to $ do
     maybeType _ = pPrintEmpty
 
     mainOf f g = do
-      printConstants (f cfg_constants ++ f (map (map predCon) cfg_predicates))
+      putLine $ show $ QuickSpec.Explore.pPrintSignature
+        (map partial (f cfg_constants ++ f (map (map predCon) cfg_predicates)))
       putLine ""
       putLine "== Laws =="
       QuickSpec.Explore.quickSpec present measure (flip evalHaskell) cfg_max_size univ
@@ -456,15 +457,3 @@ quickSpec Config{..} = give cfg_default_to $ do
     runConditionals (map total constants) $
     flip evalStateT 1 $
       main
-
-printConstants :: MonadTerminal m => [Constant] -> m ()
-printConstants cs = do
-  putLine "== Functions =="
-  let
-    decls = [ (show (pPrint (App (Partial c 0) [])), pPrintType (typ c)) | c <- cs ]
-    maxWidth = maximum (0:map (length . fst) decls)
-    pad xs = replicate (maxWidth - length xs) ' ' ++ xs
-    pPrintDecl (name, ty) =
-      hang (text (pad name) <+> text "::") 2 ty
-
-  mapM_ (putLine . show . pPrintDecl) decls

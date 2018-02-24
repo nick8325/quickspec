@@ -62,3 +62,14 @@ quickSpec present measure eval maxSize univ funs = do
       loop (m+1) n (tss ++ [us])
 
   evalStateT (loop 0 maxSize []) state0
+
+pPrintSignature :: (Pretty a, Typed a) => [a] -> Doc
+pPrintSignature funs =
+  text "== Functions ==" $$
+  vcat (map pPrintDecl decls)
+  where
+    decls = [ (prettyShow f, pPrintType (typ f)) | f <- funs ]
+    maxWidth = maximum (0:map (length . fst) decls)
+    pad xs = nest (maxWidth - length xs) (text xs)
+    pPrintDecl (name, ty) =
+      pad name <+> text "::" <+> ty

@@ -61,6 +61,9 @@ getTotal :: Arity f => PartiallyApplied f -> Maybe f
 getTotal (Partial f n) | arity f == n = Just f
 getTotal _ = Nothing
 
+partial :: f -> Term (PartiallyApplied f)
+partial f = App (Partial f 0) []
+
 total :: Arity f => f -> PartiallyApplied f
 total f = Partial f (arity f)
 
