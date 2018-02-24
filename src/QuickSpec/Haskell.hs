@@ -18,10 +18,7 @@ import QuickSpec.Term
 import Data.Functor.Identity
 import Data.Maybe
 import Data.MemoUgly
-import Test.QuickCheck.Gen
 import Test.QuickCheck.Gen.Unsafe
-import Test.QuickCheck.Random
-import System.Random
 import Data.Char
 import Data.Ord
 import qualified QuickSpec.Testing.QuickCheck as QuickCheck
