@@ -66,14 +66,14 @@ inst x = instValue (toPolyValue x)
 
 -- Construct a value of a particular type.
 -- If the type is polymorphic, may return an instance of it.
-findValue :: Instances -> Type -> [Value Identity]
-findValue = is_find
+findValue :: Instances -> Type -> Maybe (Value Identity)
+findValue insts = listToMaybe . is_find insts
 
 -- Given a type a, construct a value of type f a.
 -- If the type is polymorphic, may return an instance of it.
-findInstance :: forall f. Typeable f => Instances -> Type -> [Value f]
+findInstance :: forall f. Typeable f => Instances -> Type -> Maybe (Value f)
 findInstance insts ty =
-  map (unwrapFunctor runIdentity) (findValue insts ty')
+  unwrapFunctor runIdentity <$> findValue insts ty'
   where
     ty' = typeRep (Proxy :: Proxy f) `applyType` ty
 
@@ -89,12 +89,12 @@ find_ :: Instances -> Type -> [Value Identity]
 find_ _ (App (F unit) Empty)
   | unit == tyCon (Proxy :: Proxy ()) =
     return (toValue (Identity ()))
-find_ res (App (F pair) (Cons ty1 (Cons ty2 Empty)))
+find_ insts (App (F pair) (Cons ty1 (Cons ty2 Empty)))
   | pair == tyCon (Proxy :: Proxy (,)) = do
-    x <- findValue res ty1
+    x <- is_find insts ty1
     sub <- maybeToList (match ty1 (typ x))
     -- N.B.: subst sub ty2 because searching for x may have constrained y's type
-    y <- findValue res (subst sub ty2)
+    y <- is_find insts (subst sub ty2)
     sub <- maybeToList (match ty2 (typ y))
     return (pairValues (liftM2 (,)) (typeSubst sub x) y)
 find_ insts ty = do
@@ -106,6 +106,6 @@ find_ insts ty = do
   fun <- return (typeSubst sub fun)
   arg <- return (typeSubst sub arg)
   -- Find an argument for that function and apply the function.
-  val <- findValue insts arg
+  val <- is_find insts arg
   sub <- maybeToList (match arg (typ val))
   return (apply (typeSubst sub fun) val)

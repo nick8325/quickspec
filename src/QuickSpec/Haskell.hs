@@ -159,8 +159,8 @@ newtype Names a = Names { getNames :: [String] }
 names :: Instances -> Type -> [String]
 names insts ty =
   case findInstance insts (skolemiseTypeVars ty) of
-    (x:_) -> ofValue getNames x
-    [] -> error "don't know how to name variables"
+    Just x  -> ofValue getNames x
+    Nothing -> error "don't know how to name variables"
 
 -- An Ordy a represents a value of type a together with its Ord instance.
 -- A Value Ordy is a value of unknown type which implements Ord.
@@ -193,7 +193,7 @@ arbitraryValuation :: Type -> Instances -> Gen (Var -> Maybe (Value Identity))
 arbitraryValuation def insts = do
   let
     gen :: Var -> Maybe (Gen (Value Identity))
-    gen x = bringFunctor <$> listToMaybe (findInstance insts (defaultTo def (typ x)) :: [Value Gen])
+    gen x = bringFunctor <$> (findInstance insts (defaultTo def (typ x)) :: Maybe (Value Gen))
   memo <$> arbitraryFunction (sequence . gen)
 
 -- | Generate a random observation.
@@ -206,7 +206,7 @@ arbitraryObserver def insts = do
   where
     findObserver :: Type -> Maybe (Gen (Value Identity -> Value Ordy))
     findObserver ty = do
-      inst <- listToMaybe (findInstance insts ty :: [Value WrappedObserveData])
+      inst <- findInstance insts ty :: Maybe (Value WrappedObserveData)
       return $
         case unwrap inst of
           WrappedObserveData val `In` valueWrapper ->
