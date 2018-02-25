@@ -199,25 +199,25 @@ arbitraryValuation def insts = do
 -- | Generate a random observation.
 arbitraryObserver :: Type -> Instances -> Gen (Value Identity -> Maybe (Value Ordy))
 arbitraryObserver def insts = do
-  find <- arbitraryFunction $ sequence . findObserver
+  find <- arbitraryFunction $ sequence . findObserver insts
   return $ \x -> do
     obs <- find (defaultTo def (typ x))
     return (obs x)
-  where
-    findObserver :: Type -> Maybe (Gen (Value Identity -> Value Ordy))
-    findObserver ty = do
-      inst <- findInstance insts ty :: Maybe (Value WrappedObserveData)
-      return $
-        case unwrap inst of
-          WrappedObserveData val `In` valueWrapper ->
-            case unwrap val of
-              -- This brings Arbitrary and Ord instances into scope
-              ObserveData obs `In` outcomeWrapper -> do
-                test <- arbitrary
-                return $ \x ->
-                  let value = runIdentity (reunwrap valueWrapper x)
-                      outcome = obs test value
-                  in wrap outcomeWrapper (Ordy outcome)
+
+findObserver :: Instances -> Type -> Maybe (Gen (Value Identity -> Value Ordy))
+findObserver insts ty = do
+  inst <- findInstance insts ty :: Maybe (Value WrappedObserveData)
+  return $
+    case unwrap inst of
+      WrappedObserveData val `In` valueWrapper ->
+        case unwrap val of
+          -- This brings Arbitrary and Ord instances into scope
+          ObserveData obs `In` outcomeWrapper -> do
+            test <- arbitrary
+            return $ \x ->
+              let value = runIdentity (reunwrap valueWrapper x)
+                  outcome = obs test value
+              in wrap outcomeWrapper (Ordy outcome)
 
 -- | Generate a random function. Should be in QuickCheck.
 arbitraryFunction :: CoArbitrary a => (a -> Gen b) -> Gen (a -> b)
@@ -428,7 +428,8 @@ checkArbInst t is =
 
 checkOrdInst :: Type -> Instances -> Bool
 checkOrdInst t is =
-  isJust (findValue is (typeRep (Proxy :: Proxy WrappedObserveData) `applyType` t) :: Maybe (Value Identity))
+     isJust (findValue is (typeRep (Proxy :: Proxy WrappedObserveData) `applyType` t) :: Maybe (Value Identity))
+  || isJust (findObserver is t)
 
 quickSpec :: Config -> IO ()
 quickSpec Config{..} = give cfg_default_to $ do
@@ -436,6 +437,7 @@ quickSpec Config{..} = give cfg_default_to $ do
     constantsOf f = true:f cfg_constants ++ f (map (concatMap predCons) cfg_predicates)
     constants = constantsOf concat
     univ = conditionalsUniverse constants
+    univNoPred = universe cfg_constants
     instances = mconcat (cfg_instances:map predInstances (concat cfg_predicates) ++ [baseInstances])
 
     present prop = do
@@ -463,7 +465,7 @@ quickSpec Config{..} = give cfg_default_to $ do
         (map partial (f cfg_constants ++ f (map (map predCon) cfg_predicates)))
       putLine ""
       putLine "== Laws =="
-      let monouni = defaultTo (typeRep (Proxy :: Proxy Int)) . toList . univ_root $ univ
+      let monouni = filter ((== 0) . typeArity) . defaultTo (typeRep (Proxy :: Proxy Int)) . toList . univ_root $ univNoPred
       sequence [ putLine . show $ text "WARNING: Missing instance of Arbitrary for type" <+> pPrintType t
                | t <- monouni, not $ checkArbInst t instances ]
       sequence [ putLine . show $ text "WARNING: Missing instance of Ord for type" <+> pPrintType t
