@@ -438,7 +438,7 @@ quickSpec Config{..} = give cfg_default_to $ do
     constantsOf f = true:f cfg_constants ++ f (map (concatMap predCons) cfg_predicates)
     constants = constantsOf concat
     univ = conditionalsUniverse constants
-    univNoPred = universe cfg_constants
+    univNoPred = universe $ map (map predCon) cfg_predicates ++ cfg_constants
     instances = mconcat (cfg_instances:map predInstances (concat cfg_predicates) ++ [baseInstances])
 
     present prop = do
