@@ -55,7 +55,15 @@
 -- <http://www.cse.chalmers.se/~nicsma/papers/quickspec2.pdf Quick
 -- specifications for the busy programmer>.
 
-{-# LANGUAGE ScopedTypeVariables, FlexibleContexts, TypeOperators, MultiParamTypeClasses, FunctionalDependencies #-}
+{-# LANGUAGE ScopedTypeVariables
+           , FlexibleContexts
+           , TypeOperators
+           , MultiParamTypeClasses
+           , FunctionalDependencies
+           , ConstraintKinds
+           , AllowAmbiguousTypes
+           , RankNTypes
+#-}
 module QuickSpec(
   -- * Running QuickSpec
   quickSpec, Sig, Signature(..),
@@ -69,6 +77,9 @@ module QuickSpec(
   
   -- * Declaring types
   monoType, vars, monoTypeWithVars, inst, Observe(..),
+
+  -- * Dealing with type classes
+  liftC, instanceOf, type (==>),
 
   -- * Standard signatures
   -- | The \"prelude\": a standard signature containing useful functions
@@ -140,6 +151,18 @@ con name x =
   Sig $ \(Context n names) ->
     if name `elem` names then id else
     modL Haskell.lens_constants (appendAt n [Haskell.con name x])
+
+-- | Type class constraints as first class citizens
+type c ==> t = Dict c -> t
+
+-- | Lift a constrained type to a `==>` type which QuickSpec
+-- can work with
+liftC :: (c => a) -> c ==> a
+liftC a Dict = a
+
+-- | Add an instance of a type class to the signature
+instanceOf :: forall c. (Typeable c, c) => Sig
+instanceOf = inst (Sub Dict :: () :- c)
 
 -- | Declare a predicate with a given name and value.
 -- The predicate should be a function which returns `Bool`.
