@@ -34,27 +34,37 @@ makeLensAs ''Config
   [("cfg_max_term_size", "lens_max_term_size"),
    ("cfg_max_cp_depth", "lens_max_cp_depth")]
 
-instance (Pretty fun, PrettyTerm fun, Ord fun, Typeable fun, Sized fun, Arity fun, EqualsBonus fun) => Ordered (Extended fun) where
+instance (Pretty fun, PrettyTerm fun, Ord fun, Typeable fun, Twee.Sized fun, Arity fun, EqualsBonus fun) => Ordered (Extended fun) where
   lessEq = KBO.lessEq
   lessIn = KBO.lessIn
 
 newtype Pruner fun m a =
-  Pruner (ReaderT Twee.Config (StateT (State (Extended fun)) m) a)
+  Pruner (ReaderT (Twee.Config (Extended fun)) (StateT (State (Extended fun)) m) a)
   deriving (Functor, Applicative, Monad, MonadIO, MonadTester testcase term, MonadTerminal)
 
 instance MonadTrans (Pruner fun) where
   lift = Pruner . lift . lift
 
-run :: Monad m => Config -> Pruner fun m a -> m a
+run :: (Sized fun, Monad m) => Config -> Pruner fun m a -> m a
 run Config{..} (Pruner x) =
   evalStateT (runReaderT x config) initialState
   where
     config =
       defaultConfig {
-        Twee.cfg_max_term_size = cfg_max_term_size,
+        Twee.cfg_accept_term = Just (\t -> size t <= cfg_max_term_size),
         Twee.cfg_max_cp_depth = cfg_max_cp_depth }
 
-instance (Ord fun, Typeable fun, Arity fun, Sized fun, PrettyTerm fun, EqualsBonus fun, Monad m) =>
+instance Sized fun => Sized (Twee.Term fun) where
+  size (Twee.Var _) = 1
+  size (Twee.App f ts) =
+    size (Twee.fun_value f) + sum (map size (Twee.unpack ts))
+
+instance Sized fun => Sized (Twee.Extended fun) where
+  size Twee.Minimal = 1
+  size (Twee.Skolem _) = 1
+  size (Twee.Function f) = size f
+
+instance (Ord fun, Typeable fun, Arity fun, Twee.Sized fun, PrettyTerm fun, EqualsBonus fun, Monad m) =>
   MonadPruner (Term fun) (Term fun) (Pruner fun m) where
   normaliser = Pruner $ do
     state <- lift get
@@ -77,20 +87,20 @@ instance (Ord fun, Typeable fun, Arity fun, Sized fun, PrettyTerm fun, EqualsBon
   add _ =
     error "twee pruner doesn't support non-unit equalities"
 
-normaliseTwee :: (Ord fun, Typeable fun, Arity fun, Sized fun, PrettyTerm fun, EqualsBonus fun) =>
+normaliseTwee :: (Ord fun, Typeable fun, Arity fun, Twee.Sized fun, PrettyTerm fun, EqualsBonus fun) =>
   State (Extended fun) -> Term fun -> Term fun
 normaliseTwee state t =
   fromTwee $
     result (normaliseTerm state (simplifyTerm state (skolemise t)))
 
-normalFormsTwee :: (Ord fun, Typeable fun, Arity fun, Sized fun, PrettyTerm fun, EqualsBonus fun) =>
+normalFormsTwee :: (Ord fun, Typeable fun, Arity fun, Twee.Sized fun, PrettyTerm fun, EqualsBonus fun) =>
   State (Extended fun) -> Term fun -> Set (Term fun)
 normalFormsTwee state t =
   Set.map fromTwee $
     Set.map result (normalForms state (skolemise t))
 
-addTwee :: (Ord fun, Typeable fun, Arity fun, Sized fun, PrettyTerm fun, EqualsBonus fun) =>
-  Twee.Config -> Term fun -> Term fun -> State (Extended fun) -> State (Extended fun)
+addTwee :: (Ord fun, Typeable fun, Arity fun, Twee.Sized fun, PrettyTerm fun, EqualsBonus fun) =>
+  Twee.Config (Extended fun) -> Term fun -> Term fun -> State (Extended fun) -> State (Extended fun)
 addTwee config t u state =
   completePure config $
     addAxiom config state axiom

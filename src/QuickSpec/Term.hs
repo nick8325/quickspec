@@ -11,7 +11,7 @@ import GHC.Generics(Generic)
 import Test.QuickCheck(CoArbitrary)
 import Data.DList(DList)
 import qualified Data.DList as DList
-import Twee.Base(Sized(..), Arity(..), Pretty(..), PrettyTerm(..), TermStyle(..), EqualsBonus, prettyPrint)
+import Twee.Base(Arity(..), Pretty(..), PrettyTerm(..), TermStyle(..), EqualsBonus, prettyPrint)
 import Twee.Pretty
 import qualified Data.Map.Strict as Map
 import Data.List
@@ -45,6 +45,9 @@ instance Symbolic f (Term f) where
 instance Symbolic f a => Symbolic f [a] where
   termsDL = msum . map termsDL
   subst sub = map (subst sub)
+
+class Sized a where
+  size :: a -> Int
 
 instance Sized f => Sized (Term f) where
   size (Var _) = 1
