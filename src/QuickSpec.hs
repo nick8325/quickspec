@@ -70,6 +70,11 @@ module QuickSpec(
   -- * Declaring types
   monoType, vars, monoTypeWithVars, inst, Observe(..),
 
+  -- * Standard signatures
+  -- | The \"prelude\": a standard signature containing useful functions
+  --   like '++', which can be used as background theory.
+  lists, arith, funs, bools, prelude, without,
+
   -- * Exploring functions in series
   background, series,
 
@@ -96,16 +101,21 @@ import Data.Proxy
 -- | Run QuickSpec. See the documentation at the top of this file.
 quickSpec :: Signature sig => sig -> IO ()
 quickSpec signature =
-  Haskell.quickSpec (sig 0 Haskell.defaultConfig)
+  Haskell.quickSpec (sig (Context 0 []) Haskell.defaultConfig)
   where
     Sig sig = toSig signature
 
 -- | A signature.
-newtype Sig = Sig (Int -> Haskell.Config -> Haskell.Config)
+newtype Sig = Sig (Context -> Haskell.Config -> Haskell.Config)
+
+-- Settings for building the signature.
+-- Int: number of nested calls to 'background'.
+-- [String]: list of names to exclude.
+data Context = Context Int [String]
 
 instance Monoid Sig where
   mempty = Sig (\_ -> id)
-  Sig sig1 `mappend` Sig sig2 = Sig (\n -> sig2 n . sig1 n)
+  Sig sig1 `mappend` Sig sig2 = Sig (\ctx -> sig2 ctx . sig1 ctx)
 
 -- | A class of things that can be used as a QuickSpec signature.
 class Signature sig where
@@ -127,7 +137,9 @@ instance Signature sig => Signature [sig] where
 -- QuickSpec will then understand that the constant is really polymorphic.
 con :: Typeable a => String -> a -> Sig
 con name x =
-  Sig (\n -> modL Haskell.lens_constants (appendAt n [Haskell.con name x]))
+  Sig $ \(Context n names) ->
+    if name `elem` names then id else
+    modL Haskell.lens_constants (appendAt n [Haskell.con name x])
 
 -- | Declare a predicate with a given name and value.
 -- The predicate should be a function which returns `Bool`.
@@ -147,7 +159,9 @@ predicate :: ( Predicateable a
              , Typeable (PredicateTestCase a))
              => String -> a -> Sig
 predicate name x =
-  Sig (\n -> modL Haskell.lens_predicates (appendAt n [Haskell.predicate name x]))
+  Sig $ \(Context n names) ->
+    if name `elem` names then id else
+    modL Haskell.lens_predicates (appendAt n [Haskell.predicate name x])
 
 -- | Declare a new monomorphic type.
 -- The type must implement `Ord` and `Arbitrary`.
@@ -200,7 +214,15 @@ instFun x =
 -- >     con "+" ((+) :: Int -> Int -> Int) ] ]
 background :: Signature sig => sig -> Sig
 background signature =
-  Sig (\n -> sig (n+1))
+  Sig (\(Context n xs) -> sig (Context (n+1) xs))
+  where
+    Sig sig = toSig signature
+
+-- | Remove a function or predicate from the signature.
+-- Useful in combination with 'prelude' and friends.
+without :: Signature sig => sig -> [String] -> Sig
+without signature xs =
+  Sig (\(Context n ys) -> sig (Context n (ys ++ xs)))
   where
     Sig sig = toSig signature
 
@@ -267,3 +289,48 @@ withPruningTermSize n =
 -- Useful if you want repeatable results.
 withFixedSeed :: Int -> Sig
 withFixedSeed s = Sig (\_ -> setL (QuickCheck.lens_fixed_seed # Haskell.lens_quickCheck) (Just . mkQCGen $ s))
+
+-- | A signature containing boolean functions:
+-- @(`||`)@, @(`&&`)@, `not`, `True`, `False`.
+bools :: Sig
+bools = background [
+  "||"    `con` (||),
+  "&&"    `con` (&&),
+  "not"   `con` not,
+  "True"  `con` True,
+  "False" `con` False]
+
+-- | A signature containing arithmetic operations:
+-- @0@, @1@, @(`+`)@.
+-- Instantiate it with e.g. @arith (`Proxy` :: `Proxy` `Int`)@.
+arith :: forall proxy a. (Typeable a, Ord a, Num a, Arbitrary a) => proxy a -> Sig
+arith proxy = background [
+  monoType proxy,
+  "0" `con` (0   :: a),
+  "1" `con` (1   :: a),
+  "+" `con` ((+) :: a -> a -> a)]
+
+-- | A signature containing list operations:
+-- @[]@, @(:)@, `head`, `tail`, @(`++`)@.
+lists :: Sig
+lists = background [
+  "[]"      `con` ([]      :: [A]),
+  ":"       `con` ((:)     :: A -> [A] -> [A]),
+  "head"    `con` (head    :: [A] -> A),
+  "tail"    `con` (tail    :: [A] -> [A]),
+  "++"      `con` ((++)    :: [A] -> [A] -> [A])]
+
+-- | A signature containing higher-order functions:
+-- @(`.`)@ and `id`.
+-- Useful for testing `map` and similar.
+funs :: Sig
+funs = background [
+  "."  `con` ((.) :: (A -> A) -> (A -> A) -> (A -> A)),
+  "id" `con` (id  :: A -> A) ]
+
+-- | The QuickSpec prelude.
+-- Contains boolean, arithmetic and list functions, and function composition.
+-- For more precise control over what gets included,
+-- see 'bools', 'arith', 'lists', 'funs' and 'without'.
+prelude :: Sig
+prelude = toSig [bools, arith (Proxy :: Proxy Int), lists, funs]
