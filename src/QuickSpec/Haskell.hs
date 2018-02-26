@@ -232,7 +232,7 @@ arbitraryFunction gen = promote (\x -> coarbitrary x (gen x))
 evalHaskell :: (Given Type, Typed f, PrettyTerm f, Eval f (Value Identity) Maybe) => TestCase -> Term f -> Either (Value Ordy) (Term f)
 evalHaskell (TestCase env obs) t =
   maybe (Right t) Left $ do
-    Identity val `In` w <- unwrap <$> eval env t
+    Identity val `In` w <- unwrap <$> eval env (defaultTo given t)
     res <- obs (wrap w (Identity val))
     -- Don't allow partial results to enter the decision tree
     guard (withValue res (\(Ordy x) -> isJust (teaspoon (x == x))))
@@ -350,12 +350,11 @@ instance Predicate Constant where
 
 instance (Given Type, Given Instances) => Eval Constant (Value Identity) Maybe where
   eval _ Constant{..} =
-    let val = defaultTo given con_value in
     case con_constraint of
-      Nothing -> return val
+      Nothing -> return con_value
       Just constraint -> do
         dict <- findValue given constraint
-        return (apply val dict)
+        return (apply con_value dict)
 
 class Predicateable a where
   -- A test case for predicates of type a

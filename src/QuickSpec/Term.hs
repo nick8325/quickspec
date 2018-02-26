@@ -135,7 +135,7 @@ evaluateTerm fun var = eval
   where
     eval (Var x) = var x
     eval (App f ts) = do
-      f <- fun (defaultTo given f)
+      f <- fun f
       ts <- mapM eval ts
       return (foldl apply f ts)
 
