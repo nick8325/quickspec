@@ -465,7 +465,8 @@ quickSpec Config{..} = give cfg_default_to $ do
         (map partial (f cfg_constants ++ f (map (map predCon) cfg_predicates)))
       putLine ""
       putLine "== Laws =="
-      let monouni = filter ((== 0) . typeArity) . defaultTo (typeRep (Proxy :: Proxy Int)) . toList . univ_root $ univNoPred
+      -- Look for missing instances
+      let monouni = filter ((== 0) . typeArity) . defaultTo cfg_default_to . toList . univ_root $ univNoPred
       sequence [ putLine . show $ text "WARNING: Missing instance of Arbitrary for type" <+> pPrintType t
                | t <- monouni, not $ checkArbInst t instances ]
       sequence [ putLine . show $ text "WARNING: Missing instance of Ord for type" <+> pPrintType t
