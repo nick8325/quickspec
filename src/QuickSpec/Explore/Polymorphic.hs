@@ -105,7 +105,6 @@ exploreNoMGU ::
   StateT (Polymorphic testcase result fun norm) m (Result fun)
 exploreNoMGU t = do
   univ <- access univ
-  let ty = polyTyp (poly t)
   if not (t `inUniverse` univ) then return (Rejected []) else do
     schemas1 <- access schemas
     (res, schemas2) <- unPolyM (runStateT (Schemas.explore (polyTerm t)) schemas1)
