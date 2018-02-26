@@ -122,15 +122,15 @@ canonicalise t = subst (\x -> Map.findWithDefault undefined x sub) t
         | (x@(V ty _), n) <- zip (nub (vars t)) [0..]]
 
 -- | A class for things which can be evaluated to a value, given a valuation for variables.
-class Eval term val where
+class Monad m => Eval term val m where
   -- | Evaluate something, given a valuation for variables.
-  eval :: Monad m => (Var -> m val) -> term -> m val
+  eval :: (Var -> m val) -> term -> m val
 
-instance (Typed fun, Given Type, Apply a, Eval fun a) => Eval (Term fun) a where
+instance (Typed fun, Given Type, Apply a, Eval fun a m) => Eval (Term fun) a m where
   eval env = evaluateTerm (eval env) env
 
 -- | Evaluate a term, given a valuation for variables and function symbols.
-evaluateTerm :: (Typed fun, Given Type, Apply a, Monad m) => (fun -> m a) -> (Var -> m a) -> Term fun -> m a
+evaluateTerm :: (Given Type, Typed fun, Apply a, Monad m) => (fun -> m a) -> (Var -> m a) -> Term fun -> m a
 evaluateTerm fun var = eval
   where
     eval (Var x) = var x
@@ -191,7 +191,7 @@ compareFuns (App f ts) (App g us) =
 -- symbols. Comes with instances that are useful for QuickSpec.
 data a :+: b = Inl a | Inr b deriving (Eq, Ord)
 
-instance (Eval fun1 a, Eval fun2 a) => Eval (fun1 :+: fun2) a where
+instance (Eval fun1 a m, Eval fun2 a m) => Eval (fun1 :+: fun2) a m where
   eval env (Inl x) = eval env x
   eval env (Inr x) = eval env x
 
