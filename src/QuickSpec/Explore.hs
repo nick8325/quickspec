@@ -84,12 +84,12 @@ quickSpec present eval maxSize univ enum = do
 
   evalStateT (loop 0 maxSize (repeat [])) state0
 
-pPrintSignature :: Pretty a => (a -> Doc) -> [a] -> Doc
-pPrintSignature pprType funs =
+pPrintSignature :: (Pretty a, Typed a) => [a] -> Doc
+pPrintSignature funs =
   text "== Functions ==" $$
   vcat (map pPrintDecl decls)
   where
-    decls = [ (prettyShow f, pprType f) | f <- funs ]
+    decls = [ (prettyShow f, pPrintType (typ f)) | f <- funs ]
     maxWidth = maximum (0:map (length . fst) decls)
     pad xs = nest (maxWidth - length xs) (text xs)
     pPrintDecl (name, ty) =

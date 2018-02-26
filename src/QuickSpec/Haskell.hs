@@ -306,6 +306,12 @@ isOp xs = not (all isIdent xs)
   where
     isIdent x = isAlphaNum x || x == '\'' || x == '_' || x == '.'
 
+unhideConstraint :: Constant -> Constant
+unhideConstraint con =
+  con {
+    con_type = typ (con_value con),
+    con_constraint = Nothing }
+
 instance Typed Constant where
   typ = con_type
   otherTypesDL con =
@@ -494,8 +500,8 @@ quickSpec Config{..} = do
           atomic = cons ++ [Var (V typeVar 0)]
 
       mainOf f g = do
-        putLine $ show $ pPrintSignature (pPrintType . typ . fmap (fmap con_value))
-          (map partial (f cfg_constants ++ f (map (map predCon) cfg_predicates)))
+        putLine $ show $ pPrintSignature
+          (map (partial . unhideConstraint) (f cfg_constants ++ f (map (map predCon) cfg_predicates)))
         putLine ""
         putLine "== Laws =="
         QuickSpec.Explore.quickSpec present (flip evalHaskell) cfg_max_size univ
