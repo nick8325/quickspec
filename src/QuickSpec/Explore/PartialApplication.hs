@@ -1,6 +1,6 @@
 -- Pruning support for partial application and the like.
 {-# OPTIONS_HADDOCK hide #-}
-{-# LANGUAGE FlexibleInstances, TypeSynonymInstances, RecordWildCards, MultiParamTypeClasses, FlexibleContexts, GeneralizedNewtypeDeriving, UndecidableInstances #-}
+{-# LANGUAGE FlexibleInstances, TypeSynonymInstances, RecordWildCards, MultiParamTypeClasses, FlexibleContexts, GeneralizedNewtypeDeriving, UndecidableInstances, DeriveFunctor #-}
 module QuickSpec.Explore.PartialApplication where
 
 import QuickSpec.Term
@@ -17,7 +17,7 @@ data PartiallyApplied f =
     -- The ($) operator, for oversaturated applications.
     -- The type argument is the type of the first argument to ($).
   | Apply Type
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Functor)
 
 instance Sized f => Sized (PartiallyApplied f) where
   size (Partial f _) = size f
@@ -40,7 +40,7 @@ instance PrettyArity f => PrettyArity (PartiallyApplied f) where
   prettyArity (Apply _) = 1
 
 instance Typed f => Typed (PartiallyApplied f) where
-  typ (Apply ty) = Twee.build (Twee.app (Twee.fun Arrow) [ty, ty])
+  typ (Apply ty) = arrowType [ty] ty
   typ (Partial f _) = typ f
   otherTypesDL (Apply _) = mempty
   otherTypesDL (Partial f _) = otherTypesDL f
@@ -84,7 +84,7 @@ instance (Arity f, Typed f, Background f) => Background (PartiallyApplied f) whe
       vs = map Var (zipWith V (typeArgs (typ f)) [0..])
   background _ = []
 
-instance (Applicative f, Eval fun (Value f)) => Eval (PartiallyApplied fun) (Value f) where
+instance (Applicative f, Eval fun (Value f) m) => Eval (PartiallyApplied fun) (Value f) m where
   eval var (Partial f _) = eval var f
   eval _ (Apply ty) =
     return $ fromJust $

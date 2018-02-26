@@ -10,9 +10,9 @@ module QuickSpec.Type(
   Type, TyCon(..), tyCon, fromTyCon, A, B, C, D, E, F, G, ClassA, ClassB, ClassC, ClassD, ClassE, SymA, typeVar, isTypeVar,
   typeOf, typeRep, applyType, fromTypeRep,
   arrowType, unpackArrow, typeArgs, typeRes, typeDrop, typeArity,
-  isDictionary, getDictionary, pPrintType,
+  isDictionary, getDictionary, dictArity, pPrintType,
   -- * Things that have types
-  Typed(..), typeSubst, typesDL, tyVars, cast,
+  Typed(..), typeSubst, typesDL, tyVars, cast, matchType,
   TypeView(..),
   Apply(..), apply, canApply,
   oneTypeVar, defaultTo, skolemiseTypeVars,
@@ -238,6 +238,10 @@ getDictionary _ = Nothing
 isDictionary :: Type -> Bool
 isDictionary = isJust . getDictionary
 
+-- | Count how many dictionary arguments a type has.
+dictArity :: Type -> Int
+dictArity = length . takeWhile isDictionary . typeArgs
+
 -- CoArbitrary instances.
 instance CoArbitrary Type where
   coarbitrary = coarbitrary . singleton
@@ -251,9 +255,15 @@ instance CoArbitrary (TermList TyCon) where
 -- | Pretty-print a type. Differs from the `Pretty` instance by printing type
 -- variables in lowercase.
 pPrintType :: Type -> Doc
-pPrintType = pPrint . typeSubst (\(V x) -> build (con (fun (String (as !! x))))) . canonicalise
+pPrintType = ppr . typeSubst (\(V x) -> build (con (fun (String (as !! x))))) . canonicalise
   where
     as = supply [[x] | x <- ['a'..'z']]
+    -- Print dictionary arguments specially
+    ppr ty
+      | Just (dict, res) <- unpackArrow ty,
+        Just constraint <- getDictionary dict =
+      pPrint constraint <+> text "=>" <+> ppr res
+    ppr ty = pPrint ty
 
 -- | A class for things that have a type.
 class Typed a where
@@ -294,6 +304,10 @@ cast :: Typed a => Type -> a -> Maybe a
 cast ty x = do
   s <- match (typ x) ty
   return (typeSubst s x)
+
+-- | Check if the second argument is an instance of the first argument.
+matchType :: Type -> Type -> Maybe (Subst TyCon)
+matchType = match
 
 -- | Typed things that support function application.
 class Typed a => Apply a where
