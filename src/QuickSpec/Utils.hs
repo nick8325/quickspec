@@ -124,3 +124,8 @@ isSubsequenceOf :: Ord a => [a] -> [a] -> Bool
   | x == y = xs `isSubsequenceOf` ys
   | otherwise = (x:xs) `isSubsequenceOf` ys
 #endif
+
+appendAt :: Int -> [a] -> [[a]] -> [[a]]
+appendAt n xs [] = appendAt n xs [[]]
+appendAt 0 xs (ys:yss) = (ys ++ xs):yss
+appendAt n xs (ys:yss) = ys:appendAt (n-1) xs yss
