@@ -64,7 +64,9 @@ module QuickSpec(
   con, predicate,
   -- ** Type variables for polymorphic functions
   A, B, C, D, E,
-
+  -- ** Type variables for higher kinded types
+  F, G,
+  
   -- * Declaring types
   monoType, vars, monoTypeWithVars, inst, Observe(..),
 

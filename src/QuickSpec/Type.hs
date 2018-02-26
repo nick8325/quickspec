@@ -7,7 +7,7 @@
 module QuickSpec.Type(
   -- * Types
   Typeable,
-  Type, TyCon(..), tyCon, fromTyCon, A, B, C, D, E, ClassA, ClassB, ClassC, ClassD, ClassE, SymA, typeVar, isTypeVar,
+  Type, TyCon(..), tyCon, fromTyCon, A, B, C, D, E, F, G, ClassA, ClassB, ClassC, ClassD, ClassE, SymA, typeVar, isTypeVar,
   typeOf, typeRep, applyType, fromTypeRep,
   arrowType, unpackArrow, typeArgs, typeRes, typeDrop, typeArity,
   isDictionary, getDictionary, pPrintType,
@@ -33,7 +33,8 @@ import GHC.Exts(Any)
 import Test.QuickCheck
 import Unsafe.Coerce
 import Data.Constraint
-import Twee.Base
+import Twee.Base hiding (F)
+import qualified Twee.Base as T
 import Data.Proxy
 import Data.List
 import Data.Char
@@ -86,6 +87,9 @@ newtype C = C Any deriving Typeable
 newtype D = D Any deriving Typeable
 newtype E = E Any deriving Typeable
 
+newtype F (a :: *) = F (Any a) deriving Typeable
+newtype G (a :: *) = G (Any a) deriving Typeable
+
 class ClassA
 deriving instance Typeable ClassA
 class ClassB
@@ -108,6 +112,8 @@ typeVars =
    Ty.typeRep (Proxy :: Proxy C),
    Ty.typeRep (Proxy :: Proxy D),
    Ty.typeRep (Proxy :: Proxy E),
+   Ty.typeRep (Proxy :: Proxy F),
+   Ty.typeRep (Proxy :: Proxy G),
    Ty.typeRep (Proxy :: Proxy ClassA),
    Ty.typeRep (Proxy :: Proxy ClassB),
    Ty.typeRep (Proxy :: Proxy ClassC),
@@ -148,20 +154,20 @@ arrowType (arg:args) res =
 --
 -- For multiple-argument functions, unpacks one argument.
 unpackArrow :: Type -> Maybe (Type, Type)
-unpackArrow (App (F Arrow) (Cons t (Cons u Empty))) =
+unpackArrow (App (T.F Arrow) (Cons t (Cons u Empty))) =
   Just (t, u)
 unpackArrow _ =
   Nothing
 
 -- | The arguments of a function type.
 typeArgs :: Type -> [Type]
-typeArgs (App (F Arrow) (Cons arg (Cons res Empty))) =
+typeArgs (App (T.F Arrow) (Cons arg (Cons res Empty))) =
   arg:typeArgs res
 typeArgs _ = []
 
 -- | The result of a function type.
 typeRes :: Type -> Type
-typeRes (App (F Arrow) (Cons _ (Cons res Empty))) =
+typeRes (App (T.F Arrow) (Cons _ (Cons res Empty))) =
   typeRes res
 typeRes ty = ty
 
@@ -169,7 +175,7 @@ typeRes ty = ty
 -- @n@ arguments. Crashes if the type does not have enough arguments.
 typeDrop :: Int -> Type -> Type
 typeDrop 0 ty = ty
-typeDrop n (App (F Arrow) (Cons _ (Cons ty Empty))) =
+typeDrop n (App (T.F Arrow) (Cons _ (Cons ty Empty))) =
   typeDrop (n-1) ty
 typeDrop _ _ =
   error "typeDrop on non-function type"
@@ -224,7 +230,7 @@ tyCon = fromTyCon . mkCon
 
 -- | Check if a type is of the form @`Dict` c@, and if so, return @c@.
 getDictionary :: Type -> Maybe Type
-getDictionary (App (F (TyCon dict)) (Cons ty Empty))
+getDictionary (App (T.F (TyCon dict)) (Cons ty Empty))
   | dict == dictTyCon = Just ty
 getDictionary _ = Nothing
 
@@ -323,7 +329,7 @@ instance Typed Type where
   typeSubst_ = subst
 
 instance Apply Type where
-  tryApply (App (F Arrow) (Cons arg (Cons res Empty))) t
+  tryApply (App (T.F Arrow) (Cons arg (Cons res Empty))) t
     | t == arg = Just res
   tryApply _ _ = Nothing
 
