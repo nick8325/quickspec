@@ -125,7 +125,7 @@ instance Signature sig => Signature [sig] where
 -- QuickSpec will then understand that the constant is really polymorphic.
 con :: Typeable a => String -> a -> Sig
 con name x =
-  Sig (\n -> modL Haskell.lens_constants (appendAt n (Haskell.con name x)))
+  Sig (\n -> modL Haskell.lens_constants (appendAt n [Haskell.con name x]))
 
 -- | Declare a predicate with a given name and value.
 -- The predicate should be a function which returns `Bool`.
@@ -145,12 +145,7 @@ predicate :: ( Predicateable a
              , Typeable (PredicateTestCase a))
              => String -> a -> Sig
 predicate name x =
-  Sig (\n -> modL Haskell.lens_predicates (appendAt n (Haskell.predicate name x)))
-
-appendAt :: Int -> a -> [[a]] -> [[a]]
-appendAt n x [] = appendAt n x [[]]
-appendAt 0 x (xs:xss) = (xs ++ [x]):xss
-appendAt n x (xs:xss) = xs:appendAt (n-1) x xss
+  Sig (\n -> modL Haskell.lens_predicates (appendAt n [Haskell.predicate name x]))
 
 -- | Declare a new monomorphic type.
 -- The type must implement `Ord` and `Arbitrary`.

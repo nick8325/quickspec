@@ -23,6 +23,7 @@ import Data.Char
 import Data.Ord
 import qualified QuickSpec.Testing.QuickCheck as QuickCheck
 import qualified QuickSpec.Pruning.Twee as Twee
+import QuickSpec.Explore hiding (quickSpec)
 import qualified QuickSpec.Explore
 import QuickSpec.Explore.Polymorphic
 import QuickSpec.Explore.PartialApplication
@@ -460,8 +461,14 @@ quickSpec Config{..} = give cfg_default_to $ do
       text "::" <+> pPrintType (typ x)
     maybeType _ = pPrintEmpty
 
+    enumerator cons =
+      sortTerms measure $
+      enumerateConstants atomic `mappend` enumerateApplications
+      where
+        atomic = cons ++ [Var (V typeVar 0)]
+
     mainOf f g = do
-      putLine $ show $ QuickSpec.Explore.pPrintSignature
+      putLine $ show $ pPrintSignature
         (map partial (f cfg_constants ++ f (map (map predCon) cfg_predicates)))
       putLine ""
       putLine "== Laws =="
@@ -471,8 +478,8 @@ quickSpec Config{..} = give cfg_default_to $ do
                | t <- monouni, not $ checkArbInst t instances ]
       sequence [ putLine . show $ text "WARNING: Missing instance of Ord for type" <+> pPrintType t
                | t <- monouni, not $ checkOrdInst t instances ]
-      QuickSpec.Explore.quickSpec present measure (flip evalHaskell) cfg_max_size univ
-        [ partial fun | fun <- constantsOf g ]
+      QuickSpec.Explore.quickSpec present (flip evalHaskell) cfg_max_size univ
+        (enumerator [partial fun | fun <- constantsOf g])
       putLine ""
 
     main = mapM_ round [1..rounds]
