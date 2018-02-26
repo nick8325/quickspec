@@ -26,8 +26,7 @@ import qualified Data.DList as DList
 data Polymorphic testcase result fun norm =
   Polymorphic {
     pm_schemas :: Schemas testcase result (PolyFun fun) norm,
-    pm_unifiable :: Map (Poly Type) ([Poly Type], [(Poly Type, Poly Type)]),
-    pm_accepted :: Map (Poly Type) (Set (Term fun)),
+    pm_unifiable :: Map (Poly Type) [Poly Type],
     pm_universe :: Universe }
 
 data PolyFun fun =
@@ -48,7 +47,6 @@ data Universe = Universe { univ_inner :: Set Type, univ_root :: Set Type }
 makeLensAs ''Polymorphic
   [("pm_schemas", "schemas"),
    ("pm_unifiable", "unifiable"),
-   ("pm_accepted", "accepted"),
    ("pm_universe", "univ")]
 
 initialState ::
@@ -60,7 +58,6 @@ initialState univ inst eval =
   Polymorphic {
     pm_schemas = Schemas.initialState (inst . fmap fun_specialised) (eval . fmap fun_specialised),
     pm_unifiable = Map.empty,
-    pm_accepted = Map.empty,
     pm_universe = univ }
 
 polyFun :: Typed fun => fun -> PolyFun fun
@@ -89,25 +86,17 @@ explore t = do
   if not (t `inUniverse` univ) then
     return (Accepted [])
    else do
-    let ty = polyTyp (poly t)
-    addPolyType ty
-
-    unif <- access unifiable
-    let (here, there) = Map.findWithDefault undefined ty unif
-    acc <- access accepted
-    ress1 <-
-      concat <$>
-      forM there (\(ty', mgu) ->
-        forM (Set.toList (Map.findWithDefault undefined ty' acc)) (\u ->
-          exploreNoMGU (u `at` mgu)))
     res <- exploreNoMGU t
-    ress2 <-
-      forM here (\mgu ->
-        exploreNoMGU (t `at` mgu))
-    return res { result_props = concatMap result_props (ress1 ++ [res] ++ ress2) }
+    case res of
+      Rejected{} -> return res
+      Accepted{} -> do
+        tys <- addPolyType (polyTyp (poly t))
+        ress <- forM tys $ \ty ->
+          exploreNoMGU (t `at` ty)
+        return res { result_props = concatMap result_props (res:ress) }
     where
       t `at` ty =
-        fromMaybe undefined (cast (unPoly ty) t)
+        fromMaybe (error ("Couldn't cast " ++ prettyShow (typ t) ++ " to " ++ prettyShow (unPoly ty))) (cast (unPoly ty) t)
 
 exploreNoMGU ::
   (PrettyTerm fun, Ord result, Ord norm, Typed fun, Ord fun, Apply (Term fun),
@@ -116,11 +105,7 @@ exploreNoMGU ::
   StateT (Polymorphic testcase result fun norm) m (Result fun)
 exploreNoMGU t = do
   univ <- access univ
-  let ty = polyTyp (poly t)
-  acc <- access accepted
-  if (t `Set.member` Map.findWithDefault Set.empty ty acc ||
-      not (t `inUniverse` univ)) then return (Rejected []) else do
-    accepted %= Map.insertWith Set.union ty (Set.singleton t)
+  if not (t `inUniverse` univ) then return (Rejected []) else do
     schemas1 <- access schemas
     (res, schemas2) <- unPolyM (runStateT (Schemas.explore (polyTerm t)) schemas1)
     schemas ~= schemas2
@@ -129,19 +114,16 @@ exploreNoMGU t = do
     mapProps f (Accepted props) = Accepted (map f props)
     mapProps f (Rejected props) = Rejected (map f props)
 
-addPolyType :: Monad m => Poly Type -> StateT (Polymorphic testcase result fun norm) m ()
+addPolyType :: Monad m => Poly Type -> StateT (Polymorphic testcase result fun norm) m [Poly Type]
 addPolyType ty = do
   unif <- access unifiable
   univ <- access univ
-  unless (ty `Map.member` unif) $ do
-    let
-      tys = [(ty', mgu) | ty' <- Map.keys unif, Just mgu <- [polyMgu ty ty']]
-      ok ty mgu = oneTypeVar ty /= mgu && oneTypeVar (unPoly mgu) `Set.member` univ_root univ
-      here = [mgu | (_, mgu) <- tys, ok mgu ty]
-      there = [(ty', mgu) | (ty', mgu) <- tys, ok mgu ty']
-    key ty # unifiable ~= Just (here, there)
-    forM_ there $ \(ty', _) ->
-      sndLens # keyDefault ty' undefined # unifiable %= (there ++)
+  case Map.lookup ty unif of
+    Just tys -> return tys
+    Nothing -> do
+      let tys = usort [ poly ty' | ty' <- Set.toList (univ_root univ), isJust (Twee.match (unPoly ty) ty') ]
+      unifiable %= Map.insert ty tys
+      return tys
 
 instance (PrettyTerm fun, Ord fun, Typed fun, Apply (Term fun), MonadPruner (Term fun) norm m) =>
   MonadPruner (Term (PolyFun fun)) norm (PolyM testcase result fun norm m) where
@@ -235,6 +217,7 @@ universe xs = Universe (Set.fromList base) (Set.fromList (withFunctions base))
     -- result type of every function (with all type variables unified), and all
     -- subterms of these types
     base = usort $ typeVar:concatMap (oneTypeVar . typs . typ) xs
+    --  XXX look into getting rid of subterms
     typs ty = (typeRes ty:typeArgs ty) >>= Twee.subterms
 
     -- We then add partial applications, according to the rule:

@@ -11,6 +11,4 @@ main = quickSpec [
   con "concat" (concat :: [[A]] -> [A]),
 
   -- Add some numeric functions to get more laws about length.
-  background [
-    con "0" (0 :: Int),
-    con "+" ((+) :: Int -> Int -> Int) ] ]
+  arith (Proxy :: Proxy Int) ]

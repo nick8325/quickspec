@@ -13,6 +13,7 @@ import QuickSpec.Prop
 import QuickSpec.Terminal
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
+import qualified Twee.Base as Twee
 
 data Tagged fun =
     Func fun
@@ -26,6 +27,9 @@ instance Arity fun => Arity (Tagged fun) where
 instance Sized fun => Sized (Tagged fun) where
   size (Func f) = size f
   size (Tag _) = 0
+
+instance Sized fun => Twee.Sized (Tagged fun) where
+  size f = size f `max` 1
 
 instance Pretty fun => Pretty (Tagged fun) where
   pPrint (Func f) = pPrint f

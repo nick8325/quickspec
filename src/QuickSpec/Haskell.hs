@@ -4,6 +4,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE ScopedTypeVariables, TypeOperators, GADTs, FlexibleInstances, FlexibleContexts, MultiParamTypeClasses, RecordWildCards, TemplateHaskell, UndecidableInstances, DefaultSignatures, FunctionalDependencies #-}
+{-# LANGUAGE ConstraintKinds #-}
 module QuickSpec.Haskell where
 
 import QuickSpec.Haskell.Resolve
@@ -60,6 +61,7 @@ baseInstances =
       Names (map (++ "s") names) :: Names [A],
     inst (Names ["p", "q", "r"] :: Names (A -> Bool)),
     inst (Names ["f", "g", "h"] :: Names (A -> B)),
+    inst (Names ["dict"] :: Names (Dict ClassA)),
     inst (Names ["x", "y", "z", "w"] :: Names A),
     -- Standard instances
     baseType (Proxy :: Proxy ()),
@@ -98,15 +100,19 @@ baseInstances =
     inst (Sub Dict :: (CoArbitrary A, CoArbitrary B, CoArbitrary C, CoArbitrary D) :- CoArbitrary (A, B, C, D)),
     inst (Sub Dict :: (CoArbitrary A, Arbitrary B) :- Arbitrary (A -> B)),
     inst (Sub Dict :: (Arbitrary A, CoArbitrary B) :- CoArbitrary (A -> B)),
+    inst (Sub Dict :: () :- Ord (Dict ClassA)),
+    inst (Sub Dict :: ClassA :- Arbitrary (Dict ClassA)),
     inst (Sub Dict :: Ord A :- Eq A),
     -- From Arbitrary to Gen
     inst $ \(Dict :: Dict (Arbitrary A)) -> arbitrary :: Gen A,
-    inst $ \(dict :: Dict ClassA) -> return dict :: Gen (Dict ClassA),
     -- Observation functions
     inst (\(Dict :: Dict (Observe A B C)) -> observeObs :: ObserveData C B),
     inst (\(Dict :: Dict (Ord A)) -> observeOrd :: ObserveData A A),
     inst (\(Dict :: Dict (Arbitrary A)) (obs :: ObserveData B C) -> observeFunction obs :: ObserveData (A -> B) C),
     inst (\(obs :: ObserveData A B) -> WrappedObserveData (toValue obs))]
+
+instance c => Arbitrary (Dict c) where
+  arbitrary = return Dict
 
 -- | A typeclass for types which support observational equality, typically used
 -- for types that have no `Ord` instance.

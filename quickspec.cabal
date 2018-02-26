@@ -110,6 +110,5 @@ library
     spoon,
     template-haskell,
     transformers,
-    twee-lib >= 2.1.2,
-    uglymemo,
-    deepseq
+    twee-lib == 2.1.3,
+    uglymemo
