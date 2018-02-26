@@ -71,7 +71,7 @@ module QuickSpec(
   -- * Standard signatures
   -- | The \"prelude\": a standard signature containing useful functions
   --   like '++', which can be used as background theory.
-  lists, nums, funs, bools, prelude, without,
+  lists, arith, funs, bools, prelude, without,
 
   -- * Exploring functions in series
   background, series,
@@ -300,9 +300,9 @@ bools = background [
 
 -- | A signature containing arithmetic operations:
 -- @0@, @1@, @(`+`)@.
--- Instantiate it with e.g. @nums (`Proxy` :: `Proxy` `Int`)@.
-nums :: forall proxy a. (Typeable a, Ord a, Num a, Arbitrary a) => proxy a -> Sig
-nums proxy = background [
+-- Instantiate it with e.g. @arith (`Proxy` :: `Proxy` `Int`)@.
+arith :: forall proxy a. (Typeable a, Ord a, Num a, Arbitrary a) => proxy a -> Sig
+arith proxy = background [
   monoType proxy,
   "0" `con` (0   :: a),
   "1" `con` (1   :: a),
@@ -331,4 +331,4 @@ funs = background [
 -- For more precise control over what gets included,
 -- see 'bools', 'arith', 'lists', 'funs' and 'without'.
 prelude :: Sig
-prelude = toSig [bools, nums (Proxy :: Proxy Int), lists, funs]
+prelude = toSig [bools, arith (Proxy :: Proxy Int), lists, funs]
