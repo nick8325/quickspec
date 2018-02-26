@@ -254,6 +254,10 @@ data Constant =
     con_size :: Int,
     con_classify :: Classification Constant }
 
+-- For debugging only (!)
+instance Show Constant where
+  show = con_name
+
 instance Eq Constant where
   x == y =
     con_name x == con_name y && typ (con_value x) == typ (con_value y)

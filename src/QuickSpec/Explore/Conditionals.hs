@@ -75,7 +75,7 @@ instance (Arity fun, Predicate fun) => Predicate (PartiallyApplied fun) where
 data WithConstructor fun =
     Constructor fun Type
   | Normal fun
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Show)
 
 instance Sized fun => Sized (WithConstructor fun) where
   size Constructor{} = 0

@@ -17,7 +17,7 @@ data PartiallyApplied f =
     -- The ($) operator, for oversaturated applications.
     -- The type argument is the type of the first argument to ($).
   | Apply Type
-  deriving (Eq, Ord, Functor)
+  deriving (Eq, Ord, Functor, Show)
 
 instance Sized f => Sized (PartiallyApplied f) where
   size (Partial f _) = size f
