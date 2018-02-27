@@ -499,7 +499,7 @@ quickSpec Config{..} = do
     
     -- Ugly hack to add the right types from instances
     univ = conditionalsUniverse $ constants ++ instanceTypeCons
-    univNoPred = conditionalsUniverse . (++instanceTypeCons) . concat $ map (map snd) cfg_predicates ++ cfg_constants
+    univNoPred = universe $ concat cfg_constants ++ instanceTypeCons
     instances = cfg_instances `mappend` baseInstances
 
     {- Adding types to the universe for type class instantiation -}
