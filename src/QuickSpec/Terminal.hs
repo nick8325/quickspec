@@ -9,8 +9,12 @@ import Control.Monad.Trans.Reader
 import qualified Test.QuickCheck.Text as Text
 
 class Monad m => MonadTerminal m where
+  putText :: String -> m ()
   putLine :: String -> m ()
   putTemp :: String -> m ()
+
+  default putText :: (MonadTrans t, MonadTerminal m', m ~ t m') => String -> m ()
+  putText = lift . putText
 
   default putLine :: (MonadTrans t, MonadTerminal m', m ~ t m') => String -> m ()
   putLine = lift . putLine
@@ -34,6 +38,10 @@ newtype Terminal a = Terminal (ReaderT Text.Terminal IO a)
   deriving (Functor, Applicative, Monad, MonadIO)
 
 instance MonadTerminal Terminal where
+  putText str = Terminal $ do
+    term <- ask
+    liftIO $ Text.putPart term str
+
   putLine str = Terminal $ do
     term <- ask
     liftIO $ Text.putLine term str
