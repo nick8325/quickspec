@@ -23,4 +23,4 @@ install:
     - stack --no-terminal install
 
 script:
-    - examples/tests/run
+    - GHC="stack exec -- ghc" examples/tests/run

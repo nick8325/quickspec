@@ -1,8 +1,9 @@
 #!/bin/bash
 exitcode=0
+GHC=${GHC=ghc}
 cd $(dirname $0)/..
 for i in ./*.hs tests/*.hs; do
-    ghc --make -O $i || exitcode=1
+    $GHC --make -O $i || exitcode=1
     prog=${i/.hs/}
     out=tests/$(basename $prog).output
     if [ -f $out ]; then
