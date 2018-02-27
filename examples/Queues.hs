@@ -1,32 +1,25 @@
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeOperators, GeneralizedNewtypeDeriving, TypeApplications #-}
 
-import Test.QuickSpec hiding (lists)
+import QuickSpec
 import Test.QuickCheck
-import Data.Typeable
 import Prelude hiding (fst)
 
-enq x ys = ys ++ [x]
-deq (x:xs) = xs
-fst (x:xs) = x
+newtype Queue a = Queue [a] deriving (Eq, Ord, Arbitrary, CoArbitrary)
+nil = Queue []
+enq x (Queue ys) = Queue (ys ++ [x])
+deq (Queue (x:xs)) = Queue xs
+fst (Queue (x:xs)) = x
 
 main = quickSpec [
-  vars ["x","y"] (undefined :: A),
-  vars ["f","g","h"] (undefined :: [A] -> [A]),
-  vars ["f","g","h"] (undefined :: [A] -> A),
-  "enq" `blind1` (enq :: A -> [A] -> [A]),
-  "deq" `blind0` (deq :: [A] -> [A]),
-  "fst" `blind0` (fst :: [A] -> A),
-  "."   `blind2` ((.) :: ([A] -> [A]) -> ([A] -> [A]) -> [A] -> [A]),
-  "."   `blind2` ((.) :: ([A] -> A) -> ([A] -> [A]) -> [A] -> A),
-  -- "id"  `blind0` (id :: [A] -> [A]),
-  observer2 (\(x::[A]) (f::[A]->A) -> f x),
-  observer2 (\(x::[A]) (f::[A]->[A]) -> f x),
-  -- "empty" `fun0` ([] :: [A]),
-  withDepth 4,
-  withSize 7
+  background [
+    con "." ((.) @(Queue A) @(Queue A) @(Queue A)),
+    con "id" (id @(Queue A)) ],
+
+  inst (Sub Dict :: Ord A :- Ord (Queue A)),
+  inst (Sub Dict :: Arbitrary A :- Arbitrary (Queue A)),
+  inst (Sub Dict :: CoArbitrary A :- CoArbitrary (Queue A)),
+  "enq" `con` (enq :: A -> Queue A -> Queue A),
+  "deq" `con` (deq :: Queue A -> Queue A),
+  "fst" `con` (fst :: Queue A -> A),
+  "nil" `con` (nil :: Queue A)
   ]
-
--- main = quickCheck prop
-
--- prop :: Int -> Int -> [Int] -> Bool
--- prop x y q = fst (enq y (enq x q)) == fst (enq x q)
