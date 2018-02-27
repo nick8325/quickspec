@@ -1,0 +1,20 @@
+== Functions ==
+  0 :: Float
+  1 :: Float
+(+) :: Float -> Float -> Float
+(*) :: Float -> Float -> Float
+
+== Laws ==
+  1. x * y = y * x
+  2. x + y = y + x
+  3. x * 0 = 0
+  4. x * 1 = x
+  5. x + 0 = x
+  6. x * (y + y) = y * (x + x)
+  7. (x * y) * (z + z) = z * (x * (y + y))
+  8. (x + y) + (x + y) = (x + x) + (y + y)
+  9. (x + x) + (x + x) = x + (x + (x + x))
+ 10. (x + (x + 1)) + 1 = (x + x) + (1 + 1)
+ 11. ((x + y) + 1) + 1 = (x + y) + (1 + 1)
+ 12. x * ((1 + 1) + 1) = x + (x + x)
+

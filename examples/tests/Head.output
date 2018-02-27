@@ -1,0 +1,9 @@
+== Functions ==
+head :: [a] -> a
+tail :: [a] -> [a]
+ (:) :: a -> [a] -> [a]
+
+== Laws ==
+  1. head (x : xs) = x
+  2. tail (x : xs) = xs
+

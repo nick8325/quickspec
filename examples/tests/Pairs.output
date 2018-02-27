@@ -1,0 +1,16 @@
+== Functions ==
+(,) :: a -> b -> (a, b)
+fst :: (a, b) -> a
+snd :: (a, b) -> b
+
+== Laws ==
+  1. fst (x, y) = x
+  2. snd (x, y) = y
+  3. (fst x, snd x) = x
+
+== Functions ==
+pair :: (Bool, Char)
+
+== Laws ==
+  4. fst pair
+

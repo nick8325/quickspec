@@ -10,7 +10,7 @@ module QuickSpec.Type(
   Type, TyCon(..), tyCon, fromTyCon, A, B, C, D, E, ClassA, ClassB, ClassC, ClassD, ClassE, SymA, typeVar, isTypeVar,
   typeOf, typeRep, applyType, fromTypeRep,
   arrowType, unpackArrow, typeArgs, typeRes, typeDrop, typeArity,
-  isDictionary, getDictionary, dictArity, pPrintType,
+  isDictionary, getDictionary, splitConstrainedType, dictArity, pPrintType,
   -- * Things that have types
   Typed(..), typeSubst, typesDL, tyVars, cast, matchType,
   TypeView(..),
@@ -235,6 +235,13 @@ isDictionary = isJust . getDictionary
 -- | Count how many dictionary arguments a type has.
 dictArity :: Type -> Int
 dictArity = length . takeWhile isDictionary . typeArgs
+
+-- | Split a type into constraints and normal type.
+splitConstrainedType :: Type -> ([Type], Type)
+splitConstrainedType ty =
+  (dicts, arrowType rest (typeRes ty))
+  where
+    (dicts, rest) = splitAt (dictArity ty) (typeArgs ty)
 
 -- CoArbitrary instances.
 instance CoArbitrary Type where

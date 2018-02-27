@@ -1,0 +1,16 @@
+== Functions ==
+return :: a -> [a]
+ (>>=) :: [a] -> (a -> [b]) -> [b]
+  (++) :: [a] -> [a] -> [a]
+ (>=>) :: (a -> [b]) -> (b -> [c]) -> a -> [c]
+
+== Laws ==
+  1. return >=> f = f
+  2. f >=> return = f
+  3. xs >>= return = xs
+  4. (xs ++ ys) ++ zs = xs ++ (ys ++ zs)
+  5. (f >=> g) >=> h = f >=> (g >=> h)
+  6. (xs >>= f) >>= g = xs >>= (f >=> g)
+  7. (f >=> g) x >>= h = (f >=> (g >=> h)) x
+  8. (xs >>= f) ++ (ys >>= f) = (xs ++ ys) >>= f
+

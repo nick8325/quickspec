@@ -107,16 +107,22 @@ import Data.Lens.Light
 import QuickSpec.Utils
 import QuickSpec.Type hiding (defaultTo)
 import Data.Proxy
+import System.Environment
 
 -- | Run QuickSpec. See the documentation at the top of this file.
 quickSpec :: Signature sig => sig -> IO ()
-quickSpec signature =
-  Haskell.quickSpec (sig (Context 0 []) Haskell.defaultConfig)
-  where
-    Sig sig = toSig signature
+quickSpec sig = do
+  -- Undocumented feature for testing :)
+  seed <- lookupEnv "QUICKCHECK_SEED"
+  let
+    sig' = case seed of
+      Nothing -> signature sig
+      Just xs -> signature [signature sig, withFixedSeed (read xs)]
+
+  Haskell.quickSpec (runSig sig' (Context 0 []) Haskell.defaultConfig)
 
 -- | A signature.
-newtype Sig = Sig (Context -> Haskell.Config -> Haskell.Config)
+newtype Sig = Sig { unSig :: Context -> Haskell.Config -> Haskell.Config }
 
 -- Settings for building the signature.
 -- Int: number of nested calls to 'background'.
@@ -130,13 +136,16 @@ instance Monoid Sig where
 -- | A class of things that can be used as a QuickSpec signature.
 class Signature sig where
   -- | Convert the thing to a signature.
-  toSig :: sig -> Sig
+  signature :: sig -> Sig
 
 instance Signature Sig where
-  toSig = id
+  signature = id
 
 instance Signature sig => Signature [sig] where
-  toSig = mconcat . map toSig
+  signature = mconcat . map signature
+
+runSig :: Signature sig => sig -> Context -> Haskell.Config -> Haskell.Config
+runSig = unSig . signature
 
 -- | Declare a constant with a given name and value.
 -- If the constant you want to use is polymorphic, you can use the types
@@ -147,9 +156,14 @@ instance Signature sig => Signature [sig] where
 -- QuickSpec will then understand that the constant is really polymorphic.
 con :: Typeable a => String -> a -> Sig
 con name x =
-  Sig $ \(Context n names) ->
+  Sig $ \ctx@(Context _ names) ->
     if name `elem` names then id else
-    modL Haskell.lens_constants (appendAt n [Haskell.con name x])
+      unSig (constant (Haskell.con name x)) ctx
+
+constant :: Haskell.Constant -> Sig
+constant con =
+  Sig $ \(Context n _) ->
+    modL Haskell.lens_constants (appendAt n [con])
 
 -- | Type class constraints as first class citizens
 type c ==> t = Dict c -> t
@@ -181,9 +195,10 @@ predicate :: ( Predicateable a
              , Typeable (PredicateTestCase a))
              => String -> a -> Sig
 predicate name x =
-  Sig $ \(Context n names) ->
+  Sig $ \ctx@(Context _ names) ->
     if name `elem` names then id else
-    modL Haskell.lens_predicates (appendAt n [Haskell.predicate name x])
+    let (insts, con) = Haskell.predicate name x in
+      runSig [instFun insts `mappend` constant con] ctx
 
 -- | Declare a new monomorphic type.
 -- The type must implement `Ord` and `Arbitrary`.
@@ -235,18 +250,14 @@ instFun x =
 -- >     con "0" (0 :: Int),
 -- >     con "+" ((+) :: Int -> Int -> Int) ] ]
 background :: Signature sig => sig -> Sig
-background signature =
-  Sig (\(Context n xs) -> sig (Context (n+1) xs))
-  where
-    Sig sig = toSig signature
+background sig =
+  Sig (\(Context n xs) -> runSig sig (Context (n+1) xs))
 
 -- | Remove a function or predicate from the signature.
 -- Useful in combination with 'prelude' and friends.
 without :: Signature sig => sig -> [String] -> Sig
-without signature xs =
-  Sig (\(Context n ys) -> sig (Context n (ys ++ xs)))
-  where
-    Sig sig = toSig signature
+without sig xs =
+  Sig (\(Context n ys) -> runSig sig (Context n (ys ++ xs)))
 
 -- | Run QuickCheck on a series of signatures. Tests the functions in the first
 -- signature, then adds the functions in the second signature, then adds the
@@ -267,9 +278,9 @@ without signature xs =
 -- >       con "++" ((++) :: [A] -> [A] -> [A]),
 -- >       con "length" (length :: [A] -> Int) ]
 series :: Signature sig => [sig] -> Sig
-series = foldl op mempty . map toSig
+series = foldl op mempty . map signature
   where
-    op sigs sig = toSig [background sigs, sig]
+    op sigs sig = signature [background sigs, sig]
 
 -- | Set the maximum size of terms to explore (default: 7).
 withMaxTermSize :: Int -> Sig
@@ -338,13 +349,11 @@ arith proxy = background [
   "+" `con` ((+) :: a -> a -> a)]
 
 -- | A signature containing list operations:
--- @[]@, @(:)@, `head`, `tail`, @(`++`)@.
+-- @[]@, @(:)@, @(`++`)@.
 lists :: Sig
 lists = background [
   "[]"      `con` ([]      :: [A]),
   ":"       `con` ((:)     :: A -> [A] -> [A]),
-  "head"    `con` (head    :: [A] -> A),
-  "tail"    `con` (tail    :: [A] -> [A]),
   "++"      `con` ((++)    :: [A] -> [A] -> [A])]
 
 -- | A signature containing higher-order functions:
@@ -360,4 +369,4 @@ funs = background [
 -- For more precise control over what gets included,
 -- see 'bools', 'arith', 'lists', 'funs' and 'without'.
 prelude :: Sig
-prelude = toSig [bools, arith (Proxy :: Proxy Int), lists, funs]
+prelude = signature [bools, arith (Proxy :: Proxy Int), lists]

@@ -1,0 +1,11 @@
+== Functions ==
+ id :: a -> a
+(.) :: (a -> b) -> (c -> a) -> c -> b
+
+== Laws ==
+  1. id x = x
+  2. f . id = f
+  3. id . f = f
+  4. (f . g) x = f (g x)
+  5. (f . g) . h = f . (g . h)
+

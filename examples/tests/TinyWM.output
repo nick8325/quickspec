@@ -1,0 +1,127 @@
+== Functions ==
+ (||) :: Bool -> Bool -> Bool
+ (&&) :: Bool -> Bool -> Bool
+  not :: Bool -> Bool
+ True :: Bool
+False :: Bool
+    0 :: Int
+    1 :: Int
+   [] :: [a]
+  (:) :: a -> [a] -> [a]
+ (++) :: [a] -> [a] -> [a]
+    0 :: Natural
+    1 :: Natural
+  (+) :: Natural -> Natural -> Natural
+
+== Laws ==
+  1. not False
+  2. not True = False
+  3. x && y = y && x
+  4. x && x = x
+  5. x + y = y + x
+  6. x || y = y || x
+  7. x || x = x
+  8. x && False = False
+  9. x && True = x
+ 10. x + 0 = x
+ 11. xs ++ [] = xs
+ 12. [] ++ xs = xs
+ 13. not (not x) = x
+ 14. x || False = x
+ 15. x || True
+ 16. x && not x = False
+ 17. x || not x
+ 18. (x && y) && z = x && (y && z)
+ 19. x && (x || y) = x
+ 20. (x + y) + z = x + (y + z)
+ 21. (xs ++ ys) ++ zs = xs ++ (ys ++ zs)
+ 22. x : (xs ++ ys) = (x : xs) ++ ys
+ 23. x || (x && y) = x
+ 24. (x || y) || z = x || (y || z)
+ 25. not x && not y = not (x || y)
+ 26. x && not (x && y) = x && not y
+ 27. x && (y || (x && z)) = x && (y || z)
+ 28. (x || y) && (x || z) = x || (y && z)
+
+== Functions ==
+     LT :: Ordering
+     GT :: Ordering
+     EQ :: Ordering
+  empty :: Natural -> StackSet OrdA
+   view :: Natural -> StackSet OrdA -> StackSet OrdA
+   peek :: StackSet OrdA -> OrdA
+ rotate :: Ordering -> StackSet OrdA -> StackSet OrdA
+   push :: OrdA -> StackSet OrdA -> StackSet OrdA
+  shift :: Natural -> StackSet OrdA -> StackSet OrdA
+ insert :: OrdA -> Natural -> StackSet OrdA -> StackSet OrdA
+ delete :: OrdA -> StackSet OrdA -> StackSet OrdA
+current :: StackSet OrdA -> Natural
+  index :: Natural -> StackSet OrdA -> [OrdA]
+
+== Laws ==
+ 29. current (empty x) = 0
+ 30. rotate EQ s = s
+ 31. current (delete x s) = current s
+ 32. current (push x s) = current s
+ 33. current (rotate o s) = current s
+ 34. current (shift x s) = current s
+ 35. peek (push x s) = x
+ 36. shift (current s) s = s
+ 37. view (current s) s = s
+ 38. current (view 0 s) = 0
+ 39. delete x (empty 1) = empty 1
+ 40. rotate o (empty 1) = empty 1
+ 41. shift x (empty 1) = empty 1
+ 42. view x (empty 1) = empty 1
+ 43. index 0 (empty 1) = []
+ 44. current (insert x y s) = current s
+ 45. delete x (delete y s) = delete y (delete x s)
+ 46. delete x (delete x s) = delete x s
+ 47. delete x (push x s) = delete x s
+ 48. insert x (current s) s = push x s
+ 49. push x (delete x s) = push x s
+ 50. rotate o (rotate o' s) = rotate o' (rotate o s)
+ 51. shift x (push y s) = insert y x s
+ 52. view x (delete y s) = delete y (view x s)
+ 53. view x (view x s) = view x s
+ 54. index 0 (view x s) = index 0 s
+ 55. view 0 (view x s) = view 0 s
+ 56. view 1 (view x s) = view 1 s
+ 57. insert x 1 (empty 1) = empty 1
+ 58. rotate GT (rotate LT s) = s
+ 59. delete x (insert x y s) = delete x s
+ 60. insert x y (view z s) = view z (insert x y s)
+ 61. current (view x (rotate o s)) = current (view x s)
+ 62. current (view x (shift y s)) = current (view x s)
+ 63. index (current s) (view x s) = index (current s) s
+ 64. view (current s) (view x s) = s
+ 65. delete x (empty (y + 1)) = empty (y + 1)
+ 66. index x (empty (x + 1)) = []
+ 67. index 0 (insert x 1 s) = index 0 (delete x s)
+ 68. rotate o (empty (x + 1)) = empty (x + 1)
+ 69. rotate o (push x (empty 1)) = push x (empty 1)
+ 70. shift x (empty (y + 1)) = empty (y + 1)
+ 71. index 0 (empty (x + 1)) = []
+ 72. index 0 (push x (empty 1)) = x : []
+ 73. delete x (push y (delete x s)) = delete x (push y s)
+ 74. delete x (rotate o (delete x s)) = rotate o (delete x s)
+ 75. delete x (shift y (delete x s)) = shift y (delete x s)
+ 76. view x (rotate o (view x s)) = rotate o (view x s)
+ 77. view x (shift y (view x s)) = shift y (view x s)
+ 78. view x (view y (view x s)) = view x (view y s)
+ 79. view x (view (x + y) s) = view x s
+ 80. x : index 0 (delete x s) = index 0 (insert x 0 s)
+ 81. delete x (rotate GT (push x s)) = delete x s
+ 82. delete x (rotate LT (push x s)) = rotate LT (delete x s)
+ 83. index 0 (shift (x + x) s) = index 0 (shift x s)
+ 84. insert x (y + y) (empty 1) = insert x y (empty 1)
+ 85. rotate o (insert x y (empty 1)) = insert x y (empty 1)
+ 86. shift x (insert y z (empty 1)) = insert y (x + z) (empty 1)
+ 87. current (view x (empty (x + 1))) = x
+ 88. current (view (current (view 1 s)) s2) = current (view (current (view 1 s2)) s)
+ 89. index 0 (push x (view 0 s)) = index 0 (insert x 0 s)
+ 90. index 0 (shift (x + 1) s) = index 0 (shift 1 s)
+ 91. insert x 1 (push y (empty 1)) = delete x (push y (empty 1))
+ 92. shift 1 (shift x (view 1 s)) = shift x (shift 1 (view 1 s))
+ 93. view 1 (push x (view 0 s)) = insert x 0 (view 1 s)
+

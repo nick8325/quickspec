@@ -1,0 +1,9 @@
+#!/bin/bash
+set -e
+GHC=${GHC=ghc}
+for i in $*; do
+    $GHC --make -O $i
+    prog=${i/.hs/}
+    out=$(dirname $0)/$(basename $prog).output
+    QUICKCHECK_SEED=1234 $i > $out
+done
