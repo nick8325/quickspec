@@ -309,13 +309,11 @@ arith proxy = background [
   "+" `con` ((+) :: a -> a -> a)]
 
 -- | A signature containing list operations:
--- @[]@, @(:)@, `head`, `tail`, @(`++`)@.
+-- @[]@, @(:)@, @(`++`)@.
 lists :: Sig
 lists = background [
   "[]"      `con` ([]      :: [A]),
   ":"       `con` ((:)     :: A -> [A] -> [A]),
-  "head"    `con` (head    :: [A] -> A),
-  "tail"    `con` (tail    :: [A] -> [A]),
   "++"      `con` ((++)    :: [A] -> [A] -> [A])]
 
 -- | A signature containing higher-order functions:
@@ -331,4 +329,4 @@ funs = background [
 -- For more precise control over what gets included,
 -- see 'bools', 'arith', 'lists', 'funs' and 'without'.
 prelude :: Sig
-prelude = toSig [bools, arith (Proxy :: Proxy Int), lists, funs]
+prelude = toSig [bools, arith (Proxy :: Proxy Int), lists]
