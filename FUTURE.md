@@ -20,3 +20,5 @@
   (i.e., "this is a law about BLAH")
 
 * Improve handling of partial functions (see Heaps.hs)
+
+* Make Type into an abstract type
