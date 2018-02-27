@@ -43,11 +43,13 @@ instance (Typed fun, Ord fun, PrettyTerm fun, Ord norm, MonadPruner (Term (WithC
       when res (considerConditionalising prop)
       return res
 
-conditionalsUniverse :: (Typed fun, Predicate fun) => [fun] -> Universe
-conditionalsUniverse funs =
+conditionalsUniverse :: (Typed fun, Predicate fun) => [Type] -> [fun] -> Universe
+conditionalsUniverse tys funs =
   universe $
-    map Normal funs ++
-    [ Constructor pred clas_test_case | pred <- funs, Predicate{..} <- [classify pred] ]
+    tys ++
+    (map typ $
+      map Normal funs ++
+      [ Constructor pred clas_test_case | pred <- funs, Predicate{..} <- [classify pred] ])
 
 runConditionals ::
   (PrettyTerm fun, Ord norm, MonadPruner (Term (WithConstructor fun)) norm m, Predicate fun, MonadTerminal m) =>

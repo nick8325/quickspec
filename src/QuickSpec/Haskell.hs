@@ -316,12 +316,14 @@ isOp xs = not (all isIdent xs)
   where
     isIdent x = isAlphaNum x || x == '\'' || x == '_' || x == '.'
 
+-- Get selectors of a predicate
 selectors :: Constant -> [Constant]
 selectors con =
   case con_classify con of
     Predicate{..} -> clas_selectors
     _ -> []
 
+-- Move the constraints of a constant back into the main type
 unhideConstraint :: Constant -> Constant
 unhideConstraint con =
   con {
@@ -466,27 +468,42 @@ defaultConfig =
     cfg_default_to = typeRep (Proxy :: Proxy Int),
     cfg_infer_instance_types = False }
 
--- Gather up all type class constraints in a list of function and constant types 
-gatherTypeClasses :: [Type] -> [Type]
-gatherTypeClasses ts =
-  let dicts  = nub . concat $ [ take (dictArity t) (typeArgs t) | t <- ts, dictArity t > 0]
-      consts = [ c | Just c <- getDictionary <$> dicts ]
-  in consts
+-- Extra types for the universe that come from in-scope instances.
+instanceTypes :: Instances -> Config -> [Type]
+instanceTypes insts Config{..}
+  | not cfg_infer_instance_types = []
+  | otherwise =
+    snd <$> (concat . concat)
+      [ [ tv
+        | Just tv <- map (fmap T.substToList . T.unify cls) groundConclusions]
+        | cls <- allTCCons ]
+  where
+    {- Adding types to the universe for type class instantiation -}
+    allTypes = map (typ . con_value) (concat cfg_constants)
+    allTCCons = gatherTypeClasses allTypes
+    groundConclusions = groundInstances gatherInstanceTypes
 
-gatherInstanceTypes :: Instances -> [Type]
-gatherInstanceTypes = map (typeRes . valueType . unPoly) . is_instances
-
--- Takes a list of [X :- Y] and returns only the Ys where X = ()
--- and Y is monomorphic
-groundInstances :: [Type] -> [Type]
-groundInstances ts =
-  let allConclusions =
-              [ conclusion
-              | [head, conclusion] <- map (T.unpack . T.children) ts
-              , head == (typeRep (Proxy :: Proxy (() :: Constraint)))
-              , not . any T.isVar $ T.subterms conclusion
-              ]
-  in allConclusions
+    -- Gather up all type class constraints in a list of function and constant types 
+    gatherTypeClasses :: [Type] -> [Type]
+    gatherTypeClasses ts =
+      let dicts  = nub . concat $ [ take (dictArity t) (typeArgs t) | t <- ts, dictArity t > 0]
+          consts = [ c | Just c <- getDictionary <$> dicts ]
+      in consts
+    
+    gatherInstanceTypes :: [Type]
+    gatherInstanceTypes = map (typeRes . valueType . unPoly) . is_instances $ insts
+    
+    -- Takes a list of [X :- Y] and returns only the Ys where X = ()
+    -- and Y is monomorphic
+    groundInstances :: [Type] -> [Type]
+    groundInstances ts =
+      let allConclusions =
+                  [ conclusion
+                  | [head, conclusion] <- map (T.unpack . T.children) ts
+                  , head == (typeRep (Proxy :: Proxy (() :: Constraint)))
+                  , not . any T.isVar $ T.subterms conclusion
+                  ]
+      in allConclusions
 
 data Warnings =
   Warnings {
@@ -494,7 +511,7 @@ data Warnings =
     warn_no_observer :: [Type] }
 
 warnings :: Instances -> Config -> Warnings
-warnings insts Config{..} =
+warnings insts cfg@Config{..} =
   Warnings {
     warn_no_generator =
       [ ty | ty <- univ, isNothing (findGenerator cfg_default_to insts ty) ],
@@ -504,7 +521,7 @@ warnings insts Config{..} =
     -- Check after defaulting types to Int (or whatever it is)
     univ =
       defaultTo cfg_default_to . Set.toList . univ_types $
-        universe (concat cfg_constants)
+        universe (instanceTypes insts cfg ++ map typ (concat cfg_constants))
 
 instance Pretty Warnings where
   pPrint Warnings{..} =
@@ -533,23 +550,9 @@ quickSpec cfg@Config{..} = do
   let
     constantsOf f = true:f cfg_constants ++ concatMap selectors (f cfg_constants)
     constants = constantsOf concat
-    instanceTypeCons = if cfg_infer_instance_types
-                       then [ (con "" ()) { con_type = t } | t <- typesFromConclusions ]
-                       else []
     
-    -- Ugly hack to add the right types from instances
-    univ = conditionalsUniverse $ constants ++ instanceTypeCons
+    univ = conditionalsUniverse (instanceTypes instances cfg) constants
     instances = cfg_instances `mappend` baseInstances
-
-    {- Adding types to the universe for type class instantiation -}
-    allTypes = map (typ . con_value) constants
-    allTCCons = gatherTypeClasses allTypes
-    groundConclusions = groundInstances . gatherInstanceTypes $ instances
-    typesFromConclusions =
-      snd <$> (concat . concat)
-          [ [ tv
-            | Just tv <- map (fmap T.substToList . T.unify cls) groundConclusions]
-          | cls <- allTCCons ]
 
   give cfg_default_to $ give instances $ do
     let
