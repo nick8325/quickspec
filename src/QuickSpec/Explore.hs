@@ -31,6 +31,10 @@ mapEnumerator f e =
   Enumerator $ \n tss ->
     f (enumerate e n tss)
 
+filterEnumerator :: (a -> Bool) -> Enumerator a -> Enumerator a
+filterEnumerator p e =
+  mapEnumerator (filter p) e
+
 enumerateConstants :: Sized a => [a] -> Enumerator a
 enumerateConstants ts = Enumerator (\n _ -> [t | t <- ts, size t == n])
 
@@ -44,7 +48,7 @@ enumerateApplications = Enumerator $ \n tss ->
 
 filterUniverse :: Typed f => Universe -> Enumerator (Term f) -> Enumerator (Term f)
 filterUniverse univ e =
-  mapEnumerator (filter (`usefulForUniverse` univ)) e
+  filterEnumerator (`usefulForUniverse` univ) e
 
 sortTerms :: Ord b => (a -> b) -> Enumerator a -> Enumerator a
 sortTerms measure e =

@@ -26,8 +26,8 @@ import qualified QuickSpec.Testing.QuickCheck as QuickCheck
 import qualified QuickSpec.Pruning.Twee as Twee
 import QuickSpec.Explore hiding (quickSpec)
 import qualified QuickSpec.Explore
-import QuickSpec.Explore.Polymorphic
 import QuickSpec.Explore.PartialApplication
+import QuickSpec.Explore.Polymorphic(Universe(..))
 import QuickSpec.Pruning.Background(Background)
 import Control.Monad
 import Control.Monad.Trans.State.Strict
@@ -39,6 +39,9 @@ import GHC.TypeLits
 import QuickSpec.Explore.Conditionals
 import Control.Spoon
 import Data.Set (toList)
+import qualified Data.Set as Set
+import Data.List (nub)
+import qualified Twee.Term as T
 
 baseInstances :: Instances
 baseInstances =
@@ -100,8 +103,6 @@ baseInstances =
     inst (Sub Dict :: (CoArbitrary A, CoArbitrary B, CoArbitrary C, CoArbitrary D) :- CoArbitrary (A, B, C, D)),
     inst (Sub Dict :: (CoArbitrary A, Arbitrary B) :- Arbitrary (A -> B)),
     inst (Sub Dict :: (Arbitrary A, CoArbitrary B) :- CoArbitrary (A -> B)),
-    inst (Sub Dict :: () :- Ord (Dict ClassA)),
-    inst (Sub Dict :: ClassA :- Arbitrary (Dict ClassA)),
     inst (Sub Dict :: Ord A :- Eq A),
     -- From Arbitrary to Gen
     inst $ \(Dict :: Dict (Arbitrary A)) -> arbitrary :: Gen A,
@@ -231,7 +232,7 @@ arbitraryFunction :: CoArbitrary a => (a -> Gen b) -> Gen (a -> b)
 arbitraryFunction gen = promote (\x -> coarbitrary x (gen x))
 
 -- | Evaluate a Haskell term in an environment.
-evalHaskell :: (Given Type, Typed f, PrettyTerm f, Eval f (Value Identity)) => TestCase -> Term f -> Either (Value Ordy) (Term f)
+evalHaskell :: (Given Type, Typed f, PrettyTerm f, Eval f (Value Identity) Maybe) => TestCase -> Term f -> Either (Value Ordy) (Term f)
 evalHaskell (TestCase env obs) t =
   maybe (Right t) Left $ do
     Identity val `In` w <- unwrap <$> eval env t
@@ -246,8 +247,11 @@ data Constant =
     con_style :: TermStyle,
     con_pretty_arity :: Int,
     con_value :: Value Identity,
+    con_type :: Type,
+    con_constraint :: Maybe Type,
     con_size :: Int,
-    con_classify :: Classification Constant }
+    con_classify :: Classification Constant,
+    con_isHidden :: Bool }
 
 instance Eq Constant where
   x == y =
@@ -287,8 +291,17 @@ constant' name val =
           | isOp name -> 1
           | otherwise -> typeArity (typ val),
     con_value = val,
+    con_type = ty,
+    con_constraint = constraint,
     con_size = 1,
-    con_classify = Function }
+    con_classify = Function,
+    con_isHidden = False }
+  where
+    (ty, constraint) =
+      case typeArgs (typ val) of
+        (dict:_) | isDictionary dict ->
+          (typeDrop 1 (typ val), Just dict)
+        _ -> (typ val, Nothing)
 
 isOp :: String -> Bool
 isOp "[]" = False
@@ -298,9 +311,16 @@ isOp xs = not (all isIdent xs)
   where
     isIdent x = isAlphaNum x || x == '\'' || x == '_' || x == '.'
 
+unhideConstraint :: Constant -> Constant
+unhideConstraint con =
+  con {
+    con_type = typ (con_value con),
+    con_constraint = Nothing }
+
 instance Typed Constant where
-  typ = typ . con_value
+  typ = con_type
   otherTypesDL con =
+    return (typ (con_value con)) `mplus`
     case con_classify con of
       Predicate{..} ->
         -- Don't call typesDL on clas_selectors because it in turn
@@ -311,6 +331,8 @@ instance Typed Constant where
       Function -> mzero
   typeSubst_ sub con =
     con { con_value = typeSubst_ sub (con_value con),
+          con_type = typeSubst_ sub (con_type con),
+          con_constraint = typeSubst_ sub <$> con_constraint con,
           con_classify = fmap (typeSubst_ sub) (con_classify con) }
 
 instance Pretty Constant where
@@ -331,8 +353,14 @@ instance Arity Constant where
 instance Predicate Constant where
   classify = con_classify
 
-instance (Given Type, Applicative f) => Eval Constant (Value f) where
-  eval _ = return . mapValue (pure . runIdentity) . con_value
+instance (Given Type, Given Instances) => Eval Constant (Value Identity) Maybe where
+  eval _ Constant{..} =
+    let val = defaultTo given con_value in
+    case con_constraint of
+      Nothing -> return val
+      Just constraint -> do
+        dict <- findValue given constraint
+        return (apply val dict)
 
 class Predicateable a where
   -- A test case for predicates of type a
@@ -438,66 +466,114 @@ checkOrdInst t is =
      isJust (findValue is (typeRep (Proxy :: Proxy WrappedObserveData) `applyType` t) :: Maybe (Value Identity))
   || isJust (findObserver is t)
 
+-- Gather up all type class constraints in a list of function and constant types 
+gatherTypeClasses :: [Type] -> [Type]
+gatherTypeClasses ts =
+  let dicts  = nub . concat $ [ take (dictArity t) (typeArgs t) | t <- ts, dictArity t > 0]
+      consts = [ c | Just c <- getDictionary <$> dicts ]
+  in consts
+
+gatherInstanceTypes :: Instances -> [Type]
+gatherInstanceTypes = map (typeRes . valueType . unPoly) . is_instances
+
+-- Takes a list of [X :- Y] and returns only the Ys where X = ()
+-- and Y is monomorphic
+groundInstances :: [Type] -> [Type]
+groundInstances ts =
+  let allConclusions =
+              [ conclusion
+              | [head, conclusion] <- map (T.unpack . T.children) ts
+              , head == (typeRep (Proxy :: Proxy (() :: Constraint)))
+              , not . any T.isVar $ T.subterms conclusion
+              ]
+  in allConclusions
+
 quickSpec :: Config -> IO ()
-quickSpec Config{..} = give cfg_default_to $ do
+quickSpec Config{..} = do
   let
     constantsOf f = true:f cfg_constants ++ f (map (concatMap predCons) cfg_predicates)
     constants = constantsOf concat
-    univ = conditionalsUniverse constants
-    univNoPred = universe $ map (map predCon) cfg_predicates ++ cfg_constants
+    
+    -- Ugly hack to add the right types form instances
+    univ = conditionalsUniverse $ constants ++ [ (con "" ()) { con_type = t } | t <- typesFromConclusions ]
+    univNoPred = conditionalsUniverse . concat $ map (map predCon) cfg_predicates ++ cfg_constants
     instances = mconcat (cfg_instances:map predInstances (concat cfg_predicates) ++ [baseInstances])
 
-    present prop = do
-      n :: Int <- get
-      put (n+1)
-      norm <- normaliser
-      putLine (printf "%3d. %s" n (show (prettyProp (names instances) (ac norm (conditionalise prop)) <+> maybeType prop)))
+    {- Adding types to the universe for type class instantiation -}
+    allTypes = map (typ . con_value) constants
+    allTCCons = gatherTypeClasses allTypes
+    groundConclusions = groundInstances . gatherInstanceTypes $ instances
+    typesFromConclusions =
+      snd <$> (concat . concat)
+          [ [ tv
+            | Just tv <- map (fmap T.substToList . T.unify cls) groundConclusions]
+          | cls <- allTCCons ]
 
-    -- Transform x+(y+z) = y+(x+z) into associativity, if + is commutative
-    ac norm (lhs :=>: App f [Var x, App f1 [Var y, Var z]] :=: App f2 [Var y1, App f3 [Var x1, Var z1]])
-      | f == f1, f1 == f2, f2 == f3,
-        x == x1, y == y1, z == z1,
-        x /= y, y /= z, x /= z,
-        norm (App f [Var x, Var y]) == norm (App f [Var y, Var x]) =
-          lhs :=>: App f [App f [Var x, Var y], Var z] :=: App f [Var x, App f [Var y, Var z]]
-    ac _ prop = prop
+  give cfg_default_to $ give instances $ do
+    let
+      present prop = do
+        n :: Int <- get
+        put (n+1)
+        norm <- normaliser
+        putLine (printf "%3d. %s" n (show (prettyProp (names instances) (ac norm (conditionalise prop)) <+> maybeType prop)))
 
-    -- Add a type signature when printing the equation x = y.
-    maybeType (_ :=>: x@(Var _) :=: Var _) =
-      text "::" <+> pPrintType (typ x)
-    maybeType _ = pPrintEmpty
+      -- Transform x+(y+z) = y+(x+z) into associativity, if + is commutative
+      ac norm (lhs :=>: App f [Var x, App f1 [Var y, Var z]] :=: App f2 [Var y1, App f3 [Var x1, Var z1]])
+        | f == f1, f1 == f2, f2 == f3,
+          x == x1, y == y1, z == z1,
+          x /= y, y /= z, x /= z,
+          norm (App f [Var x, Var y]) == norm (App f [Var y, Var x]) =
+            lhs :=>: App f [App f [Var x, Var y], Var z] :=: App f [Var x, App f [Var y, Var z]]
+      ac _ prop = prop
 
-    enumerator cons =
-      sortTerms measure $
-      enumerateConstants atomic `mappend` enumerateApplications
-      where
-        atomic = cons ++ [Var (V typeVar 0)]
+      -- Add a type signature when printing the equation x = y.
+      maybeType (_ :=>: x@(Var _) :=: Var _) =
+        text "::" <+> pPrintType (typ x)
+      maybeType _ = pPrintEmpty
 
-    mainOf f g = do
-      putLine $ show $ pPrintSignature
-        (map partial (f cfg_constants ++ f (map (map predCon) cfg_predicates)))
-      putLine ""
-      putLine "== Laws =="
-      -- Look for missing instances
-      let monouni = filter ((== 0) . typeArity) . defaultTo cfg_default_to . toList . univ_root $ univNoPred
-      sequence [ putLine . show $ text "WARNING: Missing instance of Arbitrary for type" <+> pPrintType t
-               | t <- monouni, not $ checkArbInst t instances ]
-      sequence [ putLine . show $ text "WARNING: Missing instance of Ord for type" <+> pPrintType t
-               | t <- monouni, not $ checkOrdInst t instances ]
-      QuickSpec.Explore.quickSpec present (flip evalHaskell) cfg_max_size univ
-        (enumerator [partial fun | fun <- constantsOf g])
-      putLine ""
+      constraintsOk (Partial f _) = constraintsOk1 f
+      constraintsOk (Apply _) = True
+      constraintsOk1 = memo $ \con ->
+        or [ case con_constraint (typeSubst sub con) of
+               Nothing -> True
+               Just constraint ->
+                 isJust (findValue instances (defaultTo cfg_default_to constraint))
+           | ty <- Set.toList (univ_root univ),
+             sub <- maybeToList (matchType (typ con) ty) ]
 
-    main = mapM_ round [1..rounds]
-      where
-        round n = mainOf (concat . take 1 . drop (rounds-n)) (concat . drop (rounds-n))
-        rounds = max (length cfg_constants) (length cfg_predicates)
+      enumerator cons =
+        sortTerms measure $
+        filterEnumerator (all constraintsOk . funs) $
+        enumerateConstants atomic `mappend` enumerateApplications
+        where
+          atomic = cons ++ [Var (V typeVar 0)]
 
-  join $
-    fmap withStdioTerminal $
-    generate $
-    QuickCheck.run cfg_quickCheck (arbitraryTestCase cfg_default_to instances) evalHaskell $
-    Twee.run cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size } $
-    runConditionals (map total constants) $
-    flip evalStateT 1 $
-      main
+      mainOf f g = do
+        putLine $ show $ pPrintSignature
+          (map (partial . unhideConstraint)
+          (f (map (filter (not . con_isHidden)) cfg_constants) ++ f (map (map predCon) cfg_predicates)))
+        putLine ""
+        putLine "== Laws =="
+        -- Look for missing instances
+        let monouni = filter ((== 0) . typeArity) . defaultTo cfg_default_to . toList . univ_root $ univNoPred
+        sequence [ putLine . show $ text "WARNING: Missing instance of Arbitrary for type" <+> pPrintType t
+                 | t <- monouni, not $ checkArbInst t instances ]
+        sequence [ putLine . show $ text "WARNING: Missing instance of Ord for type" <+> pPrintType t
+                 | t <- monouni, not $ checkOrdInst t instances ]
+        QuickSpec.Explore.quickSpec present (flip evalHaskell) cfg_max_size univ
+          (enumerator [partial fun | fun <- constantsOf g])
+        putLine ""
+
+      main = mapM_ round [1..rounds]
+        where
+          round n = mainOf (concat . take 1 . drop (rounds-n)) (concat . drop (rounds-n))
+          rounds = max (length cfg_constants) (length cfg_predicates)
+
+    join $
+      fmap withStdioTerminal $
+      generate $
+      QuickCheck.run cfg_quickCheck (arbitraryTestCase cfg_default_to instances) evalHaskell $
+      Twee.run cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size } $
+      runConditionals (map total constants) $
+      flip evalStateT 1 $
+        main
