@@ -1,5 +1,9 @@
 *.sw*
 /dist
+examples/*
+!examples/*.hs
+!examples/test/run
+!examples/test/update
 !examples/weird/*.hs
 !examples/*.hs
 cabal.sandbox.config

@@ -514,7 +514,7 @@ instance Pretty Warnings where
       [text "" | warnings ]
     where
       warnings = not (null warn_no_generator) || not (null warn_no_observer)
-      section doc [] = pPrintEmpty
+      section _ [] = pPrintEmpty
       section doc xs =
         doc $$
         nest 2 (vcat (map pPrintType xs)) $$
@@ -539,7 +539,6 @@ quickSpec cfg@Config{..} = do
     
     -- Ugly hack to add the right types from instances
     univ = conditionalsUniverse $ constants ++ instanceTypeCons
-    univNoPred = universe $ concat cfg_constants ++ instanceTypeCons
     instances = cfg_instances `mappend` baseInstances
 
     {- Adding types to the universe for type class instantiation -}
