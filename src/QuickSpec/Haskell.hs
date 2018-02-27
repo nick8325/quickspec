@@ -537,12 +537,14 @@ quickSpec Config{..} = do
         text "::" <+> pPrintType (typ x)
       maybeType _ = pPrintEmpty
 
-      constraintsOk (Partial f _) = constraintsOk1 f
-      constraintsOk (Apply _) = True
-      constraintsOk1 = memo $ \con ->
-        or [ and [ isJust (findValue instances (defaultTo cfg_default_to constraint)) | constraint <- con_constraints (typeSubst sub con) ]
-           | ty <- Set.toList (univ_root univ),
-             sub <- maybeToList (matchType (typ con) ty) ]
+      -- constraintsOk (Partial f _) = constraintsOk1 f
+      -- constraintsOk (Apply _) = True
+      -- constraintsOk1 = memo $ \con ->
+      --   or [ and [ isJust (findValue instances (defaultTo cfg_default_to constraint)) | constraint <- con_constraints (typeSubst sub con) ]
+      --      | ty <- Set.toList (univ_root univ),
+      --        sub <- maybeToList (matchType (typ con) ty) ]
+
+      constraintsOk _ = True
 
       enumerator cons =
         sortTerms measure $
@@ -558,7 +560,7 @@ quickSpec Config{..} = do
         putLine ""
         putLine "== Laws =="
         -- Look for missing instances
-        let monouni = filter ((== 0) . typeArity) . defaultTo cfg_default_to . toList . univ_root $ univNoPred
+        let monouni = filter ((== 0) . typeArity) . defaultTo cfg_default_to . toList . univ_types $ univNoPred
         sequence [ putLine . show $ text "WARNING: Missing instance of Arbitrary for type" <+> pPrintType t
                  | t <- monouni, not $ checkArbInst t instances ]
         sequence [ putLine . show $ text "WARNING: Missing instance of Ord for type" <+> pPrintType t
