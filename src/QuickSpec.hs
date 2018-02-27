@@ -198,7 +198,7 @@ predicate name x =
   Sig $ \ctx@(Context _ names) ->
     if name `elem` names then id else
     let (insts, con) = Haskell.predicate name x in
-      runSig [instFun insts `mappend` constant con] ctx
+      runSig [addInstances insts `mappend` constant con] ctx
 
 -- | Declare a new monomorphic type.
 -- The type must implement `Ord` and `Arbitrary`.
@@ -231,8 +231,11 @@ inst :: (Typeable c1, Typeable c2) => c1 :- c2 -> Sig
 inst = instFun
 
 instFun :: Typeable a => a -> Sig
-instFun x =
-  Sig (\_ -> modL Haskell.lens_instances (`mappend` Haskell.inst x))
+instFun x = addInstances (Haskell.inst x)
+
+addInstances :: Haskell.Instances -> Sig
+addInstances insts =
+  Sig (\_ -> modL Haskell.lens_instances (`mappend` insts))
 
 -- | Declare some functions as being background functions.
 -- These are functions which are not interesting on their own,
