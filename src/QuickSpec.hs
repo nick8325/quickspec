@@ -98,13 +98,11 @@ import Data.Proxy
 
 -- | Run QuickSpec. See the documentation at the top of this file.
 quickSpec :: Signature sig => sig -> IO ()
-quickSpec sign =
-  Haskell.quickSpec (sig (Context 0 []) Haskell.defaultConfig)
-  where
-    Sig sig = signature sign
+quickSpec sig =
+  Haskell.quickSpec (runSig sig (Context 0 []) Haskell.defaultConfig)
 
 -- | A signature.
-newtype Sig = Sig (Context -> Haskell.Config -> Haskell.Config)
+newtype Sig = Sig { unSig :: Context -> Haskell.Config -> Haskell.Config }
 
 -- Settings for building the signature.
 -- Int: number of nested calls to 'background'.
@@ -125,6 +123,9 @@ instance Signature Sig where
 
 instance Signature sig => Signature [sig] where
   signature = mconcat . map signature
+
+runSig :: Signature sig => sig -> Context -> Haskell.Config -> Haskell.Config
+runSig = unSig . signature
 
 -- | Declare a constant with a given name and value.
 -- If the constant you want to use is polymorphic, you can use the types
@@ -211,18 +212,14 @@ instFun x =
 -- >     con "0" (0 :: Int),
 -- >     con "+" ((+) :: Int -> Int -> Int) ] ]
 background :: Signature sig => sig -> Sig
-background sign =
-  Sig (\(Context n xs) -> sig (Context (n+1) xs))
-  where
-    Sig sig = signature sign
+background sig =
+  Sig (\(Context n xs) -> runSig sig (Context (n+1) xs))
 
 -- | Remove a function or predicate from the signature.
 -- Useful in combination with 'prelude' and friends.
 without :: Signature sig => sig -> [String] -> Sig
-without sign xs =
-  Sig (\(Context n ys) -> sig (Context n (ys ++ xs)))
-  where
-    Sig sig = signature sign
+without sig xs =
+  Sig (\(Context n ys) -> runSig sig (Context n (ys ++ xs)))
 
 -- | Run QuickCheck on a series of signatures. Tests the functions in the first
 -- signature, then adds the functions in the second signature, then adds the
