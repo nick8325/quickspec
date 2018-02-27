@@ -38,7 +38,6 @@ import QuickSpec.Utils
 import GHC.TypeLits
 import QuickSpec.Explore.Conditionals
 import Control.Spoon
-import Data.Set (toList)
 import qualified Data.Set as Set
 import qualified Test.QuickCheck.Poly as Poly
 import Numeric.Natural
@@ -210,10 +209,7 @@ arbitraryTestCase def insts =
 -- | Generate a random variable valuation.
 arbitraryValuation :: Type -> Instances -> Gen (Var -> Maybe (Value Identity))
 arbitraryValuation def insts = do
-  let
-    gen :: Var -> Maybe (Gen (Value Identity))
-    gen x = bringFunctor <$> (findInstance insts (defaultTo def (typ x)) :: Maybe (Value Gen))
-  memo <$> arbitraryFunction (sequence . gen)
+  memo <$> arbitraryFunction (sequence . findGenerator def insts . var_ty)
 
 -- | Generate a random observation.
 arbitraryObserver :: Type -> Instances -> Gen (Value Identity -> Maybe (Value Ordy))
@@ -222,6 +218,10 @@ arbitraryObserver def insts = do
   return $ \x -> do
     obs <- find (defaultTo def (typ x))
     return (obs x)
+
+findGenerator :: Type -> Instances -> Type -> Maybe (Gen (Value Identity))
+findGenerator def insts ty =
+  bringFunctor <$> (findInstance insts (defaultTo def ty) :: Maybe (Value Gen))
 
 findObserver :: Instances -> Type -> Maybe (Gen (Value Identity -> Value Ordy))
 findObserver insts ty = do
@@ -261,8 +261,7 @@ data Constant =
     con_type :: Type,
     con_constraints :: [Type],
     con_size :: Int,
-    con_classify :: Classification Constant,
-    con_isHidden :: Bool }
+    con_classify :: Classification Constant }
 
 instance Eq Constant where
   x == y =
@@ -305,8 +304,7 @@ constant' name val =
     con_type = ty,
     con_constraints = constraints,
     con_size = 1,
-    con_classify = Function,
-    con_isHidden = False }
+    con_classify = Function }
   where
     (constraints, ty) = splitConstrainedType (typ val)
 
@@ -317,6 +315,12 @@ isOp xs | all (== '.') xs = True
 isOp xs = not (all isIdent xs)
   where
     isIdent x = isAlphaNum x || x == '\'' || x == '_' || x == '.'
+
+selectors :: Constant -> [Constant]
+selectors con =
+  case con_classify con of
+    Predicate{..} -> clas_selectors
+    _ -> []
 
 unhideConstraint :: Constant -> Constant
 unhideConstraint con =
@@ -389,10 +393,6 @@ data TestCaseWrapped (t :: Symbol) a = TestCaseWrapped { unTestCaseWrapped :: a 
 genSuchThat :: (Predicateable a, Arbitrary (PredicateTestCase a)) => a -> Gen (TestCaseWrapped x (PredicateTestCase a))
 genSuchThat p = TestCaseWrapped <$> arbitrary `suchThat` uncrry p
 
-data PredRep = PredRep { predInstances :: Instances
-                       , predCon :: Constant
-                       , predCons :: [Constant] }
-
 true :: Constant
 true = con "True" True
 
@@ -404,7 +404,7 @@ trueTerm = App (total true) []
 predicate :: forall a. ( Predicateable a
              , Typeable a
              , Typeable (PredicateTestCase a))
-             => String -> a -> PredRep
+             => String -> a -> (Instances, Constant)
 predicate name pred =
   case someSymbolVal name of
     SomeSymbol (_ :: Proxy sym) ->
@@ -430,7 +430,7 @@ predicate name pred =
 
         ty = typeRep (Proxy :: Proxy (TestCaseWrapped sym (PredicateTestCase a)))
       in
-        PredRep instances conPred (conPred:conSels)
+        (instances, conPred)
 
 data Config =
   Config {
@@ -439,7 +439,6 @@ data Config =
     cfg_max_size :: Int,
     cfg_instances :: Instances,
     cfg_constants :: [[Constant]],
-    cfg_predicates :: [[PredRep]],
     cfg_default_to :: Type }
 
 makeLensAs ''Config
@@ -448,7 +447,6 @@ makeLensAs ''Config
    ("cfg_max_size", "lens_max_size"),
    ("cfg_instances", "lens_instances"),
    ("cfg_constants", "lens_constants"),
-   ("cfg_predicates", "lens_predicates"),
    ("cfg_default_to", "lens_default_to")]
 
 defaultConfig :: Config
@@ -459,17 +457,7 @@ defaultConfig =
     cfg_max_size = 7,
     cfg_instances = mempty,
     cfg_constants = [],
-    cfg_predicates = [],
     cfg_default_to = typeRep (Proxy :: Proxy Int) }
-
-checkArbInst :: Type -> Instances -> Bool
-checkArbInst t is =
-  isJust (findValue is (typeRep (Proxy :: Proxy Gen) `applyType` t) :: Maybe (Value Identity))
-
-checkOrdInst :: Type -> Instances -> Bool
-checkOrdInst t is =
-     isJust (findValue is (typeRep (Proxy :: Proxy WrappedObserveData) `applyType` t) :: Maybe (Value Identity))
-  || isJust (findObserver is t)
 
 -- Gather up all type class constraints in a list of function and constant types 
 gatherTypeClasses :: [Type] -> [Type]
@@ -496,14 +484,13 @@ groundInstances ts =
 quickSpec :: Config -> IO ()
 quickSpec Config{..} = do
   let
-    constantsOf f = true:f cfg_constants ++ f (map (concatMap predCons) cfg_predicates)
+    constantsOf f = true:f cfg_constants ++ concatMap selectors (f cfg_constants)
     constants = constantsOf concat
     ugly = [ (con "" ()) { con_type = t } | t <- typesFromConclusions ]
     
     -- Ugly hack to add the right types from instances
     univ = conditionalsUniverse $ constants ++ ugly
-    univNoPred = universe . (++ugly) . concat $ map (map predCon) cfg_predicates ++ cfg_constants
-    instances = mconcat (cfg_instances:map predInstances (concat cfg_predicates) ++ [baseInstances])
+    instances = cfg_instances `mappend` baseInstances
 
     {- Adding types to the universe for type class instantiation -}
     allTypes = map (typ . con_value) constants
@@ -554,16 +541,15 @@ quickSpec Config{..} = do
 
       mainOf f g = do
         putLine $ show $ pPrintSignature
-          (map (partial . unhideConstraint)
-          (f (map (filter (not . con_isHidden)) cfg_constants) ++ f (map (map predCon) cfg_predicates)))
+          (map (partial . unhideConstraint) (f cfg_constants))
         putLine ""
         putLine "== Laws =="
         -- Look for missing instances
-        let monouni = filter ((== 0) . typeArity) . defaultTo cfg_default_to . toList . univ_types $ univNoPred
+        let monouni = defaultTo cfg_default_to . Set.toList . univ_types $ universe (concat cfg_constants)
         sequence [ putLine . show $ text "WARNING: Missing instance of Arbitrary for type" <+> pPrintType t
-                 | t <- monouni, not $ checkArbInst t instances ]
+                 | t <- monouni, isNothing (findGenerator cfg_default_to instances t) ]
         sequence [ putLine . show $ text "WARNING: Missing instance of Ord for type" <+> pPrintType t
-                 | t <- monouni, not $ checkOrdInst t instances ]
+                 | t <- monouni, isNothing (findObserver instances t) ]
         QuickSpec.Explore.quickSpec present (flip evalHaskell) cfg_max_size univ
           (enumerator [partial fun | fun <- constantsOf g])
         putLine ""
@@ -571,7 +557,7 @@ quickSpec Config{..} = do
       main = mapM_ round [1..rounds]
         where
           round n = mainOf (concat . take 1 . drop (rounds-n)) (concat . drop (rounds-n))
-          rounds = max (length cfg_constants) (length cfg_predicates)
+          rounds = length cfg_constants
 
     join $
       fmap withStdioTerminal $

@@ -155,9 +155,14 @@ runSig = unSig . signature
 -- QuickSpec will then understand that the constant is really polymorphic.
 con :: Typeable a => String -> a -> Sig
 con name x =
-  Sig $ \(Context n names) ->
+  Sig $ \ctx@(Context _ names) ->
     if name `elem` names then id else
-    modL Haskell.lens_constants (appendAt n [Haskell.con name x])
+      unSig (constant (Haskell.con name x)) ctx
+
+constant :: Haskell.Constant -> Sig
+constant con =
+  Sig $ \(Context n _) ->
+    modL Haskell.lens_constants (appendAt n [con])
 
 -- | Type class constraints as first class citizens
 type c ==> t = Dict c -> t
@@ -189,9 +194,10 @@ predicate :: ( Predicateable a
              , Typeable (PredicateTestCase a))
              => String -> a -> Sig
 predicate name x =
-  Sig $ \(Context n names) ->
+  Sig $ \ctx@(Context _ names) ->
     if name `elem` names then id else
-    modL Haskell.lens_predicates (appendAt n [Haskell.predicate name x])
+    let (insts, con) = Haskell.predicate name x in
+      runSig [instFun insts `mappend` constant con] ctx
 
 -- | Declare a new monomorphic type.
 -- The type must implement `Ord` and `Arbitrary`.
