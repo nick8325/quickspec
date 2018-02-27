@@ -27,7 +27,7 @@ import qualified QuickSpec.Pruning.Twee as Twee
 import QuickSpec.Explore hiding (quickSpec)
 import qualified QuickSpec.Explore
 import QuickSpec.Explore.PartialApplication
-import QuickSpec.Explore.Polymorphic(Universe(..))
+import QuickSpec.Explore.Polymorphic(Universe(..), universe)
 import QuickSpec.Pruning.Background(Background)
 import Control.Monad
 import Control.Monad.Trans.State.Strict
@@ -507,7 +507,7 @@ quickSpec Config{..} = do
     
     -- Ugly hack to add the right types from instances
     univ = conditionalsUniverse $ constants ++ ugly
-    univNoPred = conditionalsUniverse . (++ugly) . concat $ map (map predCon) cfg_predicates ++ cfg_constants
+    univNoPred = universe . (++ugly) . concat $ map (map predCon) cfg_predicates ++ cfg_constants
     instances = mconcat (cfg_instances:map predInstances (concat cfg_predicates) ++ [baseInstances])
 
     {- Adding types to the universe for type class instantiation -}
