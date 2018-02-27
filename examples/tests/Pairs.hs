@@ -3,12 +3,12 @@
 import QuickSpec
 import Data.Monoid
 
-main = do
-  thy <-
-    quickSpec signature {
-      constants = [
-        constant "," ((,) :: A -> B -> (A, B)),
-        constant "fst" (fst :: (A, B) -> A),
-        constant "snd" (snd :: (A, B) -> B) ] }
-  quickSpec $ thy `mappend` signature {
-    constants = [constant "pair" (True, 'a')] }
+main =
+  quickSpec [series [sig1, sig2]]
+  where
+    sig1 = [
+      con "," ((,) :: A -> B -> (A, B)),
+      con "fst" (fst :: (A, B) -> A),
+      con "snd" (snd :: (A, B) -> B) ]
+    sig2 = [
+      con "pair" (True, 'a')]

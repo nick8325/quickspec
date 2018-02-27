@@ -32,23 +32,15 @@ oddNonZero (Odd i) = NonZero i
 divide :: Int -> NonZero -> Int
 divide i (NonZero j) = div i j
 
-sig =
-  signature {
-    maxTermSize = Just 10,
-    instances   = [ 
-                    baseTypeNames ["x", "y", "z"] (undefined :: NonZero),
-                    baseTypeNames ["x", "y", "z"] (undefined :: Odd)
-    ],
-    constants   = [
-      constant "1" (1 :: Int),
-      constant "1" (NonZero 1),
-      constant "1" (Odd 1),
-      constant "0" (0 :: Int),
-      constant "nonZeroInt" nonZeroInt,
-      constant "oddInt"     oddInt,
-      constant "oddNonZero" oddNonZero,
-      constant "divide"     divide
-    ]
-   }
-
-main = quickSpec sig
+main = quickSpec [
+  withMaxTermSize 10,
+  monoTypeWithVars ["x", "y", "z"] (Proxy :: Proxy NonZero),
+  monoTypeWithVars ["x", "y", "z"] (Proxy :: Proxy Odd),
+  con "1" (1 :: Int),
+  con "1" (NonZero 1),
+  con "1" (Odd 1),
+  con "0" (0 :: Int),
+  con "nonZeroInt" nonZeroInt,
+  con "oddInt"     oddInt,
+  con "oddNonZero" oddNonZero,
+  con "divide"     divide ]
