@@ -1,7 +1,7 @@
 -- Theory exploration which handles polymorphism.
 {-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE TemplateHaskell, FlexibleContexts, GeneralizedNewtypeDeriving, FlexibleInstances, MultiParamTypeClasses, BangPatterns, UndecidableInstances, RankNTypes, GADTs, RecordWildCards #-}
-module QuickSpec.Explore.Polymorphic(module QuickSpec.Explore.Polymorphic, Result(..)) where
+module QuickSpec.Explore.Polymorphic(module QuickSpec.Explore.Polymorphic, Result(..), Universe(..)) where
 
 import qualified QuickSpec.Explore.Schemas as Schemas
 import QuickSpec.Explore.Schemas(Schemas, Result(..))

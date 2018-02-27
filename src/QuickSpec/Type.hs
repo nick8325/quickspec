@@ -1,7 +1,7 @@
 -- | This module is internal to QuickSpec.
 --
 -- Polymorphic types and dynamic values.
-{-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances, GeneralizedNewtypeDeriving, Rank2Types, ExistentialQuantification, PolyKinds, TypeFamilies, FlexibleContexts, StandaloneDeriving, PatternGuards, MultiParamTypeClasses, ConstraintKinds, DataKinds #-}
+{-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances, GeneralizedNewtypeDeriving, Rank2Types, ExistentialQuantification, PolyKinds, TypeFamilies, FlexibleContexts, StandaloneDeriving, PatternGuards, MultiParamTypeClasses, ConstraintKinds, DataKinds, GADTs #-}
 -- To avoid a warning about TyVarNumber's constructor being unused:
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
 module QuickSpec.Type(
@@ -20,7 +20,7 @@ module QuickSpec.Type(
   canonicaliseType,
   Poly, toPolyValue, poly, unPoly, polyTyp, polyRename, polyApply, polyPair, polyList, polyMgu,
   -- * Dynamic values
-  Value, toValue, fromValue,
+  Value, toValue, fromValue, valueType,
   unwrap, Unwrapped(..), Wrapper(..),
   mapValue, forValue, ofValue, withValue, pairValues, wrapFunctor, unwrapFunctor, bringFunctor) where
 
@@ -471,8 +471,9 @@ unwrap x =
         else error "non-matching types")
 
 -- | The unwrapped value. Consists of the value itself (with an existential
--- type) and functions to wrap and unwrap other values which have the same type.
-data Unwrapped f = forall a. f a `In` Wrapper a
+-- type) and functions to wrap it up again.
+data Unwrapped f where
+  In :: f a -> Wrapper a -> Unwrapped f
 
 -- | Functions for re-wrapping an `Unwrapped` value.
 data Wrapper a =

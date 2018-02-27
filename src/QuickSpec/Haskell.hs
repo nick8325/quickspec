@@ -38,10 +38,13 @@ import QuickSpec.Utils
 import GHC.TypeLits
 import QuickSpec.Explore.Conditionals
 import Control.Spoon
+import Data.Set (toList)
 import qualified Data.Set as Set
 import qualified Test.QuickCheck.Poly as Poly
 import Numeric.Natural
 import Test.QuickCheck.Instances()
+import Data.List (nub)
+import qualified Twee.Term as T
 
 baseInstances :: Instances
 baseInstances =
@@ -215,25 +218,25 @@ arbitraryValuation def insts = do
 -- | Generate a random observation.
 arbitraryObserver :: Type -> Instances -> Gen (Value Identity -> Maybe (Value Ordy))
 arbitraryObserver def insts = do
-  find <- arbitraryFunction $ sequence . findObserver
+  find <- arbitraryFunction $ sequence . findObserver insts
   return $ \x -> do
     obs <- find (defaultTo def (typ x))
     return (obs x)
-  where
-    findObserver :: Type -> Maybe (Gen (Value Identity -> Value Ordy))
-    findObserver ty = do
-      inst <- findInstance insts ty :: Maybe (Value WrappedObserveData)
-      return $
-        case unwrap inst of
-          WrappedObserveData val `In` valueWrapper ->
-            case unwrap val of
-              -- This brings Arbitrary and Ord instances into scope
-              ObserveData obs `In` outcomeWrapper -> do
-                test <- arbitrary
-                return $ \x ->
-                  let value = runIdentity (reunwrap valueWrapper x)
-                      outcome = obs test value
-                  in wrap outcomeWrapper (Ordy outcome)
+
+findObserver :: Instances -> Type -> Maybe (Gen (Value Identity -> Value Ordy))
+findObserver insts ty = do
+  inst <- findInstance insts ty :: Maybe (Value WrappedObserveData)
+  return $
+    case unwrap inst of
+      WrappedObserveData val `In` valueWrapper ->
+        case unwrap val of
+          -- This brings Arbitrary and Ord instances into scope
+          ObserveData obs `In` outcomeWrapper -> do
+            test <- arbitrary
+            return $ \x ->
+              let value = runIdentity (reunwrap valueWrapper x)
+                  outcome = obs test value
+              in wrap outcomeWrapper (Ordy outcome)
 
 -- | Generate a random function. Should be in QuickCheck.
 arbitraryFunction :: CoArbitrary a => (a -> Gen b) -> Gen (a -> b)
@@ -258,7 +261,8 @@ data Constant =
     con_type :: Type,
     con_constraint :: Maybe Type,
     con_size :: Int,
-    con_classify :: Classification Constant }
+    con_classify :: Classification Constant,
+    con_isHidden :: Bool }
 
 instance Eq Constant where
   x == y =
@@ -301,7 +305,8 @@ constant' name val =
     con_type = ty,
     con_constraint = constraint,
     con_size = 1,
-    con_classify = Function }
+    con_classify = Function,
+    con_isHidden = False }
   where
     (ty, constraint) =
       case typeArgs (typ val) of
@@ -462,13 +467,58 @@ defaultConfig =
     cfg_predicates = [],
     cfg_default_to = typeRep (Proxy :: Proxy Int) }
 
+checkArbInst :: Type -> Instances -> Bool
+checkArbInst t is =
+  isJust (findValue is (typeRep (Proxy :: Proxy Gen) `applyType` t) :: Maybe (Value Identity))
+
+checkOrdInst :: Type -> Instances -> Bool
+checkOrdInst t is =
+     isJust (findValue is (typeRep (Proxy :: Proxy WrappedObserveData) `applyType` t) :: Maybe (Value Identity))
+  || isJust (findObserver is t)
+
+-- Gather up all type class constraints in a list of function and constant types 
+gatherTypeClasses :: [Type] -> [Type]
+gatherTypeClasses ts =
+  let dicts  = nub . concat $ [ take (dictArity t) (typeArgs t) | t <- ts, dictArity t > 0]
+      consts = [ c | Just c <- getDictionary <$> dicts ]
+  in consts
+
+gatherInstanceTypes :: Instances -> [Type]
+gatherInstanceTypes = map (typeRes . valueType . unPoly) . is_instances
+
+-- Takes a list of [X :- Y] and returns only the Ys where X = ()
+-- and Y is monomorphic
+groundInstances :: [Type] -> [Type]
+groundInstances ts =
+  let allConclusions =
+              [ conclusion
+              | [head, conclusion] <- map (T.unpack . T.children) ts
+              , head == (typeRep (Proxy :: Proxy (() :: Constraint)))
+              , not . any T.isVar $ T.subterms conclusion
+              ]
+  in allConclusions
+
 quickSpec :: Config -> IO ()
 quickSpec Config{..} = do
   let
     constantsOf f = true:f cfg_constants ++ f (map (concatMap predCons) cfg_predicates)
     constants = constantsOf concat
-    univ = conditionalsUniverse constants
+    ugly = [ (con "" ()) { con_type = t } | t <- typesFromConclusions ]
+    
+    -- Ugly hack to add the right types from instances
+    univ = conditionalsUniverse $ constants ++ ugly
+    univNoPred = conditionalsUniverse . (++ugly) . concat $ map (map predCon) cfg_predicates ++ cfg_constants
     instances = mconcat (cfg_instances:map predInstances (concat cfg_predicates) ++ [baseInstances])
+
+    {- Adding types to the universe for type class instantiation -}
+    allTypes = map (typ . con_value) constants
+    allTCCons = gatherTypeClasses allTypes
+    groundConclusions = groundInstances . gatherInstanceTypes $ instances
+    typesFromConclusions =
+      snd <$> (concat . concat)
+          [ [ tv
+            | Just tv <- map (fmap T.substToList . T.unify cls) groundConclusions]
+          | cls <- allTCCons ]
 
   give cfg_default_to $ give instances $ do
     let
@@ -511,9 +561,16 @@ quickSpec Config{..} = do
 
       mainOf f g = do
         putLine $ show $ pPrintSignature
-          (map (partial . unhideConstraint) (f cfg_constants ++ f (map (map predCon) cfg_predicates)))
+          (map (partial . unhideConstraint)
+          (f (map (filter (not . con_isHidden)) cfg_constants) ++ f (map (map predCon) cfg_predicates)))
         putLine ""
         putLine "== Laws =="
+        -- Look for missing instances
+        let monouni = filter ((== 0) . typeArity) . defaultTo cfg_default_to . toList . univ_root $ univNoPred
+        sequence [ putLine . show $ text "WARNING: Missing instance of Arbitrary for type" <+> pPrintType t
+                 | t <- monouni, not $ checkArbInst t instances ]
+        sequence [ putLine . show $ text "WARNING: Missing instance of Ord for type" <+> pPrintType t
+                 | t <- monouni, not $ checkOrdInst t instances ]
         QuickSpec.Explore.quickSpec present (flip evalHaskell) cfg_max_size univ
           (enumerator [partial fun | fun <- constantsOf g])
         putLine ""

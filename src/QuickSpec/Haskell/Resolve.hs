@@ -14,7 +14,7 @@
 
 {-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE RankNTypes, ScopedTypeVariables #-}
-module QuickSpec.Haskell.Resolve(Instances, inst, findInstance, findValue) where
+module QuickSpec.Haskell.Resolve(Instances(..), inst, findInstance, findValue) where
 
 import Twee.Base
 import QuickSpec.Type
