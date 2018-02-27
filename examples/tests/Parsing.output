@@ -81,12 +81,8 @@ pfail :: ReadP a
  63. (x +++ (y <++ peek)) <++ get = x +++ (y <++ peek)
  64. ((x <++ get) +++ peek) <++ y = (x <++ (get <++ y)) +++ peek
  65. ((x <++ peek) +++ get) <++ y = (x <++ (peek <++ y)) +++ get
- 66. void (x +++ (get <++ return y)) = eof +++ void (x +++ get)
- 67. void (x +++ (peek <++ return y)) = eof +++ void (x +++ peek)
- 68. void (get <++ (x +++ return y)) = eof +++ void (get <++ x)
- 69. void (peek <++ (x +++ return y)) = eof +++ void (peek <++ x)
- 70. (void get <++ x) +++ void peek = void (get +++ peek) <++ x
- 71. (void peek <++ x) +++ void get = void (get +++ peek) <++ x
- 72. (x +++ void get) <++ void peek = x +++ void get
- 73. (x +++ void peek) <++ void get = x +++ void peek
+ 66. (void get <++ x) +++ void peek = void (get +++ peek) <++ x
+ 67. (void peek <++ x) +++ void get = void (get +++ peek) <++ x
+ 68. (x +++ void get) <++ void peek = x +++ void get
+ 69. (x +++ void peek) <++ void get = x +++ void peek
 

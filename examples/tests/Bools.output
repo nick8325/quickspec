@@ -6,27 +6,26 @@ False :: Bool
   not :: Bool -> Bool
 
 == Laws ==
-  1. x = y :: ()
-  2. not x & not y => x = y
-  3. not x => False = x
-  4. not x => not True = x
-  5. x && y = y && x
-  6. x && x = x
-  7. not y => x && y = y
-  8. x || y = y || x
-  9. x || x = x
- 10. not y => x || y = x
- 11. x && True = x
- 12. not (not x) = x
- 13. x || True
- 14. not y => x && not x = y
- 15. x || not x
- 16. (x && y) && z = x && (y && z)
- 17. x && (x || y) = x
- 18. x || (x && y) = x
- 19. (x || y) || z = x || (y || z)
- 20. not x && not y = not (x || y)
- 21. x && not (x && y) = x && not y
- 22. x && (y || (x && z)) = x && (y || z)
- 23. (x || y) && (x || z) = x || (y && z)
+  1. not x & not y => x = y
+  2. not x => False = x
+  3. not x => not True = x
+  4. x && y = y && x
+  5. x && x = x
+  6. not y => x && y = y
+  7. x || y = y || x
+  8. x || x = x
+  9. not y => x || y = x
+ 10. x && True = x
+ 11. not (not x) = x
+ 12. x || True
+ 13. not y => x && not x = y
+ 14. x || not x
+ 15. (x && y) && z = x && (y && z)
+ 16. x && (x || y) = x
+ 17. x || (x && y) = x
+ 18. (x || y) || z = x || (y || z)
+ 19. not x && not y = not (x || y)
+ 20. x && not (x && y) = x && not y
+ 21. x && (y || (x && z)) = x && (y || z)
+ 22. (x || y) && (x || z) = x || (y && z)
 
