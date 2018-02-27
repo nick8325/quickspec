@@ -14,7 +14,7 @@ import QuickSpec.Pruning
 import Test.QuickCheck hiding (total)
 import Data.Constraint
 import Data.Proxy
-import qualified Twee.Base as B
+import qualified Twee.Base as Twee
 import QuickSpec.Term
 import Data.Functor.Identity
 import Data.Maybe
@@ -43,7 +43,6 @@ import qualified Test.QuickCheck.Poly as Poly
 import Numeric.Natural
 import Test.QuickCheck.Instances()
 import Data.List (nub)
-import qualified Twee.Term as T
 
 baseInstances :: Instances
 baseInstances =
@@ -473,37 +472,25 @@ instanceTypes :: Instances -> Config -> [Type]
 instanceTypes insts Config{..}
   | not cfg_infer_instance_types = []
   | otherwise =
-    snd <$> (concat . concat)
-      [ [ tv
-        | Just tv <- map (fmap T.substToList . T.unify cls) groundConclusions]
-        | cls <- allTCCons ]
+    [ tv
+    | cls <- dicts,
+      inst <- groundInstances,
+      sub <- maybeToList (matchType cls inst),
+      (_, tv) <- Twee.substToList sub ]
   where
-    {- Adding types to the universe for type class instantiation -}
-    allTypes = map (typ . con_value) (concat cfg_constants)
-    allTCCons = gatherTypeClasses allTypes
-    groundConclusions = groundInstances gatherInstanceTypes
+    dicts =
+      concatMap con_constraints (concat cfg_constants) >>=
+      maybeToList . getDictionary
 
-    -- Gather up all type class constraints in a list of function and constant types 
-    gatherTypeClasses :: [Type] -> [Type]
-    gatherTypeClasses ts =
-      let dicts  = nub . concat $ [ take (dictArity t) (typeArgs t) | t <- ts, dictArity t > 0]
-          consts = [ c | Just c <- getDictionary <$> dicts ]
-      in consts
-    
-    gatherInstanceTypes :: [Type]
-    gatherInstanceTypes = map (typeRes . valueType . unPoly) . is_instances $ insts
-    
-    -- Takes a list of [X :- Y] and returns only the Ys where X = ()
-    -- and Y is monomorphic
-    groundInstances :: [Type] -> [Type]
-    groundInstances ts =
-      let allConclusions =
-                  [ conclusion
-                  | [head, conclusion] <- map (T.unpack . T.children) ts
-                  , head == (typeRep (Proxy :: Proxy (() :: Constraint)))
-                  , not . any T.isVar $ T.subterms conclusion
-                  ]
-      in allConclusions
+    groundInstances :: [Type]
+    groundInstances =
+      [ dict
+      | -- () :- dict
+        Twee.App tc (Twee.Cons (Twee.App unit Twee.Empty) (Twee.Cons dict Twee.Empty)) <-
+        map (typeRes . typ) (is_instances insts),
+        Twee.fun_value tc == tyCon (Proxy :: Proxy (:-)),
+        Twee.fun_value unit == tyCon (Proxy :: Proxy (() :: Constraint)),
+        Twee.isGround dict ]
 
 data Warnings =
   Warnings {
