@@ -98,10 +98,10 @@ import Data.Proxy
 
 -- | Run QuickSpec. See the documentation at the top of this file.
 quickSpec :: Signature sig => sig -> IO ()
-quickSpec signature =
+quickSpec sign =
   Haskell.quickSpec (sig (Context 0 []) Haskell.defaultConfig)
   where
-    Sig sig = toSig signature
+    Sig sig = signature sign
 
 -- | A signature.
 newtype Sig = Sig (Context -> Haskell.Config -> Haskell.Config)
@@ -118,13 +118,13 @@ instance Monoid Sig where
 -- | A class of things that can be used as a QuickSpec signature.
 class Signature sig where
   -- | Convert the thing to a signature.
-  toSig :: sig -> Sig
+  signature :: sig -> Sig
 
 instance Signature Sig where
-  toSig = id
+  signature = id
 
 instance Signature sig => Signature [sig] where
-  toSig = mconcat . map toSig
+  signature = mconcat . map signature
 
 -- | Declare a constant with a given name and value.
 -- If the constant you want to use is polymorphic, you can use the types
@@ -211,18 +211,18 @@ instFun x =
 -- >     con "0" (0 :: Int),
 -- >     con "+" ((+) :: Int -> Int -> Int) ] ]
 background :: Signature sig => sig -> Sig
-background signature =
+background sign =
   Sig (\(Context n xs) -> sig (Context (n+1) xs))
   where
-    Sig sig = toSig signature
+    Sig sig = signature sign
 
 -- | Remove a function or predicate from the signature.
 -- Useful in combination with 'prelude' and friends.
 without :: Signature sig => sig -> [String] -> Sig
-without signature xs =
+without sign xs =
   Sig (\(Context n ys) -> sig (Context n (ys ++ xs)))
   where
-    Sig sig = toSig signature
+    Sig sig = signature sign
 
 -- | Run QuickCheck on a series of signatures. Tests the functions in the first
 -- signature, then adds the functions in the second signature, then adds the
@@ -243,9 +243,9 @@ without signature xs =
 -- >       con "++" ((++) :: [A] -> [A] -> [A]),
 -- >       con "length" (length :: [A] -> Int) ]
 series :: Signature sig => [sig] -> Sig
-series = foldl op mempty . map toSig
+series = foldl op mempty . map signature
   where
-    op sigs sig = toSig [background sigs, sig]
+    op sigs sig = signature [background sigs, sig]
 
 -- | Set the maximum size of terms to explore (default: 7).
 withMaxTermSize :: Int -> Sig
@@ -329,4 +329,4 @@ funs = background [
 -- For more precise control over what gets included,
 -- see 'bools', 'arith', 'lists', 'funs' and 'without'.
 prelude :: Sig
-prelude = toSig [bools, arith (Proxy :: Proxy Int), lists]
+prelude = signature [bools, arith (Proxy :: Proxy Int), lists]

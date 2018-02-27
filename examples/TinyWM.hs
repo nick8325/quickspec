@@ -159,7 +159,7 @@ instance (Ord a, CoArbitrary a) => CoArbitrary (StackSet a) where
 type T = StackSet OrdA
 
 ordering :: Sig
-ordering = toSig [
+ordering = signature [
   con "LT" LT,
   con "GT" GT,
   con "EQ" EQ,
