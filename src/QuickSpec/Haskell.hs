@@ -488,8 +488,48 @@ groundInstances ts =
               ]
   in allConclusions
 
+data Warnings =
+  Warnings {
+    warn_no_generator :: [Type],
+    warn_no_observer :: [Type] }
+
+warnings :: Instances -> Config -> Warnings
+warnings insts Config{..} =
+  Warnings {
+    warn_no_generator =
+      [ ty | ty <- univ, isNothing (findGenerator cfg_default_to insts ty) ],
+    warn_no_observer =
+      [ ty | ty <- univ, isNothing (findObserver insts ty) ] }
+  where
+    -- Check after defaulting types to Int (or whatever it is)
+    univ =
+      defaultTo cfg_default_to . Set.toList . univ_types $
+        universe (concat cfg_constants)
+
+instance Pretty Warnings where
+  pPrint Warnings{..} =
+    vcat $
+      [section genDoc warn_no_generator] ++
+      [section obsDoc warn_no_observer] ++
+      [text "" | warnings ]
+    where
+      warnings = not (null warn_no_generator) || not (null warn_no_observer)
+      section doc [] = pPrintEmpty
+      section doc xs =
+        doc $$
+        nest 2 (vcat (map pPrintType xs)) $$
+        text ""
+
+      genDoc =
+        text "WARNING: The following types have no 'Arbitrary' instance declared." $$
+        text "You will not get any variables of the following types:"
+
+      obsDoc =
+        text "WARNING: The following types have no 'Ord' or 'Observe' instance declared." $$
+        text "You will not get any equations about the following types:"
+
 quickSpec :: Config -> IO ()
-quickSpec Config{..} = do
+quickSpec cfg@Config{..} = do
   let
     constantsOf f = true:f cfg_constants ++ concatMap selectors (f cfg_constants)
     constants = constantsOf concat
@@ -553,13 +593,8 @@ quickSpec Config{..} = do
         putLine $ show $ pPrintSignature
           (map (partial . unhideConstraint) (f cfg_constants))
         putLine ""
+        putText (prettyShow (warnings instances cfg))
         putLine "== Laws =="
-        -- Look for missing instances
-        let monouni = defaultTo cfg_default_to . Set.toList . univ_types $ univNoPred
-        sequence [ putLine . show $ text "WARNING: Missing instance of Arbitrary for type" <+> pPrintType t
-                 | t <- monouni, isNothing (findGenerator cfg_default_to instances t) ]
-        sequence [ putLine . show $ text "WARNING: Missing instance of Ord for type" <+> pPrintType t
-                 | t <- monouni, isNothing (findObserver instances t) ]
         QuickSpec.Explore.quickSpec present (flip evalHaskell) cfg_max_size univ
           (enumerator [partial fun | fun <- constantsOf g])
         putLine ""
