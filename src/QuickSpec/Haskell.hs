@@ -259,7 +259,7 @@ data Constant =
     con_pretty_arity :: Int,
     con_value :: Value Identity,
     con_type :: Type,
-    con_constraint :: Maybe Type,
+    con_constraints :: [Type],
     con_size :: Int,
     con_classify :: Classification Constant,
     con_isHidden :: Bool }
@@ -303,16 +303,12 @@ constant' name val =
           | otherwise -> typeArity (typ val),
     con_value = val,
     con_type = ty,
-    con_constraint = constraint,
+    con_constraints = constraints,
     con_size = 1,
     con_classify = Function,
     con_isHidden = False }
   where
-    (ty, constraint) =
-      case typeArgs (typ val) of
-        (dict:_) | isDictionary dict ->
-          (typeDrop 1 (typ val), Just dict)
-        _ -> (typ val, Nothing)
+    (constraints, ty) = splitConstrainedType (typ val)
 
 isOp :: String -> Bool
 isOp "[]" = False
@@ -326,7 +322,7 @@ unhideConstraint :: Constant -> Constant
 unhideConstraint con =
   con {
     con_type = typ (con_value con),
-    con_constraint = Nothing }
+    con_constraints = [] }
 
 instance Typed Constant where
   typ = con_type
@@ -343,7 +339,7 @@ instance Typed Constant where
   typeSubst_ sub con =
     con { con_value = typeSubst_ sub (con_value con),
           con_type = typeSubst_ sub (con_type con),
-          con_constraint = typeSubst_ sub <$> con_constraint con,
+          con_constraints = map (typeSubst_ sub) (con_constraints con),
           con_classify = fmap (typeSubst_ sub) (con_classify con) }
 
 instance Pretty Constant where
@@ -365,12 +361,11 @@ instance Predicate Constant where
   classify = con_classify
 
 instance (Given Type, Given Instances) => Eval Constant (Value Identity) Maybe where
-  eval _ Constant{..} =
-    case con_constraint of
-      Nothing -> return con_value
-      Just constraint -> do
+  eval _ Constant{..} = foldM app con_value con_constraints
+    where
+      app val constraint = do
         dict <- findValue given constraint
-        return (apply con_value dict)
+        return (apply val dict)
 
 class Predicateable a where
   -- A test case for predicates of type a
@@ -420,7 +415,7 @@ predicate name pred =
           inst (Names [name ++ "_var"] :: Names (TestCaseWrapped sym (PredicateTestCase a)))
 
         conPred = (con name pred) { con_classify = Predicate conSels ty (App true []) }
-        conSels = [ (constant' (name ++ "_" ++ show i) (select i)) { con_classify = Selector i conPred ty, con_size = 0 } | i <- [0..typeArity (typeOf pred)-1] ]
+        conSels = [ (constant' (name ++ "_" ++ show i) (select (i + length (con_constraints conPred)))) { con_classify = Selector i conPred ty, con_size = 0 } | i <- [0..typeArity (typ conPred)-1] ]
 
         select i =
           fromJust (cast (arrowType [ty] (typeArgs (typeOf pred) !! i)) (unPoly (compose (sel i) unwrapV)))
@@ -545,10 +540,7 @@ quickSpec Config{..} = do
       constraintsOk (Partial f _) = constraintsOk1 f
       constraintsOk (Apply _) = True
       constraintsOk1 = memo $ \con ->
-        or [ case con_constraint (typeSubst sub con) of
-               Nothing -> True
-               Just constraint ->
-                 isJust (findValue instances (defaultTo cfg_default_to constraint))
+        or [ and [ isJust (findValue instances (defaultTo cfg_default_to constraint)) | constraint <- con_constraints (typeSubst sub con) ]
            | ty <- Set.toList (univ_root univ),
              sub <- maybeToList (matchType (typ con) ty) ]
 
