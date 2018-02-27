@@ -435,7 +435,9 @@ data Config =
     cfg_instances :: Instances,
     cfg_constants :: [[Constant]],
     cfg_predicates :: [[PredRep]],
-    cfg_default_to :: Type }
+    cfg_default_to :: Type,
+    cfg_infer_instance_types :: Bool
+    }
 
 makeLensAs ''Config
   [("cfg_quickCheck", "lens_quickCheck"),
@@ -444,7 +446,8 @@ makeLensAs ''Config
    ("cfg_instances", "lens_instances"),
    ("cfg_constants", "lens_constants"),
    ("cfg_predicates", "lens_predicates"),
-   ("cfg_default_to", "lens_default_to")]
+   ("cfg_default_to", "lens_default_to"),
+   ("cfg_infer_instance_types", "lens_infer_instance_types")]
 
 defaultConfig :: Config
 defaultConfig =
@@ -455,7 +458,8 @@ defaultConfig =
     cfg_instances = mempty,
     cfg_constants = [],
     cfg_predicates = [],
-    cfg_default_to = typeRep (Proxy :: Proxy Int) }
+    cfg_default_to = typeRep (Proxy :: Proxy Int),
+    cfg_infer_instance_types = False }
 
 checkArbInst :: Type -> Instances -> Bool
 checkArbInst t is =
@@ -493,11 +497,13 @@ quickSpec Config{..} = do
   let
     constantsOf f = true:f cfg_constants ++ f (map (concatMap predCons) cfg_predicates)
     constants = constantsOf concat
-    ugly = [ (con "" ()) { con_type = t } | t <- typesFromConclusions ]
+    instanceTypeCons = if cfg_infer_instance_types
+                       then [ (con "" ()) { con_type = t } | t <- typesFromConclusions ]
+                       else []
     
     -- Ugly hack to add the right types from instances
-    univ = conditionalsUniverse $ constants ++ ugly
-    univNoPred = conditionalsUniverse . (++ugly) . concat $ map (map predCon) cfg_predicates ++ cfg_constants
+    univ = conditionalsUniverse $ constants ++ instanceTypeCons
+    univNoPred = conditionalsUniverse . (++instanceTypeCons) . concat $ map (map predCon) cfg_predicates ++ cfg_constants
     instances = mconcat (cfg_instances:map predInstances (concat cfg_predicates) ++ [baseInstances])
 
     {- Adding types to the universe for type class instantiation -}

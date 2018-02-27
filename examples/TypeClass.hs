@@ -11,4 +11,5 @@ main = quickSpec [ con "0" (liftC 0   :: Num A ==> A)
                  , con "*" (liftC (*) :: Num A ==> (A -> A -> A))
                  , instanceOf @(Num Float)
                  , monoType (Proxy :: Proxy Float)
+                 --, withInferInstanceTypes
                  ]

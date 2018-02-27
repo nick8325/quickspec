@@ -90,6 +90,7 @@ module QuickSpec(
   -- * Customising QuickSpec
   withMaxTermSize, withMaxTests, withMaxTestSize, defaultTo,
   withPruningDepth, withPruningTermSize, withFixedSeed,
+  withInferInstanceTypes,
 
   -- * Re-exported functionality
   Typeable, (:-)(..), Dict(..), Proxy(..), Arbitrary) where
@@ -310,6 +311,11 @@ withPruningTermSize n =
 -- Useful if you want repeatable results.
 withFixedSeed :: Int -> Sig
 withFixedSeed s = Sig (\_ -> setL (QuickCheck.lens_fixed_seed # Haskell.lens_quickCheck) (Just . mkQCGen $ s))
+
+-- | Automatically infer types to add to the universe from
+-- available type class instances
+withInferInstanceTypes :: Sig
+withInferInstanceTypes = Sig (\_ -> setL (Haskell.lens_infer_instance_types) True)
 
 -- | A signature containing boolean functions:
 -- @(`||`)@, @(`&&`)@, `not`, `True`, `False`.
