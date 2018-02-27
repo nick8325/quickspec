@@ -493,10 +493,11 @@ quickSpec Config{..} = do
   let
     constantsOf f = true:f cfg_constants ++ f (map (concatMap predCons) cfg_predicates)
     constants = constantsOf concat
+    ugly = [ (con "" ()) { con_type = t } | t <- typesFromConclusions ]
     
     -- Ugly hack to add the right types from instances
-    univ = conditionalsUniverse $ constants ++ [ (con "" ()) { con_type = t } | t <- typesFromConclusions ]
-    univNoPred = conditionalsUniverse . concat $ map (map predCon) cfg_predicates ++ cfg_constants
+    univ = conditionalsUniverse $ constants ++ ugly
+    univNoPred = conditionalsUniverse . (++ugly) . concat $ map (map predCon) cfg_predicates ++ cfg_constants
     instances = mconcat (cfg_instances:map predInstances (concat cfg_predicates) ++ [baseInstances])
 
     {- Adding types to the universe for type class instantiation -}
