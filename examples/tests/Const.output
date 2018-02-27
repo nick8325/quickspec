@@ -1,0 +1,8 @@
+== Functions ==
+   const :: a -> b -> a
+asTypeOf :: a -> a -> a
+
+== Laws ==
+  1. asTypeOf x y = x
+  2. const x y = x
+

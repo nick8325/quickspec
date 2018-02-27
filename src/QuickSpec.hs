@@ -95,11 +95,19 @@ import Data.Lens.Light
 import QuickSpec.Utils
 import QuickSpec.Type hiding (defaultTo)
 import Data.Proxy
+import System.Environment
 
 -- | Run QuickSpec. See the documentation at the top of this file.
 quickSpec :: Signature sig => sig -> IO ()
-quickSpec sig =
-  Haskell.quickSpec (runSig sig (Context 0 []) Haskell.defaultConfig)
+quickSpec sig = do
+  -- Undocumented feature for testing :)
+  seed <- lookupEnv "QUICKCHECK_SEED"
+  let
+    sig' = case seed of
+      Nothing -> signature sig
+      Just xs -> signature [signature sig, withFixedSeed (read xs)]
+
+  Haskell.quickSpec (runSig sig' (Context 0 []) Haskell.defaultConfig)
 
 -- | A signature.
 newtype Sig = Sig { unSig :: Context -> Haskell.Config -> Haskell.Config }

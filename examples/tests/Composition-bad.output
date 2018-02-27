@@ -1,0 +1,6 @@
+== Functions ==
+(.) :: (Queue a -> Queue a) -> (Queue a -> Queue a) -> Queue a -> Queue a
+
+== Laws ==
+  1. (f . g) . h = f . (g . h)
+

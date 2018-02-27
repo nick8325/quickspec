@@ -1,0 +1,59 @@
+== Functions ==
+       union :: IntSet -> IntSet -> IntSet
+intersection :: IntSet -> IntSet -> IntSet
+       empty :: IntSet
+
+== Laws ==
+  1. x = y :: ()
+  2. intersection x y = intersection y x
+  3. intersection x x = x
+  4. union x y = union y x
+  5. union x x = x
+  6. intersection x empty = empty
+  7. union x empty = x
+  8. intersection (intersection x y) z = intersection x (intersection y z)
+  9. intersection x (union x y) = x
+ 10. union x (intersection x y) = x
+ 11. union (union x y) z = union x (union y z)
+ 12. intersection x (union y (intersection x z)) = intersection x (union y z)
+ 13. intersection (union x y) (union x z) = union x (intersection y z)
+
+== Functions ==
+insert :: Int -> IntSet -> IntSet
+delete :: Int -> IntSet -> IntSet
+
+== Laws ==
+ 14. delete x empty = empty
+ 15. delete x (delete y z) = delete y (delete x z)
+ 16. delete x (delete x y) = delete x y
+ 17. delete x (insert x y) = delete x y
+ 18. insert x (delete x y) = insert x y
+ 19. insert x (insert y z) = insert y (insert x z)
+ 20. intersection x (delete y z) = delete y (intersection x z)
+ 21. intersection x (insert y x) = x
+ 22. union x (insert y z) = insert y (union x z)
+ 23. intersection x (insert y (intersection x z)) = intersection x (insert y z)
+ 24. intersection (insert x y) (insert x z) = insert x (intersection y z)
+ 25. union (delete x y) (delete x z) = delete x (union y z)
+ 26. union x (delete y (insert z empty)) = union x (delete y (insert z x))
+ 27. union x (intersection y (insert z empty)) = intersection (insert z x) (union x y)
+
+== Functions ==
+ False :: Bool
+member :: Int -> IntSet -> Bool
+
+== Laws ==
+ 28. member x y => insert x y = y
+ 29. member x empty = False
+ 30. member x (delete x y) = False
+ 31. member x (insert x y)
+ 32. member x z & member y w => member x (delete y z) = member y (delete x w)
+ 33. member x z => member x (intersection y z) = member x y
+ 34. member x (insert y empty) = member y (insert x empty)
+ 35. member x (insert y (delete x z)) = member x (insert y empty)
+ 36. member x (union y (delete x z)) = member x y
+ 37. member x w & member z x2 => member x (insert y (delete z w)) = member z (insert y (delete x x2))
+ 38. member x w & member z x2 => member x (union y (delete z w)) = member z (union y (delete x x2))
+ 39. member x (delete y (insert z empty)) = member z (delete y (insert x empty))
+ 40. member x (intersection y (insert z empty)) = member z (intersection y (insert x empty))
+

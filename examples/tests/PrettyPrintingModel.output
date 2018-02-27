@@ -1,0 +1,43 @@
+== Functions ==
+    "" :: [Char]
+  (++) :: [Char] -> [Char] -> [Char]
+     0 :: Int
+   (+) :: Int -> Int -> Int
+length :: [Char] -> Int
+
+== Laws ==
+  1. length "" = 0
+  2. x + y = y + x
+  3. x + 0 = x
+  4. xs ++ "" = xs
+  5. "" ++ xs = xs
+  6. length (xs ++ ys) = length (ys ++ xs)
+  7. (x + y) + z = x + (y + z)
+  8. (xs ++ ys) ++ zs = xs ++ (ys ++ zs)
+  9. length xs + length ys = length (xs ++ ys)
+
+== Functions ==
+text :: [Char] -> Layout
+nest :: Int -> Layout -> Layout
+($$) :: Layout -> Layout -> Layout
+(<>) :: Layout -> Layout -> Layout
+
+== Laws ==
+ 10. nest 0 x = x
+ 11. x <> text "" = x
+ 12. (x $$ y) $$ z = x $$ (y $$ z)
+ 13. x <> nest y z = x <> z
+ 14. (x $$ y) <> z = x $$ (y <> z)
+ 15. (x <> y) <> z = x <> (y <> z)
+ 16. nest x (y <> z) = nest x y <> z
+ 17. nest x (nest y z) = nest y (nest x z)
+ 18. nest (x + y) z = nest x (nest y z)
+ 19. text xs <> text ys = text (xs ++ ys)
+ 20. nest x y $$ nest x z = nest x (y $$ z)
+ 21. text xs $$ nest (length xs) x = text xs <> (text "" $$ x)
+ 22. text "" <> (text xs $$ x) = text xs $$ x
+ 23. text (xs ++ ys) $$ nest (length xs) x = text xs <> (text ys $$ x)
+ 24. (text xs <> x) $$ (text "" <> x) = text xs <> (nest (length xs) x $$ x)
+ 25. (text xs <> x) $$ nest (length xs) y = text xs <> ((text "" <> x) $$ y)
+ 26. text "" <> ((text xs <> x) $$ y) = (text xs <> x) $$ y
+
