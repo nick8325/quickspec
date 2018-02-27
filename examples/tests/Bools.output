@@ -1,9 +1,9 @@
 == Functions ==
+  not :: Bool -> Bool
  True :: Bool
 False :: Bool
  (||) :: Bool -> Bool -> Bool
  (&&) :: Bool -> Bool -> Bool
-  not :: Bool -> Bool
 
 == Laws ==
   1. not x & not y => x = y
