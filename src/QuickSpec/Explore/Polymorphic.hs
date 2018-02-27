@@ -218,7 +218,12 @@ universe xs = Universe (Set.fromList base)
     -- result type of every function (with all type variables unified), and all
     -- subterms of these types
     base = usort $ typeVar:concatMap (oneTypeVar . typs . typ) xs
-    typs ty = typeRes ty:typeArgs ty
+    typs ty = (typeRes ty:typeArgs ty) >>= generalise
+
+    generalise ty@(Twee.App f tys) =
+      typeVar:
+      (Twee.build <$> Twee.app f <$> mapM generalise (Twee.unpack tys))
+    generalise ty = [ty]
 
 inUniverse :: Typed fun => Term fun -> Universe -> Bool
 t `inUniverse` Universe{..} =
