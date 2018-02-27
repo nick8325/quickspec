@@ -40,6 +40,8 @@ import QuickSpec.Explore.Conditionals
 import Control.Spoon
 import qualified Data.Set as Set
 import qualified Test.QuickCheck.Poly as Poly
+import Numeric.Natural
+import Test.QuickCheck.Instances()
 
 baseInstances :: Instances
 baseInstances =
@@ -68,6 +70,7 @@ baseInstances =
     baseType (Proxy :: Proxy ()),
     baseType (Proxy :: Proxy Int),
     baseType (Proxy :: Proxy Integer),
+    baseType (Proxy :: Proxy Natural),
     baseType (Proxy :: Proxy Bool),
     baseType (Proxy :: Proxy Char),
     baseType (Proxy :: Proxy Poly.OrdA),
@@ -76,8 +79,12 @@ baseInstances =
     inst (Sub Dict :: () :- CoArbitrary ()),
     inst (Sub Dict :: () :- CoArbitrary Int),
     inst (Sub Dict :: () :- CoArbitrary Integer),
+    inst (Sub Dict :: () :- CoArbitrary Natural),
     inst (Sub Dict :: () :- CoArbitrary Bool),
     inst (Sub Dict :: () :- CoArbitrary Char),
+    inst (Sub Dict :: () :- CoArbitrary Poly.OrdA),
+    inst (Sub Dict :: () :- CoArbitrary Poly.OrdB),
+    inst (Sub Dict :: () :- CoArbitrary Poly.OrdC),
     inst (Sub Dict :: Eq A :- Eq [A]),
     inst (Sub Dict :: Ord A :- Ord [A]),
     inst (Sub Dict :: Arbitrary A :- Arbitrary [A]),
