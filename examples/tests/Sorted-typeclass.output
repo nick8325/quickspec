@@ -1,0 +1,21 @@
+== Functions ==
+    [] :: [a]
+   (:) :: a -> [a] -> [a]
+  sort :: Ord a => [a] -> [a]
+insert :: Ord a => a -> [a] -> [a]
+sorted :: Ord a => [a] -> Bool
+
+== Laws ==
+  1. x = y :: ()
+  2. sort [] = []
+  3. sorted []
+  4. insert x [] = x : []
+  5. sort (sort xs) = sort xs
+  6. sorted (sort xs)
+  7. sort (x : xs) = insert x (sort xs)
+  8. sort (insert x xs) = insert x (sort xs)
+  9. sorted (insert x xs) = sorted xs
+ 10. insert x (x : xs) = x : (x : xs)
+ 11. insert x (insert y xs) = insert y (insert x xs)
+ 12. sorted (x : insert x xs) = sorted (x : xs)
+
