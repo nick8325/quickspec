@@ -537,14 +537,13 @@ quickSpec Config{..} = do
         text "::" <+> pPrintType (typ x)
       maybeType _ = pPrintEmpty
 
-      -- constraintsOk (Partial f _) = constraintsOk1 f
-      -- constraintsOk (Apply _) = True
-      -- constraintsOk1 = memo $ \con ->
-      --   or [ and [ isJust (findValue instances (defaultTo cfg_default_to constraint)) | constraint <- con_constraints (typeSubst sub con) ]
-      --      | ty <- Set.toList (univ_root univ),
-      --        sub <- maybeToList (matchType (typ con) ty) ]
-
-      constraintsOk _ = True
+      -- XXX do this during testing
+      constraintsOk (Partial f _) = constraintsOk1 f
+      constraintsOk (Apply _) = True
+      constraintsOk1 = memo $ \con ->
+        or [ and [ isJust (findValue instances (defaultTo cfg_default_to constraint)) | constraint <- con_constraints (typeSubst sub con) ]
+           | ty <- Set.toList (univ_types univ),
+             sub <- maybeToList (matchType (typeRes (typ con)) ty) ]
 
       enumerator cons =
         sortTerms measure $
