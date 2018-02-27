@@ -39,6 +39,7 @@ import GHC.TypeLits
 import QuickSpec.Explore.Conditionals
 import Control.Spoon
 import qualified Data.Set as Set
+import qualified Test.QuickCheck.Poly as Poly
 
 baseInstances :: Instances
 baseInstances =
@@ -69,6 +70,9 @@ baseInstances =
     baseType (Proxy :: Proxy Integer),
     baseType (Proxy :: Proxy Bool),
     baseType (Proxy :: Proxy Char),
+    baseType (Proxy :: Proxy Poly.OrdA),
+    baseType (Proxy :: Proxy Poly.OrdB),
+    baseType (Proxy :: Proxy Poly.OrdC),
     inst (Sub Dict :: () :- CoArbitrary ()),
     inst (Sub Dict :: () :- CoArbitrary Int),
     inst (Sub Dict :: () :- CoArbitrary Integer),
