@@ -91,8 +91,8 @@ explore t = do
       Rejected{} -> return res
       Accepted{} -> do
         tys <- addPolyType (polyTyp (poly t))
-        ress <- forM tys $ \ty ->
-          exploreNoMGU (t `at` ty)
+        ress <- forM (typeInstances univ t) $ \u ->
+          exploreNoMGU u
         return res { result_props = concatMap result_props (res:ress) }
     where
       t `at` ty =
@@ -198,10 +198,7 @@ typeInstances Universe{..} prop =
     cs =
       foldr intersection [Map.empty]
         (map (constrain (Set.toList univ_types))
-          (usort (DList.toList (termsDL prop) >>= arguments)))
-
-    arguments x@Var{} = [x]
-    arguments (App _ ts) = ts >>= subterms
+          (usort (DList.toList (termsDL prop) >>= subterms)))
 
     constrain tys t =
       usort [ Map.fromList (Twee.substToList sub) | u <- tys, Just sub <- [Twee.match (typ t) u] ]
