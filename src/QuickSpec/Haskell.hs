@@ -119,7 +119,12 @@ baseInstances =
     inst (\(Dict :: Dict (Observe A B C)) -> observeObs :: ObserveData C B),
     inst (\(Dict :: Dict (Ord A)) -> observeOrd :: ObserveData A A),
     inst (\(Dict :: Dict (Arbitrary A)) (obs :: ObserveData B C) -> observeFunction obs :: ObserveData (A -> B) C),
-    inst (\(obs :: ObserveData A B) -> WrappedObserveData (toValue obs))]
+    inst (\(obs :: ObserveData A B) -> WrappedObserveData (toValue obs)),
+    -- No warnings for TestCaseWrapped
+    inst (NoWarnings :: NoWarnings (TestCaseWrapped SymA A))]
+
+-- A token used in the instance list for types that shouldn't generate warnings
+data NoWarnings a = NoWarnings
 
 instance c => Arbitrary (Dict c) where
   arbitrary = return Dict
@@ -497,18 +502,19 @@ data Warnings =
     warn_no_generator :: [Type],
     warn_no_observer :: [Type] }
 
-warnings :: Instances -> Config -> Warnings
-warnings insts cfg@Config{..} =
+warnings :: Universe -> Instances -> Config -> Warnings
+warnings univ insts cfg@Config{..} =
   Warnings {
     warn_no_generator =
-      [ ty | ty <- univ, isNothing (findGenerator cfg_default_to insts ty) ],
+      [ ty | ty <- types, isNothing (findGenerator cfg_default_to insts ty) ],
     warn_no_observer =
-      [ ty | ty <- univ, isNothing (findObserver insts ty) ] }
+      [ ty | ty <- types, isNothing (findObserver insts ty) ] }
   where
     -- Check after defaulting types to Int (or whatever it is)
-    univ =
-      defaultTo cfg_default_to . Set.toList . univ_types $
-        universe (instanceTypes insts cfg ++ map typ (concat cfg_constants))
+    types =
+      [ ty
+      | ty <- defaultTo cfg_default_to . Set.toList . univ_types $ univ,
+        isNothing (findInstance insts ty :: Maybe (Value NoWarnings)) ]
 
 instance Pretty Warnings where
   pPrint Warnings{..} =
@@ -582,7 +588,7 @@ quickSpec cfg@Config{..} = do
         putLine $ show $ pPrintSignature
           (map (partial . unhideConstraint) (f cfg_constants))
         putLine ""
-        putText (prettyShow (warnings instances cfg))
+        putText (prettyShow (warnings univ instances cfg))
         putLine "== Laws =="
         QuickSpec.Explore.quickSpec present (flip evalHaskell) cfg_max_size univ
           (enumerator [partial fun | fun <- constantsOf g])

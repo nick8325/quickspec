@@ -1,0 +1,42 @@
+== Functions ==
+    [] :: [a]
+  (++) :: [a] -> [a] -> [a]
+     0 :: Int
+   (+) :: Int -> Int -> Int
+length :: [a] -> Int
+
+WARNING: The following types have no 'Arbitrary' instance declared.
+You will not get any variables of the following types:
+  Doc
+
+WARNING: The following types have no 'Ord' or 'Observe' instance declared.
+You will not get any equations about the following types:
+  Doc
+
+== Laws ==
+  1. length [] = 0
+  2. x + y = y + x
+  3. x + 0 = x
+  4. xs ++ [] = xs
+  5. [] ++ xs = xs
+  6. length (xs ++ ys) = length (ys ++ xs)
+  7. (x + y) + z = x + (y + z)
+  8. (xs ++ ys) ++ zs = xs ++ (ys ++ zs)
+  9. length xs + length ys = length (xs ++ ys)
+
+== Functions ==
+text :: [Char] -> Doc
+nest :: Int -> Doc -> Doc
+(<>) :: Doc -> Doc -> Doc
+($$) :: Doc -> Doc -> Doc
+
+WARNING: The following types have no 'Arbitrary' instance declared.
+You will not get any variables of the following types:
+  Doc
+
+WARNING: The following types have no 'Ord' or 'Observe' instance declared.
+You will not get any equations about the following types:
+  Doc
+
+== Laws ==
+
