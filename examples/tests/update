@@ -5,5 +5,5 @@ for i in $*; do
     $GHC --make -O $i
     prog=${i/.hs/}
     out=$(dirname $0)/$(basename $prog).output
-    QUICKCHECK_SEED=1234 $i > $out
+    QUICKCHECK_SEED=1234 $prog > $out
 done
