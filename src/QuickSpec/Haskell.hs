@@ -1,10 +1,21 @@
 {-# OPTIONS_HADDOCK hide #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE PatternGuards #-}
-{-# LANGUAGE ScopedTypeVariables, TypeOperators, GADTs, FlexibleInstances, FlexibleContexts, MultiParamTypeClasses, RecordWildCards, TemplateHaskell, UndecidableInstances, DefaultSignatures, FunctionalDependencies #-}
-{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds
+           , RankNTypes
+           , TypeFamilies
+           , PatternGuards
+           , ScopedTypeVariables
+           , TypeOperators
+           , GADTs
+           , FlexibleInstances
+           , FlexibleContexts
+           , MultiParamTypeClasses
+           , RecordWildCards
+           , TemplateHaskell
+           , UndecidableInstances
+           , DefaultSignatures
+           , FunctionalDependencies
+           , ConstraintKinds
+#-}
 module QuickSpec.Haskell where
 
 import QuickSpec.Haskell.Resolve

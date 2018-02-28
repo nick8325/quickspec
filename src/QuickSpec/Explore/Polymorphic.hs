@@ -1,6 +1,16 @@
 -- Theory exploration which handles polymorphism.
 {-# OPTIONS_HADDOCK hide #-}
-{-# LANGUAGE TemplateHaskell, FlexibleContexts, GeneralizedNewtypeDeriving, FlexibleInstances, MultiParamTypeClasses, BangPatterns, UndecidableInstances, RankNTypes, GADTs, RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell
+           , FlexibleContexts
+           , GeneralizedNewtypeDeriving
+           , FlexibleInstances
+           , MultiParamTypeClasses
+           , BangPatterns
+           , UndecidableInstances
+           , RankNTypes
+           , GADTs
+           , RecordWildCards
+#-}
 module QuickSpec.Explore.Polymorphic(module QuickSpec.Explore.Polymorphic, Result(..), Universe(..)) where
 
 import qualified QuickSpec.Explore.Schemas as Schemas
@@ -39,9 +49,7 @@ instance Pretty fun => Pretty (PolyFun fun) where
 instance PrettyTerm fun => PrettyTerm (PolyFun fun) where
   termStyle = termStyle . fun_specialised
 
--- univ_inner: the type universe, with all type variables unified
--- univ_root: the set of types allowed for partially applied functions, only at
--- the root of a term
+-- The set of all types being explored
 data Universe = Universe { univ_types :: Set Type }
 
 makeLensAs ''Polymorphic
