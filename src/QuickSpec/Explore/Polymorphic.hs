@@ -90,13 +90,10 @@ explore t = do
     case res of
       Rejected{} -> return res
       Accepted{} -> do
-        tys <- addPolyType (polyTyp (poly t))
+        addPolyType (polyTyp (poly t))
         ress <- forM (typeInstances univ t) $ \u ->
           exploreNoMGU u
         return res { result_props = concatMap result_props (res:ress) }
-    where
-      t `at` ty =
-        fromMaybe (error ("Couldn't cast " ++ prettyShow (typ t) ++ " to " ++ prettyShow (unPoly ty))) (cast (unPoly ty) t)
 
 exploreNoMGU ::
   (PrettyTerm fun, Ord result, Ord norm, Typed fun, Ord fun, Apply (Term fun),

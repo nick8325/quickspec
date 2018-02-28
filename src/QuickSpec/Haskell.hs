@@ -27,7 +27,7 @@ import qualified QuickSpec.Pruning.Twee as Twee
 import QuickSpec.Explore hiding (quickSpec)
 import qualified QuickSpec.Explore
 import QuickSpec.Explore.PartialApplication
-import QuickSpec.Explore.Polymorphic(Universe(..), universe)
+import QuickSpec.Explore.Polymorphic(Universe(..))
 import QuickSpec.Pruning.Background(Background)
 import Control.Monad
 import Control.Monad.Trans.State.Strict
@@ -42,7 +42,6 @@ import qualified Data.Set as Set
 import qualified Test.QuickCheck.Poly as Poly
 import Numeric.Natural
 import Test.QuickCheck.Instances()
-import Data.List (nub)
 
 baseInstances :: Instances
 baseInstances =
@@ -503,7 +502,7 @@ data Warnings =
     warn_no_observer :: [Type] }
 
 warnings :: Universe -> Instances -> Config -> Warnings
-warnings univ insts cfg@Config{..} =
+warnings univ insts Config{..} =
   Warnings {
     warn_no_generator =
       [ ty | ty <- types, isNothing (findGenerator cfg_default_to insts ty) ],
