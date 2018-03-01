@@ -84,9 +84,12 @@ instance (Arity f, Typed f, Background f) => Background (PartiallyApplied f) whe
       vs = map Var (zipWith V (typeArgs (typ f)) [0..])
   background _ = []
 
-instance (Applicative f, Eval fun (Value f) m) => Eval (PartiallyApplied fun) (Value f) m where
-  eval var (Partial f _) = eval var f
-  eval _ (Apply ty) =
-    return $ fromJust $
-      cast (Twee.build (Twee.app (Twee.fun Arrow) [ty, ty]))
-        (toValue (pure (($) :: (A -> B) -> (A -> B))))
+evalPartiallyApplied ::
+  (Applicative f, Monad m) =>
+  (fun -> m (Value f)) ->
+  (PartiallyApplied fun -> m (Value f))
+evalPartiallyApplied eval (Partial f _) = eval f
+evalPartiallyApplied _ (Apply ty) =
+  return $ fromJust $
+    cast (Twee.build (Twee.app (Twee.fun Arrow) [ty, ty]))
+      (toValue (pure (($) :: (A -> B) -> (A -> B))))

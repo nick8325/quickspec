@@ -44,7 +44,6 @@ import Control.Monad
 import Control.Monad.Trans.State.Strict
 import QuickSpec.Terminal
 import Text.Printf
-import Data.Reflection hiding (D)
 import QuickSpec.Utils
 import GHC.TypeLits
 import QuickSpec.Explore.Conditionals
@@ -257,10 +256,11 @@ arbitraryFunction :: CoArbitrary a => (a -> Gen b) -> Gen (a -> b)
 arbitraryFunction gen = promote (\x -> coarbitrary x (gen x))
 
 -- | Evaluate a Haskell term in an environment.
-evalHaskell :: (Given Type, Typed f, PrettyTerm f, Eval f (Value Identity) Maybe) => TestCase -> Term f -> Either (Value Ordy) (Term f)
-evalHaskell (TestCase env obs) t =
+evalHaskell :: Type -> Instances -> TestCase -> Term (PartiallyApplied Constant) -> Either (Value Ordy) (Term (PartiallyApplied Constant))
+evalHaskell def insts (TestCase env obs) t =
   maybe (Right t) Left $ do
-    Identity val `In` w <- unwrap <$> eval env (defaultTo given t)
+    let eval env t = evalTerm env (evalPartiallyApplied (evalConstant insts)) t
+    Identity val `In` w <- unwrap <$> eval env (defaultTo def t)
     res <- obs (wrap w (Identity val))
     -- Don't allow partial results to enter the decision tree
     guard (withValue res (\(Ordy x) -> isJust (teaspoon (x == x))))
@@ -380,12 +380,12 @@ instance Arity Constant where
 instance Predicate Constant where
   classify = con_classify
 
-instance (Given Type, Given Instances) => Eval Constant (Value Identity) Maybe where
-  eval _ Constant{..} = foldM app con_value con_constraints
-    where
-      app val constraint = do
-        dict <- findValue given constraint
-        return (apply val dict)
+evalConstant :: Instances -> Constant -> Maybe (Value Identity)
+evalConstant insts Constant{..} = foldM app con_value con_constraints
+  where
+    app val constraint = do
+      dict <- findValue insts constraint
+      return (apply val dict)
 
 class Predicateable a where
   -- A test case for predicates of type a
@@ -557,6 +557,8 @@ quickSpec cfg@Config{..} = do
     univ = conditionalsUniverse (instanceTypes instances cfg) constants
     instances = cfg_instances `mappend` baseInstances
 
+    eval = evalHaskell cfg_default_to instances
+
   give cfg_default_to $ give instances $ do
     let
       present prop = do
@@ -600,7 +602,7 @@ quickSpec cfg@Config{..} = do
         putLine ""
         putText (prettyShow (warnings univ instances cfg))
         putLine "== Laws =="
-        QuickSpec.Explore.quickSpec present (flip evalHaskell) cfg_max_size univ
+        QuickSpec.Explore.quickSpec present (flip eval) cfg_max_size univ
           (enumerator [partial fun | fun <- constantsOf g])
         putLine ""
 
@@ -612,7 +614,7 @@ quickSpec cfg@Config{..} = do
     join $
       fmap withStdioTerminal $
       generate $
-      QuickCheck.run cfg_quickCheck (arbitraryTestCase cfg_default_to instances) evalHaskell $
+      QuickCheck.run cfg_quickCheck (arbitraryTestCase cfg_default_to instances) eval $
       Twee.run cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size } $
       runConditionals (map total constants) $
       flip evalStateT 1 $
