@@ -559,63 +559,61 @@ quickSpec cfg@Config{..} = do
 
     eval = evalHaskell cfg_default_to instances
 
-  give cfg_default_to $ give instances $ do
-    let
-      present prop = do
-        n :: Int <- get
-        put (n+1)
-        norm <- normaliser
-        putLine (printf "%3d. %s" n (show (prettyProp (names instances) (ac norm (conditionalise prop)) <+> maybeType prop)))
+    present prop = do
+      n :: Int <- get
+      put (n+1)
+      norm <- normaliser
+      putLine (printf "%3d. %s" n (show (prettyProp (names instances) (ac norm (conditionalise prop)) <+> maybeType prop)))
 
-      -- Transform x+(y+z) = y+(x+z) into associativity, if + is commutative
-      ac norm (lhs :=>: App f [Var x, App f1 [Var y, Var z]] :=: App f2 [Var y1, App f3 [Var x1, Var z1]])
-        | f == f1, f1 == f2, f2 == f3,
-          x == x1, y == y1, z == z1,
-          x /= y, y /= z, x /= z,
-          norm (App f [Var x, Var y]) == norm (App f [Var y, Var x]) =
-            lhs :=>: App f [App f [Var x, Var y], Var z] :=: App f [Var x, App f [Var y, Var z]]
-      ac _ prop = prop
+    -- Transform x+(y+z) = y+(x+z) into associativity, if + is commutative
+    ac norm (lhs :=>: App f [Var x, App f1 [Var y, Var z]] :=: App f2 [Var y1, App f3 [Var x1, Var z1]])
+      | f == f1, f1 == f2, f2 == f3,
+        x == x1, y == y1, z == z1,
+        x /= y, y /= z, x /= z,
+        norm (App f [Var x, Var y]) == norm (App f [Var y, Var x]) =
+          lhs :=>: App f [App f [Var x, Var y], Var z] :=: App f [Var x, App f [Var y, Var z]]
+    ac _ prop = prop
 
-      -- Add a type signature when printing the equation x = y.
-      maybeType (_ :=>: x@(Var _) :=: Var _) =
-        text "::" <+> pPrintType (typ x)
-      maybeType _ = pPrintEmpty
+    -- Add a type signature when printing the equation x = y.
+    maybeType (_ :=>: x@(Var _) :=: Var _) =
+      text "::" <+> pPrintType (typ x)
+    maybeType _ = pPrintEmpty
 
-      -- XXX do this during testing
-      constraintsOk (Partial f _) = constraintsOk1 f
-      constraintsOk (Apply _) = True
-      constraintsOk1 = memo $ \con ->
-        or [ and [ isJust (findValue instances (defaultTo cfg_default_to constraint)) | constraint <- con_constraints (typeSubst sub con) ]
-           | ty <- Set.toList (univ_types univ),
-             sub <- maybeToList (matchType (typeRes (typ con)) ty) ]
+    -- XXX do this during testing
+    constraintsOk (Partial f _) = constraintsOk1 f
+    constraintsOk (Apply _) = True
+    constraintsOk1 = memo $ \con ->
+      or [ and [ isJust (findValue instances (defaultTo cfg_default_to constraint)) | constraint <- con_constraints (typeSubst sub con) ]
+         | ty <- Set.toList (univ_types univ),
+           sub <- maybeToList (matchType (typeRes (typ con)) ty) ]
 
-      enumerator cons =
-        sortTerms measure $
-        filterEnumerator (all constraintsOk . funs) $
-        enumerateConstants atomic `mappend` enumerateApplications
-        where
-          atomic = cons ++ [Var (V typeVar 0)]
+    enumerator cons =
+      sortTerms measure $
+      filterEnumerator (all constraintsOk . funs) $
+      enumerateConstants atomic `mappend` enumerateApplications
+      where
+        atomic = cons ++ [Var (V typeVar 0)]
 
-      mainOf f g = do
-        putLine $ show $ pPrintSignature
-          (map (partial . unhideConstraint) (f cfg_constants))
-        putLine ""
-        putText (prettyShow (warnings univ instances cfg))
-        putLine "== Laws =="
-        QuickSpec.Explore.quickSpec present (flip eval) cfg_max_size univ
-          (enumerator [partial fun | fun <- constantsOf g])
-        putLine ""
+    mainOf f g = do
+      putLine $ show $ pPrintSignature
+        (map (partial . unhideConstraint) (f cfg_constants))
+      putLine ""
+      putText (prettyShow (warnings univ instances cfg))
+      putLine "== Laws =="
+      QuickSpec.Explore.quickSpec present (flip eval) cfg_max_size univ
+        (enumerator [partial fun | fun <- constantsOf g])
+      putLine ""
 
-      main = mapM_ round [1..rounds]
-        where
-          round n = mainOf (concat . take 1 . drop (rounds-n)) (concat . drop (rounds-n))
-          rounds = length cfg_constants
+    main = mapM_ round [1..rounds]
+      where
+        round n = mainOf (concat . take 1 . drop (rounds-n)) (concat . drop (rounds-n))
+        rounds = length cfg_constants
 
-    join $
-      fmap withStdioTerminal $
-      generate $
-      QuickCheck.run cfg_quickCheck (arbitraryTestCase cfg_default_to instances) eval $
-      Twee.run cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size } $
-      runConditionals (map total constants) $
-      flip evalStateT 1 $
-        main
+  join $
+    fmap withStdioTerminal $
+    generate $
+    QuickCheck.run cfg_quickCheck (arbitraryTestCase cfg_default_to instances) eval $
+    Twee.run cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size } $
+    runConditionals (map total constants) $
+    flip evalStateT 1 $
+      main
