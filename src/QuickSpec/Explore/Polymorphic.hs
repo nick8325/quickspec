@@ -30,13 +30,11 @@ import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Class
 import qualified Twee.Base as Twee
 import Control.Monad
-import Data.Maybe
 import qualified Data.DList as DList
 
 data Polymorphic testcase result fun norm =
   Polymorphic {
     pm_schemas :: Schemas testcase result (PolyFun fun) norm,
-    pm_unifiable :: Map (Poly Type) [Poly Type],
     pm_universe :: Universe }
 
 data PolyFun fun =
@@ -54,7 +52,6 @@ data Universe = Universe { univ_types :: Set Type }
 
 makeLensAs ''Polymorphic
   [("pm_schemas", "schemas"),
-   ("pm_unifiable", "unifiable"),
    ("pm_universe", "univ")]
 
 initialState ::
@@ -65,7 +62,6 @@ initialState ::
 initialState univ inst eval =
   Polymorphic {
     pm_schemas = Schemas.initialState (inst . fmap fun_specialised) (eval . fmap fun_specialised),
-    pm_unifiable = Map.empty,
     pm_universe = univ }
 
 polyFun :: Typed fun => fun -> PolyFun fun
@@ -98,7 +94,6 @@ explore t = do
     case res of
       Rejected{} -> return res
       Accepted{} -> do
-        addPolyType (polyTyp (poly t))
         ress <- forM (typeInstances univ t) $ \u ->
           exploreNoMGU u
         return res { result_props = concatMap result_props (res:ress) }
@@ -118,17 +113,6 @@ exploreNoMGU t = do
   where
     mapProps f (Accepted props) = Accepted (map f props)
     mapProps f (Rejected props) = Rejected (map f props)
-
-addPolyType :: Monad m => Poly Type -> StateT (Polymorphic testcase result fun norm) m [Poly Type]
-addPolyType ty = do
-  unif <- access unifiable
-  univ <- access univ
-  case Map.lookup ty unif of
-    Just tys -> return tys
-    Nothing -> do
-      let tys = usort [ poly ty' | ty' <- Set.toList (univ_types univ), isJust (Twee.match (unPoly ty) ty') ]
-      unifiable %= Map.insert ty tys
-      return tys
 
 instance (PrettyTerm fun, Ord fun, Typed fun, Apply (Term fun), MonadPruner (Term fun) norm m) =>
   MonadPruner (Term (PolyFun fun)) norm (PolyM testcase result fun norm m) where
