@@ -15,7 +15,6 @@ import Twee.Base(Arity(..), Pretty(..), PrettyTerm(..), TermStyle(..), EqualsBon
 import Twee.Pretty
 import qualified Data.Map.Strict as Map
 import Data.List
-import Data.Reflection
 
 -- | A typed term.
 data Term f = Var {-# UNPACK #-} !Var | App !f ![Term f]
@@ -126,11 +125,11 @@ class Monad m => Eval term val m where
   -- | Evaluate something, given a valuation for variables.
   eval :: (Var -> m val) -> term -> m val
 
-instance (Typed fun, Given Type, Apply a, Eval fun a m) => Eval (Term fun) a m where
+instance (Typed fun, Apply a, Eval fun a m) => Eval (Term fun) a m where
   eval env = evaluateTerm (eval env) env
 
 -- | Evaluate a term, given a valuation for variables and function symbols.
-evaluateTerm :: (Given Type, Typed fun, Apply a, Monad m) => (fun -> m a) -> (Var -> m a) -> Term fun -> m a
+evaluateTerm :: (Typed fun, Apply a, Monad m) => (fun -> m a) -> (Var -> m a) -> Term fun -> m a
 evaluateTerm fun var = eval
   where
     eval (Var x) = var x
