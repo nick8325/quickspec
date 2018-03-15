@@ -453,6 +453,9 @@ data Config =
     cfg_twee :: Twee.Config,
     cfg_max_size :: Int,
     cfg_instances :: Instances,
+    -- This represents the constants for a series of runs of QuickSpec.
+    -- Each index in cfg_constants represents one run of QuickSpec.
+    -- head cfg_constants contains all the background functions.
     cfg_constants :: [[Constant]],
     cfg_default_to :: Type,
     cfg_infer_instance_types :: Bool
@@ -474,7 +477,7 @@ defaultConfig =
     cfg_twee = Twee.Config { Twee.cfg_max_term_size = minBound, Twee.cfg_max_cp_depth = maxBound },
     cfg_max_size = 7,
     cfg_instances = mempty,
-    cfg_constants = [],
+    cfg_constants = [[true]],
     cfg_default_to = typeRep (Proxy :: Proxy Int),
     cfg_infer_instance_types = False }
 
@@ -590,19 +593,22 @@ quickSpec cfg@Config{..} = do
       where
         atomic = cons ++ [Var (V typeVar 0)]
 
-    mainOf f g = do
+    mainOf n f g = do
       putLine $ show $ pPrintSignature
         (map (partial . unhideConstraint) (f cfg_constants))
       putLine ""
-      putText (prettyShow (warnings univ instances cfg))
-      putLine "== Laws =="
-      QuickSpec.Explore.quickSpec present (flip eval) cfg_max_size univ
+      when (n > 0) $ do
+        putText (prettyShow (warnings univ instances cfg))
+        putLine "== Laws =="
+      let pres = if n == 0 then \_ -> return () else present
+      QuickSpec.Explore.quickSpec pres (flip eval) cfg_max_size univ
         (enumerator [partial fun | fun <- constantsOf g])
-      putLine ""
+      when (n > 0) $ do
+        putLine ""
 
-    main = mapM_ round [1..rounds]
+    main = mapM_ round [0..rounds-1]
       where
-        round n = mainOf (concat . take 1 . drop (rounds-n)) (concat . drop (rounds-n))
+        round n = mainOf n (concat . take 1 . drop n) (concat . take (n+1))
         rounds = length cfg_constants
 
   join $

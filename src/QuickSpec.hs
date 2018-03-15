@@ -119,7 +119,7 @@ quickSpec sig = do
       Nothing -> signature sig
       Just xs -> signature [signature sig, withFixedSeed (read xs)]
 
-  Haskell.quickSpec (runSig sig' (Context 0 []) Haskell.defaultConfig)
+  Haskell.quickSpec (runSig sig' (Context 1 []) Haskell.defaultConfig)
 
 -- | A signature.
 newtype Sig = Sig { unSig :: Context -> Haskell.Config -> Haskell.Config }
@@ -254,7 +254,7 @@ addInstances insts =
 -- >     con "+" ((+) :: Int -> Int -> Int) ] ]
 background :: Signature sig => sig -> Sig
 background sig =
-  Sig (\(Context n xs) -> runSig sig (Context (n+1) xs))
+  Sig (\(Context _ xs) -> runSig sig (Context 0 xs))
 
 -- | Remove a function or predicate from the signature.
 -- Useful in combination with 'prelude' and friends.
@@ -281,9 +281,11 @@ without sig xs =
 -- >       con "++" ((++) :: [A] -> [A] -> [A]),
 -- >       con "length" (length :: [A] -> Int) ]
 series :: Signature sig => [sig] -> Sig
-series = foldl op mempty . map signature
+series = foldr op mempty . map signature
   where
-    op sigs sig = signature [background sigs, sig]
+    op sig sigs = sig `mappend` later (signature sigs)
+    later sig =
+      Sig (\(Context n xs) cfg -> unSig sig (Context (n+1) xs) cfg)
 
 -- | Set the maximum size of terms to explore (default: 7).
 withMaxTermSize :: Int -> Sig
