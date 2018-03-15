@@ -454,7 +454,6 @@ data Config =
     cfg_max_size :: Int,
     cfg_instances :: Instances,
     cfg_constants :: [[Constant]],
-    cfg_predicates :: [[(Instances, Constant)]],
     cfg_default_to :: Type,
     cfg_infer_instance_types :: Bool
     }
@@ -465,7 +464,6 @@ makeLensAs ''Config
    ("cfg_max_size", "lens_max_size"),
    ("cfg_instances", "lens_instances"),
    ("cfg_constants", "lens_constants"),
-   ("cfg_predicates", "lens_predicates"),
    ("cfg_default_to", "lens_default_to"),
    ("cfg_infer_instance_types", "lens_infer_instance_types")]
 
@@ -477,7 +475,6 @@ defaultConfig =
     cfg_max_size = 7,
     cfg_instances = mempty,
     cfg_constants = [],
-    cfg_predicates = [],
     cfg_default_to = typeRep (Proxy :: Proxy Int),
     cfg_infer_instance_types = False }
 
