@@ -43,7 +43,11 @@ main = quickSpec [
     con "0" (0 :: Int),
     con "+" ((+) :: Int -> Int -> Int),
     con "length" (length :: String -> Int) ],
-  con "text" text,
-  con "nest" nest,
-  con "$$" ($$),
-  con "<>" (<>) ]
+  series [sig1, sig2]]
+  where
+    sig1 = [
+      con "text" text,
+      con "nest" nest,
+      con "$$" ($$),
+      con "<>" (<>) ]
+    sig2 = [con "nesting" nesting]
