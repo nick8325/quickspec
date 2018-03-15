@@ -558,11 +558,31 @@ quickSpec cfg@Config{..} = do
 
     eval = evalHaskell cfg_default_to instances
 
-    present prop = do
+    present funs prop = do
       n :: Int <- get
       put (n+1)
       norm <- normaliser
-      putLine (printf "%3d. %s" n (show (prettyProp (names instances) (ac norm (conditionalise prop)) <+> maybeType prop)))
+      putLine $
+        printf "%3d. %s" n $ show $
+          prettyProp (names instances) (makeDefinition funs (ac norm (conditionalise prop)))
+          <+> maybeType prop
+
+    -- Put an equation that defines the function f into the form f lhs = rhs.
+    -- An equation defines f if:
+    --   * it is of the form f lhs = rhs (or vice versa).
+    --   * f is not a background function.
+    --   * lhs only contains background functions.
+    --   * rhs does not contain f.
+    makeDefinition cons (lhs :=>: t :=: u)
+      | Just f <- defines u, f `notElem` mapMaybe getTotal (funs t) =
+        lhs :=>: u :=: t
+        -- In the case where t defines f, the equation is already oriented correctly
+      | otherwise = lhs :=>: t :=: u
+      where
+        defines (App (Partial f _) ts)
+          | f `elem` cons,
+            all (`notElem` cons) (mapMaybe getTotal (funs ts)) = Just f
+        defines _ = Nothing
 
     -- Transform x+(y+z) = y+(x+z) into associativity, if + is commutative
     ac norm (lhs :=>: App f [Var x, App f1 [Var y, Var z]] :=: App f2 [Var y1, App f3 [Var x1, Var z1]])
@@ -601,7 +621,7 @@ quickSpec cfg@Config{..} = do
       when (n > 0) $ do
         putText (prettyShow (warnings univ instances cfg))
         putLine "== Laws =="
-      let pres = if n == 0 then \_ -> return () else present
+      let pres = if n == 0 then \_ -> return () else present (constantsOf f)
       QuickSpec.Explore.quickSpec pres (flip eval) cfg_max_size univ
         (enumerator [partial fun | fun <- constantsOf g])
       when (n > 0) $ do
