@@ -72,7 +72,8 @@ instance Pretty a => Pretty (Equation a) where
     | isTrue y = pPrint x
     | otherwise = pPrint x <+> text "=" <+> pPrint y
     where
-      isTrue x = show (pPrint x) `elem` ["true", "True"]
+      -- XXX this is a hack
+      isTrue x = show (pPrint x) == "True"
 
 infix 4 ===
 (===) :: a -> a -> Prop a
