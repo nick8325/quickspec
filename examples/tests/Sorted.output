@@ -2,8 +2,6 @@
  [] :: [a]
 (:) :: a -> [a] -> [a]
 
-== Laws ==
-
 == Functions ==
   sort :: [Int] -> [Int]
 insert :: Int -> [Int] -> [Int]

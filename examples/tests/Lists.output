@@ -3,11 +3,6 @@
   1 :: Int
 (+) :: Int -> Int -> Int
 
-== Laws ==
-  1. x + y = y + x
-  2. x + 0 = x
-  3. (x + y) + z = x + (y + z)
-
 == Functions ==
 reverse :: [a] -> [a]
    (++) :: [a] -> [a] -> [a]
@@ -17,21 +12,21 @@ reverse :: [a] -> [a]
  concat :: [[a]] -> [a]
 
 == Laws ==
-  4. concat [] = []
-  5. length [] = 0
-  6. reverse [] = []
-  7. xs ++ [] = xs
-  8. [] ++ xs = xs
-  9. length (reverse xs) = length xs
- 10. map f [] = []
- 11. reverse (reverse xs) = xs
- 12. length (xs ++ ys) = length (ys ++ xs)
- 13. length (map f xs) = length xs
- 14. reverse (map f xs) = map f (reverse xs)
- 15. length (concat (reverse xss)) = length (concat xss)
- 16. (xs ++ ys) ++ zs = xs ++ (ys ++ zs)
- 17. length xs + length ys = length (xs ++ ys)
- 18. concat xss ++ concat yss = concat (xss ++ yss)
- 19. reverse xs ++ reverse ys = reverse (ys ++ xs)
- 20. map f xs ++ map f ys = map f (xs ++ ys)
+  1. concat [] = []
+  2. length [] = 0
+  3. reverse [] = []
+  4. xs ++ [] = xs
+  5. [] ++ xs = xs
+  6. length (reverse xs) = length xs
+  7. map f [] = []
+  8. reverse (reverse xs) = xs
+  9. length (xs ++ ys) = length (ys ++ xs)
+ 10. length (map f xs) = length xs
+ 11. reverse (map f xs) = map f (reverse xs)
+ 12. length (concat (reverse xss)) = length (concat xss)
+ 13. (xs ++ ys) ++ zs = xs ++ (ys ++ zs)
+ 14. length xs + length ys = length (xs ++ ys)
+ 15. concat xss ++ concat yss = concat (xss ++ yss)
+ 16. reverse xs ++ reverse ys = reverse (ys ++ xs)
+ 17. map f xs ++ map f ys = map f (xs ++ ys)
 

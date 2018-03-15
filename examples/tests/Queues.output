@@ -2,12 +2,6 @@
 (.) :: (Queue a -> Queue a) -> (Queue a -> Queue a) -> Queue a -> Queue a
  id :: Queue a -> Queue a
 
-== Laws ==
-  1. id x = x
-  2. f . id = f
-  3. id . f = f
-  4. (f . g) . h = f . (g . h)
-
 == Functions ==
 enq :: a -> Queue a -> Queue a
 deq :: Queue a -> Queue a
@@ -15,17 +9,17 @@ fst :: Queue a -> a
 nil :: Queue a
 
 == Laws ==
-  5. deq (enq x nil) = nil
-  6. fst (enq x nil) = x
-  7. (deq . enq x) y = deq (enq x y)
-  8. (enq x . enq y) z = enq x (enq y z)
-  9. enq x (deq (enq y z)) = deq (enq x (enq y z))
- 10. fst (enq x (enq y z)) = fst (enq y z)
- 11. (f . (g . enq x)) y = (f . g) (enq x y)
- 12. ((enq x . f) . g) y = enq x ((f . g) y)
- 13. ((deq . enq x) . f) y = deq ((enq x . f) y)
- 14. deq (enq (fst (enq x y)) y) = deq (enq (fst y) y)
- 15. fst (enq (fst (enq x y)) y) = fst (enq x y)
- 16. (enq x . deq) . enq y = (deq . enq x) . enq y
- 17. (f . deq) (enq (fst x) nil) = (f . deq) (enq y nil)
+  1. deq (enq x nil) = nil
+  2. fst (enq x nil) = x
+  3. (deq . enq x) y = deq (enq x y)
+  4. (enq x . enq y) z = enq x (enq y z)
+  5. enq x (deq (enq y z)) = deq (enq x (enq y z))
+  6. fst (enq x (enq y z)) = fst (enq y z)
+  7. (f . (g . enq x)) y = (f . g) (enq x y)
+  8. ((enq x . f) . g) y = enq x ((f . g) y)
+  9. ((deq . enq x) . f) y = deq ((enq x . f) y)
+ 10. deq (enq (fst (enq x y)) y) = deq (enq (fst y) y)
+ 11. fst (enq (fst (enq x y)) y) = fst (enq x y)
+ 12. (enq x . deq) . enq y = (deq . enq x) . enq y
+ 13. (f . deq) (enq (fst x) nil) = (f . deq) (enq y nil)
 
