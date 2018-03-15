@@ -22,7 +22,8 @@ import QuickSpec.Type
 import QuickSpec.Prop
 import QuickSpec.Pruning
 import Test.QuickCheck hiding (total)
-import Data.Constraint
+import Data.Constraint hiding ((\\))
+import Data.List
 import Data.Proxy
 import qualified Twee.Base as Twee
 import QuickSpec.Term
@@ -573,15 +574,18 @@ quickSpec cfg@Config{..} = do
     --   * f is not a background function.
     --   * lhs only contains background functions.
     --   * rhs does not contain f.
+    --   * all vars in rhs appear in lhs
     makeDefinition cons (lhs :=>: t :=: u)
-      | Just f <- defines u, f `notElem` mapMaybe getTotal (funs t) =
+      | Just (f, ts) <- defines u,
+        f `notElem` mapMaybe getTotal (funs t),
+        null (usort (vars t) \\ vars ts) =
         lhs :=>: u :=: t
         -- In the case where t defines f, the equation is already oriented correctly
       | otherwise = lhs :=>: t :=: u
       where
         defines (App (Partial f _) ts)
           | f `elem` cons,
-            all (`notElem` cons) (mapMaybe getTotal (funs ts)) = Just f
+            all (`notElem` cons) (mapMaybe getTotal (funs ts)) = Just (f, ts)
         defines _ = Nothing
 
     -- Transform x+(y+z) = y+(x+z) into associativity, if + is commutative
