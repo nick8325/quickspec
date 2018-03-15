@@ -41,7 +41,7 @@ quartet :: Drawing -> Drawing -> Drawing -> Drawing -> Drawing
  15. rot (cycle x) = cycle x
  16. cycle (rot (flip x)) = flip (cycle x)
  17. over (cycle x) (cycle y) = cycle (over x y)
- 18. above (beside x y) (beside z w) = quartet x y z w
+ 18. quartet x y z w = above (beside x y) (beside z w)
 
 == Functions ==
 rot45 :: Drawing -> Drawing

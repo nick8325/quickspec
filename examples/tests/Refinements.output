@@ -9,12 +9,12 @@ oddNonZero :: Odd -> NonZero
     divide :: Int -> NonZero -> Int
 
 == Laws ==
-  1. nonZeroInt 1 = 1
-  2. oddInt 1 = 1
-  3. oddNonZero 1 = 1
+  1. 1 = nonZeroInt 1
+  2. 1 = oddInt 1
+  3. 1 = oddNonZero 1
   4. divide x 1 = x
   5. divide 0 x = 0
-  6. nonZeroInt (oddNonZero x) = oddInt x
+  6. oddInt x = nonZeroInt (oddNonZero x)
   7. divide (nonZeroInt x) x = 1
   8. divide (divide (divide (nonZeroInt x) y) x) y = divide (divide 1 y) y
   9. divide (divide (divide (divide 1 x) y) x) x = divide (divide (divide (divide 1 x) x) x) y

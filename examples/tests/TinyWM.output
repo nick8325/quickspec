@@ -48,10 +48,10 @@ current :: StackSet OrdA -> Natural
  17. delete x (delete y s) = delete y (delete x s)
  18. delete x (delete x s) = delete x s
  19. delete x (push x s) = delete x s
- 20. insert x (current s) s = push x s
+ 20. push x s = insert x (current s) s
  21. push x (delete x s) = push x s
  22. rotate o (rotate o' s) = rotate o' (rotate o s)
- 23. shift x (push y s) = insert y x s
+ 23. insert x y s = shift y (push x s)
  24. view x (delete y s) = delete y (view x s)
  25. view x (view x s) = view x s
  26. index 0 (view x s) = index 0 s

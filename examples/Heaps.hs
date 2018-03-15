@@ -72,8 +72,8 @@ main = quickSpec [
   "merge"      `con` (merge      :: Heap OrdA -> Heap OrdA -> Heap OrdA),
   "null"       `con` (null       :: Heap OrdA -> Bool),
   "fromList"   `con` (fromList   :: [OrdA] -> Heap OrdA),
-  con "true" True,
-  con "false" False,
+  con "True" True,
+  con "False" False,
 
   -- A few more list functions that are helpful for getting
   -- laws about toList/fromList.
