@@ -477,7 +477,7 @@ defaultConfig =
     cfg_twee = Twee.Config { Twee.cfg_max_term_size = minBound, Twee.cfg_max_cp_depth = maxBound },
     cfg_max_size = 7,
     cfg_instances = mempty,
-    cfg_constants = [[true]],
+    cfg_constants = [],
     cfg_default_to = typeRep (Proxy :: Proxy Int),
     cfg_infer_instance_types = False }
 
