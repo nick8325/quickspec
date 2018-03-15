@@ -594,9 +594,10 @@ quickSpec cfg@Config{..} = do
         atomic = cons ++ [Var (V typeVar 0)]
 
     mainOf n f g = do
-      putLine $ show $ pPrintSignature
-        (map (partial . unhideConstraint) (f cfg_constants))
-      putLine ""
+      unless (null (f cfg_constants)) $ do
+        putLine $ show $ pPrintSignature
+          (map (partial . unhideConstraint) (f cfg_constants))
+        putLine ""
       when (n > 0) $ do
         putText (prettyShow (warnings univ instances cfg))
         putLine "== Laws =="
