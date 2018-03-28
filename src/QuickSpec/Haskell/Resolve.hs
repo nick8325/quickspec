@@ -14,7 +14,7 @@
 
 {-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE RankNTypes, ScopedTypeVariables #-}
-module QuickSpec.Haskell.Resolve(Instances(..), inst, findInstance, findValue) where
+module QuickSpec.Haskell.Resolve(Instances(..), inst, valueInst, findInstance, findValue) where
 
 import Twee.Base
 import QuickSpec.Type
@@ -45,16 +45,19 @@ instance Monoid Instances where
 
 -- Create a single instance.
 inst :: Typeable a => a -> Instances
-inst x = instValue (toPolyValue x)
+inst x = valueInst (toValue (Identity x))
+
+valueInst :: Value Identity -> Instances
+valueInst x = polyInst (poly x)
   where
-    instValue :: Poly (Value Identity) -> Instances
-    instValue x =
+    polyInst :: Poly (Value Identity) -> Instances
+    polyInst x =
       -- Transform x into a single-argument function
       -- (see comment about is_instances).
       case typ x of
         -- A function of type a -> (b -> c) gets uncurried.
         App (F Arrow) (Cons _ (Cons (App (F Arrow) _) Empty)) ->
-          instValue (apply uncur x)
+          polyInst (apply uncur x)
         App (F Arrow) _ ->
           makeInstances [x]
         -- A plain old value x (not a function) turns into \() -> x.

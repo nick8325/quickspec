@@ -422,31 +422,48 @@ predicate :: forall a. ( Predicateable a
              , Typeable (PredicateTestCase a))
              => String -> a -> (Instances, Constant)
 predicate name pred =
-  case someSymbolVal name of
-    SomeSymbol (_ :: Proxy sym) ->
-      let
-        instances =
-          inst (\(dict :: Dict (Arbitrary (PredicateTestCase a))) -> (withDict dict genSuchThat) pred :: Gen (TestCaseWrapped sym (PredicateTestCase a)))
-          `mappend`
-          inst (Names [name ++ "_var"] :: Names (TestCaseWrapped sym (PredicateTestCase a)))
+  let
+    -- The following doesn't compile on GHC 7.10:
+    -- ty = typeRep (Proxy :: Proxy (TestCaseWrapped sym (PredicateTestCase a)))
+    -- (where sym was created using someSymbolVal)
+    -- So do it by hand instead:
+    ty = addName (typeRep (Proxy :: Proxy (TestCaseWrapped SymA (PredicateTestCase a))))
 
-        conPred = (con name pred) { con_classify = Predicate conSels ty (App true []) }
-        conSels = [ (constant' (name ++ "_" ++ show i) (select (i + length (con_constraints conPred)))) { con_classify = Selector i conPred ty, con_size = 0 } | i <- [0..typeArity (typ conPred)-1] ]
+    -- Replaces SymA with 'String name'
+    -- (XXX: not correct if the type 'a' also contains SymA)
+    addName :: forall a. Typed a => a -> a
+    addName = typeSubst sub
+      where
+        sub x
+          | Twee.build (Twee.var x) == typeRep (Proxy :: Proxy SymA) =
+            Twee.builder (typeFromTyCon (String name))
+          | otherwise = Twee.var x
 
-        select i =
-          fromJust (cast (arrowType [ty] (typeArgs (typeOf pred) !! i)) (unPoly (compose (sel i) unwrapV)))
-          where
-            compose f g = apply (apply cmpV f) g
-            sel 0 = fstV
-            sel n = compose (sel (n-1)) sndV
-            fstV = toPolyValue (fst :: (A, B) -> A)
-            sndV = toPolyValue (snd :: (A, B) -> B)
-            cmpV = toPolyValue ((.) :: (B -> C) -> (A -> B) -> A -> C)
-            unwrapV = toPolyValue (unTestCaseWrapped :: TestCaseWrapped SymA A -> A)
+    instances =
+      mconcat $ map (valueInst . addName)
+        [toValue (Identity inst1), toValue (Identity inst2)]
 
-        ty = typeRep (Proxy :: Proxy (TestCaseWrapped sym (PredicateTestCase a)))
-      in
-        (instances, conPred)
+    inst1 :: Dict (Arbitrary (PredicateTestCase a)) -> Gen (TestCaseWrapped SymA (PredicateTestCase a))
+    inst1 Dict = genSuchThat pred
+
+    inst2 :: Names (TestCaseWrapped SymA (PredicateTestCase a))
+    inst2 = Names [name ++ "_var"]
+
+    conPred = (con name pred) { con_classify = Predicate conSels ty (App true []) }
+    conSels = [ (constant' (name ++ "_" ++ show i) (select (i + length (con_constraints conPred)))) { con_classify = Selector i conPred ty, con_size = 0 } | i <- [0..typeArity (typ conPred)-1] ]
+
+    select i =
+      fromJust (cast (arrowType [ty] (typeArgs (typeOf pred) !! i)) (unPoly (compose (sel i) unwrapV)))
+      where
+        compose f g = apply (apply cmpV f) g
+        sel 0 = fstV
+        sel n = compose (sel (n-1)) sndV
+        fstV = toPolyValue (fst :: (A, B) -> A)
+        sndV = toPolyValue (snd :: (A, B) -> B)
+        cmpV = toPolyValue ((.) :: (B -> C) -> (A -> B) -> A -> C)
+        unwrapV = toPolyValue (unTestCaseWrapped :: TestCaseWrapped SymA A -> A)
+  in
+    (instances, conPred)
 
 data Config =
   Config {
