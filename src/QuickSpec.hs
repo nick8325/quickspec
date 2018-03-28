@@ -22,10 +22,12 @@
 -- You must also declare those instances to QuickSpec, by including them in the
 -- signature. For monomorphic types you can do this using `monoType`:
 --
--- > data T = ...
--- > main = quickSpec [
--- >   ...,
--- >   `monoType` (Proxy :: Proxy T)]
+-- @
+-- data T = ...
+-- main = quickSpec [
+--   ...,
+--   `monoType` (Proxy :: Proxy T)]
+-- @
 --
 -- You can only declare monomorphic types with `monoType`. If you want to test
 -- your own polymorphic types, you must explicitly declare `Arbitrary` and `Ord`
@@ -73,7 +75,7 @@ module QuickSpec(
   A, B, C, D, E,
 
   -- * Declaring types
-  monoType, vars, monoTypeWithVars, inst, Observe(..),
+  monoType, monoTypeObserve, vars, monoTypeWithVars, inst, Observe(..),
 
   -- * Including type class constraints
   type (==>), liftC, instanceOf,
@@ -205,6 +207,16 @@ monoType :: forall proxy a. (Ord a, Arbitrary a, Typeable a) => proxy a -> Sig
 monoType _ =
   mconcat [
     inst (Sub Dict :: () :- Ord a),
+    inst (Sub Dict :: () :- Arbitrary a)]
+
+-- | Declare a new monomorphic type using observational equivalence.
+-- The type must implement `Observe` and `Arbitrary`.
+monoTypeObserve :: forall proxy test outcome a.
+  (Observe test outcome a, Arbitrary test, Ord outcome, Arbitrary a, Typeable test, Typeable outcome, Typeable a) =>
+  proxy a -> Sig
+monoTypeObserve _ =
+  mconcat [
+    inst (Sub Dict :: () :- Observe test outcome a),
     inst (Sub Dict :: () :- Arbitrary a)]
 
 -- | Declare a new monomorphic type, saying how you want variables of that type to be named.

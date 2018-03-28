@@ -146,11 +146,11 @@ instance c => Arbitrary (Dict c) where
 -- @observe :: test -> outcome -> a@. Then, two values @x@ and @y@ are considered
 -- equal, if for many random values of type @test@, @observe test x == observe test y@.
 --
--- For an example of using observational equality, see @<https://github.com/nick8325/quickspec/tree/master/examples/PrettyPrinting.hs PrettyPrinting.hs>@.
+-- The function `QuickSpec.monoTypeObserve` declares a monomorphic
+-- type with an observation function. For polymorphic types, use
+-- `QuickSpec.inst` to declare the `Observe` instance.
 --
--- You must use `QuickSpec.inst` to add the @Observe@ instance to your signature.
--- Note that `QuickSpec.monoType` requires an `Ord` instance, so this even applies for
--- monomorphic types. Don't forget to add the `Arbitrary` instance too in that case.
+-- For an example of using observational equality, see @<https://github.com/nick8325/quickspec/tree/master/examples/PrettyPrinting.hs PrettyPrinting.hs>@.
 class (Arbitrary test, Ord outcome) => Observe test outcome a | a -> test outcome where
   -- | Make an observation on a value. Should satisfy the following law: if
   -- @x /= y@, then there exists a value of @test@ such that @observe test x /= observe test y@.

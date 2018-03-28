@@ -65,6 +65,5 @@ main = quickSpec [
   con "<>" (<>),
   con "$$" ($$),
 
-  inst (Sub Dict :: () :- Observe Context Str Doc),
-  inst (Sub Dict :: () :- Arbitrary Doc),
+  monoTypeObserve (Proxy :: Proxy Doc),
   defaultTo (Proxy :: Proxy Bool)]
