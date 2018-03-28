@@ -1,0 +1,14 @@
+QuickSpec 2.1.1 (released ???)
+------------------------------
+
+* Builds on GHC 7.10.
+* Better presentation of discovered equations.
+* Prints a warning when Ord or Arbitrary instances are missing.
+* Limited support for partial functions.
+* Experimental support for type class polymorphism.
+* Numerous bug fixes.
+
+QuickSpec 2 (released 2018-02-23)
+---------------------------------
+
+New, much better version of QuickSpec.
