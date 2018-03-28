@@ -54,8 +54,7 @@
 -- * @<https://github.com/nick8325/quickspec/tree/master/examples/Parsing.hs Parsing.hs>@: parser combinators. Demonstrates testing polymorphic datatypes and using observational equality.
 --
 -- You can also find some larger case studies in our paper,
--- <http://www.cse.chalmers.se/~nicsma/papers/quickspec2.pdf Quick
--- specifications for the busy programmer>.
+-- <http://www.cse.chalmers.se/~nicsma/papers/quickspec2.pdf Quick specifications for the busy programmer>.
 
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
