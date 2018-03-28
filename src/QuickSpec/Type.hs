@@ -8,7 +8,7 @@ module QuickSpec.Type(
   -- * Types
   Typeable,
   Type, TyCon(..), tyCon, fromTyCon, A, B, C, D, E, ClassA, ClassB, ClassC, ClassD, ClassE, SymA, typeVar, isTypeVar,
-  typeOf, typeRep, applyType, fromTypeRep,
+  typeOf, typeRep, typeFromTyCon, applyType, fromTypeRep,
   arrowType, unpackArrow, typeArgs, typeRes, typeDrop, typeArity,
   isDictionary, getDictionary, splitConstrainedType, dictArity, pPrintType,
   -- * Things that have types
@@ -130,6 +130,10 @@ typeOf x = fromTypeRep (Ty.typeOf x)
 -- | Construct a type from a `Typeable`.
 typeRep :: Typeable (a :: k) => proxy a -> Type
 typeRep x = fromTypeRep (Ty.typeRep x)
+
+-- | Turn a `TyCon` into a type.
+typeFromTyCon :: TyCon -> Type
+typeFromTyCon tc = build (con (fun tc))
 
 -- | Function application for type constructors.
 --
