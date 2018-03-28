@@ -55,15 +55,14 @@
 -- <http://www.cse.chalmers.se/~nicsma/papers/quickspec2.pdf Quick
 -- specifications for the busy programmer>.
 
-{-# LANGUAGE ScopedTypeVariables
-           , FlexibleContexts
-           , TypeOperators
-           , MultiParamTypeClasses
-           , FunctionalDependencies
-           , AllowAmbiguousTypes
-           , ConstraintKinds
-           , RankNTypes
-#-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE RankNTypes #-}
 module QuickSpec(
   -- * Running QuickSpec
   quickSpec, Sig, Signature(..),
