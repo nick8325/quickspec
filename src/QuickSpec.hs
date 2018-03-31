@@ -73,7 +73,7 @@ module QuickSpec(
   A, B, C, D, E,
 
   -- * Declaring types
-  monoType, vars, monoTypeWithVars, inst, Observe(..),
+  monoType, vars, monoTypeWithVars, inst, instFun, Observe(..),
 
   -- * Including type class constraints
   type (==>), liftC, instanceOf,
