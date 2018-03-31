@@ -96,6 +96,8 @@ class ClassD
 deriving instance Typeable ClassD
 class ClassE
 deriving instance Typeable ClassE
+class ClassF
+deriving instance Typeable ClassF
 
 -- | A polymorphic type of kind Symbol.
 type SymA = "__polymorphic_symbol__"
