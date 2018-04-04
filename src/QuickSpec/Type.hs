@@ -7,7 +7,7 @@
 module QuickSpec.Type(
   -- * Types
   Typeable,
-  Type, TyCon(..), tyCon, fromTyCon, A, B, C, D, E, ClassA, ClassB, ClassC, ClassD, ClassE, SymA, typeVar, isTypeVar,
+  Type, TyCon(..), tyCon, fromTyCon, A, B, C, D, E, ClassA, ClassB, ClassC, ClassD, ClassE, ClassF, SymA, typeVar, isTypeVar,
   typeOf, typeRep, typeFromTyCon, applyType, fromTypeRep,
   arrowType, unpackArrow, typeArgs, typeRes, typeDrop, typeArity,
   isDictionary, getDictionary, splitConstrainedType, dictArity, pPrintType,
@@ -96,6 +96,8 @@ class ClassD
 deriving instance Typeable ClassD
 class ClassE
 deriving instance Typeable ClassE
+class ClassF
+deriving instance Typeable ClassF
 
 -- | A polymorphic type of kind Symbol.
 type SymA = "__polymorphic_symbol__"
@@ -113,6 +115,7 @@ typeVars =
    Ty.typeRep (Proxy :: Proxy ClassC),
    Ty.typeRep (Proxy :: Proxy ClassD),
    Ty.typeRep (Proxy :: Proxy ClassE),
+   Ty.typeRep (Proxy :: Proxy ClassF),
    Ty.typeRep (Proxy :: Proxy SymA)]
 
 -- | A type variable.
