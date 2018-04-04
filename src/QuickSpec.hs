@@ -93,13 +93,19 @@ module QuickSpec(
   withInferInstanceTypes,
 
   -- * Re-exported functionality
-  Typeable, (:-)(..), Dict(..), Proxy(..), Arbitrary) where
+  Typeable, (:-)(..), Dict(..), Proxy(..), Arbitrary,
+
+  -- * Advanced use
+  quickSpecResult) where
 
 import QuickSpec.Haskell(Predicateable, PredicateTestCase, Names(..), Observe(..))
 import qualified QuickSpec.Haskell as Haskell
 import qualified QuickSpec.Haskell.Resolve as Haskell
 import qualified QuickSpec.Testing.QuickCheck as QuickCheck
 import qualified QuickSpec.Pruning.UntypedTwee as Twee
+import QuickSpec.Explore.PartialApplication
+import QuickSpec.Prop
+import QuickSpec.Term(Term)
 import Test.QuickCheck
 import Test.QuickCheck.Random
 import Data.Constraint
@@ -112,6 +118,12 @@ import System.Environment
 -- | Run QuickSpec. See the documentation at the top of this file.
 quickSpec :: Signature sig => sig -> IO ()
 quickSpec sig = do
+  quickSpecResult sig
+  return ()
+
+-- | Run QuickSpec, returning the list of discovered properties.
+quickSpecResult :: Signature sig => sig -> IO [Prop (Term (PartiallyApplied Haskell.Constant))]
+quickSpecResult sig = do
   -- Undocumented feature for testing :)
   seed <- lookupEnv "QUICKCHECK_SEED"
   let

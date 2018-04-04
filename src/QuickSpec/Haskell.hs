@@ -565,7 +565,7 @@ instance Pretty Warnings where
         text "WARNING: The following types have no 'Ord' or 'Observe' instance declared." $$
         text "You will not get any equations about the following types:"
 
-quickSpec :: Config -> IO ()
+quickSpec :: Config -> IO [Prop (Term (PartiallyApplied Constant))]
 quickSpec cfg@Config{..} = do
   let
     constantsOf f = true:f cfg_constants ++ concatMap selectors (f cfg_constants)
@@ -577,13 +577,13 @@ quickSpec cfg@Config{..} = do
     eval = evalHaskell cfg_default_to instances
 
     present funs prop = do
-      n :: Int <- get
-      put (n+1)
       norm <- normaliser
+      let prop' = makeDefinition funs (ac norm (conditionalise prop))
+      (n :: Int, props) <- get
+      put (n+1, prop:props)
       putLine $
         printf "%3d. %s" n $ show $
-          prettyProp (names instances) (makeDefinition funs (ac norm (conditionalise prop)))
-          <+> maybeType prop
+          prettyProp (names instances) prop' <+> maybeType prop'
 
     -- Put an equation that defines the function f into the form f lhs = rhs.
     -- An equation defines f if:
@@ -659,5 +659,4 @@ quickSpec cfg@Config{..} = do
     QuickCheck.run cfg_quickCheck (arbitraryTestCase cfg_default_to instances) eval $
     Twee.run cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size } $
     runConditionals (map total constants) $
-    flip evalStateT 1 $
-      main
+    fmap (reverse . snd) $ flip execStateT (1, []) main
