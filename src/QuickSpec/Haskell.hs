@@ -584,7 +584,7 @@ quickSpec cfg@Config{..} = do
       put (n+1, prop:props)
       putLine $
         printf "%3d. %s" n $ show $
-          prettyProp (names instances) prop' <+> maybeType prop'
+          prettyProp (names instances) prop' <+> maybeType prop
 
     -- Put an equation that defines the function f into the form f lhs = rhs.
     -- An equation defines f if:
