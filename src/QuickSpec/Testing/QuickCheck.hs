@@ -4,6 +4,7 @@
 module QuickSpec.Testing.QuickCheck where
 
 import QuickSpec.Testing
+import QuickSpec.Pruning
 import QuickSpec.Prop
 import Test.QuickCheck
 import Test.QuickCheck.Gen
@@ -37,7 +38,7 @@ data Environment testcase term result =
 
 newtype Tester testcase term result m a =
   Tester (ReaderT (Environment testcase term result) m a)
-  deriving (Functor, Applicative, Monad, MonadIO, MonadTerminal)
+  deriving (Functor, Applicative, Monad, MonadIO, MonadTerminal, MonadPruner term' res')
 
 instance MonadTrans (Tester testcase term result) where
   lift = Tester . lift
