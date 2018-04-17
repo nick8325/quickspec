@@ -131,7 +131,9 @@ baseInstances =
     inst (\(Dict :: Dict (Arbitrary A)) (obs :: ObserveData B C) -> observeFunction obs :: ObserveData (A -> B) C),
     inst (\(obs :: ObserveData A B) -> WrappedObserveData (toValue obs)),
     -- No warnings for TestCaseWrapped
-    inst (NoWarnings :: NoWarnings (TestCaseWrapped SymA A))]
+    inst (NoWarnings :: NoWarnings (TestCaseWrapped SymA A)),
+    -- Needed for typeclass-polymorphic predicates to work currently
+    inst (\(Dict :: Dict ClassA) -> Dict :: Dict (Arbitrary (Dict ClassA)))]
 
 -- A token used in the instance list for types that shouldn't generate warnings
 data NoWarnings a = NoWarnings
