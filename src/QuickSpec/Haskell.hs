@@ -583,7 +583,7 @@ quickSpec cfg@Config{..} = do
       norm <- normaliser
       let prop' = makeDefinition funs (ac norm (conditionalise prop))
       (n :: Int, props) <- get
-      put (n+1, prop:props)
+      put (n+1, prop':props)
       putLine $
         printf "%3d. %s" n $ show $
           prettyProp (names instances) prop' <+> maybeType prop
