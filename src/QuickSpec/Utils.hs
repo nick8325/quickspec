@@ -88,31 +88,6 @@ unbuffered x = do
 spoony :: Eq a => a -> Maybe a
 spoony x = teaspoon ((x == x) `seq` x)
 
-newtype Max a = Max { getMax :: Maybe a }
-
-getMaxWith :: Ord a => a -> Max a -> a
-getMaxWith x (Max (Just y)) = x `max` y
-getMaxWith x (Max Nothing)  = x
-
-instance Ord a => Monoid (Max a) where
-  mempty = Max Nothing
-  Max (Just x) `mappend` y = Max (Just (getMaxWith x y))
-  Max Nothing  `mappend` y = y
-
-newtype Min a = Min { getMin :: Maybe a }
-
-getMinWith :: Ord a => a -> Min a -> a
-getMinWith x (Min (Just y)) = x `min` y
-getMinWith x (Min Nothing)  = x
-
-minimumBy :: (a -> a -> Bool) -> [a] -> a
-minimumBy f = foldr1 (\x y -> if f x y then x else y)
-
-instance Ord a => Monoid (Min a) where
-  mempty = Min Nothing
-  Min (Just x) `mappend` y = Min (Just (getMinWith x y))
-  Min Nothing  `mappend` y = y
-
 labelM :: Monad m => (a -> m b) -> [a] -> m [(a, b)]
 labelM f = mapM (\x -> do { y <- f x; return (x, y) })
 

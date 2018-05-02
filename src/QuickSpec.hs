@@ -114,6 +114,7 @@ import QuickSpec.Utils
 import QuickSpec.Type hiding (defaultTo)
 import Data.Proxy
 import System.Environment
+import Data.Semigroup(Semigroup(..))
 
 -- | Run QuickSpec. See the documentation at the top of this file.
 quickSpec :: Signature sig => sig -> IO ()
@@ -141,9 +142,11 @@ newtype Sig = Sig { unSig :: Context -> Haskell.Config -> Haskell.Config }
 -- [String]: list of names to exclude.
 data Context = Context Int [String]
 
+instance Semigroup Sig where
+  Sig sig1 <> Sig sig2 = Sig (\ctx -> sig2 ctx . sig1 ctx)
 instance Monoid Sig where
   mempty = Sig (\_ -> id)
-  Sig sig1 `mappend` Sig sig2 = Sig (\ctx -> sig2 ctx . sig1 ctx)
+  mappend = (<>)
 
 -- | A class of things that can be used as a QuickSpec signature.
 class Signature sig where

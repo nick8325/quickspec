@@ -23,6 +23,7 @@ import Data.Functor.Identity
 import Data.Maybe
 import Data.Proxy
 import Control.Monad
+import Data.Semigroup
 
 -- A set of instances.
 data Instances =
@@ -39,9 +40,11 @@ makeInstances is = inst
   where
     inst = Instances is (memo (find_ inst . canonicaliseType))
 
+instance Semigroup Instances where
+  x <> y = makeInstances (is_instances x ++ is_instances y)
 instance Monoid Instances where
   mempty = makeInstances []
-  x `mappend` y = makeInstances (is_instances x ++ is_instances y)
+  mappend = (<>)
 
 -- Create a single instance.
 inst :: Typeable a => a -> Instances
