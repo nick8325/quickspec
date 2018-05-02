@@ -23,7 +23,7 @@ import Data.Functor.Identity
 import Data.Maybe
 import Data.Proxy
 import Control.Monad
-import Data.Semigroup
+import Data.Semigroup(Semigroup(..))
 
 -- A set of instances.
 data Instances =
