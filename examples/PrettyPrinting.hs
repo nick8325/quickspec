@@ -2,6 +2,7 @@
 -- Illustrates observational equality and using custom generators.
 -- See the QuickSpec paper for more details.
 {-# LANGUAGE DeriveDataTypeable, TypeOperators, StandaloneDeriving, TypeSynonymInstances, FlexibleInstances, MultiParamTypeClasses #-}
+import Prelude hiding ((<>))
 import Control.Monad
 import Test.QuickCheck
 import QuickSpec
