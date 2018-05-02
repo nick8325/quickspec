@@ -51,21 +51,31 @@ run config@Config{..} gen eval (Tester x) = do
   let
     seeds = unfoldr (Just . split) seed
     n = cfg_num_tests
-    k = cfg_max_test_size
-    -- Divide tests equally between all sizes.
-    -- There are n total tests of k+1 different sizes.
-    -- If it doesn't divide equally, the biggest size gets the
-    -- left-overs.
+    k = max 1 cfg_max_test_size
+    bias = 3
+    cfg_max_test_size = 100
+    -- Bias tests towards smaller sizes.
+    -- We do this by distributing the cube of the size uniformly.
     sizes =
-      concat [replicate (n `div` (k+1)) i | i <- [0..k-1]] ++
-      replicate (n `divRoundUp` (k+1)) k
-    m `divRoundUp` n = (m-1) `div` n + 1
+      reverse $ map (k -) $
+      map (truncate . (** (1/fromInteger bias)) . fromIntegral) $
+      uniform (toInteger n) (toInteger k^bias)
     tests = zipWith (unGen gen) seeds sizes
   return $ runReaderT x
     Environment {
       env_config = config,
       env_tests = tests,
       env_eval = eval }
+
+-- uniform n k: generate a list of n integers which are distributed evenly between 0 and k-1.
+uniform :: Integer -> Integer -> [Integer]
+uniform n k =
+  -- n `div` k: divide evenly as far as possible.
+  concat [replicate (fromIntegral (n `div` k)) i | i <- [0..k-1]] ++
+  -- The leftovers get distributed at equal intervals.
+  [i * k `div` leftovers | i <- [0..leftovers-1]]
+  where
+    leftovers = n `mod` k
 
 instance (MonadTerminal m, Eq result) => MonadTester testcase term (Tester testcase term result m) where
   test prop =
