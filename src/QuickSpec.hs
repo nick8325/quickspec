@@ -76,9 +76,6 @@ module QuickSpec(
   -- * Declaring types
   monoType, monoTypeObserve, vars, monoTypeWithVars, inst, Observe(..),
 
-  -- * Including type class constraints
-  type (==>), liftC, instanceOf,
-
   -- * Standard signatures
   -- | The \"prelude\": a standard signature containing useful functions
   --   like '++', which can be used as background theory.
@@ -86,6 +83,9 @@ module QuickSpec(
 
   -- * Exploring functions in series
   background, series,
+
+  -- * Including type class constraints (experimental, subject to change)
+  type (==>), liftC, instanceOf,
 
   -- * Customising QuickSpec
   withMaxTermSize, withMaxTests, withMaxTestSize, defaultTo,
