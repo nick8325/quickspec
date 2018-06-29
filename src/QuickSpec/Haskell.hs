@@ -21,7 +21,7 @@ import QuickSpec.Haskell.Resolve
 import QuickSpec.Type
 import QuickSpec.Prop
 import QuickSpec.Pruning
-import Test.QuickCheck hiding (total)
+import Test.QuickCheck hiding (total, classify, subterms)
 import Data.Constraint hiding ((\\))
 import Data.List
 import Data.Proxy
@@ -633,9 +633,12 @@ quickSpec cfg@Config{..} = do
     enumerator cons =
       sortTerms measure $
       filterEnumerator (all constraintsOk . funs) $
+      filterEnumerator (\t -> size t + length (conditions t) <= cfg_max_size) $
       enumerateConstants atomic `mappend` enumerateApplications
       where
         atomic = cons ++ [Var (V typeVar 0)]
+
+    conditions t = usort [p | f <- funs t, Selector _ p _ <- [classify f]]
 
     mainOf n f g = do
       unless (null (f cfg_constants)) $ do
