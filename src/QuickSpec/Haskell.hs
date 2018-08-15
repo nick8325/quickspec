@@ -479,7 +479,8 @@ data Config =
     -- head cfg_constants contains all the background functions.
     cfg_constants :: [[Constant]],
     cfg_default_to :: Type,
-    cfg_infer_instance_types :: Bool
+    cfg_infer_instance_types :: Bool,
+    cfg_background :: [Prop (Term (PartiallyApplied Constant))]
     }
 
 makeLensAs ''Config
@@ -489,7 +490,8 @@ makeLensAs ''Config
    ("cfg_instances", "lens_instances"),
    ("cfg_constants", "lens_constants"),
    ("cfg_default_to", "lens_default_to"),
-   ("cfg_infer_instance_types", "lens_infer_instance_types")]
+   ("cfg_infer_instance_types", "lens_infer_instance_types"),
+   ("cfg_background", "lens_background")]
 
 defaultConfig :: Config
 defaultConfig =
@@ -500,7 +502,8 @@ defaultConfig =
     cfg_instances = mempty,
     cfg_constants = [],
     cfg_default_to = typeRep (Proxy :: Proxy Int),
-    cfg_infer_instance_types = False }
+    cfg_infer_instance_types = False,
+    cfg_background = [] }
 
 -- Extra types for the universe that come from in-scope instances.
 instanceTypes :: Instances -> Config -> [Type]
@@ -654,7 +657,10 @@ quickSpec cfg@Config{..} = do
       when (n > 0) $ do
         putLine ""
 
-    main = mapM_ round [0..rounds-1]
+    main = do
+      forM_ cfg_background $ \prop -> do
+        add prop
+      mapM_ round [0..rounds-1]
       where
         round n = mainOf n (concat . take 1 . drop n) (concat . take (n+1))
         rounds = length cfg_constants

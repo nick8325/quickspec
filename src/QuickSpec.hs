@@ -95,8 +95,8 @@ module QuickSpec(
   -- * Re-exported functionality
   Typeable, (:-)(..), Dict(..), Proxy(..), Arbitrary,
 
-  -- * Advanced use
-  quickSpecResult) where
+  -- * For QuickSpec hackers
+  quickSpecResult, addBackground, addInstances, instFun, customConstant) where
 
 import QuickSpec.Haskell(Predicateable, PredicateTestCase, Names(..), Observe(..))
 import qualified QuickSpec.Haskell as Haskell
@@ -133,6 +133,11 @@ quickSpecResult sig = do
       Just xs -> signature [signature sig, withFixedSeed (read xs)]
 
   Haskell.quickSpec (runSig sig' (Context 1 []) Haskell.defaultConfig)
+
+-- | Add some properties to the background theory.
+addBackground :: [Prop (Term (PartiallyApplied Haskell.Constant))] -> Sig
+addBackground props =
+  Sig $ \_ cfg -> cfg { Haskell.cfg_background = Haskell.cfg_background cfg ++ props }
 
 -- | A signature.
 newtype Sig = Sig { unSig :: Context -> Haskell.Config -> Haskell.Config }
@@ -173,10 +178,11 @@ con :: Typeable a => String -> a -> Sig
 con name x =
   Sig $ \ctx@(Context _ names) ->
     if name `elem` names then id else
-      unSig (constant (Haskell.con name x)) ctx
+      unSig (customConstant (Haskell.con name x)) ctx
 
-constant :: Haskell.Constant -> Sig
-constant con =
+-- | Add a custom constant.
+customConstant :: Haskell.Constant -> Sig
+customConstant con =
   Sig $ \(Context n _) ->
     modL Haskell.lens_constants (appendAt n [con])
 
@@ -213,7 +219,7 @@ predicate name x =
   Sig $ \ctx@(Context _ names) ->
     if name `elem` names then id else
     let (insts, con) = Haskell.predicate name x in
-      runSig [addInstances insts `mappend` constant con] ctx
+      runSig [addInstances insts `mappend` customConstant con] ctx
 
 -- | Declare a new monomorphic type.
 -- The type must implement `Ord` and `Arbitrary`.
@@ -255,6 +261,7 @@ vars xs _ = instFun (Names xs :: Names a)
 inst :: (Typeable c1, Typeable c2) => c1 :- c2 -> Sig
 inst = instFun
 
+-- | Declare an arbitrary value to be used by instance resolution.
 instFun :: Typeable a => a -> Sig
 instFun x = addInstances (Haskell.inst x)
 
