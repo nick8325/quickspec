@@ -120,7 +120,7 @@ instance (PrettyTerm fun, Ord fun, Typed fun, Apply (Term fun), MonadPruner (Ter
     return (norm . fmap fun_specialised)
   add prop = PolyM $ do
     univ <- access univ
-    let insts = typeInstances univ (regeneralise (mapFun fun_original prop))
+    let insts = typeInstances univ (canonicalise (regeneralise (mapFun fun_original prop)))
     or <$> mapM add insts
 
 instance MonadTester testcase (Term fun) m =>
