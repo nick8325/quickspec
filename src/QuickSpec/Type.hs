@@ -9,7 +9,7 @@ module QuickSpec.Type(
   Typeable,
   Type, TyCon(..), tyCon, fromTyCon, A, B, C, D, E, ClassA, ClassB, ClassC, ClassD, ClassE, ClassF, SymA, typeVar, isTypeVar,
   typeOf, typeRep, typeFromTyCon, applyType, fromTypeRep,
-  arrowType, unpackArrow, typeArgs, typeRes, typeDrop, typeArity,
+  arrowType, isArrowType, unpackArrow, typeArgs, typeRes, typeDrop, typeArity,
   isDictionary, getDictionary, splitConstrainedType, dictArity, pPrintType,
   -- * Things that have types
   Typed(..), typeSubst, typesDL, tyVars, cast, matchType,
@@ -150,6 +150,10 @@ arrowType :: [Type] -> Type -> Type
 arrowType [] res = res
 arrowType (arg:args) res =
   build (app (fun Arrow) [arg, arrowType args res])
+
+-- | Is a given type a function type?
+isArrowType :: Type -> Bool
+isArrowType = isJust . unpackArrow
 
 -- | Decompose a function type into (argument, result).
 --

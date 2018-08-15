@@ -17,6 +17,9 @@ import qualified Data.Map.Strict as Map
 import Data.Map(Map)
 import Language.Haskell.TH.Syntax
 import Data.Lens.Light
+import Twee.Base hiding (lookup)
+import Control.Monad.Trans.State.Strict
+import Control.Monad
 
 (#) :: Category.Category cat => cat b c -> cat a b -> cat a c
 (#) = (Category..)
@@ -104,3 +107,32 @@ appendAt :: Int -> [a] -> [[a]] -> [[a]]
 appendAt n xs [] = appendAt n xs [[]]
 appendAt 0 xs (ys:yss) = (ys ++ xs):yss
 appendAt n xs (ys:yss) = ys:appendAt (n-1) xs yss
+
+-- Should be in Twee.Base.
+antiunify :: Ord f => Term f -> Term f -> Term f
+antiunify t u =
+  build $ evalState (loop t u) (succ (snd (bound t) `max` snd (bound u)), Map.empty)
+  where
+    loop (App f ts) (App g us)
+      | f == g =
+        app f <$> zipWithM loop (unpack ts) (unpack us)
+    loop (Var x) (Var y)
+      | x == y =
+        return (var x)
+    loop t u = do
+      (next, m) <- get
+      case Map.lookup (t, u) m of
+        Just v -> return (var v)
+        Nothing -> do
+          put (succ next, Map.insert (t, u) next m)
+          return (var next)
+
+{-# INLINE fixpoint #-}
+fixpoint :: Eq a => (a -> a) -> a -> a
+fixpoint f x = fxp x
+  where
+    fxp x
+      | x == y = x
+      | otherwise = fxp y
+      where
+        y = f x

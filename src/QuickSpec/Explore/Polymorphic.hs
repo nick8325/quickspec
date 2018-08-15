@@ -202,9 +202,34 @@ universe xs = Universe (Set.fromList base)
     -- The universe contains the type variable "a", the argument and
     -- result type of every function (with all type variables unified), and all
     -- subterms of these types
-    base = usort $ typeVar:concatMap (oneTypeVar . typs . typ) xs
+    base0 = usort $ concatMap (oneTypeVar . typs) (hofs (map typ xs)) >>= results
+    -- Add antiunifiers of all pairs of types, so that each equation
+    -- has a most general type
+    base = fixpoint (\tys -> usort $ tys ++ [oneTypeVar $ antiunify ty1 ty2 | ty1 <- tys, ty2 <- tys]) base0
     typs ty = typeRes ty:typeArgs ty
-
+    results ty =
+      ty:
+      case unpackArrow ty of
+        Nothing -> []
+        Just (_, ty') -> results ty'
+    -- A bit of a hack - add extra type instances for higher-order functions
+    -- whenever the type universe so far is an instance of a higher-order argument
+    hofs tys =
+      tys ++
+      [ inst
+      | ty <- tys, pat <- typeArgs ty, isArrowType pat, arg <- tys >>= results,
+        Just sub <- [matchType pat arg],
+        let inst = Twee.subst sub ty,
+        and (zipWith simple (typeArgs ty) (typeArgs inst)) ]
+    -- Some ad hoc restrictions on what substitutions to make in hofs:
+    -- type variables become anything except arrows; everything else must be unchanged
+    simple x y
+      | isArrowType x =
+        typeArity x == typeArity y && and (zipWith simple1 (typeArgs x) (typeArgs y))
+      | otherwise = True
+    simple1 Twee.Var{} ty = not (isArrowType ty)
+    simple1 x y = oneTypeVar x == oneTypeVar y
+ 
 inUniverse :: Typed fun => Term fun -> Universe -> Bool
 t `inUniverse` Universe{..} =
   and [oneTypeVar (typ u) `Set.member` univ_types | u <- subterms t]
