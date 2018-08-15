@@ -51,10 +51,10 @@ newtype Pruner fun pruner a =
 instance MonadTrans (Pruner fun) where
   lift = Pruner
 
-instance (PrettyTerm fun, Typed fun, MonadPruner (UntypedTerm fun) (UntypedTerm fun) pruner) => MonadPruner (TypedTerm fun) (TypedTerm fun) (Pruner fun pruner) where
+instance (PrettyTerm fun, Typed fun, MonadPruner (UntypedTerm fun) norm pruner) => MonadPruner (TypedTerm fun) norm (Pruner fun pruner) where
   normaliser =
     Pruner $ do
-      norm <- normaliser :: pruner (UntypedTerm fun -> UntypedTerm fun)
+      norm <- normaliser :: pruner (UntypedTerm fun -> norm)
       
       -- Note that we don't call addFunction on the functions in the term.
       -- This is because doing so might be expensive, as adding typing
@@ -62,7 +62,7 @@ instance (PrettyTerm fun, Typed fun, MonadPruner (UntypedTerm fun) (UntypedTerm 
       -- This is OK because in encode, we tag all functions and variables
       -- with their types (i.e. we can fall back to the naive type encoding).
       return $ \t ->
-        decode . norm . encode $ t
+        norm . encode $ t
 
   add prop = lift (add (encode <$> canonicalise prop))
 
@@ -108,20 +108,3 @@ encode :: Typed fun => TypedTerm fun -> UntypedTerm fun
 encode (Var x) = tag (typ x) (Var x)
 encode (App f ts) =
   tag (typeDrop (length ts) (typ f)) (App (Func f) (map encode ts))
-
-decode :: Typed fun => UntypedTerm fun -> TypedTerm fun
-decode = dec Nothing
-  where
-    dec _ (App (Tag ty) [t]) =
-      dec (Just ty) t
-    dec _ (App Tag{} _) =
-      error "Tag function applied with wrong arity"
-    dec (Just ty) (Var (V _ x)) =
-      Var (V ty x)
-    dec Nothing (Var _) =
-      error "Naked variable in type-encoded term"
-    dec _ (App (Func f) ts) =
-      App f $
-        zipWith dec
-          (map Just (typeArgs (typ f)))
-          ts

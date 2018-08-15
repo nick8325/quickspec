@@ -64,8 +64,10 @@ instance Sized fun => Sized (Twee.Extended fun) where
   size (Twee.Skolem _) = 1
   size (Twee.Function f) = size f
 
+type Norm fun = Twee.Term (Extended fun)
+
 instance (Ord fun, Typeable fun, Arity fun, Twee.Sized fun, PrettyTerm fun, EqualsBonus fun, Monad m) =>
-  MonadPruner (Term fun) (Term fun) (Pruner fun m) where
+  MonadPruner (Term fun) (Norm fun) (Pruner fun m) where
   normaliser = Pruner $ do
     state <- lift get
     return $ \t ->
@@ -88,16 +90,14 @@ instance (Ord fun, Typeable fun, Arity fun, Twee.Sized fun, PrettyTerm fun, Equa
     error "twee pruner doesn't support non-unit equalities"
 
 normaliseTwee :: (Ord fun, Typeable fun, Arity fun, Twee.Sized fun, PrettyTerm fun, EqualsBonus fun) =>
-  State (Extended fun) -> Term fun -> Term fun
+  State (Extended fun) -> Term fun -> Norm fun
 normaliseTwee state t =
-  fromTwee $
-    result (normaliseTerm state (simplifyTerm state (skolemise t)))
+  result (normaliseTerm state (simplifyTerm state (skolemise t)))
 
 normalFormsTwee :: (Ord fun, Typeable fun, Arity fun, Twee.Sized fun, PrettyTerm fun, EqualsBonus fun) =>
-  State (Extended fun) -> Term fun -> Set (Term fun)
+  State (Extended fun) -> Term fun -> Set (Norm fun)
 normalFormsTwee state t =
-  Set.map fromTwee $
-    Set.map result (normalForms state (skolemise t))
+  Set.map result (normalForms state (skolemise t))
 
 addTwee :: (Ord fun, Typeable fun, Arity fun, Twee.Sized fun, PrettyTerm fun, EqualsBonus fun) =>
   Twee.Config (Extended fun) -> Term fun -> Term fun -> State (Extended fun) -> State (Extended fun)
@@ -124,14 +124,3 @@ skolemise = Twee.build . sk
       Twee.con (Twee.fun (Skolem (Twee.V x)))
     sk (App f ts) =
       Twee.app (Twee.fun (Function f)) (map sk ts)
-
-fromTwee :: Twee.Term (Extended f) -> Term f
-fromTwee = unsk
-  where
-    unsk (Twee.App (F Minimal) Empty) =
-      Var (V typeVar 0)
-    unsk (Twee.App (F (Skolem (Twee.V x))) Empty) =
-      Var (V typeVar x)
-    unsk (Twee.App (F (Function f)) ts) =
-      App f (map unsk (unpack ts))
-    unsk _ = error "variable introduced by rewriting"
