@@ -16,7 +16,7 @@ import qualified Twee.Base as Twee
 import Twee hiding (Config(..))
 import Twee.Rule hiding (normalForms)
 import Twee.Proof hiding (Config, defaultConfig)
-import Twee.Base(Ordered(..), Extended(..), EqualsBonus, pattern F, pattern Empty, unpack)
+import Twee.Base(Ordered(..), Extended(..), EqualsBonus)
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Strict hiding (State)
 import Control.Monad.Trans.Class
