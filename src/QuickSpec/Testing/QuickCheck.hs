@@ -53,7 +53,6 @@ run config@Config{..} gen eval (Tester x) = do
     n = cfg_num_tests
     k = max 1 cfg_max_test_size
     bias = 3
-    cfg_max_test_size = 100
     -- Bias tests towards smaller sizes.
     -- We do this by distributing the cube of the size uniformly.
     sizes =
