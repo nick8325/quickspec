@@ -15,7 +15,7 @@ import qualified QuickSpec.Pruning.UntypedTwee as Untyped
 import QuickSpec.Pruning.UntypedTwee(Config(..))
 
 newtype Pruner fun m a =
-  Pruner (Background.Pruner fun (Types.Pruner fun (Untyped.Pruner (Types.Tagged fun) m)) a)
+  Pruner (Types.Pruner fun (Background.Pruner (Types.Tagged fun) (Untyped.Pruner (Types.Tagged fun) m)) a)
   deriving (Functor, Applicative, Monad, MonadIO, MonadTester testcase term, MonadPruner (Term fun) (Term fun), MonadTerminal)
 
 instance MonadTrans (Pruner fun) where
@@ -23,4 +23,4 @@ instance MonadTrans (Pruner fun) where
 
 run :: (Sized fun, Monad m) => Config -> Pruner fun m a -> m a
 run config (Pruner x) =
-  Untyped.run config (Types.run (Background.run x))
+  Untyped.run config (Background.run (Types.run x))
