@@ -574,7 +574,9 @@ instance Pretty Warnings where
 quickSpec :: Config -> IO [Prop (Term (PartiallyApplied Constant))]
 quickSpec cfg@Config{..} = do
   let
-    constantsOf f = true:f cfg_constants ++ concatMap selectors (f cfg_constants)
+    constantsOf f =
+      [true | any (/= Function) (map classify (f cfg_constants))] ++
+      f cfg_constants ++ concatMap selectors (f cfg_constants)
     constants = constantsOf concat
     
     univ = conditionalsUniverse (instanceTypes instances cfg) constants
