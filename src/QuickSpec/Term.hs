@@ -148,15 +148,20 @@ instance Typed f => Typed (Term f) where
 -- | A standard term ordering - size, skeleton, generality.
 -- Satisfies the property:
 -- if measure (schema t) < measure (schema u) then t < u.
-type Measure f = (Int, Int, MeasureFuns f, Int, [Var])
+type Measure f = (Int, Int, Int, MeasureFuns f, Int, [Var])
 -- | Compute the term ordering for a term.
-measure :: Sized f => Term f -> Measure f
+measure :: (Sized f, Typed f) => Term f -> Measure f
 measure t =
-  (size t, -length (vars t), MeasureFuns (skel t),
+  (size t, sizeHO t, -length (vars t), MeasureFuns (skel t),
    -length (usort (vars t)), vars t)
   where
     skel (Var (V ty _)) = Var (V ty 0)
     skel (App f ts) = App f (map skel ts)
+    -- Prefer fully-applied terms to partially-applied ones.
+    -- This function computes the size, but adds 1 for every
+    -- unapplied function.
+    sizeHO (App f ts) = size f + typeArity (typ f) - length ts + sum (map sizeHO ts)
+    sizeHO Var{} = 1
 
 -- | A helper for `Measure`.
 newtype MeasureFuns f = MeasureFuns (Term f)
