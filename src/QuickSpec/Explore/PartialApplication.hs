@@ -21,7 +21,7 @@ data PartiallyApplied f =
 
 instance Sized f => Sized (PartiallyApplied f) where
   size (Partial f _) = size f
-  size (Apply _) = 0
+  size (Apply _) = 1
 
 instance Arity (PartiallyApplied f) where
   arity (Partial _ n) = n
