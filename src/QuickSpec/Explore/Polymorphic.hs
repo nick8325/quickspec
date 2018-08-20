@@ -178,18 +178,22 @@ regeneralise =
         skel (V ty x) = V (oneTypeVar ty) x
     litCs (t :=: u) = [(typ t, typ u)]
 
+typeInstancesList :: [Type] -> [Type] -> [Twee.Var -> Type]
+typeInstancesList types prop =
+  map eval
+    (foldr intersection [Map.empty]
+      (map constrain
+        (usort prop)))
+  where
+    constrain t =
+      usort [ Map.fromList (Twee.substToList sub) | u <- types, Just sub <- [Twee.match t u] ]
+    eval sub x =
+      Map.findWithDefault (error ("not found: " ++ prettyShow x)) x sub
+
 typeInstances :: (Pretty a, PrettyTerm fun, Symbolic fun a, Ord fun, Typed fun, Typed a) => Universe -> a -> [a]
 typeInstances Universe{..} prop =
-  [ typeSubst (\x -> Map.findWithDefault (error ("not found: " ++ prettyShow x)) x sub) prop
-  | sub <- cs ]
-  where
-    cs =
-      foldr intersection [Map.empty]
-        (map (constrain (Set.toList univ_types))
-          (usort (DList.toList (termsDL prop) >>= subterms)))
-
-    constrain tys t =
-      usort [ Map.fromList (Twee.substToList sub) | u <- tys, Just sub <- [Twee.match (typ t) u] ]
+  [ typeSubst sub prop
+  | sub <- typeInstancesList (Set.toList univ_types) (map typ (DList.toList (termsDL prop) >>= subterms)) ]
 
 intersection :: [Map Twee.Var Type] -> [Map Twee.Var Type] -> [Map Twee.Var Type]
 ms1 `intersection` ms2 = usort [ Map.union m1 m2 | m1 <- ms1, m2 <- ms2, ok m1 m2 ]
@@ -197,38 +201,46 @@ ms1 `intersection` ms2 = usort [ Map.union m1 m2 | m1 <- ms1, m2 <- ms2, ok m1 m
     ok m1 m2 = and [ Map.lookup x m1 == Map.lookup x m2 | x <- Map.keys (Map.intersection m1 m2) ]
 
 universe :: Typed a => [a] -> Universe
-universe xs = Universe (Set.fromList base)
+universe xs = Universe (Set.fromList univ)
   where
-    -- The universe contains the type variable "a", the argument and
-    -- result type of every function (with all type variables unified), and all
-    -- subterms of these types
-    base0 = usort $ concatMap (oneTypeVar . typs) (hofs (map typ xs)) >>= results
+    -- Types of all functions
+    types = usort $ map typ xs
+
+    -- Take the argument and result type of every function.
+    univBase = usort $ concatMap components types
+
+    -- Add partially-applied functions, if they can be used to
+    -- fill in a higher-order argument.
+    univHo = usort $ concatMap addHo univBase
+      where
+        addHo ty =
+          ty:
+          [ typeSubst sub ho
+          | fun <- types,
+            ho <- arrows fun,
+            sub <- typeInstancesList univBase (components fun) ]
+  
     -- Add antiunifiers of all pairs of types, so that each equation
     -- has a most general type
-    base = fixpoint (\tys -> usort $ tys ++ [oneTypeVar $ antiunify ty1 ty2 | ty1 <- tys, ty2 <- tys]) base0
-    typs ty = typeRes ty:typeArgs ty
-    results ty =
-      ty:
+    univ = usort $ oneTypeVar $ fixpoint antiunifiers univHo
+      where
+        antiunifiers tys =
+          usort $ map (unPoly . poly) $
+            tys ++ [antiunify ty1 ty2 | ty1 <- tys, ty2 <- tys]
+
+    components ty =
       case unpackArrow ty of
-        Nothing -> []
-        Just (_, ty') -> results ty'
-    -- A bit of a hack - add extra type instances for higher-order functions
-    -- whenever the type universe so far is an instance of a higher-order argument
-    hofs tys =
-      tys ++
-      [ inst
-      | ty <- tys, pat <- typeArgs ty, isArrowType pat, arg <- tys >>= results,
-        Just sub <- [matchType pat arg],
-        let inst = Twee.subst sub ty,
-        and (zipWith simple (typeArgs ty) (typeArgs inst)) ]
-    -- Some ad hoc restrictions on what substitutions to make in hofs:
-    -- type variables become anything except arrows; everything else must be unchanged
-    simple x y
-      | isArrowType x =
-        typeArity x == typeArity y && and (zipWith simple1 (typeArgs x) (typeArgs y))
-      | otherwise = True
-    simple1 Twee.Var{} ty = not (isArrowType ty)
-    simple1 x y = oneTypeVar x == oneTypeVar y
+        Nothing -> [ty]
+        Just (ty1, ty2) -> components ty1 ++ components ty2
+
+    arrows ty =
+      concatMap arrows1 (typeArgs ty)
+      where
+        arrows1 ty
+          | isArrowType ty =
+            ty:concatMap arrows1 (typeArgs ty)
+          | otherwise =
+            []
  
 inUniverse :: Typed fun => Term fun -> Universe -> Bool
 t `inUniverse` Universe{..} =
