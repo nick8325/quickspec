@@ -204,7 +204,7 @@ universe :: Typed a => [a] -> Universe
 universe xs = Universe (Set.fromList univ)
   where
     -- Types of all functions
-    types = usort $ map typ xs
+    types = usort $ typeVar:map typ xs
 
     -- Take the argument and result type of every function.
     univBase = usort $ concatMap components types
