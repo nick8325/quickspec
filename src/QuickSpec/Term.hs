@@ -206,7 +206,7 @@ instance (Typed fun1, Typed fun2) => Typed (fun1 :+: fun2) where
 instance (Pretty fun1, Pretty fun2) => Pretty (fun1 :+: fun2) where
   pPrintPrec l p (Inl x) = pPrintPrec l p x
   pPrintPrec l p (Inr x) = pPrintPrec l p x
-  
+
 instance (PrettyTerm fun1, PrettyTerm fun2) => PrettyTerm (fun1 :+: fun2) where
   termStyle (Inl x) = termStyle x
   termStyle (Inr x) = termStyle x

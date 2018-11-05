@@ -55,7 +55,7 @@ instance (PrettyTerm fun, Typed fun, MonadPruner (UntypedTerm fun) norm pruner) 
   normaliser =
     Pruner $ do
       norm <- normaliser :: pruner (UntypedTerm fun -> norm)
-      
+
       -- Note that we don't call addFunction on the functions in the term.
       -- This is because doing so might be expensive, as adding typing
       -- axioms starts the completion algorithm.
