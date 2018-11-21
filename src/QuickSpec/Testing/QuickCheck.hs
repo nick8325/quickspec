@@ -76,7 +76,7 @@ uniform n k =
   where
     leftovers = n `mod` k
 
-instance (MonadTerminal m, Eq result) => MonadTester testcase term (Tester testcase term result m) where
+instance (Monad m, Eq result) => MonadTester testcase term (Tester testcase term result m) where
   test prop =
     Tester $ do
       env <- ask

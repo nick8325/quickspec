@@ -96,6 +96,7 @@ module QuickSpec(
   Typeable, (:-)(..), Dict(..), Proxy(..), Arbitrary,
 
   -- * For QuickSpec hackers
+  Sig(..), Context(..),
   quickSpecResult, addBackground, addInstances, instFun, customConstant) where
 
 import QuickSpec.Haskell(Predicateable, PredicateTestCase, Names(..), Observe(..))
