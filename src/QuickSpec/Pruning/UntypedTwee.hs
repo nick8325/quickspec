@@ -87,7 +87,8 @@ instance (Ord fun, Typeable fun, Arity fun, Twee.Sized fun, PrettyTerm fun, Equa
     return (Set.null (Set.intersection t' u'))
 
   add _ =
-    error "twee pruner doesn't support non-unit equalities"
+    return True
+    --error "twee pruner doesn't support non-unit equalities"
 
 normaliseTwee :: (Ord fun, Typeable fun, Arity fun, Twee.Sized fun, PrettyTerm fun, EqualsBonus fun) =>
   State (Extended fun) -> Term fun -> Norm fun

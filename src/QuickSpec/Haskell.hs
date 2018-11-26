@@ -480,7 +480,8 @@ data Config =
     cfg_constants :: [[Constant]],
     cfg_default_to :: Type,
     cfg_infer_instance_types :: Bool,
-    cfg_background :: [Prop (Term (PartiallyApplied Constant))]
+    cfg_background :: [Prop (Term (PartiallyApplied Constant))],
+    cfg_print_filter :: Prop (Term (PartiallyApplied Constant)) -> Bool
     }
 
 makeLensAs ''Config
@@ -491,7 +492,8 @@ makeLensAs ''Config
    ("cfg_constants", "lens_constants"),
    ("cfg_default_to", "lens_default_to"),
    ("cfg_infer_instance_types", "lens_infer_instance_types"),
-   ("cfg_background", "lens_background")]
+   ("cfg_background", "lens_background"),
+   ("cfg_print_filter", "lens_print_filter")]
 
 defaultConfig :: Config
 defaultConfig =
@@ -503,7 +505,8 @@ defaultConfig =
     cfg_constants = [],
     cfg_default_to = typeRep (Proxy :: Proxy Int),
     cfg_infer_instance_types = False,
-    cfg_background = [] }
+    cfg_background = [],
+    cfg_print_filter = \_ -> True }
 
 -- Extra types for the universe that come from in-scope instances.
 instanceTypes :: Instances -> Config -> [Type]
@@ -587,11 +590,12 @@ quickSpec cfg@Config{..} = do
     present funs prop = do
       norm <- normaliser
       let prop' = makeDefinition funs (ac norm (conditionalise prop))
-      (n :: Int, props) <- get
-      put (n+1, prop':props)
-      putLine $
-        printf "%3d. %s" n $ show $
-          prettyProp (names instances) prop' <+> maybeType prop
+      when (cfg_print_filter prop) $ do
+        (n :: Int, props) <- get
+        put (n+1, prop':props)
+        putLine $
+          printf "%3d. %s" n $ show $
+            prettyProp (names instances) prop' <+> maybeType prop
 
     -- Put an equation that defines the function f into the form f lhs = rhs.
     -- An equation defines f if:

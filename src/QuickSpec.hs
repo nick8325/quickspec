@@ -97,7 +97,7 @@ module QuickSpec(
 
   -- * For QuickSpec hackers
   Sig(..), Context(..),
-  quickSpecResult, addBackground, addInstances, instFun, customConstant) where
+  quickSpecResult, addBackground, addInstances, instFun, customConstant, withPrintFilter) where
 
 import QuickSpec.Haskell(Predicateable, PredicateTestCase, Names(..), Observe(..))
 import qualified QuickSpec.Haskell as Haskell
@@ -269,6 +269,10 @@ instFun x = addInstances (Haskell.inst x)
 addInstances :: Haskell.Instances -> Sig
 addInstances insts =
   Sig (\_ -> modL Haskell.lens_instances (`mappend` insts))
+
+withPrintFilter :: (Prop (Term (PartiallyApplied Haskell.Constant)) -> Bool) -> Sig
+withPrintFilter p =
+  Sig (\_ -> setL Haskell.lens_print_filter p)
 
 -- | Declare some functions as being background functions.
 -- These are functions which are not interesting on their own,
