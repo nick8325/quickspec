@@ -408,10 +408,6 @@ instance forall a b. (Predicateable b, Typeable a) => Predicateable (a -> b) whe
 
 data TestCaseWrapped (t :: Symbol) a = TestCaseWrapped { unTestCaseWrapped :: a }
 
--- A `suchThat` generator for a predicate
-genSuchThat :: (Predicateable a, Arbitrary (PredicateTestCase a)) => a -> Gen (TestCaseWrapped x (PredicateTestCase a))
-genSuchThat p = TestCaseWrapped <$> arbitrary `suchThat` uncrry p
-
 true :: Constant
 true = con "True" True
 
@@ -420,11 +416,13 @@ trueTerm = App (total true) []
 
 -- | Declare a predicate with a given name and value.
 -- The predicate should have type @... -> Bool@.
-predicate :: forall a. ( Predicateable a
+-- Uses an explicit generator.
+predicateGen :: forall a b. ( Predicateable a
              , Typeable a
+             , Typeable b
              , Typeable (PredicateTestCase a))
-             => String -> a -> (Instances, Constant)
-predicate name pred =
+             => String -> a -> (b -> Gen (PredicateTestCase a)) -> (Instances, Constant)
+predicateGen name pred gen =
   let
     -- The following doesn't compile on GHC 7.10:
     -- ty = typeRep (Proxy :: Proxy (TestCaseWrapped sym (PredicateTestCase a)))
@@ -446,8 +444,8 @@ predicate name pred =
       mconcat $ map (valueInst . addName)
         [toValue (Identity inst1), toValue (Identity inst2)]
 
-    inst1 :: Dict (Arbitrary (PredicateTestCase a)) -> Gen (TestCaseWrapped SymA (PredicateTestCase a))
-    inst1 Dict = genSuchThat pred
+    inst1 :: b -> Gen (TestCaseWrapped SymA (PredicateTestCase a))
+    inst1 x = TestCaseWrapped <$> gen x
 
     inst2 :: Names (TestCaseWrapped SymA (PredicateTestCase a))
     inst2 = Names [name ++ "_var"]
@@ -467,6 +465,17 @@ predicate name pred =
         unwrapV = toPolyValue (unTestCaseWrapped :: TestCaseWrapped SymA A -> A)
   in
     (instances, conPred)
+
+-- | Declare a predicate with a given name and value.
+-- The predicate should have type @... -> Bool@.
+predicate :: forall a. ( Predicateable a
+          , Typeable a
+          , Typeable (PredicateTestCase a))
+          => String -> a -> (Instances, Constant)
+predicate name pred = predicateGen name pred inst
+  where
+    inst :: Dict (Arbitrary (PredicateTestCase a)) -> Gen (PredicateTestCase a)
+    inst Dict = arbitrary `suchThat` uncrry pred
 
 data Config =
   Config {

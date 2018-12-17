@@ -69,7 +69,7 @@ module QuickSpec(
   quickSpec, Sig, Signature(..),
 
   -- * Declaring functions and predicates
-  con, predicate,
+  con, predicate, predicateGen,
   -- ** Type variables for polymorphic functions
   A, B, C, D, E,
 
@@ -96,7 +96,7 @@ module QuickSpec(
   Typeable, (:-)(..), Dict(..), Proxy(..), Arbitrary,
 
   -- * For QuickSpec hackers
-  Sig(..), Context(..),
+  unSig, Context(..),
   quickSpecResult, addBackground, addInstances, instFun, customConstant, withPrintFilter) where
 
 import QuickSpec.Haskell(Predicateable, PredicateTestCase, Names(..), Observe(..))
@@ -220,6 +220,22 @@ predicate name x =
   Sig $ \ctx@(Context _ names) ->
     if name `elem` names then id else
     let (insts, con) = Haskell.predicate name x in
+      runSig [addInstances insts `mappend` customConstant con] ctx
+
+-- | Declare a predicate with a given name and value.
+-- The predicate should be a function which returns `Bool`.
+-- It will appear in equations just like any other constant,
+-- but will also be allowed to appear as a condition.
+-- The third argument is a generator for values satisfying the predicate.
+predicateGen :: ( Predicateable a
+                , Typeable a
+                , Typeable b
+                , Typeable (PredicateTestCase a))
+                => String -> a -> (b -> Gen (PredicateTestCase a)) -> Sig
+predicateGen name x gen =
+  Sig $ \ctx@(Context _ names) ->
+    if name `elem` names then id else
+    let (insts, con) = Haskell.predicateGen name x gen in
       runSig [addInstances insts `mappend` customConstant con] ctx
 
 -- | Declare a new monomorphic type.
