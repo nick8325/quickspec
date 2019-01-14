@@ -24,6 +24,7 @@ import Control.Monad
 
 data Schemas testcase result fun norm =
   Schemas {
+    sc_single_use :: Type -> Bool,
     sc_instantiate_singleton :: Term fun -> Bool,
     sc_empty :: Terms testcase result (Term fun) norm,
     sc_classes :: Terms testcase result (Term fun) norm,
@@ -32,6 +33,7 @@ data Schemas testcase result fun norm =
 
 makeLensAs ''Schemas
   [("sc_classes", "classes"),
+   ("sc_single_use", "single_use"),
    ("sc_instances", "instances"),
    ("sc_instantiated", "instantiated")]
 
@@ -39,11 +41,13 @@ instance_ :: Ord fun => Term fun -> Lens (Schemas testcase result fun norm) (Ter
 instance_ t = reading (\Schemas{..} -> keyDefault t sc_empty # instances)
 
 initialState ::
+  (Type -> Bool) ->
   (Term fun -> Bool) ->
   (Term fun -> testcase -> result) ->
   Schemas testcase result fun norm
-initialState inst eval =
+initialState singleUse inst eval =
   Schemas {
+    sc_single_use = singleUse,
     sc_instantiate_singleton = inst,
     sc_empty = Terms.initialState eval,
     sc_classes = Terms.initialState eval,
@@ -62,6 +66,7 @@ explore ::
 explore t0 = do
   let t = mostSpecific t0
   res <- zoom classes (Terms.explore t)
+  singleUse <- access single_use
   case res of
     Terms.Singleton -> do
       inst <- gets sc_instantiate_singleton
@@ -69,7 +74,7 @@ explore t0 = do
         instantiateRep t
        else do
         -- Add the most general instance of the schema
-        zoom (instance_ t) (Terms.explore (mostGeneral t0))
+        zoom (instance_ t) (Terms.explore (mostGeneral singleUse t0))
         return (Accepted [])
     Terms.Discovered ([] :=>: _ :=: u) ->
       exploreIn u t
@@ -85,7 +90,8 @@ exploreIn ::
   StateT (Schemas testcase result fun norm) m (Result fun)
 exploreIn rep t = do
   -- First check if schema is redundant
-  res <- zoom (instance_ rep) (Terms.explore (mostGeneral t))
+  singleUse <- access single_use
+  res <- zoom (instance_ rep) (Terms.explore (mostGeneral singleUse t))
   case res of
     Terms.Discovered prop -> do
       add prop
@@ -118,40 +124,43 @@ instantiate ::
   MonadTester testcase (Term fun) m, MonadPruner (Term fun) norm m) =>
   Term fun -> Term fun ->
   StateT (Schemas testcase result fun norm) m (Result fun)
-instantiate rep t = zoom (instance_ rep) $ do
-  let instances = sortBy (comparing generality) (allUnifications (mostGeneral t))
-  Accepted <$> catMaybes <$> forM instances (\t -> do
-    res <- Terms.explore t
-    case res of
-      Terms.Discovered prop -> do
-        add prop
-        return (Just prop)
-      _ -> return Nothing)
+instantiate rep t = do
+  singleUse <- access single_use
+  zoom (instance_ rep) $ do
+    let instances = sortBy (comparing generality) (allUnifications singleUse (mostGeneral singleUse t))
+    Accepted <$> catMaybes <$> forM instances (\t -> do
+      res <- Terms.explore t
+      case res of
+        Terms.Discovered prop -> do
+          add prop
+          return (Just prop)
+        _ -> return Nothing)
 
 -- sortBy (comparing generality) should give most general instances first.
 generality :: Term f -> (Int, [Var])
 generality t = (-length (usort (vars t)), vars t)
 
 -- | Instantiate a schema by making all the variables different.
-mostGeneral :: Term f -> Term f
-mostGeneral s = evalState (aux s) Map.empty
+mostGeneral :: (Type -> Bool) -> Term f -> Term f
+mostGeneral singleUse s = evalState (aux s) Map.empty
   where
     aux (Var (V ty _)) = do
       m <- get
       let n = Map.findWithDefault 0 ty m
-      put $! Map.insert ty (n+1) m
+      unless (singleUse ty) $
+        put $! Map.insert ty (n+1) m
       return (Var (V ty n))
     aux (App f xs) = fmap (App f) (mapM aux xs)
 
 mostSpecific :: Term f -> Term f
 mostSpecific = subst (\(V ty _) -> Var (V ty 0))
 
-allUnifications :: Term fun -> [Term fun]
-allUnifications t = map f ss
+allUnifications :: (Type -> Bool) -> Term fun -> [Term fun]
+allUnifications singleUse t = map f ss
   where
     vs = [ map (x,) (select xs) | xs <- partitionBy typ (usort (vars t)), x <- xs ]
     ss = map Map.fromList (sequence vs)
     go s x = Map.findWithDefault undefined x s
     f s = subst (Var . go s) t
-    select [V ty x] = [V ty x, V ty (succ x)]
+    select [V ty x] | not (singleUse ty) = [V ty x, V ty (succ x)]
     select xs = take 4 xs

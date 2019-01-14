@@ -62,10 +62,10 @@ quickSpec ::
   MonadPruner (Term fun) norm m, MonadTester testcase (Term fun) m, MonadTerminal m) =>
   (Prop (Term fun) -> m ()) ->
   (Term fun -> testcase -> result) ->
-  Int -> Universe -> Enumerator (Term fun) -> m ()
-quickSpec present eval maxSize univ enum = do
+  Int -> Int -> (Type -> Bool) -> Universe -> Enumerator (Term fun) -> m ()
+quickSpec present eval maxSize maxCommutativeSize singleUse univ enum = do
   let
-    state0 = initialState univ (\t -> size t <= 5) eval
+    state0 = initialState singleUse univ (\t -> size t <= maxCommutativeSize) eval
 
     loop m n _ | m > n = return ()
     loop m n tss = do

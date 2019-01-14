@@ -96,10 +96,10 @@ module QuickSpec(
   Typeable, (:-)(..), Dict(..), Proxy(..), Arbitrary,
 
   -- * For QuickSpec hackers
-  unSig, Context(..),
-  quickSpecResult, addBackground, addInstances, instFun, customConstant, withPrintFilter) where
+  unSig, Context(..), SingleUse(..), NoWarnings(..),
+  quickSpecResult, addBackground, addInstances, instFun, customConstant, withPrintFilter, withMaxCommutativeSize) where
 
-import QuickSpec.Haskell(Predicateable, PredicateTestCase, Names(..), Observe(..))
+import QuickSpec.Haskell(Predicateable, PredicateTestCase, Names(..), Observe(..), SingleUse(..), NoWarnings(..))
 import qualified QuickSpec.Haskell as Haskell
 import qualified QuickSpec.Haskell.Resolve as Haskell
 import qualified QuickSpec.Testing.QuickCheck as QuickCheck
@@ -343,6 +343,9 @@ series = foldr op mempty . map signature
 -- | Set the maximum size of terms to explore (default: 7).
 withMaxTermSize :: Int -> Sig
 withMaxTermSize n = Sig (\_ -> setL Haskell.lens_max_size n)
+
+withMaxCommutativeSize :: Int -> Sig
+withMaxCommutativeSize n = Sig (\_ -> setL Haskell.lens_max_commutative_size n)
 
 -- | Set how many times to test each discovered law (default: 1000).
 withMaxTests :: Int -> Sig

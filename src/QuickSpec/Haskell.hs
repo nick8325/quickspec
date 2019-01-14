@@ -138,6 +138,8 @@ baseInstances =
 -- A token used in the instance list for types that shouldn't generate warnings
 data NoWarnings a = NoWarnings
 
+data SingleUse a = SingleUse
+
 instance c => Arbitrary (Dict c) where
   arbitrary = return Dict
 
@@ -482,6 +484,7 @@ data Config =
     cfg_quickCheck :: QuickCheck.Config,
     cfg_twee :: Twee.Config,
     cfg_max_size :: Int,
+    cfg_max_commutative_size :: Int,
     cfg_instances :: Instances,
     -- This represents the constants for a series of runs of QuickSpec.
     -- Each index in cfg_constants represents one run of QuickSpec.
@@ -497,6 +500,7 @@ makeLensAs ''Config
   [("cfg_quickCheck", "lens_quickCheck"),
    ("cfg_twee", "lens_twee"),
    ("cfg_max_size", "lens_max_size"),
+   ("cfg_max_commutative_size", "lens_max_commutative_size"),
    ("cfg_instances", "lens_instances"),
    ("cfg_constants", "lens_constants"),
    ("cfg_default_to", "lens_default_to"),
@@ -510,6 +514,7 @@ defaultConfig =
     cfg_quickCheck = QuickCheck.Config { QuickCheck.cfg_num_tests = 1000, QuickCheck.cfg_max_test_size = 100, QuickCheck.cfg_fixed_seed = Nothing },
     cfg_twee = Twee.Config { Twee.cfg_max_term_size = minBound, Twee.cfg_max_cp_depth = maxBound },
     cfg_max_size = 7,
+    cfg_max_commutative_size = 5,
     cfg_instances = mempty,
     cfg_constants = [],
     cfg_default_to = typeRep (Proxy :: Proxy Int),
@@ -658,6 +663,9 @@ quickSpec cfg@Config{..} = do
 
     conditions t = usort [p | f <- funs t, Selector _ p _ <- [classify f]]
 
+    singleUse ty =
+      isJust (findInstance instances ty :: Maybe (Value SingleUse))
+
     mainOf n f g = do
       unless (null (f cfg_constants)) $ do
         putLine $ show $ pPrintSignature
@@ -667,7 +675,7 @@ quickSpec cfg@Config{..} = do
         putText (prettyShow (warnings univ instances cfg))
         putLine "== Laws =="
       let pres = if n == 0 then \_ -> return () else present (constantsOf f)
-      QuickSpec.Explore.quickSpec pres (flip eval) cfg_max_size univ
+      QuickSpec.Explore.quickSpec pres (flip eval) cfg_max_size cfg_max_commutative_size singleUse univ
         (enumerator [partial fun | fun <- constantsOf g])
       when (n > 0) $ do
         putLine ""

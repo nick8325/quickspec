@@ -54,13 +54,14 @@ makeLensAs ''Polymorphic
    ("pm_universe", "univ")]
 
 initialState ::
+  (Type -> Bool) ->
   Universe ->
   (Term fun -> Bool) ->
   (Term fun -> testcase -> result) ->
   Polymorphic testcase result fun norm
-initialState univ inst eval =
+initialState singleUse univ inst eval =
   Polymorphic {
-    pm_schemas = Schemas.initialState (inst . fmap fun_specialised) (eval . fmap fun_specialised),
+    pm_schemas = Schemas.initialState singleUse (inst . fmap fun_specialised) (eval . fmap fun_specialised),
     pm_universe = univ }
 
 polyFun :: Typed fun => fun -> PolyFun fun
