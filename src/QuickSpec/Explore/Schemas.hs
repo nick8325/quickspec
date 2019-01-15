@@ -21,6 +21,7 @@ import qualified Data.Set as Set
 import Data.Set(Set)
 import Data.Maybe
 import Control.Monad
+import Twee.Label
 
 data Schemas testcase result fun norm =
   Schemas {
@@ -146,10 +147,12 @@ mostGeneral singleUse s = evalState (aux s) Map.empty
   where
     aux (Var (V ty _)) = do
       m <- get
-      let n = Map.findWithDefault 0 ty m
+      let n :: Int
+          n = Map.findWithDefault 0 ty m
       unless (singleUse ty) $
         put $! Map.insert ty (n+1) m
-      return (Var (V ty n))
+      let m = fromIntegral (labelNum (label (ty, n)))
+      return (Var (V ty m))
     aux (App f xs) = fmap (App f) (mapM aux xs)
 
 mostSpecific :: Term f -> Term f
