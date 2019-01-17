@@ -15,38 +15,38 @@
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE ConstraintKinds #-}
-module QuickSpec.Haskell where
+module QuickSpec.Internal.Haskell where
 
-import QuickSpec.Haskell.Resolve
-import QuickSpec.Type
-import QuickSpec.Prop
-import QuickSpec.Pruning
+import QuickSpec.Internal.Haskell.Resolve
+import QuickSpec.Internal.Type
+import QuickSpec.Internal.Prop
+import QuickSpec.Internal.Pruning
 import Test.QuickCheck hiding (total, classify, subterms)
 import Data.Constraint hiding ((\\))
 import Data.List
 import Data.Proxy
 import qualified Twee.Base as Twee
-import QuickSpec.Term
+import QuickSpec.Internal.Term
 import Data.Functor.Identity
 import Data.Maybe
 import Data.MemoUgly
 import Test.QuickCheck.Gen.Unsafe
 import Data.Char
 import Data.Ord
-import qualified QuickSpec.Testing.QuickCheck as QuickCheck
-import qualified QuickSpec.Pruning.Twee as Twee
-import QuickSpec.Explore hiding (quickSpec)
-import qualified QuickSpec.Explore
-import QuickSpec.Explore.PartialApplication
-import QuickSpec.Explore.Polymorphic(Universe(..))
-import QuickSpec.Pruning.Background(Background)
+import qualified QuickSpec.Internal.Testing.QuickCheck as QuickCheck
+import qualified QuickSpec.Internal.Pruning.Twee as Twee
+import QuickSpec.Internal.Explore hiding (quickSpec)
+import qualified QuickSpec.Internal.Explore
+import QuickSpec.Internal.Explore.PartialApplication
+import QuickSpec.Internal.Explore.Polymorphic(Universe(..))
+import QuickSpec.Internal.Pruning.Background(Background)
 import Control.Monad
 import Control.Monad.Trans.State.Strict
-import QuickSpec.Terminal
+import QuickSpec.Internal.Terminal
 import Text.Printf
-import QuickSpec.Utils
+import QuickSpec.Internal.Utils
 import GHC.TypeLits
-import QuickSpec.Explore.Conditionals
+import QuickSpec.Internal.Explore.Conditionals
 import Control.Spoon
 import qualified Data.Set as Set
 import qualified Test.QuickCheck.Poly as Poly
@@ -675,7 +675,7 @@ quickSpec cfg@Config{..} = do
         putText (prettyShow (warnings univ instances cfg))
         putLine "== Laws =="
       let pres = if n == 0 then \_ -> return () else present (constantsOf f)
-      QuickSpec.Explore.quickSpec pres (flip eval) cfg_max_size cfg_max_commutative_size singleUse univ
+      QuickSpec.Internal.Explore.quickSpec pres (flip eval) cfg_max_size cfg_max_commutative_size singleUse univ
         (enumerator [partial fun | fun <- constantsOf g])
       when (n > 0) $ do
         putLine ""

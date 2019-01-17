@@ -1,16 +1,16 @@
 -- Encode monomorphic types during pruning.
 {-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE RecordWildCards, FlexibleInstances, GeneralizedNewtypeDeriving, MultiParamTypeClasses, FlexibleContexts, ScopedTypeVariables, UndecidableInstances #-}
-module QuickSpec.Pruning.Types where
+module QuickSpec.Internal.Pruning.Types where
 
-import QuickSpec.Pruning
-import qualified QuickSpec.Pruning.Background as Background
-import QuickSpec.Pruning.Background(Background)
-import QuickSpec.Testing
-import QuickSpec.Term
-import QuickSpec.Type
-import QuickSpec.Prop
-import QuickSpec.Terminal
+import QuickSpec.Internal.Pruning
+import qualified QuickSpec.Internal.Pruning.Background as Background
+import QuickSpec.Internal.Pruning.Background(Background)
+import QuickSpec.Internal.Testing
+import QuickSpec.Internal.Term
+import QuickSpec.Internal.Type
+import QuickSpec.Internal.Prop
+import QuickSpec.Internal.Terminal
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
 import qualified Twee.Base as Twee

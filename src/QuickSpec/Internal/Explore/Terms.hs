@@ -1,19 +1,19 @@
 -- Theory exploration which accepts one term at a time.
 {-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE RecordWildCards, FlexibleContexts, PatternGuards, TemplateHaskell #-}
-module QuickSpec.Explore.Terms where
+module QuickSpec.Internal.Explore.Terms where
 
 import qualified Data.Map.Strict as Map
 import Data.Map(Map)
-import QuickSpec.Term
-import QuickSpec.Prop
-import QuickSpec.Type
-import QuickSpec.Pruning
-import QuickSpec.Testing
-import QuickSpec.Testing.DecisionTree hiding (Result, Singleton)
+import QuickSpec.Internal.Term
+import QuickSpec.Internal.Prop
+import QuickSpec.Internal.Type
+import QuickSpec.Internal.Pruning
+import QuickSpec.Internal.Testing
+import QuickSpec.Internal.Testing.DecisionTree hiding (Result, Singleton)
 import Control.Monad.Trans.State.Strict hiding (State)
 import Data.Lens.Light
-import QuickSpec.Utils
+import QuickSpec.Internal.Utils
 
 data Terms testcase result term norm =
   Terms {

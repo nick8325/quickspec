@@ -1,15 +1,15 @@
 {-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE FlexibleContexts #-}
-module QuickSpec.Explore where
+module QuickSpec.Internal.Explore where
 
-import QuickSpec.Explore.Polymorphic
-import QuickSpec.Testing
-import QuickSpec.Pruning
-import QuickSpec.Term
-import QuickSpec.Type
-import QuickSpec.Utils
-import QuickSpec.Prop
-import QuickSpec.Terminal
+import QuickSpec.Internal.Explore.Polymorphic
+import QuickSpec.Internal.Testing
+import QuickSpec.Internal.Pruning
+import QuickSpec.Internal.Term
+import QuickSpec.Internal.Type
+import QuickSpec.Internal.Utils
+import QuickSpec.Internal.Prop
+import QuickSpec.Internal.Terminal
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.State.Strict

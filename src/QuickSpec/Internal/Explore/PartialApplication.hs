@@ -1,12 +1,12 @@
 -- Pruning support for partial application and the like.
 {-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE FlexibleInstances, TypeSynonymInstances, RecordWildCards, MultiParamTypeClasses, FlexibleContexts, GeneralizedNewtypeDeriving, UndecidableInstances, DeriveFunctor #-}
-module QuickSpec.Explore.PartialApplication where
+module QuickSpec.Internal.Explore.PartialApplication where
 
-import QuickSpec.Term
-import QuickSpec.Type
-import QuickSpec.Pruning.Background
-import QuickSpec.Prop
+import QuickSpec.Internal.Term
+import QuickSpec.Internal.Type
+import QuickSpec.Internal.Pruning.Background
+import QuickSpec.Internal.Prop
 import qualified Twee.Base as Twee
 import Data.Maybe
 

@@ -1,18 +1,18 @@
 -- Theory exploration which works on a schema at a time.
 {-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE RecordWildCards, FlexibleContexts, PatternGuards, TupleSections, TemplateHaskell, MultiParamTypeClasses, FlexibleInstances #-}
-module QuickSpec.Explore.Schemas where
+module QuickSpec.Internal.Explore.Schemas where
 
 import qualified Data.Map.Strict as Map
 import Data.Map(Map)
-import QuickSpec.Prop
-import QuickSpec.Pruning
-import QuickSpec.Term
-import QuickSpec.Type
-import QuickSpec.Testing
-import QuickSpec.Utils
-import qualified QuickSpec.Explore.Terms as Terms
-import QuickSpec.Explore.Terms(Terms)
+import QuickSpec.Internal.Prop
+import QuickSpec.Internal.Pruning
+import QuickSpec.Internal.Term
+import QuickSpec.Internal.Type
+import QuickSpec.Internal.Testing
+import QuickSpec.Internal.Utils
+import qualified QuickSpec.Internal.Explore.Terms as Terms
+import QuickSpec.Internal.Explore.Terms(Terms)
 import Control.Monad.Trans.State.Strict hiding (State)
 import Data.List
 import Data.Ord

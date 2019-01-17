@@ -75,28 +75,29 @@ library
   hs-source-dirs: src
   Exposed-modules:
     QuickSpec
-    QuickSpec.Explore
-    QuickSpec.Explore.Conditionals
-    QuickSpec.Explore.PartialApplication
-    QuickSpec.Explore.Polymorphic
-    QuickSpec.Explore.Schemas
-    QuickSpec.Explore.Terms
-    QuickSpec.Haskell
-    QuickSpec.Haskell.Resolve
-    QuickSpec.Parse
-    QuickSpec.Prop
-    QuickSpec.Pruning
-    QuickSpec.Pruning.Background
-    QuickSpec.Pruning.Twee
-    QuickSpec.Pruning.Types
-    QuickSpec.Pruning.UntypedTwee
-    QuickSpec.Term
-    QuickSpec.Terminal
-    QuickSpec.Testing
-    QuickSpec.Testing.DecisionTree
-    QuickSpec.Testing.QuickCheck
-    QuickSpec.Type
-    QuickSpec.Utils
+    QuickSpec.Internal
+    QuickSpec.Internal.Explore
+    QuickSpec.Internal.Explore.Conditionals
+    QuickSpec.Internal.Explore.PartialApplication
+    QuickSpec.Internal.Explore.Polymorphic
+    QuickSpec.Internal.Explore.Schemas
+    QuickSpec.Internal.Explore.Terms
+    QuickSpec.Internal.Haskell
+    QuickSpec.Internal.Haskell.Resolve
+    QuickSpec.Internal.Parse
+    QuickSpec.Internal.Prop
+    QuickSpec.Internal.Pruning
+    QuickSpec.Internal.Pruning.Background
+    QuickSpec.Internal.Pruning.Twee
+    QuickSpec.Internal.Pruning.Types
+    QuickSpec.Internal.Pruning.UntypedTwee
+    QuickSpec.Internal.Term
+    QuickSpec.Internal.Terminal
+    QuickSpec.Internal.Testing
+    QuickSpec.Internal.Testing.DecisionTree
+    QuickSpec.Internal.Testing.QuickCheck
+    QuickSpec.Internal.Type
+    QuickSpec.Internal.Utils
 
   Build-depends:
     QuickCheck >= 2.10,

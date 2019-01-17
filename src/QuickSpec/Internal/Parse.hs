@@ -2,13 +2,13 @@
 {-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE TypeSynonymInstances, FlexibleInstances, MultiParamTypeClasses, GADTs #-}
 {-# LANGUAGE FlexibleContexts #-}
-module QuickSpec.Parse where
+module QuickSpec.Internal.Parse where
 
 import Control.Monad
 import Data.Char
-import QuickSpec.Prop
-import QuickSpec.Term hiding (char)
-import QuickSpec.Type
+import QuickSpec.Internal.Prop
+import QuickSpec.Internal.Term hiding (char)
+import QuickSpec.Internal.Type
 import qualified Twee.Label as Label
 import Text.ParserCombinators.ReadP
 

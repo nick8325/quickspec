@@ -1,10 +1,10 @@
 -- A type of pruners.
 {-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, GeneralizedNewtypeDeriving, FlexibleInstances, UndecidableInstances, DefaultSignatures, GADTs #-}
-module QuickSpec.Pruning where
+module QuickSpec.Internal.Pruning where
 
-import QuickSpec.Prop
-import QuickSpec.Testing
+import QuickSpec.Internal.Prop
+import QuickSpec.Internal.Testing
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.IO.Class

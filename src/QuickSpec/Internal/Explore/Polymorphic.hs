@@ -10,16 +10,16 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RecordWildCards #-}
-module QuickSpec.Explore.Polymorphic(module QuickSpec.Explore.Polymorphic, Result(..), Universe(..)) where
+module QuickSpec.Internal.Explore.Polymorphic(module QuickSpec.Internal.Explore.Polymorphic, Result(..), Universe(..)) where
 
-import qualified QuickSpec.Explore.Schemas as Schemas
-import QuickSpec.Explore.Schemas(Schemas, Result(..))
-import QuickSpec.Term
-import QuickSpec.Type
-import QuickSpec.Testing
-import QuickSpec.Pruning
-import QuickSpec.Utils
-import QuickSpec.Prop
+import qualified QuickSpec.Internal.Explore.Schemas as Schemas
+import QuickSpec.Internal.Explore.Schemas(Schemas, Result(..))
+import QuickSpec.Internal.Term
+import QuickSpec.Internal.Type
+import QuickSpec.Internal.Testing
+import QuickSpec.Internal.Pruning
+import QuickSpec.Internal.Utils
+import QuickSpec.Internal.Prop
 import qualified Data.Map.Strict as Map
 import Data.Map(Map)
 import qualified Data.Set as Set

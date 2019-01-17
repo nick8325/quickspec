@@ -1,7 +1,7 @@
 -- | Miscellaneous utility functions.
 {-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE CPP #-}
-module QuickSpec.Utils where
+module QuickSpec.Internal.Utils where
 
 import Control.Arrow((&&&))
 import Control.Exception

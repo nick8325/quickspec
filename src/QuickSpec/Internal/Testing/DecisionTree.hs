@@ -1,7 +1,7 @@
 -- Decision trees for testing terms for equality.
 {-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE RecordWildCards #-}
-module QuickSpec.Testing.DecisionTree where
+module QuickSpec.Internal.Testing.DecisionTree where
 
 import qualified Data.Map as Map
 import Data.Map(Map)

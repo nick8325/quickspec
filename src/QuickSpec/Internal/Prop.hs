@@ -1,13 +1,13 @@
 {-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE DeriveGeneric, TypeFamilies, DeriveFunctor, FlexibleInstances, MultiParamTypeClasses, UndecidableInstances, FlexibleContexts, TypeOperators #-}
-module QuickSpec.Prop where
+module QuickSpec.Internal.Prop where
 
 import Control.Monad
 import qualified Data.DList as DList
 import Data.Ord
-import QuickSpec.Type
-import QuickSpec.Utils
-import QuickSpec.Term
+import QuickSpec.Internal.Type
+import QuickSpec.Internal.Utils
+import QuickSpec.Internal.Term
 import GHC.Generics(Generic)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set

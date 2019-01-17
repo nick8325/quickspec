@@ -1,14 +1,14 @@
 -- A pruner that uses twee. Does not respect types.
 {-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE RecordWildCards, FlexibleContexts, FlexibleInstances, GADTs, PatternSynonyms, GeneralizedNewtypeDeriving, MultiParamTypeClasses, UndecidableInstances, TemplateHaskell #-}
-module QuickSpec.Pruning.UntypedTwee where
+module QuickSpec.Internal.Pruning.UntypedTwee where
 
-import QuickSpec.Testing
-import QuickSpec.Pruning
-import QuickSpec.Prop
-import QuickSpec.Term
-import QuickSpec.Type
-import QuickSpec.Utils
+import QuickSpec.Internal.Testing
+import QuickSpec.Internal.Pruning
+import QuickSpec.Internal.Prop
+import QuickSpec.Internal.Term
+import QuickSpec.Internal.Type
+import QuickSpec.Internal.Utils
 import qualified Twee
 import qualified Twee.Equation as Twee
 import qualified Twee.KBO as KBO
@@ -21,7 +21,7 @@ import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Strict hiding (State)
 import Control.Monad.Trans.Class
 import Control.Monad.IO.Class
-import QuickSpec.Terminal
+import QuickSpec.Internal.Terminal
 import qualified Data.Set as Set
 import Data.Set(Set)
 

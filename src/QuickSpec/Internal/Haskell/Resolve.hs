@@ -14,10 +14,10 @@
 
 {-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE RankNTypes, ScopedTypeVariables #-}
-module QuickSpec.Haskell.Resolve(Instances(..), inst, valueInst, findInstance, findValue) where
+module QuickSpec.Internal.Haskell.Resolve(Instances(..), inst, valueInst, findInstance, findValue) where
 
 import Twee.Base
-import QuickSpec.Type
+import QuickSpec.Internal.Type
 import Data.MemoUgly
 import Data.Functor.Identity
 import Data.Maybe

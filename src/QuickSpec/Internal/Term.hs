@@ -2,10 +2,10 @@
 --
 -- Typed terms and operations on them.
 {-# LANGUAGE PatternSynonyms, ViewPatterns, TypeSynonymInstances, FlexibleInstances, TypeFamilies, ConstraintKinds, DeriveGeneric, DeriveAnyClass, MultiParamTypeClasses, FunctionalDependencies, UndecidableInstances, TypeOperators, DeriveFunctor, FlexibleContexts #-}
-module QuickSpec.Term(module QuickSpec.Term, module Twee.Base, module Twee.Pretty) where
+module QuickSpec.Internal.Term(module QuickSpec.Internal.Term, module Twee.Base, module Twee.Pretty) where
 
-import QuickSpec.Type
-import QuickSpec.Utils
+import QuickSpec.Internal.Type
+import QuickSpec.Internal.Utils
 import Control.Monad
 import GHC.Generics(Generic)
 import Test.QuickCheck(CoArbitrary)

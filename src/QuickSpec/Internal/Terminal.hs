@@ -1,6 +1,6 @@
 {-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving, DefaultSignatures, GADTs #-}
-module QuickSpec.Terminal where
+module QuickSpec.Internal.Terminal where
 
 import Control.Monad.Trans.Class
 import Control.Monad.IO.Class

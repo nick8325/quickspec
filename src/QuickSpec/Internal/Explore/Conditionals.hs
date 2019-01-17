@@ -9,18 +9,18 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE DeriveFunctor #-}
-module QuickSpec.Explore.Conditionals where
+module QuickSpec.Internal.Explore.Conditionals where
 
-import QuickSpec.Prop
-import QuickSpec.Term
-import QuickSpec.Type
-import QuickSpec.Pruning
-import QuickSpec.Pruning.Background(Background(..))
-import QuickSpec.Testing
-import QuickSpec.Terminal
-import QuickSpec.Utils
-import QuickSpec.Explore.PartialApplication
-import QuickSpec.Explore.Polymorphic
+import QuickSpec.Internal.Prop
+import QuickSpec.Internal.Term
+import QuickSpec.Internal.Type
+import QuickSpec.Internal.Pruning
+import QuickSpec.Internal.Pruning.Background(Background(..))
+import QuickSpec.Internal.Testing
+import QuickSpec.Internal.Terminal
+import QuickSpec.Internal.Utils
+import QuickSpec.Internal.Explore.PartialApplication
+import QuickSpec.Internal.Explore.Polymorphic
 import qualified Twee.Base as Twee
 import Data.List
 import Control.Monad

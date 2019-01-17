@@ -1,11 +1,11 @@
 -- Testing conjectures using QuickCheck.
 {-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE FlexibleContexts, FlexibleInstances, RecordWildCards, MultiParamTypeClasses, GeneralizedNewtypeDeriving, TemplateHaskell #-}
-module QuickSpec.Testing.QuickCheck where
+module QuickSpec.Internal.Testing.QuickCheck where
 
-import QuickSpec.Testing
-import QuickSpec.Pruning
-import QuickSpec.Prop
+import QuickSpec.Internal.Testing
+import QuickSpec.Internal.Pruning
+import QuickSpec.Internal.Prop
 import Test.QuickCheck
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Random
@@ -15,8 +15,8 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.Reader
 import Data.List
 import System.Random
-import QuickSpec.Terminal
-import QuickSpec.Utils
+import QuickSpec.Internal.Terminal
+import QuickSpec.Internal.Utils
 
 data Config =
   Config {
