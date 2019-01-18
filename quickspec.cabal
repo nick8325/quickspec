@@ -78,7 +78,6 @@ library
     QuickSpec.Internal
     QuickSpec.Internal.Explore
     QuickSpec.Internal.Explore.Conditionals
-    QuickSpec.Internal.Explore.PartialApplication
     QuickSpec.Internal.Explore.Polymorphic
     QuickSpec.Internal.Explore.Schemas
     QuickSpec.Internal.Explore.Terms
@@ -91,6 +90,7 @@ library
     QuickSpec.Internal.Pruning.Twee
     QuickSpec.Internal.Pruning.Types
     QuickSpec.Internal.Pruning.UntypedTwee
+    QuickSpec.Internal.Pruning.PartialApplication
     QuickSpec.Internal.Term
     QuickSpec.Internal.Terminal
     QuickSpec.Internal.Testing
