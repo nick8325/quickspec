@@ -123,7 +123,6 @@ instance (PrettyTerm fun, Ord fun, Typed fun, Apply (Term fun), MonadPruner (Ter
   add prop = PolyM $ do
     univ <- access univ
     let insts = typeInstances univ (canonicalise (regeneralise (mapFun fun_original prop)))
-    putLine (prettyShow insts)
     or <$> mapM add insts
 
 instance MonadTester testcase (Term fun) m =>
@@ -195,7 +194,7 @@ typeInstancesList types prop =
 typeInstances :: (Pretty a, PrettyTerm fun, Symbolic fun a, Ord fun, Typed fun, Typed a) => Universe -> a -> [a]
 typeInstances Universe{..} prop =
   [ typeSubst sub prop
-  | sub <- typeInstancesList (Set.toList univ_types) (map typ (DList.toList (termsDL prop) >>= subterms)) ]
+  | sub <- typeInstancesList (Set.toList univ_types) (map typ (DList.toList (termsDL prop) >>= subtermsFO)) ]
 
 intersection :: [Map Twee.Var Type] -> [Map Twee.Var Type] -> [Map Twee.Var Type]
 ms1 `intersection` ms2 = usort [ Map.union m1 m2 | m1 <- ms1, m2 <- ms2, ok m1 m2 ]
@@ -236,8 +235,7 @@ universe xs = Universe (Set.fromList univ)
         Just (ty1, ty2) -> components ty1 ++ components ty2
 
     arrows ty =
-      arrows1 ty
-      --concatMap arrows1 (typeArgs ty)
+      concatMap arrows1 (typeArgs ty)
       where
         arrows1 ty =
           case unpackArrow ty of
@@ -245,11 +243,11 @@ universe xs = Universe (Set.fromList univ)
               [ty] ++ arrows1 arg ++ arrows1 res
             _ -> []
  
-inUniverse :: Typed fun => Term fun -> Universe -> Bool
+inUniverse :: (PrettyTerm fun, Typed fun) => Term fun -> Universe -> Bool
 t `inUniverse` Universe{..} =
-  and [oneTypeVar (typ u) `Set.member` univ_types | u <- subterms t]
+  and [oneTypeVar (typ u) `Set.member` univ_types | u <- subtermsFO t ++ map Var (vars t)]
 
 usefulForUniverse :: Typed fun => Term fun -> Universe -> Bool
 t `usefulForUniverse` Universe{..} =
-  and [oneTypeVar (typ u) `Set.member` univ_types | u <- properSubterms t] &&
+  and [oneTypeVar (typ u) `Set.member` univ_types | u <- properSubtermsFO t ++ map Var (vars t)] &&
   oneTypeVar (typeRes (typ t)) `Set.member` univ_types

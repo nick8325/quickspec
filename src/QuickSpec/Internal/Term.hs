@@ -116,6 +116,13 @@ properSubterms :: Term f -> [Term f]
 properSubterms (t :$: u) = subterms t ++ subterms u
 properSubterms _ = []
 
+subtermsFO :: Term f -> [Term f]
+subtermsFO t = t:properSubtermsFO t
+
+properSubtermsFO :: Term f -> [Term f]
+properSubtermsFO (t :$: u) = properSubtermsFO t ++ subtermsFO u
+properSubtermsFO _ = []
+
 -- | Renames variables so that they appear in a canonical order.
 -- Also makes sure that variables of different types have different numbers.
 canonicalise :: Symbolic fun a => a -> a
