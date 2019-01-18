@@ -31,7 +31,7 @@ instance (fun1 ~ fun, Apply (Term fun)) => Parse fun1 (Term fun) where
       parseApp = do
         f <- pfun
         args <- parseArgs <++ return []
-        return (unPoly (foldl apply (poly (App f [])) (map poly args)))
+        return (unPoly (foldl apply (poly (Fun f)) (map poly args)))
       parseArgs = between (char '(') (char ')') (sepBy (parse pfun) (char ','))
 
 instance (Parse fun a, Typed a) => Parse fun (Equation a) where
