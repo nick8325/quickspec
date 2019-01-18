@@ -94,26 +94,7 @@ instance (PrettyArity fun1, PrettyArity fun2) => PrettyArity (fun1 :+: fun2) whe
 prettyProp ::
   (Typed fun, Apply (Term fun), PrettyTerm fun, PrettyArity fun) =>
   (Type -> [String]) -> Prop (Term fun) -> Doc
-prettyProp cands =
-  pPrint . nameVars cands . eta
-  where
-    eta prop =
-      case filter isPretty (etaExpand prop) of
-        [] -> last (etaExpand prop)
-        (prop:_) -> prop
-
-    isPretty (_ :=>: t :=: u) = isPretty1 t && isPretty1 u
-    isPretty1 (Fun f :@: ts) | prettyArity f > length ts = False
-    isPretty1 _ = True
-
-    etaExpand prop@(lhs :=>: t :=: u) =
-      prop:
-      case (tryApply t x, tryApply u x) of
-        (Just t', Just u') -> etaExpand (lhs :=>: t' :=: u')
-        _ -> []
-      where
-        x = Var (V (head (typeArgs (typ t))) n)
-        n = maximum (0:map (succ . var_id) (vars prop))
+prettyProp cands = pPrint . nameVars cands
 
 data Named fun = Name String | Ordinary fun
 instance Pretty fun => Pretty (Named fun) where
