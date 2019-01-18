@@ -15,9 +15,10 @@ import Twee.Base(Arity(..), Pretty(..), PrettyTerm(..), TermStyle(..), EqualsBon
 import Twee.Pretty
 import qualified Data.Map.Strict as Map
 import Data.List
+import Data.Ord
 
 -- | A typed term.
-data Term f = Var {-# UNPACK #-} !Var | App !f ![Term f]
+data Term f = Var {-# UNPACK #-} !Var | Fun !f | !(Term f) :$: !(Term f)
   deriving (Eq, Ord, Show, Functor)
 
 -- | A variable, which has a type and a number.
@@ -39,7 +40,8 @@ class Symbolic f a | a -> f where
 instance Symbolic f (Term f) where
   termsDL = return
   subst sub (Var x) = sub x
-  subst sub (App f ts) = App f (map (subst sub) ts)
+  subst _ (Fun x) = Fun x
+  subst sub (t :$: u) = subst sub t :$: subst sub u
 
 instance Symbolic f a => Symbolic f [a] where
   termsDL = msum . map termsDL
@@ -50,25 +52,18 @@ class Sized a where
 
 instance Sized f => Sized (Term f) where
   size (Var _) = 1
-  size (App f ts) = size f + sum (map size ts)
+  size (Fun f) = size f
+  size (t :$: u) = size t + size u
 
 instance Pretty Var where
   pPrint x = parens $ text "X" <#> pPrint (var_id x+1) <+> text "::" <+> pPrint (var_ty x)
   --pPrint x = text "X" <#> pPrint (var_id x+1)
 
 instance PrettyTerm f => Pretty (Term f) where
-  pPrintPrec l p (Var x) = pPrintPrec l p x
-  pPrintPrec l p (App f xs) =
-    pPrintTerm (termStyle f) l p (pPrint f) xs
-
--- | Is a term an application (i.e. not a variable)?
-isApp :: Term f -> Bool
-isApp App{} = True
-isApp Var{} = False
-
--- | Is a term a variable?
-isVar :: Term f -> Bool
-isVar = not . isApp
+  pPrintPrec l p (Var x :@: ts) =
+    pPrintTerm curried l p (pPrint x) ts
+  pPrintPrec l p (Fun f :@: ts) =
+    pPrintTerm (termStyle f) l p (pPrint f) ts
 
 -- | All terms contained in a `Symbolic`.
 terms :: Symbolic f a => a -> [Term f]
@@ -77,12 +72,22 @@ terms = DList.toList . termsDL
 -- | All function symbols appearing in a `Symbolic`, in order of appearance,
 -- with duplicates included.
 funs :: Symbolic f a => a -> [f]
-funs x = [ f | t <- terms x, App f _ <- subterms t ]
+funs x = [ f | t <- terms x, Fun f <- subterms t ]
 
 -- | All variables appearing in a `Symbolic`, in order of appearance,
 -- with duplicates included.
 vars :: Symbolic f a => a -> [Var]
 vars x = [ v | t <- terms x, Var v <- subterms t ]
+
+-- | Decompose a term into a head and a list of arguments.
+pattern f :@: ts <- (getApp -> (f, ts)) where
+  f :@: ts = foldl (:$:) f ts
+
+getApp :: Term f -> (Term f, [Term f])
+getApp (t :$: u) = (f, ts ++ [u])
+  where
+    (f, ts) = getApp t
+getApp t = (t, [])
 
 -- | Compute the number of a variable which does /not/ appear in the `Symbolic`.
 freeVar :: Symbolic f a => a -> Int
@@ -99,7 +104,8 @@ occVar x t = length (filter (== x) (vars t))
 -- | Map a function over variables.
 mapVar :: (Var -> Var) -> Term f -> Term f
 mapVar f (Var x) = Var (f x)
-mapVar f (App g xs) = App g (map (mapVar f) xs)
+mapVar _ (Fun x) = Fun x
+mapVar f (t :$: u) = mapVar f t :$: mapVar f u
 
 -- | Find all subterms of a term. Includes the term itself.
 subterms :: Term f -> [Term f]
@@ -107,7 +113,7 @@ subterms t = t:properSubterms t
 
 -- | Find all subterms of a term. Does not include the term itself.
 properSubterms :: Term f -> [Term f]
-properSubterms (App _ ts) = concatMap subterms ts
+properSubterms (t :$: u) = subterms t ++ subterms u
 properSubterms _ = []
 
 -- | Renames variables so that they appear in a canonical order.
@@ -125,25 +131,29 @@ evalTerm :: (Typed fun, Apply a, Monad m) => (Var -> m a) -> (fun -> m a) -> Ter
 evalTerm var fun = eval
   where
     eval (Var x) = var x
-    eval (App f ts) = do
-      f <- fun f
-      ts <- mapM eval ts
-      return (foldl apply f ts)
+    eval (Fun f) = fun f
+    eval (t :$: u) = liftM2 apply (eval t) (eval u)
 
 instance Typed f => Typed (Term f) where
   typ (Var x) = typ x
-  typ (App f ts) =
-    typeDrop (length ts) (typ f)
+  typ (Fun f) = typ f
+  typ (t :$: _) = typeDrop 1 (typ t)
 
   otherTypesDL (Var _) = mempty
-  otherTypesDL (App f ts) =
-    typesDL f `mplus` typesDL ts
+  otherTypesDL (Fun f) = typesDL f
+  otherTypesDL (t :$: u) = typesDL t `mplus` typesDL u
 
   typeSubst_ sub = tsub
     where
       tsub (Var x) = Var (typeSubst_ sub x)
-      tsub (App f ts) =
-        App (typeSubst_ sub f) (map tsub ts)
+      tsub (Fun f) = Fun (typeSubst_ sub f)
+      tsub (t :$: u) =
+        typeSubst_ sub t :$: typeSubst_ sub u
+
+instance (PrettyTerm f, Typed f) => Apply (Term f) where
+  tryApply t u = do
+    tryApply (typ t) (typ u)
+    return (t :$: u)
 
 -- | A standard term ordering - size, skeleton, generality.
 -- Satisfies the property:
@@ -156,12 +166,15 @@ measure t =
    -length (usort (vars t)), vars t)
   where
     skel (Var (V ty _)) = Var (V ty 0)
-    skel (App f ts) = App f (map skel ts)
+    skel (Fun f) = Fun f
+    skel (t :$: u) = skel t :$: skel u
     -- Prefer fully-applied terms to partially-applied ones.
     -- This function computes the size, but adds 1 for every
     -- unapplied function.
-    sizeHO (App f ts) = size f + typeArity (typ f) - length ts + sum (map sizeHO ts)
-    sizeHO Var{} = 1
+    sizeHO (Fun f :@: ts) =
+      size f + typeArity (typ f) - length ts + sum (map sizeHO ts)
+    sizeHO (Var _ :@: ts) =
+      1 + sum (map sizeHO ts)
 
 -- | A helper for `Measure`.
 newtype MeasureFuns f = MeasureFuns (Term f)
@@ -172,12 +185,14 @@ instance Ord f => Ord (MeasureFuns f) where
 
 -- | A helper for `Measure`.
 compareFuns :: Ord f => Term f -> Term f -> Ordering
-compareFuns (Var x) (Var y) = compare x y
-compareFuns Var{} App{} = LT
-compareFuns App{} Var{} = GT
-compareFuns (App f ts) (App g us) =
-  compare f g `orElse`
-  compare (map MeasureFuns ts) (map MeasureFuns us)
+compareFuns (f :@: ts) (g :@: us) =
+  compareHead f g `mappend` comparing (map MeasureFuns) ts us
+  where
+    compareHead (Var x) (Var y) = compare x y
+    compareHead (Var _) _ = LT
+    compareHead _ (Var _) = GT
+    compareHead (Fun f) (Fun g) = compare f g
+    compareHead _ _ = error "viewApp"
 
 ----------------------------------------------------------------------
 -- * Data types a la carte-ish.

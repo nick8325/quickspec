@@ -21,7 +21,7 @@ import QuickSpec.Internal.Haskell.Resolve
 import QuickSpec.Internal.Type
 import QuickSpec.Internal.Prop
 import QuickSpec.Internal.Pruning
-import Test.QuickCheck hiding (total, classify, subterms)
+import Test.QuickCheck hiding (total, classify, subterms, Fun)
 import Data.Constraint hiding ((\\))
 import Data.List
 import Data.Proxy
@@ -37,7 +37,6 @@ import qualified QuickSpec.Internal.Testing.QuickCheck as QuickCheck
 import qualified QuickSpec.Internal.Pruning.Twee as Twee
 import QuickSpec.Internal.Explore hiding (quickSpec)
 import qualified QuickSpec.Internal.Explore
-import QuickSpec.Internal.Explore.PartialApplication
 import QuickSpec.Internal.Explore.Polymorphic(Universe(..))
 import QuickSpec.Internal.Pruning.Background(Background)
 import Control.Monad
@@ -261,10 +260,10 @@ arbitraryFunction :: CoArbitrary a => (a -> Gen b) -> Gen (a -> b)
 arbitraryFunction gen = promote (\x -> coarbitrary x (gen x))
 
 -- | Evaluate a Haskell term in an environment.
-evalHaskell :: Type -> Instances -> TestCase -> Term (PartiallyApplied Constant) -> Either (Value Ordy) (Term (PartiallyApplied Constant))
+evalHaskell :: Type -> Instances -> TestCase -> Term Constant -> Either (Value Ordy) (Term Constant)
 evalHaskell def insts (TestCase env obs) t =
   maybe (Right t) Left $ do
-    let eval env t = evalTerm env (evalPartiallyApplied (evalConstant insts)) t
+    let eval env t = evalTerm env (evalConstant insts) t
     Identity val `In` w <- unwrap <$> eval env (defaultTo def t)
     res <- obs (wrap w (Identity val))
     -- Don't allow partial results to enter the decision tree
@@ -413,8 +412,8 @@ data TestCaseWrapped (t :: Symbol) a = TestCaseWrapped { unTestCaseWrapped :: a 
 true :: Constant
 true = con "True" True
 
-trueTerm :: Term (PartiallyApplied Constant)
-trueTerm = App (total true) []
+trueTerm :: Term Constant
+trueTerm = Fun true
 
 -- | Declare a predicate with a given name and value.
 -- The predicate should have type @... -> Bool@.
@@ -452,7 +451,7 @@ predicateGen name pred gen =
     inst2 :: Names (TestCaseWrapped SymA (PredicateTestCase a))
     inst2 = Names [name ++ "_var"]
 
-    conPred = (con name pred) { con_classify = Predicate conSels ty (App true []) }
+    conPred = (con name pred) { con_classify = Predicate conSels ty (Fun true) }
     conSels = [ (constant' (name ++ "_" ++ show i) (select (i + length (con_constraints conPred)))) { con_classify = Selector i conPred ty, con_size = 0 } | i <- [0..typeArity (typ conPred)-1] ]
 
     select i =
@@ -492,8 +491,8 @@ data Config =
     cfg_constants :: [[Constant]],
     cfg_default_to :: Type,
     cfg_infer_instance_types :: Bool,
-    cfg_background :: [Prop (Term (PartiallyApplied Constant))],
-    cfg_print_filter :: Prop (Term (PartiallyApplied Constant)) -> Bool
+    cfg_background :: [Prop (Term Constant)],
+    cfg_print_filter :: Prop (Term Constant) -> Bool
     }
 
 makeLensAs ''Config
@@ -588,7 +587,7 @@ instance Pretty Warnings where
         text "WARNING: The following types have no 'Ord' or 'Observe' instance declared." $$
         text "You will not get any equations about the following types:"
 
-quickSpec :: Config -> IO [Prop (Term (PartiallyApplied Constant))]
+quickSpec :: Config -> IO [Prop (Term Constant)]
 quickSpec cfg@Config{..} = do
   let
     constantsOf f =
@@ -620,24 +619,24 @@ quickSpec cfg@Config{..} = do
     --   * all vars in rhs appear in lhs
     makeDefinition cons (lhs :=>: t :=: u)
       | Just (f, ts) <- defines u,
-        f `notElem` mapMaybe getTotal (funs t),
+        f `notElem` funs t,
         null (usort (vars t) \\ vars ts) =
         lhs :=>: u :=: t
         -- In the case where t defines f, the equation is already oriented correctly
       | otherwise = lhs :=>: t :=: u
       where
-        defines (App (Partial f _) ts)
+        defines (Fun f :@: ts)
           | f `elem` cons,
-            all (`notElem` cons) (mapMaybe getTotal (funs ts)) = Just (f, ts)
+            all (`notElem` cons) (funs ts) = Just (f, ts)
         defines _ = Nothing
 
     -- Transform x+(y+z) = y+(x+z) into associativity, if + is commutative
-    ac norm (lhs :=>: App f [Var x, App f1 [Var y, Var z]] :=: App f2 [Var y1, App f3 [Var x1, Var z1]])
+    ac norm (lhs :=>: Fun f :@: [Var x, Fun f1 :@: [Var y, Var z]] :=: Fun f2 :@: [Var y1, Fun f3 :@: [Var x1, Var z1]])
       | f == f1, f1 == f2, f2 == f3,
         x == x1, y == y1, z == z1,
         x /= y, y /= z, x /= z,
-        norm (App f [Var x, Var y]) == norm (App f [Var y, Var x]) =
-          lhs :=>: App f [App f [Var x, Var y], Var z] :=: App f [Var x, App f [Var y, Var z]]
+        norm (Fun f :@: [Var x, Var y]) == norm (Fun f :@: [Var y, Var x]) =
+          lhs :=>: Fun f :@: [Fun f :@: [Var x, Var y], Var z] :=: Fun f :@: [Var x, Fun f :@: [Var y, Var z]]
     ac _ prop = prop
 
     -- Add a type signature when printing the equation x = y.
@@ -646,9 +645,7 @@ quickSpec cfg@Config{..} = do
     maybeType _ = pPrintEmpty
 
     -- XXX do this during testing
-    constraintsOk (Partial f _) = constraintsOk1 f
-    constraintsOk (Apply _) = True
-    constraintsOk1 = memo $ \con ->
+    constraintsOk = memo $ \con ->
       or [ and [ isJust (findValue instances (defaultTo cfg_default_to constraint)) | constraint <- con_constraints (typeSubst sub con) ]
          | ty <- Set.toList (univ_types univ),
            sub <- maybeToList (matchType (typeRes (typ con)) ty) ]
@@ -669,14 +666,14 @@ quickSpec cfg@Config{..} = do
     mainOf n f g = do
       unless (null (f cfg_constants)) $ do
         putLine $ show $ pPrintSignature
-          (map (partial . unhideConstraint) (f cfg_constants))
+          (map (Fun . unhideConstraint) (f cfg_constants))
         putLine ""
       when (n > 0) $ do
         putText (prettyShow (warnings univ instances cfg))
         putLine "== Laws =="
       let pres = if n == 0 then \_ -> return () else present (constantsOf f)
       QuickSpec.Internal.Explore.quickSpec pres (flip eval) cfg_max_size cfg_max_commutative_size singleUse univ
-        (enumerator [partial fun | fun <- constantsOf g])
+        (enumerator (map Fun (constantsOf g)))
       when (n > 0) $ do
         putLine ""
 
@@ -693,5 +690,5 @@ quickSpec cfg@Config{..} = do
     generate $
     QuickCheck.run cfg_quickCheck (arbitraryTestCase cfg_default_to instances) eval $
     Twee.run cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size } $
-    runConditionals (map total constants) $
+    runConditionals constants $
     fmap (reverse . snd) $ flip execStateT (1, []) main

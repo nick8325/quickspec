@@ -58,7 +58,7 @@ sortTerms measure e =
   mapEnumerator (sortBy' measure) e
 
 quickSpec ::
-  (Ord fun, Ord norm, Sized fun, Typed fun, Ord result, Apply (Term fun), PrettyTerm fun,
+  (Ord fun, Ord norm, Sized fun, Typed fun, Ord result, PrettyTerm fun,
   MonadPruner (Term fun) norm m, MonadTester testcase (Term fun) m, MonadTerminal m) =>
   (Prop (Term fun) -> m ()) ->
   (Term fun -> testcase -> result) ->

@@ -20,6 +20,7 @@ import QuickSpec.Internal.Testing
 import QuickSpec.Internal.Pruning
 import QuickSpec.Internal.Utils
 import QuickSpec.Internal.Prop
+import QuickSpec.Internal.Terminal
 import qualified Data.Map.Strict as Map
 import Data.Map(Map)
 import qualified Data.Set as Set
@@ -80,7 +81,7 @@ newtype PolyM testcase result fun norm m a = PolyM { unPolyM :: StateT (Polymorp
 
 explore ::
   (PrettyTerm fun, Ord result, Ord norm, Typed fun, Ord fun, Apply (Term fun),
-  MonadTester testcase (Term fun) m, MonadPruner (Term fun) norm m) =>
+  MonadTester testcase (Term fun) m, MonadPruner (Term fun) norm m, MonadTerminal m) =>
   Term fun ->
   StateT (Polymorphic testcase result fun norm) m (Result fun)
 explore t = do
@@ -100,7 +101,7 @@ explore t = do
 
 exploreNoMGU ::
   (PrettyTerm fun, Ord result, Ord norm, Typed fun, Ord fun, Apply (Term fun),
-  MonadTester testcase (Term fun) m, MonadPruner (Term fun) norm m) =>
+  MonadTester testcase (Term fun) m, MonadPruner (Term fun) norm m, MonadTerminal m) =>
   Term fun ->
   StateT (Polymorphic testcase result fun norm) m (Result fun)
 exploreNoMGU t = do
@@ -114,7 +115,7 @@ exploreNoMGU t = do
     mapProps f (Accepted props) = Accepted (map f props)
     mapProps f (Rejected props) = Rejected (map f props)
 
-instance (PrettyTerm fun, Ord fun, Typed fun, Apply (Term fun), MonadPruner (Term fun) norm m) =>
+instance (PrettyTerm fun, Ord fun, Typed fun, Apply (Term fun), MonadPruner (Term fun) norm m, MonadTerminal m) =>
   MonadPruner (Term (PolyFun fun)) norm (PolyM testcase result fun norm m) where
   normaliser = PolyM $ do
     norm <- normaliser
@@ -122,6 +123,7 @@ instance (PrettyTerm fun, Ord fun, Typed fun, Apply (Term fun), MonadPruner (Ter
   add prop = PolyM $ do
     univ <- access univ
     let insts = typeInstances univ (canonicalise (regeneralise (mapFun fun_original prop)))
+    putLine (prettyShow insts)
     or <$> mapM add insts
 
 instance MonadTester testcase (Term fun) m =>
@@ -148,17 +150,16 @@ regeneralise =
       -- In the case of the type (), we get the law x == y :: (),
       -- which we must not generalise to x == y :: a.
       poly (Var (V (genType ty) x))
-    genTerm (App f ts) =
+    genTerm (Fun f) = poly (Fun f)
+    genTerm (t :$: u) =
       let
-        -- Need to polymorphise all of ts together so that type variables which
-        -- only occur in subterms of ts don't get unified
-        (f', us) = unPoly (polyPair (poly f) (polyList (map genTerm ts)))
-        Just ty = fmap unPoly (polyMgu (polyTyp (poly f')) (polyApply arrowType (poly (map typ us)) (poly typeVar)))
-        tys = take (length us) (typeArgs ty)
-        Just f'' = cast ty f'
-        Just us' = sequence (zipWith cast tys us)
+        (t', u') = unPoly (polyPair (genTerm t) (genTerm u))
+        Just ty = fmap unPoly (polyMgu (polyTyp (poly t')) (polyApply (\arg res -> arrowType [arg] res) (polyTyp (poly u')) (poly typeVar)))
+        Just (arg, _) = unpackArrow ty
+        Just t'' = cast ty t'
+        Just u'' = cast arg u'
       in
-        poly (App f'' us')
+        poly (t'' :$: u'')
 
     genType = Twee.build . aux 0 . Twee.singleton
       where
@@ -175,7 +176,7 @@ regeneralise =
         cs = [(var_ty x, var_ty y) | x:xs <- vs, y <- xs] ++ concatMap litCs (lhs prop) ++ litCs (rhs prop)
         -- Two variables that were equal before generalisation must have the
         -- same type afterwards
-        vs = partitionBy skel (concatMap vars (terms prop >>= subterms))
+        vs = partitionBy skel (concatMap vars (terms prop))
         skel (V ty x) = V (oneTypeVar ty) x
     litCs (t :=: u) = [(typ t, typ u)]
 
@@ -235,13 +236,14 @@ universe xs = Universe (Set.fromList univ)
         Just (ty1, ty2) -> components ty1 ++ components ty2
 
     arrows ty =
-      concatMap arrows1 (typeArgs ty)
+      arrows1 ty
+      --concatMap arrows1 (typeArgs ty)
       where
-        arrows1 ty
-          | isArrowType ty =
-            ty:concatMap arrows1 (typeArgs ty)
-          | otherwise =
-            []
+        arrows1 ty =
+          case unpackArrow ty of
+            Just (arg, res) ->
+              [ty] ++ arrows1 arg ++ arrows1 res
+            _ -> []
  
 inUniverse :: Typed fun => Term fun -> Universe -> Bool
 t `inUniverse` Universe{..} =

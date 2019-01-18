@@ -103,8 +103,8 @@ prettyProp cands =
         (prop:_) -> prop
 
     isPretty (_ :=>: t :=: u) = isPretty1 t && isPretty1 u
-    isPretty1 (App f ts) = prettyArity f <= length ts
-    isPretty1 (Var _) = True
+    isPretty1 (Fun f :@: ts) | prettyArity f > length ts = False
+    isPretty1 _ = True
 
     etaExpand prop@(lhs :=>: t :=: u) =
       prop:
@@ -115,17 +115,17 @@ prettyProp cands =
         x = Var (V (head (typeArgs (typ t))) n)
         n = maximum (0:map (succ . var_id) (vars prop))
 
-data Named fun = Name String | Fun fun
+data Named fun = Name String | Ordinary fun
 instance Pretty fun => Pretty (Named fun) where
   pPrintPrec _ _ (Name name) = text name
-  pPrintPrec l p (Fun fun) = pPrintPrec l p fun
+  pPrintPrec l p (Ordinary fun) = pPrintPrec l p fun
 instance PrettyTerm fun => PrettyTerm (Named fun) where
-  termStyle Name{} = uncurried
-  termStyle (Fun fun) = termStyle fun
+  termStyle Name{} = curried
+  termStyle (Ordinary fun) = termStyle fun
 
 nameVars :: (Type -> [String]) -> Prop (Term fun) -> Prop (Term (Named fun))
 nameVars cands p =
-  subst (\x -> Map.findWithDefault undefined x sub) (fmap (fmap Fun) p)
+  subst (\x -> Map.findWithDefault undefined x sub) (fmap (fmap Ordinary) p)
   where
     sub = Map.fromList (evalState (mapM assign (nub (vars p))) Set.empty)
     assign x = do
@@ -133,4 +133,4 @@ nameVars cands p =
       let names = supply (cands (typ x))
           name = head (filter (`Set.notMember` s) names)
       modify (Set.insert name)
-      return (x, App (Name name) [])
+      return (x, Fun (Name name))

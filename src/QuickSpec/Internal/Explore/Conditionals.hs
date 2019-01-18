@@ -19,7 +19,6 @@ import QuickSpec.Internal.Pruning.Background(Background(..))
 import QuickSpec.Internal.Testing
 import QuickSpec.Internal.Terminal
 import QuickSpec.Internal.Utils
-import QuickSpec.Internal.Explore.PartialApplication
 import QuickSpec.Internal.Explore.Polymorphic
 import qualified Twee.Base as Twee
 import Data.List
@@ -67,12 +66,6 @@ data Classification fun =
   | Selector { clas_index :: Int, clas_pred :: fun, clas_test_case :: Type }
   | Function
   deriving (Eq, Ord, Functor)
-
-instance (Arity fun, Predicate fun) => Predicate (PartiallyApplied fun) where
-  classify f =
-    case getTotal f of
-      Nothing -> Function
-      Just f -> fmap total (classify f)
 
 data WithConstructor fun =
     Constructor fun Type
@@ -125,8 +118,8 @@ considerPredicate f =
       let
         x = Var (V ty 0)
         eqns =
-          [App (Constructor f ty) [App (Normal sel) [x] | sel <- sels] === x,
-           App (Normal f) [App (Normal sel) [x] | sel <- sels] === fmap Normal true]
+          [Fun (Constructor f ty) :@: [Fun (Normal sel) :$: x | sel <- sels] === x,
+           Fun (Normal f) :@: [Fun (Normal sel) :$: x | sel <- sels] === fmap Normal true]
       mapM_ (lift . add) eqns
     _ -> return ()
 
@@ -139,7 +132,7 @@ considerConditionalising (lhs :=>: t :=: u) = do
   -- we should add the axiom "get_x_n (toSomePredicate x_1 x_2 ... x_n) = x_n"
   -- to the set of known equations
   case t of
-    App f ts | Predicate{..} <- classify f -> -- It is an interesting predicate, i.e. it was added by the user
+    Fun f :@: ts | Predicate{..} <- classify f -> -- It is an interesting predicate, i.e. it was added by the user
       when (norm u == norm clas_true) $
         addPredicate lhs f ts
     _ -> return ()
@@ -165,7 +158,7 @@ conditionallyRedundant' lhs t u t' u' = do
           argss = sequence [ [ arg | arg <- terms [t, u] >>= subterms, typ arg == ty ] | ty <- tys ]
         forM_ argss $ \args -> do
           norm <- normaliser
-          let p = App clas_pred args
+          let p = Fun clas_pred :@: args
           when (norm p == norm clas_true) $ do
             addPredicate lhs clas_pred args
       _ -> return ()
@@ -187,10 +180,10 @@ addPredicate lhs f ts = do
       ts' = map (fmap Normal) ts
       lhs' = map (fmap (fmap Normal)) lhs
       -- The "to_p x1 x2 ... xm" term
-      construction = App (Constructor f clas_test_case) ts'
+      construction = Fun (Constructor f clas_test_case) :@: ts'
       -- The "p_n (to_p x1 x2 ... xn ... xm) = xn"
       -- equations
-      equations = [ lhs' :=>: App (Normal (clas_selectors !! i)) [construction] :=: x | (x, i) <- zip ts' [0..]]
+      equations = [ lhs' :=>: Fun (Normal (clas_selectors !! i)) :$: construction :=: x | (x, i) <- zip ts' [0..]]
 
   -- Declare the relevant equations as axioms
   mapM_ (lift . add) equations
@@ -201,22 +194,23 @@ conditionalise (lhs :=>: t :=: u) =
   where
     -- Replace one predicate with a conditional
     go lhs t u =
-      case [ (p, x, clas_selectors, clas_true) | (App f [Var x]) <- subterms t ++ subterms u, Selector _ p _ <- [classify f], Predicate{..} <- [classify p] ] of
+      case [ (p, x, clas_selectors, clas_true) | Fun f :$: Var x <- subterms t ++ subterms u, Selector _ p _ <- [classify f], Predicate{..} <- [classify p] ] of
         [] -> sort lhs :=>: t :=: u
         ((p, x, sels, true):_) ->
           let
             n = freeVar [t, u]
             tys = typeArgs (typ p)
             xs = map Var (zipWith V tys [n..])
-            subs = [(App (sels !! i) [Var x], xs !! i) | i <- [0..length tys-1]]
+            subs = [(Fun (sels !! i) :$: Var x, xs !! i) | i <- [0..length tys-1]]
           in
-            go ((App p xs :=: true):lhs) (replaceMany subs t) (replaceMany subs u)
+            go ((Fun p :@: xs :=: true):lhs) (replaceMany subs t) (replaceMany subs u)
 
     replace from to t
       | t == from = to
-    replace from to (App f ts) =
-      App f (map (replace from to) ts)
+    replace from to (t :$: u) =
+      replace from to t :$: replace from to u
     replace _ _ (Var x) = Var x
+    replace _ _ (Fun f) = Fun f
 
     replaceMany subs t =
       foldr (uncurry replace) t subs

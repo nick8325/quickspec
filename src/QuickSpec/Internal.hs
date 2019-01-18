@@ -15,7 +15,6 @@ import qualified QuickSpec.Internal.Haskell as Haskell
 import qualified QuickSpec.Internal.Haskell.Resolve as Haskell
 import qualified QuickSpec.Internal.Testing.QuickCheck as QuickCheck
 import qualified QuickSpec.Internal.Pruning.UntypedTwee as Twee
-import QuickSpec.Internal.Explore.PartialApplication
 import QuickSpec.Internal.Prop
 import QuickSpec.Internal.Term(Term)
 import Test.QuickCheck
@@ -35,7 +34,7 @@ quickSpec sig = do
   return ()
 
 -- | Run QuickSpec, returning the list of discovered properties.
-quickSpecResult :: Signature sig => sig -> IO [Prop (Term (PartiallyApplied Haskell.Constant))]
+quickSpecResult :: Signature sig => sig -> IO [Prop (Term Haskell.Constant)]
 quickSpecResult sig = do
   -- Undocumented feature for testing :)
   seed <- lookupEnv "QUICKCHECK_SEED"
@@ -47,7 +46,7 @@ quickSpecResult sig = do
   Haskell.quickSpec (runSig sig' (Context 1 []) Haskell.defaultConfig)
 
 -- | Add some properties to the background theory.
-addBackground :: [Prop (Term (PartiallyApplied Haskell.Constant))] -> Sig
+addBackground :: [Prop (Term Haskell.Constant)] -> Sig
 addBackground props =
   Sig $ \_ cfg -> cfg { Haskell.cfg_background = Haskell.cfg_background cfg ++ props }
 
@@ -197,7 +196,7 @@ addInstances :: Haskell.Instances -> Sig
 addInstances insts =
   Sig (\_ -> modL Haskell.lens_instances (`mappend` insts))
 
-withPrintFilter :: (Prop (Term (PartiallyApplied Haskell.Constant)) -> Bool) -> Sig
+withPrintFilter :: (Prop (Term Haskell.Constant) -> Bool) -> Sig
 withPrintFilter p =
   Sig (\_ -> setL Haskell.lens_print_filter p)
 

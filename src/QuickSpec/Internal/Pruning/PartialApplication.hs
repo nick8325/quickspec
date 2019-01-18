@@ -1,12 +1,17 @@
 -- Pruning support for partial application and the like.
 {-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE FlexibleInstances, TypeSynonymInstances, RecordWildCards, MultiParamTypeClasses, FlexibleContexts, GeneralizedNewtypeDeriving, UndecidableInstances, DeriveFunctor #-}
-module QuickSpec.Internal.Explore.PartialApplication where
+module QuickSpec.Internal.Pruning.PartialApplication where
 
 import QuickSpec.Internal.Term
 import QuickSpec.Internal.Type
-import QuickSpec.Internal.Pruning.Background
+import QuickSpec.Internal.Pruning.Background hiding (Pruner)
+import QuickSpec.Internal.Pruning
 import QuickSpec.Internal.Prop
+import QuickSpec.Internal.Terminal
+import QuickSpec.Internal.Testing
+import Control.Monad.IO.Class
+import Control.Monad.Trans.Class
 import qualified Twee.Base as Twee
 import Data.Maybe
 
@@ -47,31 +52,27 @@ instance Typed f => Typed (PartiallyApplied f) where
   typeSubst_ sub (Apply ty) = Apply (typeSubst_ sub ty)
   typeSubst_ sub (Partial f n) = Partial (typeSubst_ sub f) n
 
-instance (Arity f, Typed f) => Apply (Term (PartiallyApplied f)) where
-  tryApply t u = do
-    tryApply (typ t) (typ u)
-    return $
-      case t of
-        App (Partial f n) ts | n < arity f ->
-          App (Partial f (n+1)) (ts ++ [u])
-        _ ->
-          simpleApply t u
-
 getTotal :: Arity f => PartiallyApplied f -> Maybe f
 getTotal (Partial f n) | arity f == n = Just f
 getTotal _ = Nothing
 
 partial :: f -> Term (PartiallyApplied f)
-partial f = App (Partial f 0) []
+partial f = Fun (Partial f 0)
 
 total :: Arity f => f -> PartiallyApplied f
 total f = Partial f (arity f)
+
+smartApply ::
+  (Arity f, Typed f) => Term (PartiallyApplied f) -> Term (PartiallyApplied f) -> Term (PartiallyApplied f)
+smartApply (Fun (Partial f n) :@: ts) u | n < arity f =
+  Fun (Partial f (n+1)) :@: (ts ++ [u])
+smartApply t u = simpleApply t u
 
 simpleApply ::
   Typed f =>
   Term (PartiallyApplied f) -> Term (PartiallyApplied f) -> Term (PartiallyApplied f)
 simpleApply t u =
-  App (Apply (typ t)) [t, u]
+  Fun (Apply (typ t)) :@: [t, u]
 
 instance (Arity f, Typed f, Background f) => Background (PartiallyApplied f) where
   background (Partial f _) =
@@ -80,16 +81,29 @@ instance (Arity f, Typed f, Background f) => Background (PartiallyApplied f) whe
     | n <- [0..arity f-1] ]
     where
       partial i =
-        App (Partial f i) (take i vs)
+        Fun (Partial f i) :@: take i vs
       vs = map Var (zipWith V (typeArgs (typ f)) [0..])
   background _ = []
 
-evalPartiallyApplied ::
-  (Applicative f, Monad m) =>
-  (fun -> m (Value f)) ->
-  (PartiallyApplied fun -> m (Value f))
-evalPartiallyApplied eval (Partial f _) = eval f
-evalPartiallyApplied _ (Apply ty) =
-  return $ fromJust $
-    cast (Twee.build (Twee.app (Twee.fun Arrow) [ty, ty]))
-      (toValue (pure (($) :: (A -> B) -> (A -> B))))
+newtype Pruner fun pruner a =
+  Pruner { run :: pruner a }
+  deriving (Functor, Applicative, Monad, MonadIO, MonadTester testcase term, MonadTerminal)
+
+instance MonadTrans (Pruner fun) where
+  lift = Pruner
+
+instance (PrettyTerm fun, Typed fun, Arity fun, MonadPruner (Term (PartiallyApplied fun)) norm pruner) => MonadPruner (Term fun) norm (Pruner fun pruner) where
+  normaliser =
+    Pruner $ do
+      norm <- normaliser
+      return $ \t ->
+        norm . encode $ t
+
+  add prop =
+    Pruner $ do
+      add (encode <$> canonicalise prop)
+
+encode :: (Typed fun, Arity fun) => Term fun -> Term (PartiallyApplied fun)
+encode (Var x) = Var x
+encode (Fun f) = partial f
+encode (t :$: u) = smartApply (encode t) (encode u)

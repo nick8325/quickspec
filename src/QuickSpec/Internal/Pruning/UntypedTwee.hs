@@ -114,8 +114,9 @@ toTwee = Twee.build . tt
   where
     tt (Var (V _ x)) =
       Twee.var (Twee.V x)
-    tt (App f ts) =
+    tt (Fun f :@: ts) =
       Twee.app (Twee.fun (Function f)) (map tt ts)
+    tt _ = error "partially applied term"
 
 skolemise :: (Ord f, Typeable f) =>
   Term f -> Twee.Term (Extended f)
@@ -123,5 +124,6 @@ skolemise = Twee.build . sk
   where
     sk (Var (V _ x)) =
       Twee.con (Twee.fun (Skolem (Twee.V x)))
-    sk (App f ts) =
+    sk (Fun f :@: ts) =
       Twee.app (Twee.fun (Function f)) (map sk ts)
+    sk _ = error "partially applied term"

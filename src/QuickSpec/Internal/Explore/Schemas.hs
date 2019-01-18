@@ -153,7 +153,8 @@ mostGeneral singleUse s = evalState (aux s) Map.empty
         put $! Map.insert ty (n+1) m
       let m = fromIntegral (labelNum (label (ty, n)))
       return (Var (V ty m))
-    aux (App f xs) = fmap (App f) (mapM aux xs)
+    aux (Fun f) = return (Fun f)
+    aux (t :$: u) = liftM2 (:$:) (aux t) (aux u)
 
 mostSpecific :: Term f -> Term f
 mostSpecific = subst (\(V ty _) -> Var (V ty 0))

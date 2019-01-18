@@ -80,7 +80,7 @@ typingAxioms (Func func) =
   [tag res t === t] ++
   [tagArg i ty === t | (i, ty) <- zip [0..] args]
   where
-    f = Func func
+    f = Fun (Func func)
     xs = take n (map (Var . V typeVar) [0..])
 
     ty = typ func
@@ -90,21 +90,22 @@ typingAxioms (Func func) =
     args = take n (typeArgs ty)
     res = typeDrop n ty
 
-    t = App f xs
+    t = f :@: xs
 
     tagArg i ty =
-      App f $
-        take i xs ++
-        [tag ty (xs !! i)] ++
-        drop (i+1) xs
+      f :@:
+        (take i xs ++
+         [tag ty (xs !! i)] ++
+         drop (i+1) xs)
 
 tag :: Type -> UntypedTerm fun -> UntypedTerm fun
-tag ty t = App (Tag ty) [t]
+tag ty t = Fun (Tag ty) :$: t
 
 encode :: Typed fun => TypedTerm fun -> UntypedTerm fun
 -- We always add type tags; see comment in normaliseMono.
 -- In the common case, twee will immediately remove these surplus type tags
 -- by rewriting using the typing axioms.
 encode (Var x) = tag (typ x) (Var x)
-encode (App f ts) =
-  tag (typeDrop (length ts) (typ f)) (App (Func f) (map encode ts))
+encode (Fun f :@: ts) =
+  tag (typeDrop (length ts) (typ f)) (Fun (Func f) :@: map encode ts)
+encode _ = error "partial application"
