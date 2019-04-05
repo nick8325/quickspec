@@ -1,6 +1,5 @@
 -- Theory exploration which handles polymorphism.
 {-# OPTIONS_HADDOCK hide #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -49,9 +48,8 @@ instance PrettyTerm fun => PrettyTerm (PolyFun fun) where
 -- The set of all types being explored
 data Universe = Universe { univ_types :: Set Type }
 
-makeLensAs ''Polymorphic
-  [("pm_schemas", "schemas"),
-   ("pm_universe", "univ")]
+schemas = lens pm_schemas (\x y -> y { pm_schemas = x })
+univ = lens pm_universe (\x y -> y { pm_universe = x })
 
 initialState ::
   (Type -> Bool) ->

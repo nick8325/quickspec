@@ -1,6 +1,6 @@
 -- Theory exploration which works on a schema at a time.
 {-# OPTIONS_HADDOCK hide #-}
-{-# LANGUAGE RecordWildCards, FlexibleContexts, PatternGuards, TupleSections, TemplateHaskell, MultiParamTypeClasses, FlexibleInstances #-}
+{-# LANGUAGE RecordWildCards, FlexibleContexts, PatternGuards, TupleSections, MultiParamTypeClasses, FlexibleInstances #-}
 module QuickSpec.Explore.Schemas where
 
 import qualified Data.Map.Strict as Map
@@ -32,11 +32,10 @@ data Schemas testcase result fun norm =
     sc_instantiated :: Set (Term fun),
     sc_instances :: Map (Term fun) (Terms testcase result (Term fun) norm) }
 
-makeLensAs ''Schemas
-  [("sc_classes", "classes"),
-   ("sc_single_use", "single_use"),
-   ("sc_instances", "instances"),
-   ("sc_instantiated", "instantiated")]
+classes = lens sc_classes (\x y -> y { sc_classes = x })
+single_use = lens sc_single_use (\x y -> y { sc_single_use = x })
+instances = lens sc_instances (\x y -> y { sc_instances = x })
+instantiated = lens sc_instantiated (\x y -> y { sc_instantiated = x })
 
 instance_ :: Ord fun => Term fun -> Lens (Schemas testcase result fun norm) (Terms testcase result (Term fun) norm)
 instance_ t = reading (\Schemas{..} -> keyDefault t sc_empty # instances)

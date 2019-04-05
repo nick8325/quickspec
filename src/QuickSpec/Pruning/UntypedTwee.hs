@@ -1,6 +1,6 @@
 -- A pruner that uses twee. Does not respect types.
 {-# OPTIONS_HADDOCK hide #-}
-{-# LANGUAGE RecordWildCards, FlexibleContexts, FlexibleInstances, GADTs, PatternSynonyms, GeneralizedNewtypeDeriving, MultiParamTypeClasses, UndecidableInstances, TemplateHaskell #-}
+{-# LANGUAGE RecordWildCards, FlexibleContexts, FlexibleInstances, GADTs, PatternSynonyms, GeneralizedNewtypeDeriving, MultiParamTypeClasses, UndecidableInstances #-}
 module QuickSpec.Pruning.UntypedTwee where
 
 import QuickSpec.Testing
@@ -8,7 +8,7 @@ import QuickSpec.Pruning
 import QuickSpec.Prop
 import QuickSpec.Term
 import QuickSpec.Type
-import QuickSpec.Utils
+import Data.Lens.Light
 import qualified Twee
 import qualified Twee.Equation as Twee
 import qualified Twee.KBO as KBO
@@ -30,9 +30,8 @@ data Config =
     cfg_max_term_size :: Int,
     cfg_max_cp_depth :: Int }
 
-makeLensAs ''Config
-  [("cfg_max_term_size", "lens_max_term_size"),
-   ("cfg_max_cp_depth", "lens_max_cp_depth")]
+lens_max_term_size = lens cfg_max_term_size (\x y -> y { cfg_max_term_size = x })
+lens_max_cp_depth = lens cfg_max_cp_depth (\x y -> y { cfg_max_cp_depth = x })
 
 instance (Pretty fun, PrettyTerm fun, Ord fun, Typeable fun, Twee.Sized fun, Arity fun, EqualsBonus fun) => Ordered (Extended fun) where
   lessEq = KBO.lessEq
