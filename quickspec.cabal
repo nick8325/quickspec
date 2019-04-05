@@ -100,7 +100,7 @@ library
 
   Build-depends:
     QuickCheck >= 2.10,
-    quickcheck-instances >= 0.3.15,
+    quickcheck-instances >= 0.3.16,
     base >= 4 && < 5,
     constraints,
     containers,
