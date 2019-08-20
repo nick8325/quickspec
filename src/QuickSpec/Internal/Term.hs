@@ -53,7 +53,13 @@ class Sized a where
 instance Sized f => Sized (Term f) where
   size (Var _) = 1
   size (Fun f) = size f
-  size (t :$: u) = size t + size u
+  size (t :$: u) =
+    size t + size u +
+    -- Penalise applied function variables, because they can be used
+    -- to build many many terms without any constants at all
+    case t of
+      Var _ -> 1
+      _ -> 0
 
 instance Pretty Var where
   pPrint x = parens $ text "X" <#> pPrint (var_id x+1) <+> text "::" <+> pPrint (var_ty x)
