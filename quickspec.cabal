@@ -1,5 +1,5 @@
 Name:                quickspec
-Version:             2.1.1
+Version:             2.1.2
 Cabal-version:       >= 1.6
 Build-type:          Simple
 
@@ -9,7 +9,7 @@ Maintainer:          nicsma@chalmers.se
 
 License:             BSD3
 License-file:        LICENSE
-Copyright:           2009-2018 Nick Smallbone
+Copyright:           2009-2019 Nick Smallbone
 
 Category:            Testing
 
