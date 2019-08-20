@@ -175,19 +175,19 @@ type Measure f = (Int, Int, Int, MeasureFuns f, Int, [Var])
 -- | Compute the term ordering for a term.
 measure :: (Sized f, Typed f) => Term f -> Measure f
 measure t =
-  (size t, sizeHO t, -length (vars t), MeasureFuns (skel t),
+  (size t, missing t, -length (vars t), MeasureFuns (skel t),
    -length (usort (vars t)), vars t)
   where
     skel (Var (V ty _)) = Var (V ty 0)
     skel (Fun f) = Fun f
     skel (t :$: u) = skel t :$: skel u
     -- Prefer fully-applied terms to partially-applied ones.
-    -- This function computes the size, but adds 1 for every
-    -- unapplied function.
-    sizeHO (Fun f :@: ts) =
-      size f + typeArity (typ f) - length ts + sum (map sizeHO ts)
-    sizeHO (Var _ :@: ts) =
-      1 + sum (map sizeHO ts)
+    -- This function counts how many unsaturated function applications
+    -- occur in a term.
+    missing (Fun f :@: ts) =
+      typeArity (typ f) - length ts + sum (map missing ts)
+    missing (Var _ :@: ts) =
+      sum (map missing ts)
 
 -- | A helper for `Measure`.
 newtype MeasureFuns f = MeasureFuns (Term f)
