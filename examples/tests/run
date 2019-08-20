@@ -3,10 +3,10 @@ exitcode=0
 GHC=${GHC=ghc}
 cd $(dirname $0)/..
 for i in ./*.hs tests/*.hs; do
-    $GHC --make -O $i || exitcode=1
     prog=${i/.hs/}
     out=tests/$(basename $prog).output
     if [ -f $out ]; then
+        $GHC --make -O $i || exitcode=1
         echo $prog
         tmp=$(mktemp)
         QUICKCHECK_SEED=1234 $prog > $tmp 2>/dev/null || exitcode=1
