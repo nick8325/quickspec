@@ -2,6 +2,7 @@
 --
 -- Typed terms and operations on them.
 {-# LANGUAGE PatternSynonyms, ViewPatterns, TypeSynonymInstances, FlexibleInstances, TypeFamilies, ConstraintKinds, DeriveGeneric, DeriveAnyClass, MultiParamTypeClasses, FunctionalDependencies, UndecidableInstances, TypeOperators, DeriveFunctor, FlexibleContexts #-}
+{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 module QuickSpec.Internal.Term(module QuickSpec.Internal.Term, module Twee.Base, module Twee.Pretty) where
 
 import QuickSpec.Internal.Type
