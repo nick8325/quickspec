@@ -1,6 +1,6 @@
 -- Testing conjectures using QuickCheck.
 {-# OPTIONS_HADDOCK hide #-}
-{-# LANGUAGE FlexibleContexts, FlexibleInstances, RecordWildCards, MultiParamTypeClasses, GeneralizedNewtypeDeriving, TemplateHaskell #-}
+{-# LANGUAGE FlexibleContexts, FlexibleInstances, RecordWildCards, MultiParamTypeClasses, GeneralizedNewtypeDeriving #-}
 module QuickSpec.Internal.Testing.QuickCheck where
 
 import QuickSpec.Internal.Testing
@@ -16,7 +16,7 @@ import Control.Monad.Trans.Reader
 import Data.List
 import System.Random
 import QuickSpec.Internal.Terminal
-import QuickSpec.Internal.Utils
+import Data.Lens.Light
 
 data Config =
   Config {
@@ -25,10 +25,9 @@ data Config =
     cfg_fixed_seed :: Maybe QCGen}
   deriving Show
 
-makeLensAs ''Config
-  [("cfg_num_tests", "lens_num_tests"),
-   ("cfg_max_test_size", "lens_max_test_size"),
-   ("cfg_fixed_seed", "lens_fixed_seed")]
+lens_num_tests = lens cfg_num_tests (\x y -> y { cfg_num_tests = x })
+lens_max_test_size = lens cfg_max_test_size (\x y -> y { cfg_max_test_size = x })
+lens_fixed_seed = lens cfg_fixed_seed (\x y -> y { cfg_fixed_seed = x })
 
 data Environment testcase term result =
   Environment {

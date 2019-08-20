@@ -10,7 +10,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE FunctionalDependencies #-}
@@ -44,6 +43,7 @@ import Control.Monad.Trans.State.Strict
 import QuickSpec.Internal.Terminal
 import Text.Printf
 import QuickSpec.Internal.Utils
+import Data.Lens.Light
 import GHC.TypeLits
 import QuickSpec.Internal.Explore.Conditionals
 import Control.Spoon
@@ -495,17 +495,16 @@ data Config =
     cfg_print_filter :: Prop (Term Constant) -> Bool
     }
 
-makeLensAs ''Config
-  [("cfg_quickCheck", "lens_quickCheck"),
-   ("cfg_twee", "lens_twee"),
-   ("cfg_max_size", "lens_max_size"),
-   ("cfg_max_commutative_size", "lens_max_commutative_size"),
-   ("cfg_instances", "lens_instances"),
-   ("cfg_constants", "lens_constants"),
-   ("cfg_default_to", "lens_default_to"),
-   ("cfg_infer_instance_types", "lens_infer_instance_types"),
-   ("cfg_background", "lens_background"),
-   ("cfg_print_filter", "lens_print_filter")]
+lens_quickCheck = lens cfg_quickCheck (\x y -> y { cfg_quickCheck = x })
+lens_twee = lens cfg_twee (\x y -> y { cfg_twee = x })
+lens_max_size = lens cfg_max_size (\x y -> y { cfg_max_size = x })
+lens_max_commutative_size = lens cfg_max_commutative_size (\x y -> y { cfg_max_commutative_size = x })
+lens_instances = lens cfg_instances (\x y -> y { cfg_instances = x })
+lens_constants = lens cfg_constants (\x y -> y { cfg_constants = x })
+lens_default_to = lens cfg_default_to (\x y -> y { cfg_default_to = x })
+lens_infer_instance_types = lens cfg_infer_instance_types (\x y -> y { cfg_infer_instance_types = x })
+lens_background = lens cfg_background (\x y -> y { cfg_background = x })
+lens_print_filter = lens cfg_print_filter (\x y -> y { cfg_print_filter = x })
 
 defaultConfig :: Config
 defaultConfig =

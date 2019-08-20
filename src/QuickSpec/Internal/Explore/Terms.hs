@@ -1,6 +1,6 @@
 -- Theory exploration which accepts one term at a time.
 {-# OPTIONS_HADDOCK hide #-}
-{-# LANGUAGE RecordWildCards, FlexibleContexts, PatternGuards, TemplateHaskell #-}
+{-# LANGUAGE RecordWildCards, FlexibleContexts, PatternGuards #-}
 module QuickSpec.Internal.Explore.Terms where
 
 import qualified Data.Map.Strict as Map
@@ -30,7 +30,7 @@ data Terms testcase result term norm =
     -- ill-typed equations and bad things happening in the pruner.
     tm_tree   :: Map Type (DecisionTree testcase result term) }
 
-makeLensAs ''Terms [("tm_tree", "tree")]
+tree = lens tm_tree (\x y -> y { tm_tree = x })
 
 treeForType :: Type -> Lens (Terms testcase result term norm) (DecisionTree testcase result term)
 treeForType ty = reading (\Terms{..} -> keyDefault ty tm_empty # tree)
