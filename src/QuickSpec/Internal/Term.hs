@@ -120,7 +120,7 @@ subtermsFO :: Term f -> [Term f]
 subtermsFO t = t:properSubtermsFO t
 
 properSubtermsFO :: Term f -> [Term f]
-properSubtermsFO (t :$: u) = properSubtermsFO t ++ subtermsFO u
+properSubtermsFO (_f :@: ts) = concatMap subtermsFO ts
 properSubtermsFO _ = []
 
 -- | Renames variables so that they appear in a canonical order.
