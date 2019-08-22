@@ -32,12 +32,12 @@ instance Arity (PartiallyApplied f) where
   arity (Apply _) = 2
 
 instance Pretty f => Pretty (PartiallyApplied f) where
-  pPrint (Partial f _) = pPrint f
+  pPrint (Partial f n) = pPrint f <#> text "@" <#> pPrint n
   pPrint (Apply _) = text "$"
 
 instance PrettyTerm f => PrettyTerm (PartiallyApplied f) where
   termStyle (Partial f _) = termStyle f
-  termStyle (Apply _) = invisible
+  termStyle (Apply _) = infixStyle 2
 
 instance PrettyArity f => PrettyArity (PartiallyApplied f) where
   prettyArity (Partial f _) = prettyArity f
