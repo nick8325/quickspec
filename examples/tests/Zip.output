@@ -17,7 +17,7 @@ eqLen :: [Int] -> [Int] -> Bool
  11. eqLen xs ys => zip xs (ys ++ zs) = zip xs ys
  12. eqLen xs (ys ++ (zs ++ ws)) = eqLen xs (ys ++ (ws ++ zs))
  13. eqLen xs (xs ++ (ys ++ ys)) = eqLen xs (xs ++ ys)
- 14. eqLen (xs ++ ys) (zs ++ ys) = eqLen xs zs
+ 14. eqLen (xs ++ ys) (xs ++ zs) = eqLen ys zs
  15. eqLen (xs ++ xs) (ys ++ ys) = eqLen xs ys
  16. zip xs (ys ++ (xs ++ zs)) = zip xs (ys ++ xs)
  17. zip (xs ++ (ys ++ zs)) ys = zip (xs ++ ys) ys
