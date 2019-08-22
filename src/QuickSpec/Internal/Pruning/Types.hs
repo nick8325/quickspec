@@ -4,8 +4,7 @@
 module QuickSpec.Internal.Pruning.Types where
 
 import QuickSpec.Internal.Pruning
-import qualified QuickSpec.Internal.Pruning.Background as Background
-import QuickSpec.Internal.Pruning.Background(Background)
+import QuickSpec.Internal.Pruning.Background(Background(..))
 import QuickSpec.Internal.Testing
 import QuickSpec.Internal.Term
 import QuickSpec.Internal.Type
@@ -67,11 +66,11 @@ instance (PrettyTerm fun, Typed fun, MonadPruner (UntypedTerm fun) norm pruner) 
 
   add prop = lift (add (encode <$> canonicalise prop))
 
-instance (Typed fun, Twee.Arity fun) => Background (Tagged fun) where
+instance (Typed fun, Twee.Arity fun, Background fun) => Background (Tagged fun) where
   background = typingAxioms
 
 -- Compute the typing axioms for a function or type tag.
-typingAxioms :: (Typed fun, Twee.Arity fun) =>
+typingAxioms :: (Typed fun, Twee.Arity fun, Background fun) =>
   Tagged fun -> [Prop (UntypedTerm fun)]
 typingAxioms (Tag ty) =
   [tag ty (tag ty x) === tag ty x]
@@ -79,7 +78,8 @@ typingAxioms (Tag ty) =
     x = Var (V ty 0)
 typingAxioms (Func func) =
   [tag res t === t] ++
-  [tagArg i ty === t | (i, ty) <- zip [0..] args]
+  [tagArg i ty === t | (i, ty) <- zip [0..] args] ++
+  map (fmap encode) (background func)
   where
     f = Fun (Func func)
     xs = take n (map (Var . V typeVar) [0..])
