@@ -11,6 +11,7 @@ import QuickSpec.Internal.Term
 import QuickSpec.Internal.Type
 import QuickSpec.Internal.Testing
 import QuickSpec.Internal.Utils
+import QuickSpec.Internal.Terminal
 import qualified QuickSpec.Internal.Explore.Terms as Terms
 import QuickSpec.Internal.Explore.Terms(Terms)
 import Control.Monad.Trans.State.Strict hiding (State)
@@ -61,7 +62,7 @@ data Result fun =
 -- The schema is represented as a term where there is only one distinct variable of each type
 explore ::
   (PrettyTerm fun, Ord result, Ord fun, Ord norm, Typed fun,
-  MonadTester testcase (Term fun) m, MonadPruner (Term fun) norm m) =>
+  MonadTester testcase (Term fun) m, MonadPruner (Term fun) norm m, MonadTerminal m) =>
   Term fun -> StateT (Schemas testcase result fun norm) m (Result fun)
 explore t0 = do
   let t = mostSpecific t0
@@ -85,7 +86,7 @@ explore t0 = do
 {-# INLINEABLE exploreIn #-}
 exploreIn ::
   (PrettyTerm fun, Ord result, Ord fun, Ord norm, Typed fun,
-  MonadTester testcase (Term fun) m, MonadPruner (Term fun) norm m) =>
+  MonadTester testcase (Term fun) m, MonadPruner (Term fun) norm m, MonadTerminal m) =>
   Term fun -> Term fun ->
   StateT (Schemas testcase result fun norm) m (Result fun)
 exploreIn rep t = do
@@ -111,7 +112,7 @@ exploreIn rep t = do
 {-# INLINEABLE instantiateRep #-}
 instantiateRep ::
   (PrettyTerm fun, Ord result, Ord fun, Ord norm, Typed fun,
-  MonadTester testcase (Term fun) m, MonadPruner (Term fun) norm m) =>
+  MonadTester testcase (Term fun) m, MonadPruner (Term fun) norm m, MonadTerminal m) =>
   Term fun ->
   StateT (Schemas testcase result fun norm) m (Result fun)
 instantiateRep t = do
@@ -121,7 +122,7 @@ instantiateRep t = do
 {-# INLINEABLE instantiate #-}
 instantiate ::
   (PrettyTerm fun, Ord result, Ord fun, Ord norm, Typed fun,
-  MonadTester testcase (Term fun) m, MonadPruner (Term fun) norm m) =>
+  MonadTester testcase (Term fun) m, MonadPruner (Term fun) norm m, MonadTerminal m) =>
   Term fun -> Term fun ->
   StateT (Schemas testcase result fun norm) m (Result fun)
 instantiate rep t = do

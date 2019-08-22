@@ -75,7 +75,7 @@ instance Typed fun => Typed (PolyFun fun) where
   typeSubst_ _ x = x -- because it's supposed to be monomorphic
 
 newtype PolyM testcase result fun norm m a = PolyM { unPolyM :: StateT (Polymorphic testcase result fun norm) m a }
-  deriving (Functor, Applicative, Monad)
+  deriving (Functor, Applicative, Monad, MonadTerminal)
 
 explore ::
   (PrettyTerm fun, Ord result, Ord norm, Typed fun, Ord fun, Apply (Term fun),

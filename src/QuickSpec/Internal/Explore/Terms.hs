@@ -14,6 +14,7 @@ import QuickSpec.Internal.Testing.DecisionTree hiding (Result, Singleton)
 import Control.Monad.Trans.State.Strict hiding (State)
 import Data.Lens.Light
 import QuickSpec.Internal.Utils
+import QuickSpec.Internal.Terminal
 
 data Terms testcase result term norm =
   Terms {
@@ -56,14 +57,14 @@ data Result term =
 -- The representatives of the equivalence classes are guaranteed not to change.
 --
 -- Discovered properties are not added to the pruner.
-explore :: (Pretty term, Typed term, Ord norm, Ord result, MonadTester testcase term m, MonadPruner term norm m) =>
+explore :: (Pretty term, Typed term, Ord norm, Ord result, MonadTester testcase term m, MonadPruner term norm m, MonadTerminal m) =>
   term -> StateT (Terms testcase result term norm) m (Result term)
 explore t = do
   res <- explore' t
-  -- case res of
-  --   Discovered prop -> traceM ("discovered " ++ prettyShow prop)
-  --   Knew prop -> traceM ("knew " ++ prettyShow prop)
-  --   Singleton -> traceM ("singleton " ++ prettyShow t)
+  --case res of
+  --  Discovered prop -> putLine ("discovered " ++ prettyShow prop)
+  --  Knew prop -> putLine ("knew " ++ prettyShow prop)
+  --  Singleton -> putLine ("singleton " ++ prettyShow t)
   return res
 explore' :: (Pretty term, Typed term, Ord norm, Ord result, MonadTester testcase term m, MonadPruner term norm m) =>
   term -> StateT (Terms testcase result term norm) m (Result term)
