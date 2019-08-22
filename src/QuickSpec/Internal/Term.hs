@@ -12,7 +12,7 @@ import GHC.Generics(Generic)
 import Test.QuickCheck(CoArbitrary)
 import Data.DList(DList)
 import qualified Data.DList as DList
-import Twee.Base(Arity(..), Pretty(..), PrettyTerm(..), TermStyle(..), EqualsBonus, prettyPrint)
+import Twee.Base(Pretty(..), PrettyTerm(..), TermStyle(..), EqualsBonus, prettyPrint)
 import Twee.Pretty
 import qualified Data.Map.Strict as Map
 import Data.List
@@ -219,10 +219,6 @@ data a :+: b = Inl a | Inr b deriving (Eq, Ord)
 instance (Sized fun1, Sized fun2) => Sized (fun1 :+: fun2) where
   size (Inl x) = size x
   size (Inr x) = size x
-
-instance (Arity fun1, Arity fun2) => Arity (fun1 :+: fun2) where
-  arity (Inl x) = arity x
-  arity (Inr x) = arity x
 
 instance (Typed fun1, Typed fun2) => Typed (fun1 :+: fun2) where
   typ (Inl x) = typ x

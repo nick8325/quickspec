@@ -288,7 +288,7 @@ instance Eq Constant where
 instance Ord Constant where
   compare =
     comparing $ \con ->
-      (con_name con, twiddle (arity con), typ con)
+      (con_name con, twiddle (con_pretty_arity con), typ con)
       where
         -- This trick comes from Prover9 and improves the ordering somewhat
         twiddle 1 = 2
@@ -377,9 +377,6 @@ instance PrettyArity Constant where
 
 instance Sized Constant where
   size = con_size
-
-instance Arity Constant where
-  arity = typeArity . typ
 
 instance Predicate Constant where
   classify = con_classify

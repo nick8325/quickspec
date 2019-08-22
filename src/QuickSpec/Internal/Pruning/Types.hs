@@ -14,6 +14,7 @@ import QuickSpec.Internal.Terminal
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
 import qualified Twee.Base as Twee
+import Twee.Base(Arity(..))
 
 data Tagged fun =
     Func fun
@@ -66,11 +67,11 @@ instance (PrettyTerm fun, Typed fun, MonadPruner (UntypedTerm fun) norm pruner) 
 
   add prop = lift (add (encode <$> canonicalise prop))
 
-instance (Typed fun, Arity fun) => Background (Tagged fun) where
+instance (Typed fun, Twee.Arity fun) => Background (Tagged fun) where
   background = typingAxioms
 
 -- Compute the typing axioms for a function or type tag.
-typingAxioms :: (Typed fun, Arity fun) =>
+typingAxioms :: (Typed fun, Twee.Arity fun) =>
   Tagged fun -> [Prop (UntypedTerm fun)]
 typingAxioms (Tag ty) =
   [tag ty (tag ty x) === tag ty x]
