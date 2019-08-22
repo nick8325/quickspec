@@ -219,13 +219,17 @@ universe xs = Universe (Set.fromList univ)
             ho <- arrows fun,
             sub <- typeInstancesList univBase (components fun) ]
   
-    -- Add antiunifiers of all pairs of types, so that each equation
-    -- has a most general type
-    univ = usort $ oneTypeVar $ fixpoint antiunifiers univHo
+    -- Now close the type universe under "anti-substitution":
+    -- if u = typeSubst sub t, and u is in the universe, then
+    -- oneTypeVar t should be in the universe.
+    -- In practice this means replacing arbitrary subterms of
+    -- each type with a type variable.
+    univ = fixpoint (usort . oneTypeVar . concatMap antisubst) univHo
       where
-        antiunifiers tys =
-          usort $ map (unPoly . poly) $
-            tys ++ [antiunify ty1 ty2 | ty1 <- tys, ty2 <- tys]
+        antisubst ty =
+          ty:
+          [ Twee.build (Twee.replacePosition n (Twee.var (Twee.V 0)) (Twee.singleton ty))
+          | n <- [0..Twee.len ty-1] ]
 
     components ty =
       case unpackArrow ty of
