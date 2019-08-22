@@ -50,10 +50,6 @@ instance Typed f => Typed (PartiallyApplied f) where
   typeSubst_ sub (Apply ty) = Apply (typeSubst_ sub ty)
   typeSubst_ sub (Partial f n) = Partial (typeSubst_ sub f) n
 
-getTotal :: Arity f => PartiallyApplied f -> Maybe f
-getTotal (Partial f n) | arity f == n = Just f
-getTotal _ = Nothing
-
 partial :: f -> Term (PartiallyApplied f)
 partial f = Fun (Partial f 0)
 
@@ -61,8 +57,8 @@ total :: Arity f => f -> PartiallyApplied f
 total f = Partial f (arity f)
 
 smartApply ::
-  (Arity f, Typed f) => Term (PartiallyApplied f) -> Term (PartiallyApplied f) -> Term (PartiallyApplied f)
-smartApply (Fun (Partial f n) :@: ts) u | n < arity f =
+  Typed f => Term (PartiallyApplied f) -> Term (PartiallyApplied f) -> Term (PartiallyApplied f)
+smartApply (Fun (Partial f n) :@: ts) u =
   Fun (Partial f (n+1)) :@: (ts ++ [u])
 smartApply t u = simpleApply t u
 
@@ -72,12 +68,13 @@ simpleApply ::
 simpleApply t u =
   Fun (Apply (typ t)) :@: [t, u]
 
-instance (Arity f, Typed f, Background f) => Background (PartiallyApplied f) where
+instance (Typed f, Background f) => Background (PartiallyApplied f) where
   background (Partial f _) =
-    map (mapFun (\f -> Partial f (arity f))) (background f) ++
+    map (mapFun (\f -> Partial f arity)) (background f) ++
     [ simpleApply (partial n) (vs !! n) === partial (n+1)
-    | n <- [0..arity f-1] ]
+    | n <- [0..arity-1] ]
     where
+      arity = typeArity (typ f)
       partial i =
         Fun (Partial f i) :@: take i vs
       vs = map Var (zipWith V (typeArgs (typ f)) [0..])
@@ -90,7 +87,7 @@ newtype Pruner fun pruner a =
 instance MonadTrans (Pruner fun) where
   lift = Pruner
 
-instance (PrettyTerm fun, Typed fun, Arity fun, MonadPruner (Term (PartiallyApplied fun)) norm pruner) => MonadPruner (Term fun) norm (Pruner fun pruner) where
+instance (PrettyTerm fun, Typed fun, MonadPruner (Term (PartiallyApplied fun)) norm pruner) => MonadPruner (Term fun) norm (Pruner fun pruner) where
   normaliser =
     Pruner $ do
       norm <- normaliser
@@ -101,7 +98,7 @@ instance (PrettyTerm fun, Typed fun, Arity fun, MonadPruner (Term (PartiallyAppl
     Pruner $ do
       add (encode <$> canonicalise prop)
 
-encode :: (Typed fun, Arity fun) => Term fun -> Term (PartiallyApplied fun)
+encode :: Typed fun => Term fun -> Term (PartiallyApplied fun)
 encode (Var x) = Var x
 encode (Fun f) = partial f
 encode (t :$: u) = smartApply (encode t) (encode u)

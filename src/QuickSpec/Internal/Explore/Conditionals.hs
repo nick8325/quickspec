@@ -76,10 +76,6 @@ instance Sized fun => Sized (WithConstructor fun) where
   size Constructor{} = 0
   size (Normal f) = size f
 
-instance Arity fun => Arity (WithConstructor fun) where
-  arity Constructor{} = 1
-  arity (Normal f) = arity f
-
 instance Pretty fun => Pretty (WithConstructor fun) where
   pPrintPrec l p (Constructor f _) = pPrintPrec l p f <#> text "_con"
   pPrintPrec l p (Normal f) = pPrintPrec l p f
