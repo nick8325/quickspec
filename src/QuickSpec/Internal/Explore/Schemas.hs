@@ -141,6 +141,16 @@ instantiate rep t = do
 generality :: Term f -> (Int, [Var])
 generality t = (-length (usort (vars t)), vars t)
 
+mkVar :: Type -> Int -> Var
+mkVar ty n = V ty m
+  -- Try to make sure that variables of different types don't end up with the
+  -- same number. It would be better to deal with this in QuickSpec.Term.
+  -- (Note: the problem we are trying to avoid is that, if two variables have
+  -- the same number and different but unifiable types, then a type substitution
+  -- can turn them into the same variable.)
+  where
+    m = fromIntegral (labelNum (label (ty, n)))
+
 -- | Instantiate a schema by making all the variables different.
 mostGeneral :: (Type -> Bool) -> Term f -> Term f
 mostGeneral singleUse s = evalState (aux s) Map.empty
@@ -151,20 +161,21 @@ mostGeneral singleUse s = evalState (aux s) Map.empty
           n = Map.findWithDefault 0 ty m
       unless (singleUse ty) $
         put $! Map.insert ty (n+1) m
-      let m = fromIntegral (labelNum (label (ty, n)))
-      return (Var (V ty m))
+      return (Var (mkVar ty n))
     aux (Fun f) = return (Fun f)
     aux (t :$: u) = liftM2 (:$:) (aux t) (aux u)
 
 mostSpecific :: Term f -> Term f
-mostSpecific = subst (\(V ty _) -> Var (V ty 0))
+mostSpecific = subst (\(V ty _) -> Var (mkVar ty 0))
 
 allUnifications :: (Type -> Bool) -> Term fun -> [Term fun]
 allUnifications singleUse t = map f ss
   where
-    vs = [ map (x,) (select xs) | xs <- partitionBy typ (usort (vars t)), x <- xs ]
+    vs = [ map (x,) vs | xs@(y:_) <- partitionBy typ (usort (vars t)), let vs = varsOf (typ y), x <- xs ]
     ss = map Map.fromList (sequence vs)
     go s x = Map.findWithDefault undefined x s
     f s = subst (Var . go s) t
-    select [V ty x] | not (singleUse ty) = [V ty x, V ty (succ x)]
-    select xs = take 4 xs
+
+    varsOf ty
+      | singleUse ty = [mkVar ty 0]
+      | otherwise = map (mkVar ty) [0..3]
