@@ -6,12 +6,12 @@ i :: a -> a
 == Laws ==
   1. i x = x
   2. k x y = x
-  3. s k f x = i x
-  4. s f g x = f x (g x)
-  5. s (k f) i x = f x
-  6. s (k i) f x = f x
-  7. s (k f) (k x) y = k (f x) y
-  8. s (k (k x)) f y = k x y
-  9. s f (s (k g) h) x = f x (g (h x))
- 10. s (k (s (k f) g)) h x = s (k f) (s (k g) h) x
+  3. s k f = i
+  4. s f i x = f x x
+  5. s (k f) i = f
+  6. s (k i) f = f
+  7. f x (g x) = s f g x
+  8. s (k f) (k x) = k (f x)
+  9. s (k (k x)) f = k x
+ 10. s (k (s (k f) g)) h = s (k f) (s (k g) h)
 

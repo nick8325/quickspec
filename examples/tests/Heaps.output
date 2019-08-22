@@ -30,6 +30,14 @@ deleteMin :: Heap OrdA -> Heap OrdA
      True :: Bool
     False :: Bool
 
+WARNING: The following types have no 'Arbitrary' instance declared.
+You will not get any variables of the following types:
+  Heap Int
+
+WARNING: The following types have no 'Ord' or 'Observe' instance declared.
+You will not get any equations about the following types:
+  Heap Int
+
 == Laws ==
   1. nil = fromList []
   2. null nil

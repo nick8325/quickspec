@@ -1,0 +1,30 @@
+== Functions ==
+ map :: (a -> b) -> [a] -> [b]
+fold :: (a -> b -> b) -> b -> [a] -> b
+ (.) :: (a -> b) -> (c -> a) -> c -> b
+  [] :: [a]
+ (:) :: a -> [a] -> [a]
+
+== Laws ==
+  1. map f [] = []
+  2. (f . g) x = f (g x)
+  3. fold f x [] = x
+  4. fold (:) [] xs = xs
+  5. map f (x : []) = f x : []
+  6. map (f . g) xs = map f (map g xs)
+  7. (f . g) . h = f . (g . h)
+  8. map f . map g = map (f . g)
+  9. f . fold (:) [] = f
+ 10. fold (:) [] . f = f
+ 11. fold ((:) . f) [] = map f
+ 12. fold f x (y : []) = f y x
+ 13. fold (f . g) x xs = fold f x (map g xs)
+ 14. fold (:) xs (x : ys) = x : fold (:) xs ys
+ 15. fold f x . map g = fold (f . g) x
+ 16. fold (:) xs . (:) x = (:) x . fold (:) xs
+ 17. f x (fold f y xs) = fold f y (x : xs)
+ 18. f x : map f xs = map f (x : xs)
+ 19. f x . fold f y = fold f y . (:) x
+ 20. fold f (fold f x xs) ys = fold f x (fold (:) xs ys)
+ 21. fold f (fold f x xs) = fold f x . fold (:) xs
+

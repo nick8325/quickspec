@@ -84,8 +84,9 @@ blank :: Drawing
  48. above blank (over x (rot45 (cycle y))) = above (rot (rot (rot45 (cycle y)))) x
  49. rot45 (flip (rot45 (above blank (rot45 x)))) = above (rot45 (flip (rot45 (rot45 x)))) blank
  50. rot45 (flip (rot45 (beside blank (rot45 x)))) = beside (rot45 (flip (rot45 (rot45 x)))) blank
- 51. rot45 (rot45 (above (cycle (rot45 x)) blank)) = beside (rot45 (rot45 (cycle (rot45 x)))) blank
- 52. rot45 (rot45 (above (rot (rot45 x)) blank)) = beside (rot45 (rot45 (rot (rot45 x)))) blank
- 53. rot45 (rot45 (beside (cycle (rot45 x)) blank)) = above (rot45 (rot45 (cycle (rot45 x)))) blank
- 54. rot45 (rot45 (beside (rot (rot45 x)) blank)) = above (rot45 (rot45 (rot (rot45 x)))) blank
+ 51. rot45 (rot (rot45 (flip (rot45 (rot x))))) = above blank (beside (rot45 (flip x)) blank)
+ 52. rot45 (rot45 (above (cycle (rot45 x)) blank)) = beside (rot45 (rot45 (cycle (rot45 x)))) blank
+ 53. rot45 (rot45 (above (rot (rot45 x)) blank)) = beside (rot45 (rot45 (rot (rot45 x)))) blank
+ 54. rot45 (rot45 (beside (cycle (rot45 x)) blank)) = above (rot45 (rot45 (cycle (rot45 x)))) blank
+ 55. rot45 (rot45 (beside (rot (rot45 x)) blank)) = above (rot45 (rot45 (rot (rot45 x)))) blank
 

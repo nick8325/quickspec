@@ -12,5 +12,4 @@ snd :: (a, b) -> b
 pair :: (Bool, Char)
 
 == Laws ==
-  4. fst pair
 

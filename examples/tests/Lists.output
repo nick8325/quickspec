@@ -24,9 +24,17 @@ reverse :: [a] -> [a]
  10. length (map f xs) = length xs
  11. reverse (map f xs) = map f (reverse xs)
  12. length (concat (reverse xss)) = length (concat xss)
- 13. (xs ++ ys) ++ zs = xs ++ (ys ++ zs)
- 14. length xs + length ys = length (xs ++ ys)
- 15. concat xss ++ concat yss = concat (xss ++ yss)
- 16. reverse xs ++ reverse ys = reverse (ys ++ xs)
- 17. map f xs ++ map f ys = map f (xs ++ ys)
+ 13. concat (map reverse xss) = reverse (concat (reverse xss))
+ 14. map ((++) []) xss = xss
+ 15. (xs ++ ys) ++ zs = xs ++ (ys ++ zs)
+ 16. length xs + length ys = length (xs ++ ys)
+ 17. concat xss ++ concat yss = concat (xss ++ yss)
+ 18. reverse xs ++ reverse ys = reverse (ys ++ xs)
+ 19. concat (map (map f) xss) = map f (concat xss)
+ 20. map reverse (map reverse xss) = xss
+ 21. map (map f) (map reverse xss) = map reverse (map (map f) xss)
+ 22. map f xs ++ map f ys = map f (xs ++ ys)
+ 23. length (concat (map f (concat (reverse xss)))) = length (concat (map f (concat xss)))
+ 24. length (concat (map ((++) (reverse xs)) xss)) = length (concat (map ((++) xs) xss))
+ 25. map ((++) xs) (map ((++) ys) xss) = map ((++) (xs ++ ys)) xss
 
