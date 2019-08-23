@@ -22,7 +22,6 @@ import QuickSpec.Internal.Prop
 import QuickSpec.Internal.Pruning
 import Test.QuickCheck hiding (total, classify, subterms, Fun)
 import Data.Constraint hiding ((\\))
-import Data.List
 import Data.Proxy
 import qualified Twee.Base as Twee
 import QuickSpec.Internal.Term
@@ -598,47 +597,13 @@ quickSpec cfg@Config{..} = do
 
     present funs prop = do
       norm <- normaliser
-      let prop' = makeDefinition funs (ac norm (conditionalise prop))
+      let prop' = prettyDefinition funs (prettyAC norm (conditionalise prop))
       when (cfg_print_filter prop) $ do
         (n :: Int, props) <- get
         put (n+1, prop':props)
         putLine $
           printf "%3d. %s" n $ show $
-            prettyProp (names instances) prop' <+> maybeType prop
-
-    -- Put an equation that defines the function f into the form f lhs = rhs.
-    -- An equation defines f if:
-    --   * it is of the form f lhs = rhs (or vice versa).
-    --   * f is not a background function.
-    --   * lhs only contains background functions.
-    --   * rhs does not contain f.
-    --   * all vars in rhs appear in lhs
-    makeDefinition cons (lhs :=>: t :=: u)
-      | Just (f, ts) <- defines u,
-        f `notElem` funs t,
-        null (usort (vars t) \\ vars ts) =
-        lhs :=>: u :=: t
-        -- In the case where t defines f, the equation is already oriented correctly
-      | otherwise = lhs :=>: t :=: u
-      where
-        defines (Fun f :@: ts)
-          | f `elem` cons,
-            all (`notElem` cons) (funs ts) = Just (f, ts)
-        defines _ = Nothing
-
-    -- Transform x+(y+z) = y+(x+z) into associativity, if + is commutative
-    ac norm (lhs :=>: Fun f :@: [Var x, Fun f1 :@: [Var y, Var z]] :=: Fun f2 :@: [Var y1, Fun f3 :@: [Var x1, Var z1]])
-      | f == f1, f1 == f2, f2 == f3,
-        x == x1, y == y1, z == z1,
-        x /= y, y /= z, x /= z,
-        norm (Fun f :@: [Var x, Var y]) == norm (Fun f :@: [Var y, Var x]) =
-          lhs :=>: Fun f :@: [Fun f :@: [Var x, Var y], Var z] :=: Fun f :@: [Var x, Fun f :@: [Var y, Var z]]
-    ac _ prop = prop
-
-    -- Add a type signature when printing the equation x = y.
-    maybeType (_ :=>: x@(Var _) :=: Var _) =
-      text "::" <+> pPrintType (typ x)
-    maybeType _ = pPrintEmpty
+            prettyProp (names instances) prop' <+> disambiguatePropType prop
 
     -- XXX do this during testing
     constraintsOk = memo $ \con ->

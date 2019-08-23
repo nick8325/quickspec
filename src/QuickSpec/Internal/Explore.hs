@@ -1,5 +1,5 @@
 {-# OPTIONS_HADDOCK hide #-}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts, PatternGuards #-}
 module QuickSpec.Internal.Explore where
 
 import QuickSpec.Internal.Explore.Polymorphic
@@ -15,6 +15,7 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.State.Strict
 import Text.Printf
 import Data.Semigroup(Semigroup(..))
+import Data.List
 
 newtype Enumerator a = Enumerator { enumerate :: Int -> [[a]] -> [a] }
 
@@ -87,6 +88,11 @@ quickSpec present eval maxSize maxCommutativeSize singleUse univ enum = do
 
   evalStateT (loop 0 maxSize (repeat [])) state0
 
+----------------------------------------------------------------------
+-- Functions that are not really to do with theory exploration,
+-- but are useful for printing the output nicely.
+----------------------------------------------------------------------
+
 pPrintSignature :: (Pretty a, Typed a) => [a] -> Doc
 pPrintSignature funs =
   text "== Functions ==" $$
@@ -97,3 +103,40 @@ pPrintSignature funs =
     pad xs = nest (maxWidth - length xs) (text xs)
     pPrintDecl (name, ty) =
       pad name <+> text "::" <+> ty
+
+-- Put an equation that defines the function f into the form f lhs = rhs.
+-- An equation defines f if:
+--   * it is of the form f lhs = rhs (or vice versa).
+--   * f is not a background function.
+--   * lhs only contains background functions.
+--   * rhs does not contain f.
+--   * all vars in rhs appear in lhs
+prettyDefinition :: Eq fun => [fun] -> Prop (Term fun) -> Prop (Term fun)
+prettyDefinition cons (lhs :=>: t :=: u)
+  | Just (f, ts) <- defines u,
+    f `notElem` funs t,
+    null (usort (vars t) \\ vars ts) =
+    lhs :=>: u :=: t
+    -- In the case where t defines f, the equation is already oriented correctly
+  | otherwise = lhs :=>: t :=: u
+  where
+    defines (Fun f :@: ts)
+      | f `elem` cons,
+        all (`notElem` cons) (funs ts) = Just (f, ts)
+    defines _ = Nothing
+
+-- Transform x+(y+z) = y+(x+z) into associativity, if + is commutative
+prettyAC :: (Eq f, Eq norm) => (Term f -> norm) -> Prop (Term f) -> Prop (Term f)
+prettyAC norm (lhs :=>: Fun f :@: [Var x, Fun f1 :@: [Var y, Var z]] :=: Fun f2 :@: [Var y1, Fun f3 :@: [Var x1, Var z1]])
+  | f == f1, f1 == f2, f2 == f3,
+    x == x1, y == y1, z == z1,
+    x /= y, y /= z, x /= z,
+    norm (Fun f :@: [Var x, Var y]) == norm (Fun f :@: [Var y, Var x]) =
+      lhs :=>: Fun f :@: [Fun f :@: [Var x, Var y], Var z] :=: Fun f :@: [Var x, Fun f :@: [Var y, Var z]]
+prettyAC _ prop = prop
+
+-- Add a type signature when printing the equation x = y.
+disambiguatePropType :: Prop (Term fun) -> Doc
+disambiguatePropType (_ :=>: (Var x) :=: Var _) =
+  text "::" <+> pPrintType (typ x)
+disambiguatePropType _ = pPrintEmpty
