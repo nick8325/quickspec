@@ -9,7 +9,7 @@ import QuickSpec.Internal.Type
 import QuickSpec.Internal.Utils
 import Control.Monad
 import GHC.Generics(Generic)
-import Test.QuickCheck(CoArbitrary)
+import Test.QuickCheck(CoArbitrary(..))
 import Data.DList(DList)
 import qualified Data.DList as DList
 import Twee.Base(Pretty(..), PrettyTerm(..), TermStyle(..), EqualsBonus, prettyPrint)
@@ -24,7 +24,10 @@ data Term f = Var {-# UNPACK #-} !Var | Fun !f | !(Term f) :$: !(Term f)
 
 -- | A variable, which has a type and a number.
 data Var = V { var_ty :: !Type, var_id :: {-# UNPACK #-} !Int }
-  deriving (Eq, Ord, Show, Generic, CoArbitrary)
+  deriving (Eq, Ord, Show, Generic)
+
+instance CoArbitrary Var where
+  coarbitrary = coarbitrary . var_id
 
 instance Typed Var where
   typ x = var_ty x
