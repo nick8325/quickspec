@@ -6,6 +6,7 @@ import Data.IntSet(IntSet)
 
 main = quickSpec [
   monoType (Proxy :: Proxy IntSet),
+  withMaxTests 10000,
 
   series [sig1, sig2, sig3]]
   where

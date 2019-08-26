@@ -49,8 +49,8 @@ member :: Int -> IntSet -> Bool
  31. member x z & member y w => member x (delete y z) = member y (delete x w)
  32. member x z => member x (intersection y z) = member x y
  33. member x (insert y empty) = member y (insert x empty)
- 34. member x (delete y (intersection z w)) = member x (delete x2 (intersection z w))
- 35. member x (insert y (delete x z)) = member x (insert y empty)
- 36. member x (union y (delete x z)) = member x y
+ 34. member x (insert y (delete x z)) = member x (insert y empty)
+ 35. member x (union y (delete x z)) = member x y
+ 36. member x (delete y (insert z empty)) = member z (delete y (insert x empty))
  37. member x (intersection y (insert z empty)) = member z (intersection y (insert x empty))
 
