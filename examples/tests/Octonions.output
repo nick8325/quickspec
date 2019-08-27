@@ -13,8 +13,9 @@ inv :: It -> It
   7. (x * y) * x = x * (y * x)
   8. (x * y) * y = x * (y * y)
   9. inv x * inv y = inv (y * x)
- 10. x * (inv x * y) = y
- 11. (x * y) * (z * x) = x * ((y * z) * x)
- 12. (x * y) * (y * y) = x * (y * (y * y))
- 13. (x * (y * x)) * z = x * (y * (x * z))
+ 10. inv x * (x * y) = y
+ 11. x * (y * (y * x)) = (x * y) * (y * x)
+ 12. x * (y * (y * y)) = (x * y) * (y * y)
+ 13. x * ((y * z) * x) = (x * y) * (z * x)
+ 14. (x * (y * x)) * z = x * (y * (x * z))
 

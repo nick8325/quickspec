@@ -14,43 +14,41 @@ intersection :: IntSet -> IntSet -> IntSet
   8. intersection x (union x y) = x
   9. union x (intersection x y) = x
  10. union (union x y) z = union x (union y z)
- 11. intersection x (union y (intersection x z)) = intersection x (union y z)
- 12. intersection (union x y) (union x z) = union x (intersection y z)
+ 11. intersection (union x y) (union x z) = union x (intersection y z)
 
 == Functions ==
 insert :: Int -> IntSet -> IntSet
 delete :: Int -> IntSet -> IntSet
 
 == Laws ==
- 13. delete x empty = empty
- 14. delete x (delete y z) = delete y (delete x z)
- 15. delete x (delete x y) = delete x y
- 16. delete x (insert x y) = delete x y
- 17. insert x (delete x y) = insert x y
- 18. insert x (insert y z) = insert y (insert x z)
- 19. intersection x (delete y z) = delete y (intersection x z)
- 20. intersection x (insert y x) = x
- 21. union x (insert y z) = insert y (union x z)
- 22. intersection x (insert y (intersection x z)) = intersection x (insert y z)
- 23. intersection (insert x y) (insert x z) = insert x (intersection y z)
- 24. union (delete x y) (delete x z) = delete x (union y z)
- 25. union x (delete y (insert z empty)) = union x (delete y (insert z x))
- 26. union x (intersection y (insert z empty)) = intersection (insert z x) (union x y)
+ 12. delete x empty = empty
+ 13. delete x (delete y z) = delete y (delete x z)
+ 14. delete x (delete x y) = delete x y
+ 15. delete x (insert x y) = delete x y
+ 16. insert x (delete x y) = insert x y
+ 17. insert x (insert y z) = insert y (insert x z)
+ 18. intersection x (delete y z) = delete y (intersection x z)
+ 19. intersection x (insert y x) = x
+ 20. union x (insert y z) = insert y (union x z)
+ 21. intersection (insert x y) (insert x z) = insert x (intersection y z)
+ 22. union (delete x y) (delete x z) = delete x (union y z)
+ 23. union x (delete y (insert z empty)) = union x (delete y (insert z x))
+ 24. union x (intersection y (insert z empty)) = intersection (insert z x) (union x y)
 
 == Functions ==
  False :: Bool
 member :: Int -> IntSet -> Bool
 
 == Laws ==
- 27. member x y => insert x y = y
- 28. member x empty = False
- 29. member x (delete x y) = False
- 30. member x (insert x y)
- 31. member x z & member y w => member x (delete y z) = member y (delete x w)
- 32. member x z => member x (intersection y z) = member x y
- 33. member x (insert y empty) = member y (insert x empty)
- 34. member x (insert y (delete x z)) = member x (insert y empty)
- 35. member x (union y (delete x z)) = member x y
- 36. member x (delete y (insert z empty)) = member z (delete y (insert x empty))
- 37. member x (intersection y (insert z empty)) = member z (intersection y (insert x empty))
+ 25. member x empty = False
+ 26. member x y => insert x y = y
+ 27. member x (delete x y) = False
+ 28. member x (insert x y)
+ 29. member x (insert y empty) = member y (insert x empty)
+ 30. member x z & member y w => member x (delete y z) = member y (delete x w)
+ 31. member x z => member x (intersection y z) = member x y
+ 32. member x (insert y (delete x z)) = member x (insert y empty)
+ 33. member x (union y (delete x z)) = member x y
+ 34. member x (delete y (insert z empty)) = member z (delete y (insert x empty))
+ 35. member x (intersection y (insert z empty)) = member z (intersection y (insert x empty))
 

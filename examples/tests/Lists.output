@@ -12,29 +12,29 @@ reverse :: [a] -> [a]
  concat :: [[a]] -> [a]
 
 == Laws ==
-  1. concat [] = []
-  2. length [] = 0
-  3. reverse [] = []
+  1. length [] = 0
+  2. reverse [] = []
+  3. concat [] = []
   4. xs ++ [] = xs
   5. [] ++ xs = xs
-  6. length (reverse xs) = length xs
-  7. map f [] = []
+  6. map f [] = []
+  7. length (reverse xs) = length xs
   8. reverse (reverse xs) = xs
   9. length (xs ++ ys) = length (ys ++ xs)
  10. length (map f xs) = length xs
- 11. reverse (map f xs) = map f (reverse xs)
- 12. length (concat (reverse xss)) = length (concat xss)
- 13. concat (map reverse xss) = reverse (concat (reverse xss))
- 14. map ((++) []) xss = xss
+ 11. map f (reverse xs) = reverse (map f xs)
+ 12. map ((++) []) xss = xss
+ 13. length (concat (reverse xss)) = length (concat xss)
+ 14. reverse (concat (reverse xss)) = concat (map reverse xss)
  15. (xs ++ ys) ++ zs = xs ++ (ys ++ zs)
  16. length xs + length ys = length (xs ++ ys)
- 17. concat xss ++ concat yss = concat (xss ++ yss)
- 18. reverse xs ++ reverse ys = reverse (ys ++ xs)
- 19. concat (map (map f) xss) = map f (concat xss)
- 20. map reverse (map reverse xss) = xss
- 21. map (map f) (map reverse xss) = map reverse (map (map f) xss)
+ 17. reverse xs ++ reverse ys = reverse (ys ++ xs)
+ 18. concat xss ++ concat yss = concat (xss ++ yss)
+ 19. map reverse (map reverse xss) = xss
+ 20. concat (map (map f) xss) = map f (concat xss)
+ 21. map reverse (map (map f) xss) = map (map f) (map reverse xss)
  22. map f xs ++ map f ys = map f (xs ++ ys)
- 23. length (concat (map f (concat (reverse xss)))) = length (concat (map f (concat xss)))
- 24. length (concat (map ((++) (reverse xs)) xss)) = length (concat (map ((++) xs) xss))
- 25. map ((++) xs) (map ((++) ys) xss) = map ((++) (xs ++ ys)) xss
+ 23. map ((++) xs) (map ((++) ys) xss) = map ((++) (xs ++ ys)) xss
+ 24. length (concat (map f (concat (reverse xss)))) = length (concat (map f (concat xss)))
+ 25. length (concat (map ((++) (reverse xs)) xss)) = length (concat (map ((++) xs) xss))
 

@@ -9,12 +9,12 @@ fst :: Queue a -> a
 nil :: Queue a
 
 == Laws ==
-  1. deq (enq x nil) = nil
-  2. fst (enq x nil) = x
+  1. fst (enq x nil) = x
+  2. deq (enq x nil) = nil
   3. fst (enq (f x) x) = fst (enq (f nil) x)
-  4. enq x (deq (enq y z)) = deq (enq x (enq y z))
-  5. fst (enq x (enq y z)) = fst (enq y z)
-  6. deq (enq (fst (enq x y)) y) = deq (enq (fst y) y)
+  4. fst (enq x (enq y z)) = fst (enq y z)
+  5. enq x (deq (enq y z)) = deq (enq x (enq y z))
+  6. enq x . (deq . enq y) = deq . (enq x . enq y)
   7. fst (enq (fst (enq x y)) y) = fst (enq x y)
-  8. (enq x . deq) . enq y = (deq . enq x) . enq y
+  8. deq (enq (fst (enq x y)) y) = deq (enq (fst y) y)
 

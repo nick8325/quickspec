@@ -31,7 +31,7 @@ flip :: Drawing -> Drawing
  11. flip (flip x) = x
  12. rot (flip (rot x)) = flip x
  13. above (flip x) (flip y) = flip (above x y)
- 14. flip (over x (flip y)) = over y (flip x)
+ 14. over (flip x) (flip y) = flip (over x y)
 
 == Functions ==
   cycle :: Drawing -> Drawing
@@ -64,29 +64,32 @@ blank :: Drawing
  28. rot45 blank = blank
  29. over x blank = x
  30. above blank blank = blank
- 31. above (beside (cycle x) blank) blank = rot45 (rot (rot45 (cycle x)))
- 32. above (rot (rot (rot45 x))) blank = above blank (rot45 (rot (rot x)))
- 33. rot (rot (rot45 (rot (rot45 x)))) = above blank (beside blank x)
- 34. rot45 (rot45 (above (rot45 x) blank)) = beside (rot45 (rot45 (rot45 x))) blank
- 35. rot45 (rot45 (beside (rot45 x) blank)) = above (rot45 (rot45 (rot45 x))) blank
- 36. flip (quartet blank (flip x) y z) = quartet x blank (flip z) (flip y)
- 37. flip (quartet x (flip y) z blank) = quartet y (flip x) blank (flip z)
- 38. flip (quartet x (flip y) blank z) = quartet y (flip x) (flip z) blank
- 39. flip (quartet (flip x) blank y z) = quartet blank x (flip z) (flip y)
- 40. flip (quartet x blank y (flip z)) = quartet blank (flip x) z (flip y)
- 41. flip (quartet x blank (flip y) z) = quartet blank (flip x) (flip z) y
- 42. flip (quartet (flip x) y z blank) = quartet (flip y) x blank (flip z)
- 43. flip (quartet (flip x) y blank z) = quartet (flip y) x (flip z) blank
- 44. flip (quartet blank x y (flip z)) = quartet (flip x) blank z (flip y)
- 45. flip (quartet blank x (flip y) z) = quartet (flip x) blank (flip z) y
- 46. flip (quartet x y blank (flip z)) = quartet (flip y) (flip x) z blank
- 47. flip (quartet x y (flip z) blank) = quartet (flip y) (flip x) blank z
- 48. above blank (over x (rot45 (cycle y))) = above (rot (rot (rot45 (cycle y)))) x
- 49. rot45 (flip (rot45 (above blank (rot45 x)))) = above (rot45 (flip (rot45 (rot45 x)))) blank
- 50. rot45 (flip (rot45 (beside blank (rot45 x)))) = beside (rot45 (flip (rot45 (rot45 x)))) blank
- 51. rot45 (rot (rot45 (flip (rot45 (rot x))))) = above blank (beside (rot45 (flip x)) blank)
- 52. rot45 (rot45 (above (cycle (rot45 x)) blank)) = beside (rot45 (rot45 (cycle (rot45 x)))) blank
- 53. rot45 (rot45 (above (rot (rot45 x)) blank)) = beside (rot45 (rot45 (rot (rot45 x)))) blank
- 54. rot45 (rot45 (beside (cycle (rot45 x)) blank)) = above (rot45 (rot45 (cycle (rot45 x)))) blank
- 55. rot45 (rot45 (beside (rot (rot45 x)) blank)) = above (rot45 (rot45 (rot (rot45 x)))) blank
+ 31. quartet (cycle x) blank blank blank = rot45 (rot (rot45 (cycle x)))
+ 32. above blank (rot45 (rot (rot x))) = rot (rot (above blank (rot45 x)))
+ 33. above (rot45 (rot45 (rot45 x))) blank = rot45 (rot45 (beside (rot45 x) blank))
+ 34. beside (rot45 (rot45 (rot45 x))) blank = rot45 (rot45 (above (rot45 x) blank))
+ 35. rot (rot (rot45 (rot (rot45 x)))) = quartet blank blank blank x
+ 36. quartet blank (flip x) (flip y) blank = flip (quartet x blank blank y)
+ 37. rot (quartet x blank blank y) = quartet blank (rot y) (rot x) blank
+ 38. quartet (rot x) blank blank (rot y) = rot (quartet blank x y blank)
+ 39. quartet (flip x) (flip y) z blank = flip (quartet y x blank (flip z))
+ 40. quartet (flip x) (flip y) blank z = flip (quartet y x (flip z) blank)
+ 41. quartet blank (flip x) y (flip z) = flip (quartet x blank z (flip y))
+ 42. quartet blank (flip x) (flip y) z = flip (quartet x blank (flip z) y)
+ 43. quartet x (flip y) blank (flip z) = flip (quartet y (flip x) z blank)
+ 44. quartet x (flip y) (flip z) blank = flip (quartet y (flip x) blank z)
+ 45. quartet (flip x) blank y (flip z) = flip (quartet blank x z (flip y))
+ 46. quartet (flip x) blank (flip y) z = flip (quartet blank x (flip z) y)
+ 47. quartet x blank (flip y) (flip z) = flip (quartet blank (flip x) z y)
+ 48. quartet (flip x) y blank (flip z) = flip (quartet (flip y) x z blank)
+ 49. quartet (flip x) y (flip z) blank = flip (quartet (flip y) x blank z)
+ 50. quartet blank x (flip y) (flip z) = flip (quartet (flip x) blank z y)
+ 51. above blank (over x (rot45 (cycle y))) = above (rot (rot (rot45 (cycle y)))) x
+ 52. above (rot45 (flip (rot45 (rot45 x)))) blank = rot45 (flip (rot45 (above blank (rot45 x))))
+ 53. above (rot45 (rot45 (cycle (rot45 x)))) blank = rot45 (rot45 (beside (cycle (rot45 x)) blank))
+ 54. above (rot45 (rot45 (rot (rot45 x)))) blank = rot45 (rot45 (rot (above (rot45 x) blank)))
+ 55. beside (rot45 (flip (rot45 (rot45 x)))) blank = rot45 (flip (rot45 (beside blank (rot45 x))))
+ 56. beside (rot45 (rot45 (cycle (rot45 x)))) blank = rot45 (rot45 (above (cycle (rot45 x)) blank))
+ 57. beside (rot45 (rot45 (rot (rot45 x)))) blank = rot45 (rot45 (rot (beside blank (rot45 x))))
+ 58. flip (rot45 (rot (rot45 (rot45 (flip x))))) = quartet blank blank blank (rot45 (rot x))
 

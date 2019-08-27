@@ -39,38 +39,45 @@ You will not get any equations about the following types:
   Heap Int
 
 == Laws ==
-  1. nil = fromList []
-  2. null nil
+  1. null nil
+  2. nil = fromList []
   3. toList nil = []
   4. merge h h1 = merge h1 h
-  5. fromList (sort xs) = fromList xs
-  6. fromList (toList h) = h
-  7. merge h nil = h
-  8. null (fromList xs) = nullList xs
-  9. toList (fromList xs) = sort xs
- 10. insert x (fromList xs) = fromList (x : xs)
- 11. null (merge h h) = null h
- 12. deleteMin (insert x nil) = nil
- 13. findMin (insert x nil) = x
- 14. merge h (insert x h1) = insert x (merge h h1)
- 15. merge (merge h h1) h2 = merge h (merge h1 h2)
- 16. null h && null h1 = null (merge h h1)
- 17. deleteList (head (sort xs)) xs = deleteList (findMin (fromList xs)) xs
- 18. deleteMin (insert (findMin h) h) = h
- 19. fromList (xs ++ toList h) = merge h (fromList xs)
- 20. head (insertList x (sort xs)) = findMin (fromList (x : xs))
+  5. merge h nil = h
+  6. null h = nullList (toList h)
+  7. null (fromList xs) = nullList xs
+  8. fromList (sort xs) = fromList xs
+  9. fromList (toList h) = h
+ 10. toList (fromList xs) = sort xs
+ 11. null (insert x h) = False
+ 12. null (merge h h) = null h
+ 13. insertList x (toList h) = toList (insert x h)
+ 14. findMin (insert x nil) = x
+ 15. deleteMin (insert x nil) = nil
+ 16. merge h (insert x h1) = insert x (merge h h1)
+ 17. merge (merge h h1) h2 = merge h (merge h1 h2)
+ 18. null h && null h1 = null (merge h h1)
+ 19. mergeLists (toList h) (toList h1) = toList (merge h h1)
+ 20. head (toList (insert x h)) = findMin (insert x h)
  21. null (deleteMin (insert x h)) = null h
- 22. toList (deleteMin (insert x h)) = tail (insertList x (toList h))
- 23. insert x (deleteMin (insert x h)) = deleteMin (insert x (insert x h))
- 24. merge h (deleteMin (insert x h)) = deleteMin (insert x (merge h h))
- 25. tail (insertList (findMin (fromList xs)) xs) = xs
+ 22. toList (deleteMin (insert x h)) = tail (toList (insert x h))
+ 23. deleteMin (insert (findMin h) h) = h
+ 24. deleteList (findMin (fromList xs)) xs = deleteList (head (sort xs)) xs
+ 25. merge h (deleteMin (insert x h)) = deleteMin (insert x (merge h h))
  26. null h || null (deleteMin h) = nullList (deleteList (findMin h) (toList h))
- 27. deleteList (findMin (fromList (xs ++ xs))) xs = deleteList (findMin (fromList xs)) xs
- 28. deleteList (head (sort xs)) (mergeLists xs xs) = deleteList (findMin (fromList xs)) (mergeLists xs xs)
- 29. deleteList (head (sort (xs ++ ys))) xs = deleteList (findMin (fromList (xs ++ ys))) xs
- 30. deleteMin (insert x (deleteMin (insert y h))) = deleteMin (deleteMin (insert x (insert y h)))
- 31. deleteMin (insert (findMin (merge h h1)) h) = h
- 32. merge h (fromList (deleteList x (toList h))) = fromList (deleteList x (toList (merge h h)))
- 33. nullList (deleteList x (toList (merge h h))) = null h
- 34. head (tail (insertList x (y : []))) = findMin (deleteMin (insert x (insert y nil)))
+ 27. tail (insertList (findMin (fromList xs)) xs) = xs
+ 28. deleteList (findMin (fromList xs)) (mergeLists xs xs) = deleteList (head (sort xs)) (mergeLists xs xs)
+ 29. deleteList (findMin (merge h h)) (toList h) = deleteList (findMin h) (toList h)
+ 30. insertList (findMin (insert x h)) (toList h) = findMin (insert x h) : toList h
+ 31. nullList (deleteList x (toList (merge h h))) = null h
+ 32. head (insertList (findMin (insert x h)) xs) = head (mergeLists (toList h) (insertList x xs))
+ 33. findMin (insert (head (insertList x xs)) h) = head (mergeLists (toList h) (insertList x xs))
+ 34. deleteMin (insert x (deleteMin (insert y h))) = deleteMin (deleteMin (insert x (insert y h)))
+ 35. deleteMin (insert (findMin (insert x h)) h) = h
+ 36. deleteMin (insert (findMin (merge h h1)) h) = h
+ 37. deleteList x (tail (toList (insert x h))) = deleteList (findMin (insert x h)) (toList h)
+ 38. deleteList (findMin (fromList (xs ++ ys))) xs = deleteList (head (sort (xs ++ ys))) xs
+ 39. deleteList (findMin (insert (head xs) h)) xs = deleteList (head (mergeLists xs (toList h))) xs
+ 40. merge h (fromList (deleteList x (toList h))) = fromList (deleteList x (toList (merge h h)))
+ 41. findMin (deleteMin (insert x (insert y nil))) = head (tail (insertList x (y : [])))
 

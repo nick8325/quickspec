@@ -13,7 +13,7 @@ return :: a -> [a]
   6. (xs ++ ys) ++ zs = xs ++ (ys ++ zs)
   7. xs >>= (f >=> g) = (xs >>= f) >>= g
   8. (f >=> g) >=> h = f >=> (g >=> h)
-  9. f x ++ (xs >>= f) = (return x ++ xs) >>= f
- 10. (xs >>= f) ++ f x = (xs ++ return x) >>= f
+  9. (xs >>= f) ++ f x = ((++) xs >=> f) (return x)
+ 10. f x ++ (xs >>= f) = (return x ++ xs) >>= f
  11. (xs >>= f) ++ (ys >>= f) = (xs ++ ys) >>= f
 
