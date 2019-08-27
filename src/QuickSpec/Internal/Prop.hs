@@ -83,16 +83,8 @@ x === y = [] :=>: x :=: y
 -- Making properties look pretty (naming variables, etc.)
 ----------------------------------------------------------------------
 
-class PrettyArity fun where
-  prettyArity :: fun -> Int
-  prettyArity _ = 0
-
-instance (PrettyArity fun1, PrettyArity fun2) => PrettyArity (fun1 :+: fun2) where
-  prettyArity (Inl x) = prettyArity x
-  prettyArity (Inr x) = prettyArity x
-
 prettyProp ::
-  (Typed fun, Apply (Term fun), PrettyTerm fun, PrettyArity fun) =>
+  (Typed fun, Apply (Term fun), PrettyTerm fun) =>
   (Type -> [String]) -> Prop (Term fun) -> Doc
 prettyProp cands = pPrint . nameVars cands
 

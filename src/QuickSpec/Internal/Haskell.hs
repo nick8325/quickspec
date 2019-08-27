@@ -273,7 +273,6 @@ data Constant =
   Constant {
     con_name  :: String,
     con_style :: TermStyle,
-    con_pretty_arity :: Int,
     con_value :: Value Identity,
     con_type :: Type,
     con_constraints :: [Type],
@@ -287,12 +286,7 @@ instance Eq Constant where
 instance Ord Constant where
   compare =
     comparing $ \con ->
-      (con_name con, twiddle (con_pretty_arity con), typ con)
-      where
-        -- This trick comes from Prover9 and improves the ordering somewhat
-        twiddle 1 = 2
-        twiddle 2 = 1
-        twiddle x = x
+      (typeArity (typ con), typ con, con_name con)
 
 instance Background Constant
 
@@ -312,11 +306,6 @@ constant' name val =
           | isOp name && typeArity (typ val) >= 2 -> infixStyle 5
           | isOp name -> prefix
           | otherwise -> curried,
-    con_pretty_arity =
-      case () of
-        _ | isOp name && typeArity (typ val) >= 2 -> 2
-          | isOp name -> 1
-          | otherwise -> typeArity (typ val),
     con_value = val,
     con_type = ty,
     con_constraints = constraints,
@@ -370,9 +359,6 @@ instance Pretty Constant where
 
 instance PrettyTerm Constant where
   termStyle = con_style
-
-instance PrettyArity Constant where
-  prettyArity = con_pretty_arity
 
 instance Sized Constant where
   size = con_size

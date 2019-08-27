@@ -84,10 +84,6 @@ instance PrettyTerm fun => PrettyTerm (WithConstructor fun) where
   termStyle (Constructor _ _) = curried
   termStyle (Normal f) = termStyle f
 
-instance PrettyArity fun => PrettyArity (WithConstructor fun) where
-  prettyArity (Constructor _ _) = 1
-  prettyArity (Normal f) = prettyArity f
-
 instance (Predicate fun, Background fun) => Background (WithConstructor fun) where
   background (Normal f) = map (mapFun Normal) (background f)
   background _ = []
