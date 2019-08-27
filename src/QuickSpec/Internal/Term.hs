@@ -172,14 +172,19 @@ instance (PrettyTerm f, Typed f) => Apply (Term f) where
     tryApply (typ t) (typ u)
     return (t :$: u)
 
+depth :: Term f -> Int
+depth Var{} = 1
+depth Fun{} = 1
+depth (t :$: u) = depth t `max` (1+depth u)
+
 -- | A standard term ordering - size, skeleton, generality.
 -- Satisfies the property:
 -- if measure (schema t) < measure (schema u) then t < u.
-type Measure f = (Int, Int, Int, MeasureFuns f, Int, [Var])
+type Measure f = (Int, Int, Int, Int, MeasureFuns f, Int, [Var])
 -- | Compute the term ordering for a term.
 measure :: (Sized f, Typed f) => Term f -> Measure f
 measure t =
-  (size t, missing t, -length (vars t), MeasureFuns (skel t),
+  (depth t, size t, missing t, -length (vars t), MeasureFuns (skel t),
    -length (usort (vars t)), vars t)
   where
     skel (Var (V ty _)) = Var (V ty 0)
