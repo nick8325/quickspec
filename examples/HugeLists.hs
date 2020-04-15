@@ -1,7 +1,7 @@
 -- A stress test using lots and lots of list functions.
 {-# LANGUAGE ScopedTypeVariables, ConstraintKinds, RankNTypes, ConstraintKinds, FlexibleContexts #-}
 import QuickSpec
-import QuickSpec.Utils
+import QuickSpec.Internal.Utils
 import Data.List
 import Control.Monad
 

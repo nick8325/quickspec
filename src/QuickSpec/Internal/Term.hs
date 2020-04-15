@@ -15,6 +15,7 @@ import qualified Data.DList as DList
 import Twee.Base(Pretty(..), PrettyTerm(..), TermStyle(..), EqualsBonus, prettyPrint)
 import Twee.Pretty
 import qualified Data.Map.Strict as Map
+import Data.Map(Map)
 import Data.List
 import Data.Ord
 
@@ -33,6 +34,37 @@ instance Typed Var where
   typ x = var_ty x
   otherTypesDL _ = mzero
   typeSubst_ sub (V ty x) = V (typeSubst_ sub ty) x
+
+match :: Eq f => Term f -> Term f -> Maybe (Map Var (Term f))
+match (Var x) t = Just (Map.singleton x t)
+match (Fun f) (Fun g)
+  | f == g = Just Map.empty
+  | otherwise = Nothing
+match (f :$: x) (g :$: y) = do
+  m1 <- match f g
+  m2 <- match x y
+  guard (and [t == u | (t, u) <- Map.elems (Map.intersectionWith (,) m1 m2)])
+  return (Map.union m1 m2)
+
+unify :: Eq f => Term f -> Term f -> Maybe (Map Var (Term f))
+unify t u = loop Map.empty [(t, u)]
+  where
+    loop sub [] = Just sub
+    loop sub ((Fun f, Fun g):xs)
+      | f == g = loop sub xs
+    loop sub ((f :$: x, g :$: y):xs) =
+      loop sub ((f, g):(x, y):xs)
+    loop sub ((Var x, t):xs)
+      | t == Var x = loop sub xs
+      | x `elem` vars t = Nothing
+      | otherwise =
+        loop
+          (Map.insert x t (fmap (replace x t) sub))
+          [(replace x t u, replace x t v) | (u, v) <- xs]
+    loop sub ((t, Var x):xs) = loop sub ((Var x, t):xs)
+
+    replace x t (Var y) | x == y = t
+    replace _ _ t = t
 
 -- | A class for things that contain terms.
 class Symbolic f a | a -> f where

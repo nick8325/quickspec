@@ -1,3 +1,7 @@
+does regenerlise need to worry about restricting occurrences of the
+same var to have the same type? now we have the invariant that each
+var has a unique type
+
 NOTE:
 schema layer should somehow be the same, whether we're discovering
 equations or something else. maybe this means splitting lower layers
