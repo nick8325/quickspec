@@ -37,10 +37,9 @@ instance (Typed fun, Ord fun, PrettyTerm fun, Ord norm, MonadPruner (Term (WithC
     return (norm . fmap Normal)
   add prop = do
     redundant <- conditionallyRedundant prop
-    if redundant then return False else do
-      res <- lift (add (mapFun Normal prop))
-      when res (considerConditionalising prop)
-      return res
+    unless redundant $ do
+      lift (add (mapFun Normal prop))
+      considerConditionalising prop
 
 conditionalsUniverse :: (Typed fun, Predicate fun) => [Type] -> [fun] -> Universe
 conditionalsUniverse tys funs =

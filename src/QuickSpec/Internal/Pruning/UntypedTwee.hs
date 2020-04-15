@@ -77,16 +77,10 @@ instance (Ord fun, Typeable fun, Arity fun, Twee.Sized fun, PrettyTerm fun, Equa
   add ([] :=>: t :=: u) = Pruner $ do
     state <- lift get
     config <- ask
-    let
-      t' = normalFormsTwee state t
-      u' = normalFormsTwee state u
-    -- Add the property anyway in case it could only be joined
-    -- by considering all normal forms
     lift (put $! addTwee config t u state)
-    return (Set.null (Set.intersection t' u'))
 
   add _ =
-    return True
+    return ()
     --error "twee pruner doesn't support non-unit equalities"
 
 normaliseTwee :: (Ord fun, Typeable fun, Arity fun, Twee.Sized fun, PrettyTerm fun, EqualsBonus fun) =>
