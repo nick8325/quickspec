@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveGeneric, TypeFamilies, DeriveFunctor, FlexibleInstances, MultiParamTypeClasses, UndecidableInstances, FlexibleContexts, TypeOperators #-}
 module QuickSpec.Internal.Prop where
 
+import Data.Bool (bool)
 import Control.Monad
 import qualified Data.DList as DList
 import Data.Ord
@@ -90,11 +91,11 @@ prettyProp cands = pPrint . snd . nameVars cands
 
 prettyPropQC ::
   (Typed fun, Apply (Term fun), PrettyTerm fun) =>
-  fun -> Int -> (Type -> [String]) -> Prop (Term fun) -> Doc
-prettyPropQC eq nth cands x =
+  (Type -> Bool) -> fun -> fun -> Int -> (Type -> [String]) -> Prop (Term fun) -> Doc
+prettyPropQC is_observed obs_eq eq nth cands x =
   hang (text first_char <+> text "counterexample" <+> (text $ show $ show $ pPrint yo) <+> text "$") 4
    $ hang ppr_binds 4
-   $ pPrint $ Fun (Ordinary eq) :$: lhs :$: rhs
+   $ pPrint $ Fun (Ordinary $ bool eq obs_eq $ is_observed $ typ lhs_for_type) :$: lhs :$: rhs
 
 --      hsep [ parens (pPrint lhs)
 --           , text "==="
@@ -106,6 +107,7 @@ prettyPropQC eq nth cands x =
       case nth of
         1 -> "["
         _ -> ","
+    (_ :=>: (lhs_for_type :=: _)) = x
     (var_defs, (ctx :=>: yo@(lhs :=: rhs))) = nameVars cands x
     print_sig name ty = parens $ text name <+> text "::" <+> pPrintType ty
     ppr_binds =
