@@ -279,6 +279,17 @@ data Constant =
     con_size :: Int,
     con_classify :: Classification Constant }
 
+quickcheckEqOperator :: Constant
+quickcheckEqOperator = Constant
+  { con_name  = "==="
+  , con_style = infixStyle 9  -- high precedence to always force parens
+  , con_value = undefined
+  , con_type = undefined
+  , con_constraints = undefined
+  , con_size = 1
+  , con_classify = Function
+  }
+
 instance Eq Constant where
   x == y =
     con_name x == con_name y && typ (con_value x) == typ (con_value y)
@@ -602,7 +613,7 @@ quickSpec cfg@Config{..} = do
                 prettyProp (names instances) prop' <+> disambiguatePropType prop
             ForQuickCheck ->
               renderStyle (style {lineLength = 78}) $
-                prettyPropQC n (names instances) prop' <+> disambiguatePropType prop
+                prettyPropQC quickcheckEqOperator n (names instances) prop' <+> disambiguatePropType prop
 
     -- XXX do this during testing
     constraintsOk = memo $ \con ->
