@@ -86,7 +86,27 @@ x === y = [] :=>: x :=: y
 prettyProp ::
   (Typed fun, Apply (Term fun), PrettyTerm fun) =>
   (Type -> [String]) -> Prop (Term fun) -> Doc
-prettyProp cands = pPrint . nameVars cands
+prettyProp cands = pPrint . snd . nameVars cands
+
+prettyPropQC ::
+  (Typed fun, Apply (Term fun), PrettyTerm fun) =>
+  Int -> (Type -> [String]) -> Prop (Term fun) -> Doc
+prettyPropQC nth cands x =
+  hang (text first_char <+> text "counterexample" <+> (text $ show $ show $ pPrint yo) <+> text "$") 4
+   $ hang ((text "\\" <> sep (fmap (uncurry pPrintSig) (Map.assocs var_defs))) <+> text "->") 2
+   $ hsep [ parens (pPrint lhs)
+          , text "==="
+          , parens (pPrint rhs)
+          ]
+
+  where
+    first_char =
+      case nth of
+        1 -> "["
+        _ -> ","
+    (var_defs, (ctx :=>: yo@(lhs :=: rhs))) = nameVars cands x
+    pPrintSig name ty = parens $ text name <+> text "::" <+> pPrintType ty
+
 
 data Named fun = Name String | Ordinary fun
 instance Pretty fun => Pretty (Named fun) where
@@ -96,14 +116,16 @@ instance PrettyTerm fun => PrettyTerm (Named fun) where
   termStyle Name{} = curried
   termStyle (Ordinary fun) = termStyle fun
 
-nameVars :: (Type -> [String]) -> Prop (Term fun) -> Prop (Term (Named fun))
+nameVars :: (Type -> [String]) -> Prop (Term fun) -> (Map.Map String Type, Prop (Term (Named fun)))
 nameVars cands p =
-  subst (\x -> Map.findWithDefault undefined x sub) (fmap (fmap Ordinary) p)
+  (var_defs, subst (\x -> Map.findWithDefault undefined x sub) (fmap (fmap Ordinary) p))
   where
-    sub = Map.fromList (evalState (mapM assign (nub (vars p))) Set.empty)
+    sub = Map.fromList sub_map
+    (sub_map, var_defs) = (runState (mapM assign (nub (vars p))) Map.empty)
     assign x = do
       s <- get
-      let names = supply (cands (typ x))
-          name = head (filter (`Set.notMember` s) names)
-      modify (Set.insert name)
+      let ty = typ x
+          names = supply (cands ty)
+          name = head (filter (`Map.notMember` s) names)
+      modify (Map.insert name ty)
       return (x, Fun (Name name))

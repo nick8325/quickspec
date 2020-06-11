@@ -272,6 +272,9 @@ withMaxTestSize n =
 defaultTo :: Typeable a => proxy a -> Sig
 defaultTo proxy = Sig (\_ -> setL Haskell.lens_default_to (typeRep proxy))
 
+withPrintStyle :: Haskell.PrintStyle -> Sig
+withPrintStyle style = Sig (\_ -> setL Haskell.lens_print_style style)
+
 -- | Set how hard QuickSpec tries to filter out redundant equations (default: no limit).
 --
 -- If you experience long pauses when running QuickSpec, try setting this number

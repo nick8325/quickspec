@@ -460,6 +460,11 @@ predicate name pred = predicateGen name pred inst
     inst :: Dict (Arbitrary (PredicateTestCase a)) -> Gen (PredicateTestCase a)
     inst Dict = arbitrary `suchThat` uncrry pred
 
+data PrintStyle
+  = ForHumans
+  | ForQuickCheck
+  deriving (Eq, Ord, Show, Read, Bounded, Enum)
+
 data Config =
   Config {
     cfg_quickCheck :: QuickCheck.Config,
@@ -474,7 +479,8 @@ data Config =
     cfg_default_to :: Type,
     cfg_infer_instance_types :: Bool,
     cfg_background :: [Prop (Term Constant)],
-    cfg_print_filter :: Prop (Term Constant) -> Bool
+    cfg_print_filter :: Prop (Term Constant) -> Bool,
+    cfg_print_style :: PrintStyle
     }
 
 lens_quickCheck = lens cfg_quickCheck (\x y -> y { cfg_quickCheck = x })
@@ -487,6 +493,7 @@ lens_default_to = lens cfg_default_to (\x y -> y { cfg_default_to = x })
 lens_infer_instance_types = lens cfg_infer_instance_types (\x y -> y { cfg_infer_instance_types = x })
 lens_background = lens cfg_background (\x y -> y { cfg_background = x })
 lens_print_filter = lens cfg_print_filter (\x y -> y { cfg_print_filter = x })
+lens_print_style = lens cfg_print_style (\x y -> y { cfg_print_style = x })
 
 defaultConfig :: Config
 defaultConfig =
@@ -500,7 +507,8 @@ defaultConfig =
     cfg_default_to = typeRep (Proxy :: Proxy Int),
     cfg_infer_instance_types = False,
     cfg_background = [],
-    cfg_print_filter = \_ -> True }
+    cfg_print_filter = \_ -> True,
+    cfg_print_style = ForHumans }
 
 -- Extra types for the universe that come from in-scope instances.
 instanceTypes :: Instances -> Config -> [Type]
@@ -575,7 +583,7 @@ quickSpec cfg@Config{..} = do
       [true | any (/= Function) (map classify (f cfg_constants))] ++
       f cfg_constants ++ concatMap selectors (f cfg_constants)
     constants = constantsOf concat
-    
+
     univ = conditionalsUniverse (instanceTypes instances cfg) constants
     instances = cfg_instances `mappend` baseInstances
 
@@ -588,8 +596,13 @@ quickSpec cfg@Config{..} = do
         (n :: Int, props) <- get
         put (n+1, prop':props)
         putLine $
-          printf "%3d. %s" n $ show $
-            prettyProp (names instances) prop' <+> disambiguatePropType prop
+          case cfg_print_style of
+            ForHumans ->
+              printf "%3d. %s" n $ show $
+                prettyProp (names instances) prop' <+> disambiguatePropType prop
+            ForQuickCheck ->
+              renderStyle (style {lineLength = 78}) $
+                prettyPropQC n (names instances) prop' <+> disambiguatePropType prop
 
     -- XXX do this during testing
     constraintsOk = memo $ \con ->
@@ -622,6 +635,7 @@ quickSpec cfg@Config{..} = do
       QuickSpec.Internal.Explore.quickSpec pres (flip eval) cfg_max_size cfg_max_commutative_size singleUse univ
         (enumerator (map Fun (constantsOf g)))
       when (n > 0) $ do
+        when (cfg_print_style == ForQuickCheck) $ putLine "]"
         putLine ""
 
     main = do
