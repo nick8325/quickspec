@@ -92,7 +92,7 @@ module QuickSpec(
   withPruningDepth, withPruningTermSize, withFixedSeed,
   withInferInstanceTypes, withPrintStyle, PrintStyle(..),
 
-  -- * Integrating with QuickSpec
+  -- * Integrating with QuickCheck
   (=~=),
 
   -- * Re-exported functionality
