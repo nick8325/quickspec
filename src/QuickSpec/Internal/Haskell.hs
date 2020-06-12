@@ -124,6 +124,7 @@ baseInstances =
     -- From Arbitrary to Gen
     inst $ \(Dict :: Dict (Arbitrary A)) -> arbitrary :: Gen A,
     -- Observation functions
+    inst $ \(Dict :: Dict (Ord A)) -> OrdInstance :: OrdInstance A,
     inst (\(Dict :: Dict (Observe A B C)) -> observeObs :: ObserveData C B),
     inst (\(Dict :: Dict (Ord A)) -> observeOrd :: ObserveData A A),
     inst (\(Dict :: Dict (Arbitrary A)) (obs :: ObserveData B C) -> observeFunction obs :: ObserveData (A -> B) C),
@@ -132,6 +133,9 @@ baseInstances =
     inst (NoWarnings :: NoWarnings (TestCaseWrapped SymA A)),
     -- Needed for typeclass-polymorphic predicates to work currently
     inst (\(Dict :: Dict ClassA) -> Dict :: Dict (Arbitrary (Dict ClassA)))]
+
+data OrdInstance a where
+  OrdInstance :: Ord a => OrdInstance a
 
 -- A token used in the instance list for types that shouldn't generate warnings
 data NoWarnings a = NoWarnings
@@ -239,6 +243,9 @@ findGenerator :: Type -> Instances -> Type -> Maybe (Gen (Value Identity))
 findGenerator def insts ty =
   bringFunctor <$> (findInstance insts (defaultTo def ty) :: Maybe (Value Gen))
 
+findOrdInstance :: Instances -> Type -> Maybe (Value OrdInstance)
+findOrdInstance insts ty = findInstance insts ty
+
 findObserver :: Instances -> Type -> Maybe (Gen (Value Identity -> Value Ordy))
 findObserver insts ty = do
   inst <- findInstance insts ty :: Maybe (Value WrappedObserveData)
@@ -279,20 +286,9 @@ data Constant =
     con_size :: Int,
     con_classify :: Classification Constant }
 
-quickcheckEqOperator :: Constant
-quickcheckEqOperator = Constant
-  { con_name  = "==="
-  , con_style = infixStyle 9  -- high precedence to always force parens
-  , con_value = undefined
-  , con_type = undefined
-  , con_constraints = undefined
-  , con_size = 1
-  , con_classify = Function
-  }
-
-quickcheckObserveOperator :: Constant
-quickcheckObserveOperator = Constant
-  { con_name  = "=~="
+makeQuickcheckFun :: String -> Constant
+makeQuickcheckFun nm = Constant
+  { con_name  = nm
   , con_style = infixStyle 9  -- high precedence to always force parens
   , con_value = undefined
   , con_type = undefined
@@ -610,7 +606,7 @@ quickSpec cfg@Config{..} = do
     instances = cfg_instances `mappend` baseInstances
 
     eval = evalHaskell cfg_default_to instances
-    is_observed = isJust . findObserver instances
+    was_observed = isNothing . findOrdInstance instances  -- it was observed if there is no Ord instance directly in scope
 
     present funs prop = do
       norm <- normaliser
@@ -624,11 +620,10 @@ quickSpec cfg@Config{..} = do
               printf "%3d. %s" n $ show $
                 prettyProp (names instances) prop' <+> disambiguatePropType prop
             ForQuickCheck ->
-              renderStyle (style {lineLength = 78}) $
+              renderStyle (style {lineLength = 78}) $ nest 2 $
                 prettyPropQC
-                  is_observed
-                  quickcheckObserveOperator
-                  quickcheckEqOperator
+                  was_observed
+                  makeQuickcheckFun
                   n
                   (names instances)
                   prop'
@@ -661,11 +656,14 @@ quickSpec cfg@Config{..} = do
       when (n > 0) $ do
         putText (prettyShow (warnings univ instances cfg))
         putLine "== Laws =="
+        when (cfg_print_style == ForQuickCheck) $ do
+          putLine "quickspec_laws :: [(String, Property)]"
+          putLine "quickspec_laws ="
       let pres = if n == 0 then \_ -> return () else present (constantsOf f)
       QuickSpec.Internal.Explore.quickSpec pres (flip eval) cfg_max_size cfg_max_commutative_size singleUse univ
         (enumerator (map Fun (constantsOf g)))
       when (n > 0) $ do
-        when (cfg_print_style == ForQuickCheck) $ putLine "]"
+        when (cfg_print_style == ForQuickCheck) $ putLine "  ]"
         putLine ""
 
     main = do

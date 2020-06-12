@@ -11,7 +11,6 @@ import QuickSpec.Internal.Utils
 import QuickSpec.Internal.Term
 import GHC.Generics(Generic)
 import qualified Data.Map.Strict as Map
-import qualified Data.Set as Set
 import Control.Monad.Trans.State.Strict
 import Data.List
 
@@ -91,24 +90,31 @@ prettyProp cands = pPrint . snd . nameVars cands
 
 prettyPropQC ::
   (Typed fun, Apply (Term fun), PrettyTerm fun) =>
-  (Type -> Bool) -> fun -> fun -> Int -> (Type -> [String]) -> Prop (Term fun) -> Doc
-prettyPropQC is_observed obs_eq eq nth cands x =
-  hang (text first_char <+> text "counterexample" <+> (text $ show $ show $ pPrint yo) <+> text "$") 4
-   $ hang ppr_binds 4
-   $ pPrint $ Fun (Ordinary $ bool eq obs_eq $ is_observed $ typ lhs_for_type) :$: lhs :$: rhs
-
---      hsep [ parens (pPrint lhs)
---           , text "==="
---           , parens (pPrint rhs)
---           ]
+  (Type -> Bool) -> (String -> fun) -> Int -> (Type -> [String]) -> Prop (Term fun) -> Doc
+prettyPropQC was_observed mk_fun nth cands x
+  = hang (text first_char <+> text "(" <+> ((text $ show $ show $ pPrint yo))) 2
+  $ hang (hsep [text ",", text "property", text "$"]) 4
+  $ hang ppr_binds 4
+  $ ppr_ctx <+> (pPrint (eq_fn :$: lhs :$: rhs) <> text ")")
 
   where
+    eq = mk_fun "==="
+    obs_eq = mk_fun "=~="
+    and_op = mk_fun "&&"
+    eq_fn = Fun $ Ordinary $ bool eq obs_eq $ was_observed $ typ lhs_for_type
+
+
     first_char =
       case nth of
         1 -> "["
         _ -> ","
+    ppr_ctx =
+      case length ctx of
+        0 -> pPrintEmpty
+        _ -> (hsep $ punctuate (text " &&") $ fmap (parens . pPrint) ctx) <+> text "==>"
+
     (_ :=>: (lhs_for_type :=: _)) = x
-    (var_defs, (ctx :=>: yo@(lhs :=: rhs))) = nameVars cands x
+    (var_defs, yo@(ctx :=>: (lhs :=: rhs))) = nameVars cands x
     print_sig name ty = parens $ text name <+> text "::" <+> pPrintType ty
     ppr_binds =
       case Map.size var_defs of
