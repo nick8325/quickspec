@@ -99,12 +99,9 @@ module QuickSpec(
   Typeable, (:-)(..), Dict(..), Proxy(..), Arbitrary) where
 
 import QuickSpec.Internal
-import QuickSpec.Internal.Haskell(Observe(..), PrintStyle(..))
+import QuickSpec.Internal.Haskell(Observe(..), PrintStyle(..), (=~=))
 import QuickSpec.Internal.Type(A, B, C, D, E)
 import Data.Typeable
 import Data.Constraint
 import Test.QuickCheck
 
-
-(=~=) :: (Show test, Show outcome, Observe test outcome a) => a -> a -> Property
-a =~= b = property $ \test -> observe test a === observe test b

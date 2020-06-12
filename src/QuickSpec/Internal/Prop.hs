@@ -100,7 +100,6 @@ prettyPropQC was_observed mk_fun nth cands x
   where
     eq = mk_fun "==="
     obs_eq = mk_fun "=~="
-    and_op = mk_fun "&&"
     eq_fn = Fun $ Ordinary $ bool eq obs_eq $ was_observed $ typ lhs_for_type
 
 
