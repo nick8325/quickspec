@@ -92,7 +92,7 @@ prettyPropQC ::
   (Typed fun, Apply (Term fun), PrettyTerm fun) =>
   (Type -> Bool) -> (String -> fun) -> Int -> (Type -> [String]) -> Prop (Term fun) -> Doc
 prettyPropQC was_observed mk_fun nth cands x
-  = hang (text first_char <+> text "(" <+> ((text $ show $ show $ pPrint yo))) 2
+  = hang (text first_char <+> text "(" <+> ((text $ show $ show $ pPrint law))) 2
   $ hang (hsep [text ",", text "property", text "$"]) 4
   $ hang ppr_binds 4
   $ ppr_ctx <+> (pPrint (eq_fn :$: lhs :$: rhs) <> text ")")
@@ -113,7 +113,7 @@ prettyPropQC was_observed mk_fun nth cands x
         _ -> (hsep $ punctuate (text " &&") $ fmap (parens . pPrint) ctx) <+> text "==>"
 
     (_ :=>: (lhs_for_type :=: _)) = x
-    (var_defs, yo@(ctx :=>: (lhs :=: rhs))) = nameVars cands x
+    (var_defs, law@(ctx :=>: (lhs :=: rhs))) = nameVars cands x
     print_sig name ty = parens $ text name <+> text "::" <+> pPrintType ty
     ppr_binds =
       case Map.size var_defs of

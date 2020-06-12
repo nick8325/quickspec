@@ -104,4 +104,3 @@ import QuickSpec.Internal.Type(A, B, C, D, E)
 import Data.Typeable
 import Data.Constraint
 import Test.QuickCheck
-
