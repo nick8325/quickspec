@@ -124,6 +124,7 @@ baseInstances =
     -- From Arbitrary to Gen
     inst $ \(Dict :: Dict (Arbitrary A)) -> arbitrary :: Gen A,
     -- Observation functions
+    inst $ \(Dict :: Dict (Ord A)) -> OrdInstance :: OrdInstance A,
     inst (\(Dict :: Dict (Observe A B C)) -> observeObs :: ObserveData C B),
     inst (\(Dict :: Dict (Ord A)) -> observeOrd :: ObserveData A A),
     inst (\(Dict :: Dict (Arbitrary A)) (obs :: ObserveData B C) -> observeFunction obs :: ObserveData (A -> B) C),
@@ -132,6 +133,9 @@ baseInstances =
     inst (NoWarnings :: NoWarnings (TestCaseWrapped SymA A)),
     -- Needed for typeclass-polymorphic predicates to work currently
     inst (\(Dict :: Dict ClassA) -> Dict :: Dict (Arbitrary (Dict ClassA)))]
+
+data OrdInstance a where
+  OrdInstance :: Ord a => OrdInstance a
 
 -- A token used in the instance list for types that shouldn't generate warnings
 data NoWarnings a = NoWarnings
@@ -164,6 +168,10 @@ class (Arbitrary test, Ord outcome) => Observe test outcome a | a -> test outcom
 
 instance (Arbitrary a, Observe test outcome b) => Observe (a, test) outcome (a -> b) where
   observe (x, obs) f = observe obs (f x)
+
+-- | Like 'Test.QuickCheck.===', but using the 'Observe' typeclass instead of 'Eq'.
+(=~=) :: (Show test, Show outcome, Observe test outcome a) => a -> a -> Property
+a =~= b = property $ \test -> observe test a Test.QuickCheck.=== observe test b
 
 -- An observation function along with instances.
 -- The parameters are in this order so that we can use findInstance to get at appropriate Wrappers.
@@ -239,6 +247,9 @@ findGenerator :: Type -> Instances -> Type -> Maybe (Gen (Value Identity))
 findGenerator def insts ty =
   bringFunctor <$> (findInstance insts (defaultTo def ty) :: Maybe (Value Gen))
 
+findOrdInstance :: Instances -> Type -> Maybe (Value OrdInstance)
+findOrdInstance insts ty = findInstance insts ty
+
 findObserver :: Instances -> Type -> Maybe (Gen (Value Identity -> Value Ordy))
 findObserver insts ty = do
   inst <- findInstance insts ty :: Maybe (Value WrappedObserveData)
@@ -278,6 +289,17 @@ data Constant =
     con_constraints :: [Type],
     con_size :: Int,
     con_classify :: Classification Constant }
+
+makeQuickcheckFun :: String -> Constant
+makeQuickcheckFun nm = Constant
+  { con_name  = nm
+  , con_style = infixStyle 9  -- high precedence to always force parens
+  , con_value = undefined
+  , con_type = undefined
+  , con_constraints = undefined
+  , con_size = 1
+  , con_classify = Function
+  }
 
 instance Eq Constant where
   x == y =
@@ -460,6 +482,11 @@ predicate name pred = predicateGen name pred inst
     inst :: Dict (Arbitrary (PredicateTestCase a)) -> Gen (PredicateTestCase a)
     inst Dict = arbitrary `suchThat` uncrry pred
 
+data PrintStyle
+  = ForHumans
+  | ForQuickCheck
+  deriving (Eq, Ord, Show, Read, Bounded, Enum)
+
 data Config =
   Config {
     cfg_quickCheck :: QuickCheck.Config,
@@ -474,7 +501,8 @@ data Config =
     cfg_default_to :: Type,
     cfg_infer_instance_types :: Bool,
     cfg_background :: [Prop (Term Constant)],
-    cfg_print_filter :: Prop (Term Constant) -> Bool
+    cfg_print_filter :: Prop (Term Constant) -> Bool,
+    cfg_print_style :: PrintStyle
     }
 
 lens_quickCheck = lens cfg_quickCheck (\x y -> y { cfg_quickCheck = x })
@@ -487,6 +515,7 @@ lens_default_to = lens cfg_default_to (\x y -> y { cfg_default_to = x })
 lens_infer_instance_types = lens cfg_infer_instance_types (\x y -> y { cfg_infer_instance_types = x })
 lens_background = lens cfg_background (\x y -> y { cfg_background = x })
 lens_print_filter = lens cfg_print_filter (\x y -> y { cfg_print_filter = x })
+lens_print_style = lens cfg_print_style (\x y -> y { cfg_print_style = x })
 
 defaultConfig :: Config
 defaultConfig =
@@ -500,7 +529,8 @@ defaultConfig =
     cfg_default_to = typeRep (Proxy :: Proxy Int),
     cfg_infer_instance_types = False,
     cfg_background = [],
-    cfg_print_filter = \_ -> True }
+    cfg_print_filter = \_ -> True,
+    cfg_print_style = ForHumans }
 
 -- Extra types for the universe that come from in-scope instances.
 instanceTypes :: Instances -> Config -> [Type]
@@ -575,11 +605,12 @@ quickSpec cfg@Config{..} = do
       [true | any (/= Function) (map classify (f cfg_constants))] ++
       f cfg_constants ++ concatMap selectors (f cfg_constants)
     constants = constantsOf concat
-    
+
     univ = conditionalsUniverse (instanceTypes instances cfg) constants
     instances = cfg_instances `mappend` baseInstances
 
     eval = evalHaskell cfg_default_to instances
+    was_observed = isNothing . findOrdInstance instances  -- it was observed if there is no Ord instance directly in scope
 
     present funs prop = do
       norm <- normaliser
@@ -588,8 +619,19 @@ quickSpec cfg@Config{..} = do
         (n :: Int, props) <- get
         put (n+1, prop':props)
         putLine $
-          printf "%3d. %s" n $ show $
-            prettyProp (names instances) prop' <+> disambiguatePropType prop
+          case cfg_print_style of
+            ForHumans ->
+              printf "%3d. %s" n $ show $
+                prettyProp (names instances) prop' <+> disambiguatePropType prop
+            ForQuickCheck ->
+              renderStyle (style {lineLength = 78}) $ nest 2 $
+                prettyPropQC
+                  was_observed
+                  makeQuickcheckFun
+                  n
+                  (names instances)
+                  prop'
+                  <+> disambiguatePropType prop
 
     -- XXX do this during testing
     constraintsOk = memo $ \con ->
@@ -618,10 +660,14 @@ quickSpec cfg@Config{..} = do
       when (n > 0) $ do
         putText (prettyShow (warnings univ instances cfg))
         putLine "== Laws =="
+        when (cfg_print_style == ForQuickCheck) $ do
+          putLine "quickspec_laws :: [(String, Property)]"
+          putLine "quickspec_laws ="
       let pres = if n == 0 then \_ -> return () else present (constantsOf f)
       QuickSpec.Internal.Explore.quickSpec pres (flip eval) cfg_max_size cfg_max_commutative_size singleUse univ
         (enumerator (map Fun (constantsOf g)))
       when (n > 0) $ do
+        when (cfg_print_style == ForQuickCheck) $ putLine "  ]"
         putLine ""
 
     main = do

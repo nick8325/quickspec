@@ -90,13 +90,16 @@ module QuickSpec(
   -- * Customising QuickSpec
   withMaxTermSize, withMaxTests, withMaxTestSize, defaultTo,
   withPruningDepth, withPruningTermSize, withFixedSeed,
-  withInferInstanceTypes,
+  withInferInstanceTypes, withPrintStyle, PrintStyle(..),
+
+  -- * Integrating with QuickCheck
+  (=~=),
 
   -- * Re-exported functionality
   Typeable, (:-)(..), Dict(..), Proxy(..), Arbitrary) where
 
 import QuickSpec.Internal
-import QuickSpec.Internal.Haskell(Observe(..))
+import QuickSpec.Internal.Haskell(Observe(..), PrintStyle(..), (=~=))
 import QuickSpec.Internal.Type(A, B, C, D, E)
 import Data.Typeable
 import Data.Constraint
