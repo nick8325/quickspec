@@ -275,6 +275,14 @@ defaultTo proxy = Sig (\_ -> setL Haskell.lens_default_to (typeRep proxy))
 withPrintStyle :: Haskell.PrintStyle -> Sig
 withPrintStyle style = Sig (\_ -> setL Haskell.lens_print_style style)
 
+-- | Set which equations QuickSpec considers in terms of linearity use of
+-- variables (default: show all equations, regardless of linearity).
+--
+-- If you are seeing laws that seem unhelpful due to unrealistically using the
+-- same variable in many places, try setting this value to @Linear@.
+withLinearity :: Haskell.Linearity -> Sig
+withLinearity style = Sig (\_ -> setL Haskell.lens_linearity style)
+
 -- | Set how hard QuickSpec tries to filter out redundant equations (default: no limit).
 --
 -- If you experience long pauses when running QuickSpec, try setting this number

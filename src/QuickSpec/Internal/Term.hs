@@ -16,6 +16,8 @@ import Twee.Base(Pretty(..), PrettyTerm(..), TermStyle(..), EqualsBonus, prettyP
 import Twee.Pretty
 import qualified Data.Map.Strict as Map
 import Data.Map(Map)
+import Data.Set(Set)
+import qualified Data.Set as Set
 import Data.List
 import Data.Ord
 
@@ -247,6 +249,14 @@ compareFuns (f :@: ts) (g :@: us) =
     compareHead _ (Var _) = GT
     compareHead (Fun f) (Fun g) = compare f g
     compareHead _ _ = error "viewApp"
+
+isLinear :: Term f -> Set Var -> Maybe (Set Var)
+isLinear Fun{} m = Just m
+isLinear (t1 :$: t2) m = isLinear t1 m >>= isLinear t2
+isLinear (Var v) m =
+  case Set.member v m of
+    True  -> Nothing
+    False -> Just (Set.singleton v)
 
 ----------------------------------------------------------------------
 -- * Data types a la carte-ish.

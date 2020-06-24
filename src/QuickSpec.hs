@@ -91,6 +91,7 @@ module QuickSpec(
   withMaxTermSize, withMaxTests, withMaxTestSize, defaultTo,
   withPruningDepth, withPruningTermSize, withFixedSeed,
   withInferInstanceTypes, withPrintStyle, PrintStyle(..),
+  withLinearity, Linearity(..),
 
   -- * Integrating with QuickCheck
   (=~=),
@@ -99,7 +100,7 @@ module QuickSpec(
   Typeable, (:-)(..), Dict(..), Proxy(..), Arbitrary) where
 
 import QuickSpec.Internal
-import QuickSpec.Internal.Haskell(Observe(..), PrintStyle(..), (=~=))
+import QuickSpec.Internal.Haskell(Observe(..), PrintStyle(..), Linearity (..), (=~=))
 import QuickSpec.Internal.Type(A, B, C, D, E)
 import Data.Typeable
 import Data.Constraint

@@ -487,6 +487,11 @@ data PrintStyle
   | ForQuickCheck
   deriving (Eq, Ord, Show, Read, Bounded, Enum)
 
+data Linearity
+  = Linear
+  | AnyLinearity
+  deriving (Eq, Ord, Show, Read, Bounded, Enum)
+
 data Config =
   Config {
     cfg_quickCheck :: QuickCheck.Config,
@@ -502,7 +507,8 @@ data Config =
     cfg_infer_instance_types :: Bool,
     cfg_background :: [Prop (Term Constant)],
     cfg_print_filter :: Prop (Term Constant) -> Bool,
-    cfg_print_style :: PrintStyle
+    cfg_print_style :: PrintStyle,
+    cfg_linearity :: Linearity
     }
 
 lens_quickCheck = lens cfg_quickCheck (\x y -> y { cfg_quickCheck = x })
@@ -516,6 +522,7 @@ lens_infer_instance_types = lens cfg_infer_instance_types (\x y -> y { cfg_infer
 lens_background = lens cfg_background (\x y -> y { cfg_background = x })
 lens_print_filter = lens cfg_print_filter (\x y -> y { cfg_print_filter = x })
 lens_print_style = lens cfg_print_style (\x y -> y { cfg_print_style = x })
+lens_linearity = lens cfg_linearity (\x y -> y { cfg_linearity = x })
 
 defaultConfig :: Config
 defaultConfig =
@@ -530,7 +537,8 @@ defaultConfig =
     cfg_infer_instance_types = False,
     cfg_background = [],
     cfg_print_filter = \_ -> True,
-    cfg_print_style = ForHumans }
+    cfg_print_style = ForHumans,
+    cfg_linearity = AnyLinearity}
 
 -- Extra types for the universe that come from in-scope instances.
 instanceTypes :: Instances -> Config -> [Type]
@@ -612,10 +620,18 @@ quickSpec cfg@Config{..} = do
     eval = evalHaskell cfg_default_to instances
     was_observed = isNothing . findOrdInstance instances  -- it was observed if there is no Ord instance directly in scope
 
+    -- When we are only printing linear equations, check both the lhs and rhs
+    -- of each prop to ensure they each use variables at most once.
+    only_print_linear =
+      case cfg_linearity of
+        Linear    -> \(_ :=>: (lhs :=: rhs)) ->
+          all (isJust . flip isLinear mempty) [ lhs, rhs ]
+        AnyLinearity -> const True
+
     present funs prop = do
       norm <- normaliser
       let prop' = prettyDefinition funs (prettyAC norm (conditionalise prop))
-      when (cfg_print_filter prop) $ do
+      when (cfg_print_filter prop && only_print_linear prop) $ do
         (n :: Int, props) <- get
         put (n+1, prop':props)
         putLine $
