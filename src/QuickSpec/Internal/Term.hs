@@ -250,6 +250,8 @@ compareFuns (f :@: ts) (g :@: us) =
     compareHead (Fun f) (Fun g) = compare f g
     compareHead _ _ = error "viewApp"
 
+-- | Returns the set of linearly used variables, or 'Nothing' if any variable
+-- is used nonlinearly.
 isLinear :: Term f -> Set Var -> Maybe (Set Var)
 isLinear Fun{} m = Just m
 isLinear (t1 :$: t2) m = isLinear t1 m >>= isLinear t2
