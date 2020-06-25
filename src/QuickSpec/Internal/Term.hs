@@ -258,7 +258,7 @@ isLinear (t1 :$: t2) m = isLinear t1 m >>= isLinear t2
 isLinear (Var v) m =
   case Set.member v m of
     True  -> Nothing
-    False -> Just (Set.singleton v)
+    False -> Just (Set.singleton v <> m)
 
 ----------------------------------------------------------------------
 -- * Data types a la carte-ish.
