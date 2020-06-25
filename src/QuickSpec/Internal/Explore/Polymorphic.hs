@@ -199,8 +199,8 @@ ms1 `intersection` ms2 = usort [ Map.union m1 m2 | m1 <- ms1, m2 <- ms2, ok m1 m
   where
     ok m1 m2 = and [ Map.lookup x m1 == Map.lookup x m2 | x <- Map.keys (Map.intersection m1 m2) ]
 
-universe :: Typed a => [a] -> Universe
-universe xs = Universe (Set.fromList univ)
+universe :: Typed a => Bool -> [a] -> Universe
+universe close_antisub xs = Universe (Set.fromList univ)
   where
     -- Types of all functions
     types = usort $ typeVar:map typ xs
@@ -218,13 +218,14 @@ universe xs = Universe (Set.fromList univ)
           | fun <- types,
             ho <- arrows fun,
             sub <- typeInstancesList univBase (components fun) ]
-  
+
     -- Now close the type universe under "anti-substitution":
     -- if u = typeSubst sub t, and u is in the universe, then
     -- oneTypeVar t should be in the universe.
     -- In practice this means replacing arbitrary subterms of
     -- each type with a type variable.
-    univ = fixpoint (usort . oneTypeVar . concatMap antisubst) univHo
+    univ | close_antisub = fixpoint (usort . oneTypeVar . concatMap antisubst) univHo
+         | otherwise     = univHo
       where
         antisubst ty =
           ty:
@@ -244,7 +245,7 @@ universe xs = Universe (Set.fromList univ)
             Just (arg, res) ->
               [ty] ++ arrows1 arg ++ arrows1 res
             _ -> []
- 
+
 inUniverse :: (PrettyTerm fun, Typed fun) => Term fun -> Universe -> Bool
 t `inUniverse` Universe{..} =
   and [oneTypeVar (typ u) `Set.member` univ_types | u <- subtermsFO t ++ map Var (vars t)]

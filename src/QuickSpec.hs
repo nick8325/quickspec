@@ -91,6 +91,7 @@ module QuickSpec(
   withMaxTermSize, withMaxTests, withMaxTestSize, defaultTo,
   withPruningDepth, withPruningTermSize, withFixedSeed,
   withInferInstanceTypes, withPrintStyle, PrintStyle(..),
+  withAutoGeneralizedTypes,
 
   -- * Integrating with QuickCheck
   (=~=),

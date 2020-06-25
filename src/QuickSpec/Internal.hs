@@ -272,6 +272,14 @@ withMaxTestSize n =
 defaultTo :: Typeable a => proxy a -> Sig
 defaultTo proxy = Sig (\_ -> setL Haskell.lens_default_to (typeRep proxy))
 
+-- | Set whether QuickSpec will also automatically generalize types that you
+-- give it (default: yes).
+--
+-- If you experience QuickSpec warning about missing instances for types that
+-- don't exist anywhere in your signature, try setting this to 'False'.
+withAutoGeneralizedTypes :: Bool -> Sig
+withAutoGeneralizedTypes t = Sig (\_ -> setL Haskell.lens_close_anti_subst t)
+
 withPrintStyle :: Haskell.PrintStyle -> Sig
 withPrintStyle style = Sig (\_ -> setL Haskell.lens_print_style style)
 

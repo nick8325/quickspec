@@ -499,6 +499,7 @@ data Config =
     -- head cfg_constants contains all the background functions.
     cfg_constants :: [[Constant]],
     cfg_default_to :: Type,
+    cfg_close_anti_subst :: Bool,
     cfg_infer_instance_types :: Bool,
     cfg_background :: [Prop (Term Constant)],
     cfg_print_filter :: Prop (Term Constant) -> Bool,
@@ -512,6 +513,7 @@ lens_max_commutative_size = lens cfg_max_commutative_size (\x y -> y { cfg_max_c
 lens_instances = lens cfg_instances (\x y -> y { cfg_instances = x })
 lens_constants = lens cfg_constants (\x y -> y { cfg_constants = x })
 lens_default_to = lens cfg_default_to (\x y -> y { cfg_default_to = x })
+lens_close_anti_subst = lens cfg_close_anti_subst (\x y -> y { cfg_close_anti_subst = x })
 lens_infer_instance_types = lens cfg_infer_instance_types (\x y -> y { cfg_infer_instance_types = x })
 lens_background = lens cfg_background (\x y -> y { cfg_background = x })
 lens_print_filter = lens cfg_print_filter (\x y -> y { cfg_print_filter = x })
@@ -527,6 +529,7 @@ defaultConfig =
     cfg_instances = mempty,
     cfg_constants = [],
     cfg_default_to = typeRep (Proxy :: Proxy Int),
+    cfg_close_anti_subst = True,
     cfg_infer_instance_types = False,
     cfg_background = [],
     cfg_print_filter = \_ -> True,
@@ -606,7 +609,7 @@ quickSpec cfg@Config{..} = do
       f cfg_constants ++ concatMap selectors (f cfg_constants)
     constants = constantsOf concat
 
-    univ = conditionalsUniverse (instanceTypes instances cfg) constants
+    univ = conditionalsUniverse cfg_close_anti_subst (instanceTypes instances cfg) constants
     instances = cfg_instances `mappend` baseInstances
 
     eval = evalHaskell cfg_default_to instances

@@ -41,9 +41,9 @@ instance (Typed fun, Ord fun, PrettyTerm fun, Ord norm, MonadPruner (Term (WithC
       lift (add (mapFun Normal prop))
       considerConditionalising prop
 
-conditionalsUniverse :: (Typed fun, Predicate fun) => [Type] -> [fun] -> Universe
-conditionalsUniverse tys funs =
-  universe $
+conditionalsUniverse :: (Typed fun, Predicate fun) => Bool -> [Type] -> [fun] -> Universe
+conditionalsUniverse close_antisub tys funs =
+  universe close_antisub $
     tys ++
     (map typ $
       map Normal funs ++
