@@ -235,7 +235,7 @@ without sig xs =
 --
 -- Here is an example which first tests @0@ and @+@ and then adds @++@ and @length@:
 --
--- > main = quickSpec [sig1, sig2]
+-- > main = quickSpec (series [sig1, sig2])
 -- >   where
 -- >     sig1 = [
 -- >       con "0" (0 :: Int),
@@ -272,6 +272,10 @@ withMaxTestSize n =
 defaultTo :: Typeable a => proxy a -> Sig
 defaultTo proxy = Sig (\_ -> setL Haskell.lens_default_to (typeRep proxy))
 
+-- | Set how QuickSpec should display its discovered equations (default: 'ForHumans').
+--
+-- If you'd instead like to turn QuickSpec's output into QuickCheck tests, set
+-- this to 'ForQuickCheck'.
 withPrintStyle :: Haskell.PrintStyle -> Sig
 withPrintStyle style = Sig (\_ -> setL Haskell.lens_print_style style)
 
