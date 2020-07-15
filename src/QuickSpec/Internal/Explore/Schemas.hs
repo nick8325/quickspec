@@ -181,7 +181,7 @@ allUnifications use t =
   [ subst (\x -> Var (Map.findWithDefault undefined x s)) t | s <- ss ]
   where
     ss =
-      map Map.fromList $ concat $ sequence
+      map Map.fromList $ map concat $ sequence
         [substsFor xs (typ y) | xs@(y:_) <- partitionBy typ (usort (vars t))]
 
     substsFor xs ty =
