@@ -482,6 +482,7 @@ predicate name pred = predicateGen name pred inst
     inst :: Dict (Arbitrary (PredicateTestCase a)) -> Gen (PredicateTestCase a)
     inst Dict = arbitrary `suchThat` uncrry pred
 
+-- | How QuickSpec should style equations.
 data PrintStyle
   = ForHumans
   | ForQuickCheck
