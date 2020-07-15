@@ -8,6 +8,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeApplications #-}
 module QuickSpec.Internal where
 
 import QuickSpec.Internal.Haskell(Predicateable, PredicateTestCase, Names(..), Observe(..))
@@ -156,6 +157,16 @@ monoType _ =
     inst (Sub Dict :: () :- Ord a),
     inst (Sub Dict :: () :- Arbitrary a)]
 
+-- | Like 'monoType', but designed to be used with TypeApplications directly.
+--
+-- For example, you can add 'Foo' to your signature via:
+--
+-- @
+-- `mono` @Foo
+-- @
+mono :: forall a. (Ord a, Arbitrary a, Typeable a) => Sig
+mono = monoType (Proxy @a)
+
 -- | Declare a new monomorphic type using observational equivalence.
 -- The type must implement `Observe` and `Arbitrary`.
 monoTypeObserve :: forall proxy test outcome a.
@@ -166,10 +177,32 @@ monoTypeObserve _ =
     inst (Sub Dict :: () :- Observe test outcome a),
     inst (Sub Dict :: () :- Arbitrary a)]
 
+-- | Like 'monoTypeObserve', but designed to be used with TypeApplications directly.
+--
+-- For example, you can add 'Foo' to your signature via:
+--
+-- @
+-- `monoObserve` @Foo
+-- @
+monoObserve :: forall a test outcome.
+  (Observe test outcome a, Arbitrary test, Ord outcome, Arbitrary a, Typeable test, Typeable outcome, Typeable a) =>
+  Sig
+monoObserve = monoTypeObserve (Proxy @a)
+
 -- | Declare a new monomorphic type, saying how you want variables of that type to be named.
 monoTypeWithVars :: forall proxy a. (Ord a, Arbitrary a, Typeable a) => [String] -> proxy a -> Sig
 monoTypeWithVars xs proxy =
   monoType proxy `mappend` vars xs proxy
+
+-- | Like 'monoTypeWithVars' designed to be used with TypeApplications directly.
+--
+-- For example, you can add 'Foo' to your signature via:
+--
+-- @
+-- `monoVars` @Foo ["foo"]
+-- @
+monoVars :: forall a. (Ord a, Arbitrary a, Typeable a) => [String] -> Sig
+monoVars xs = monoTypeWithVars xs (Proxy @a)
 
 -- | Customize how variables of a particular type are named.
 vars :: forall proxy a. Typeable a => [String] -> proxy a -> Sig
