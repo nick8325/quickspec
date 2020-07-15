@@ -189,6 +189,13 @@ monoObserve :: forall a test outcome.
   Sig
 monoObserve = monoTypeObserve (Proxy @a)
 
+-- | Declare a new monomorphic type using observational equivalence, saying how you want variables of that type to be named.
+monoTypeObserveWithVars :: forall proxy test outcome a.
+  (Observe test outcome a, Arbitrary test, Ord outcome, Arbitrary a, Typeable test, Typeable outcome, Typeable a) =>
+  [String] -> proxy a -> Sig
+monoTypeObserveWithVars xs proxy =
+  monoTypeObserve proxy `mappend` vars xs proxy
+
 -- | Declare a new monomorphic type, saying how you want variables of that type to be named.
 monoTypeWithVars :: forall proxy a. (Ord a, Arbitrary a, Typeable a) => [String] -> proxy a -> Sig
 monoTypeWithVars xs proxy =
