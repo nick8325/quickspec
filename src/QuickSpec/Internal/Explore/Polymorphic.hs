@@ -9,10 +9,14 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RecordWildCards #-}
-module QuickSpec.Internal.Explore.Polymorphic(module QuickSpec.Internal.Explore.Polymorphic, Result(..), Universe(..)) where
+module QuickSpec.Internal.Explore.Polymorphic(
+  module QuickSpec.Internal.Explore.Polymorphic,
+  Result(..),
+  Universe(..),
+  VariableUse(..)) where
 
 import qualified QuickSpec.Internal.Explore.Schemas as Schemas
-import QuickSpec.Internal.Explore.Schemas(Schemas, Result(..))
+import QuickSpec.Internal.Explore.Schemas(Schemas, Result(..), VariableUse(..))
 import QuickSpec.Internal.Term
 import QuickSpec.Internal.Type
 import QuickSpec.Internal.Testing
@@ -53,14 +57,14 @@ schemas = lens pm_schemas (\x y -> y { pm_schemas = x })
 univ = lens pm_universe (\x y -> y { pm_universe = x })
 
 initialState ::
-  (Type -> Bool) ->
+  (Type -> VariableUse) ->
   Universe ->
   (Term fun -> Bool) ->
   (Term fun -> testcase -> result) ->
   Polymorphic testcase result fun norm
-initialState singleUse univ inst eval =
+initialState use univ inst eval =
   Polymorphic {
-    pm_schemas = Schemas.initialState singleUse (inst . fmap fun_specialised) (eval . fmap fun_specialised),
+    pm_schemas = Schemas.initialState use (inst . fmap fun_specialised) (eval . fmap fun_specialised),
     pm_universe = univ }
 
 polyFun :: Typed fun => fun -> PolyFun fun

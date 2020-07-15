@@ -35,7 +35,7 @@ import qualified QuickSpec.Internal.Testing.QuickCheck as QuickCheck
 import qualified QuickSpec.Internal.Pruning.Twee as Twee
 import QuickSpec.Internal.Explore hiding (quickSpec)
 import qualified QuickSpec.Internal.Explore
-import QuickSpec.Internal.Explore.Polymorphic(Universe(..))
+import QuickSpec.Internal.Explore.Polymorphic(Universe(..), VariableUse(..))
 import QuickSpec.Internal.Pruning.Background(Background)
 import Control.Monad
 import Control.Monad.Trans.State.Strict
@@ -44,7 +44,7 @@ import Text.Printf
 import QuickSpec.Internal.Utils
 import Data.Lens.Light
 import GHC.TypeLits
-import QuickSpec.Internal.Explore.Conditionals
+import QuickSpec.Internal.Explore.Conditionals hiding (Normal)
 import Control.Spoon
 import qualified Data.Set as Set
 import qualified Test.QuickCheck.Poly as Poly
@@ -75,6 +75,8 @@ baseInstances =
     inst (Names ["f", "g", "h"] :: Names (A -> B)),
     inst (Names ["dict"] :: Names (Dict ClassA)),
     inst (Names ["x", "y", "z", "w"] :: Names A),
+    -- Allow up to 4 variables per type by default
+    inst (Use (UpTo 4) :: Use A),
     -- Standard instances
     baseType (Proxy :: Proxy ()),
     baseType (Proxy :: Proxy Int),
@@ -140,7 +142,7 @@ data OrdInstance a where
 -- A token used in the instance list for types that shouldn't generate warnings
 data NoWarnings a = NoWarnings
 
-data SingleUse a = SingleUse
+data Use a = Use VariableUse
 
 instance c => Arbitrary (Dict c) where
   arbitrary = return Dict
@@ -650,8 +652,9 @@ quickSpec cfg@Config{..} = do
 
     conditions t = usort [p | f <- funs t, Selector _ p _ <- [classify f]]
 
-    singleUse ty =
-      isJust (findInstance instances ty :: Maybe (Value SingleUse))
+    use ty =
+      ofValue (\(Use x) -> x) $ fromJust $
+      (findInstance instances ty :: Maybe (Value Use))
 
     mainOf n f g = do
       unless (null (f cfg_constants)) $ do
@@ -665,7 +668,7 @@ quickSpec cfg@Config{..} = do
           putLine "quickspec_laws :: [(String, Property)]"
           putLine "quickspec_laws ="
       let pres = if n == 0 then \_ -> return () else present (constantsOf f)
-      QuickSpec.Internal.Explore.quickSpec pres (flip eval) cfg_max_size cfg_max_commutative_size singleUse univ
+      QuickSpec.Internal.Explore.quickSpec pres (flip eval) cfg_max_size cfg_max_commutative_size use univ
         (enumerator (map Fun (constantsOf g)))
       when (n > 0) $ do
         when (cfg_print_style == ForQuickCheck) $ putLine "  ]"

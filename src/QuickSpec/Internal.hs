@@ -11,13 +11,14 @@
 {-# LANGUAGE TypeApplications #-}
 module QuickSpec.Internal where
 
-import QuickSpec.Internal.Haskell(Predicateable, PredicateTestCase, Names(..), Observe(..))
+import QuickSpec.Internal.Haskell(Predicateable, PredicateTestCase, Names(..), Observe(..), Use(..))
 import qualified QuickSpec.Internal.Haskell as Haskell
 import qualified QuickSpec.Internal.Haskell.Resolve as Haskell
 import qualified QuickSpec.Internal.Testing.QuickCheck as QuickCheck
 import qualified QuickSpec.Internal.Pruning.UntypedTwee as Twee
 import QuickSpec.Internal.Prop
 import QuickSpec.Internal.Term(Term)
+import QuickSpec.Internal.Explore.Schemas(VariableUse(..))
 import Test.QuickCheck
 import Test.QuickCheck.Random
 import Data.Constraint
@@ -215,6 +216,12 @@ monoVars xs = monoTypeWithVars xs (Proxy @a)
 vars :: forall proxy a. Typeable a => [String] -> proxy a -> Sig
 vars xs _ = instFun (Names xs :: Names a)
 
+-- | Constrain how variables of a particular type may occur in a term.
+-- The default value is @'UpTo' 4@.
+variableUse :: forall proxy a. Typeable a => VariableUse -> proxy a -> Sig
+variableUse x _ = instFun (Use x :: Use a)
+
+-- | Declare a typeclass instance. QuickSpec needs to have an `Ord` and
 -- | Declare a typeclass instance. QuickSpec needs to have an `Ord` and
 -- `Arbitrary` instance for each type you want it to test.
 --

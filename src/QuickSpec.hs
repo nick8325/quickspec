@@ -76,6 +76,7 @@ module QuickSpec(
   -- * Declaring types
   mono, monoType, monoTypeObserve, monoObserve, vars, monoTypeWithVars,
   monoVars, monoTypeObserveWithVars, inst, Observe(..),
+  variableUse, VariableUse(..),
 
   -- * Standard signatures
   -- | The \"prelude\": a standard signature containing useful functions
@@ -102,6 +103,7 @@ module QuickSpec(
 import QuickSpec.Internal
 import QuickSpec.Internal.Haskell(Observe(..), PrintStyle(..), (=~=))
 import QuickSpec.Internal.Type(A, B, C, D, E)
+import QuickSpec.Internal.Explore.Schemas(VariableUse(..))
 import Data.Typeable
 import Data.Constraint
 import Test.QuickCheck

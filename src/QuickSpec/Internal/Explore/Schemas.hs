@@ -24,9 +24,16 @@ import Data.Maybe
 import Control.Monad
 import Twee.Label
 
+-- | Constrains how variables of a particular type may occur in a term.
+data VariableUse =
+    UpTo Int -- ^ @UpTo n@: terms may contain up to @n@ distinct variables of this type
+             -- (in some cases, laws with more variables may still be found)
+  | Linear   -- ^ Each variable in the term must be distinct
+  deriving (Eq, Show)
+
 data Schemas testcase result fun norm =
   Schemas {
-    sc_single_use :: Type -> Bool,
+    sc_use :: Type -> VariableUse,
     sc_instantiate_singleton :: Term fun -> Bool,
     sc_empty :: Terms testcase result (Term fun) norm,
     sc_classes :: Terms testcase result (Term fun) norm,
@@ -34,7 +41,7 @@ data Schemas testcase result fun norm =
     sc_instances :: Map (Term fun) (Terms testcase result (Term fun) norm) }
 
 classes = lens sc_classes (\x y -> y { sc_classes = x })
-single_use = lens sc_single_use (\x y -> y { sc_single_use = x })
+use = lens sc_use (\x y -> y { sc_use = x })
 instances = lens sc_instances (\x y -> y { sc_instances = x })
 instantiated = lens sc_instantiated (\x y -> y { sc_instantiated = x })
 
@@ -42,13 +49,13 @@ instance_ :: Ord fun => Term fun -> Lens (Schemas testcase result fun norm) (Ter
 instance_ t = reading (\Schemas{..} -> keyDefault t sc_empty # instances)
 
 initialState ::
-  (Type -> Bool) ->
+  (Type -> VariableUse) ->
   (Term fun -> Bool) ->
   (Term fun -> testcase -> result) ->
   Schemas testcase result fun norm
-initialState singleUse inst eval =
+initialState use inst eval =
   Schemas {
-    sc_single_use = singleUse,
+    sc_use = use,
     sc_instantiate_singleton = inst,
     sc_empty = Terms.initialState eval,
     sc_classes = Terms.initialState eval,
@@ -65,23 +72,24 @@ explore ::
   MonadTester testcase (Term fun) m, MonadPruner (Term fun) norm m, MonadTerminal m) =>
   Term fun -> StateT (Schemas testcase result fun norm) m (Result fun)
 explore t0 = do
-  let t = mostSpecific t0
-  res <- zoom classes (Terms.explore t)
-  singleUse <- access single_use
-  case res of
-    Terms.Singleton -> do
-      inst <- gets sc_instantiate_singleton
-      if inst t then
-        instantiateRep t
-       else do
-        -- Add the most general instance of the schema
-        zoom (instance_ t) (Terms.explore (mostGeneral singleUse t0))
-        return (Accepted [])
-    Terms.Discovered ([] :=>: _ :=: u) ->
-      exploreIn u t
-    Terms.Knew ([] :=>: _ :=: u) ->
-      exploreIn u t
-    _ -> error "term layer returned non-equational property"
+  use <- access use
+  if or [use ty == UpTo 0 | ty <- usort (map typ (vars t0))] then return (Rejected []) else do
+    let t = mostSpecific t0
+    res <- zoom classes (Terms.explore t)
+    case res of
+      Terms.Singleton -> do
+        inst <- gets sc_instantiate_singleton
+        if inst t then
+          instantiateRep t
+         else do
+          -- Add the most general instance of the schema
+          zoom (instance_ t) (Terms.explore (mostGeneral use t0))
+          return (Accepted [])
+      Terms.Discovered ([] :=>: _ :=: u) ->
+        exploreIn u t
+      Terms.Knew ([] :=>: _ :=: u) ->
+        exploreIn u t
+      _ -> error "term layer returned non-equational property"
 
 {-# INLINEABLE exploreIn #-}
 exploreIn ::
@@ -91,8 +99,8 @@ exploreIn ::
   StateT (Schemas testcase result fun norm) m (Result fun)
 exploreIn rep t = do
   -- First check if schema is redundant
-  singleUse <- access single_use
-  res <- zoom (instance_ rep) (Terms.explore (mostGeneral singleUse t))
+  use <- access use
+  res <- zoom (instance_ rep) (Terms.explore (mostGeneral use t))
   case res of
     Terms.Discovered prop -> do
       add prop
@@ -126,9 +134,9 @@ instantiate ::
   Term fun -> Term fun ->
   StateT (Schemas testcase result fun norm) m (Result fun)
 instantiate rep t = do
-  singleUse <- access single_use
+  use <- access use
   zoom (instance_ rep) $ do
-    let instances = sortBy (comparing generality) (allUnifications singleUse (mostGeneral singleUse t))
+    let instances = sortBy (comparing generality) (allUnifications use (mostGeneral use t))
     Accepted <$> catMaybes <$> forM instances (\t -> do
       res <- Terms.explore t
       case res of
@@ -152,14 +160,14 @@ mkVar ty n = V ty m
     m = fromIntegral (labelNum (label (ty, n)))
 
 -- | Instantiate a schema by making all the variables different.
-mostGeneral :: (Type -> Bool) -> Term f -> Term f
-mostGeneral singleUse s = evalState (aux s) Map.empty
+mostGeneral :: (Type -> VariableUse) -> Term f -> Term f
+mostGeneral use s = evalState (aux s) Map.empty
   where
     aux (Var (V ty _)) = do
       m <- get
       let n :: Int
           n = Map.findWithDefault 0 ty m
-      unless (singleUse ty) $
+      unless (use ty == UpTo 1) $
         put $! Map.insert ty (n+1) m
       return (Var (mkVar ty n))
     aux (Fun f) = return (Fun f)
@@ -168,14 +176,19 @@ mostGeneral singleUse s = evalState (aux s) Map.empty
 mostSpecific :: Term f -> Term f
 mostSpecific = subst (\(V ty _) -> Var (mkVar ty 0))
 
-allUnifications :: (Type -> Bool) -> Term fun -> [Term fun]
-allUnifications singleUse t = map f ss
+allUnifications :: (Type -> VariableUse) -> Term fun -> [Term fun]
+allUnifications use t =
+  [ subst (\x -> Var (Map.findWithDefault undefined x s)) t | s <- ss ]
   where
-    vs = [ map (x,) vs | xs@(y:_) <- partitionBy typ (usort (vars t)), let vs = varsOf (typ y), x <- xs ]
-    ss = map Map.fromList (sequence vs)
-    go s x = Map.findWithDefault undefined x s
-    f s = subst (Var . go s) t
+    ss =
+      map Map.fromList $ concat $ sequence
+        [substsFor xs (typ y) | xs@(y:_) <- partitionBy typ (usort (vars t))]
 
-    varsOf ty
-      | singleUse ty = [mkVar ty 0]
-      | otherwise = map (mkVar ty) [0..3]
+    substsFor xs ty =
+      case use ty of
+        UpTo k ->
+          sequence [[(x, v) | v <- take k vs] | x <- xs]
+        Linear ->
+          map (zip xs) (permutations (take (length xs) vs))
+      where
+        vs = map (mkVar ty) [0..]
