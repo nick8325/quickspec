@@ -197,6 +197,18 @@ monoTypeObserveWithVars :: forall proxy test outcome a.
 monoTypeObserveWithVars xs proxy =
   monoTypeObserve proxy `mappend` vars xs proxy
 
+-- | Like 'monoTypeObserveWithVars', but designed to be used with TypeApplications directly.
+--
+-- For example, you can add 'Foo' to your signature via:
+--
+-- @
+-- `monoObserveVars` @Foo ["foo"]
+-- @
+monoObserveVars :: forall a test outcome.
+  (Observe test outcome a, Arbitrary test, Ord outcome, Arbitrary a, Typeable test, Typeable outcome, Typeable a) =>
+  [String] -> Sig
+monoObserveVars xs = monoTypeObserveWithVars xs (Proxy @a)
+
 -- | Declare a new monomorphic type, saying how you want variables of that type to be named.
 monoTypeWithVars :: forall proxy a. (Ord a, Arbitrary a, Typeable a) => [String] -> proxy a -> Sig
 monoTypeWithVars xs proxy =

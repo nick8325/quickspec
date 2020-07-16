@@ -74,9 +74,12 @@ module QuickSpec(
   A, B, C, D, E,
 
   -- * Declaring types
-  mono, monoType, monoTypeObserve, monoObserve, vars, monoTypeWithVars,
-  monoVars, monoTypeObserveWithVars, inst, Observe(..),
+  monoType, monoTypeObserve, Observe(..), inst,
+  vars, monoTypeWithVars, monoTypeObserveWithVars,
   variableUse, VariableUse(..),
+  
+  -- * Declaring types: @TypeApplication@-friendly variants
+  mono, monoObserve, monoVars, monoObserveVars,
 
   -- * Standard signatures
   -- | The \"prelude\": a standard signature containing useful functions
