@@ -1,5 +1,18 @@
-QuickSpec 2.1.1 (released ???)
-------------------------------
+QuickSpec 2.1.3 (released 2020-07-16)
+* 'variableUse' for limiting how variables can appear in a term.
+* TypeApplication-friendly combinators (thanks to Sandy Maguire).
+* '=~=' for using Observe in QuickCheck properties
+  (thanks to Sandy Maguire).
+* 'withPrintStyle' for printing out laws as QuickCheck properties
+  (thanks to Sandy Maguire).
+* Bug fixes.
+
+QuickSpec 2.1.2 (released 2019-08-20)
+
+* Implementation changes.
+
+QuickSpec 2.1.1 (released 2019-04-05)
+-------------------------------------
 
 * Builds on GHC 7.10.
 * Better presentation of discovered equations.
