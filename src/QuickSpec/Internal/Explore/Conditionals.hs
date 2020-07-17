@@ -19,7 +19,7 @@ import QuickSpec.Internal.Pruning.Background(Background(..))
 import QuickSpec.Internal.Testing
 import QuickSpec.Internal.Terminal
 import QuickSpec.Internal.Utils
-import QuickSpec.Internal.Explore.Polymorphic hiding (Normal)
+import QuickSpec.Internal.Explore.Polymorphic
 import qualified Twee.Base as Twee
 import Data.List
 import Control.Monad
