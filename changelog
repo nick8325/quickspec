@@ -1,3 +1,6 @@
+QuickSpec 2.1.4 (released 2020-07-17)
+* Compatibility with random-1.2.0.0.
+
 QuickSpec 2.1.3 (released 2020-07-16)
 * 'variableUse' for limiting how variables can appear in a term.
 * TypeApplication-friendly combinators (thanks to Sandy Maguire).
