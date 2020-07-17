@@ -14,7 +14,7 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Reader
 import Data.List
-import System.Random
+import System.Random hiding (uniform)
 import QuickSpec.Internal.Terminal
 import Data.Lens.Light
 
