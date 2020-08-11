@@ -50,6 +50,14 @@ import qualified Data.Set as Set
 import qualified Test.QuickCheck.Poly as Poly
 import Numeric.Natural
 import Test.QuickCheck.Instances()
+import Data.Word
+import Data.List.NonEmpty (NonEmpty)
+import Data.Complex
+import Data.Ratio
+import Data.Functor.Compose
+import Data.Int
+import Data.Void
+import Data.Unique
 
 baseInstances :: Instances
 baseInstances =
@@ -168,6 +176,56 @@ class (Arbitrary test, Ord outcome) => Observe test outcome a | a -> test outcom
 
 instance (Arbitrary a, Observe test outcome b) => Observe (a, test) outcome (a -> b) where
   observe (x, obs) f = observe obs (f x)
+
+instance Observe () Int Int
+instance Observe () Int8 Int8
+instance Observe () Int16 Int16
+instance Observe () Int32 Int32
+instance Observe () Int64 Int64
+instance Observe () Float Float
+instance Observe () Double Double
+instance Observe () Word Word
+instance Observe () Word8 Word8
+instance Observe () Word16 Word16
+instance Observe () Word32 Word32
+instance Observe () Word64 Word64
+instance Observe () Integer Integer
+instance Observe () Char Char
+instance Observe () Bool Bool
+instance Observe () Ordering Ordering
+instance Observe () Void Void
+instance Observe () Unique Unique
+instance Observe () Natural Natural
+instance (Observe xt xo x, Observe yt yo y)
+      => Observe (xt, yt) (xo, yo) (x, y) where
+  observe (xt, yt) (x, y)
+    = (observe xt x, observe yt y)
+instance (Observe xt xo x, Observe yt yo y, Observe zt zo z)
+      => Observe (xt, yt, zt) (xo, yo, zo) (x, y, z) where
+  observe (xt, yt, zt) (x, y, z)
+    = (observe xt x, observe yt y, observe zt z)
+instance (Observe xt xo x, Observe yt yo y, Observe zt zo z, Observe wt wo w)
+      => Observe (xt, yt, zt, wt) (xo, yo, zo, wo) (x, y, z, w) where
+  observe (xt, yt, zt, wt) (x, y, z, w)
+    = (observe xt x, observe yt y, observe zt z, observe wt w)
+instance Observe t p a => Observe t [p] [a] where
+  observe t ps = fmap (observe t) ps
+instance Observe t p a => Observe t (NonEmpty p) (NonEmpty a) where
+  observe t ps = fmap (observe t) ps
+instance Observe t p a => Observe (t, t) (p, p) (Complex a) where
+  observe (t1, t2) (p1 :+ p2) = (observe t1 p1, observe t2 p2)
+instance Observe t p a => Observe (t, t) (p, p) (Ratio a) where
+  observe (t1, t2) (p)
+    = (observe t1 $ numerator p, observe t2 $ denominator p)
+instance Observe t p a => Observe t p (Identity a) where
+  observe t = observe t . runIdentity
+instance Observe t p (f (g a)) => Observe t p (Compose f g a) where
+  observe t = observe t . getCompose
+instance (Observe at ao a, Observe bt bo b)
+      => Observe (at, bt) (Either ao bo) (Either a b) where
+  observe (at, _) (Left a)  = Left $ observe at a
+  observe (_, bt) (Right b) = Right $ observe bt b
+
 
 -- | Like 'Test.QuickCheck.===', but using the 'Observe' typeclass instead of 'Eq'.
 (=~=) :: (Show test, Show outcome, Observe test outcome a) => a -> a -> Property
