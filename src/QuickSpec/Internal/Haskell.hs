@@ -196,6 +196,7 @@ instance Observe () Ordering Ordering
 instance Observe () Void Void
 instance Observe () Unique Unique
 instance Observe () Natural Natural
+instance Observe () () ()
 instance (Observe xt xo x, Observe yt yo y)
       => Observe (xt, yt) (xo, yo) (x, y) where
   observe (xt, yt) (x, y)
