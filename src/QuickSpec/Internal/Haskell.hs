@@ -172,6 +172,7 @@ instance (Arbitrary a, Observe test outcome b) => Observe (a, test) outcome (a -
 -- | Like 'Test.QuickCheck.===', but using the 'Observe' typeclass instead of 'Eq'.
 (=~=) :: (Show test, Show outcome, Observe test outcome a) => a -> a -> Property
 a =~= b = property $ \test -> observe test a Test.QuickCheck.=== observe test b
+infix 4 =~=
 
 -- An observation function along with instances.
 -- The parameters are in this order so that we can use findInstance to get at appropriate Wrappers.
