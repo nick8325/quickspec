@@ -58,6 +58,8 @@ import Data.Functor.Compose
 import Data.Int
 import Data.Void
 import Data.Unique
+import qualified Data.Monoid as DM
+import qualified Data.Semigroup as DS
 
 baseInstances :: Instances
 baseInstances =
@@ -196,6 +198,8 @@ instance Observe () Ordering Ordering
 instance Observe () Void Void
 instance Observe () Unique Unique
 instance Observe () Natural Natural
+instance Observe () DS.All DS.All
+instance Observe () DS.Any DS.Any
 instance Observe () () ()
 instance (Observe xt xo x, Observe yt yo y)
       => Observe (xt, yt) (xo, yo) (x, y) where
@@ -226,6 +230,37 @@ instance (Observe at ao a, Observe bt bo b)
       => Observe (at, bt) (Either ao bo) (Either a b) where
   observe (at, _) (Left a)  = Left $ observe at a
   observe (_, bt) (Right b) = Right $ observe bt b
+instance Observe t p a => Observe t p (DS.Sum a) where
+  observe t = observe t . DS.getSum
+instance Observe t p a => Observe t p (DS.Product a) where
+  observe t = observe t . DS.getProduct
+instance Observe t p a => Observe t p (DS.First a) where
+  observe t = observe t . DS.getFirst
+instance Observe t p a => Observe t p (DS.Last a) where
+  observe t = observe t . DS.getLast
+instance Observe t p a => Observe t p (DS.Dual a) where
+  observe t = observe t . DS.getDual
+instance Observe t p a => Observe t p (DS.Min a) where
+  observe t = observe t . DS.getMin
+instance Observe t p a => Observe t p (DS.Max a) where
+  observe t = observe t . DS.getMax
+instance Observe t p a => Observe t p (DS.WrappedMonoid a) where
+  observe t = observe t . DS.unwrapMonoid
+instance Observe t p (f a) => Observe t p (DM.Alt f a) where
+  observe t = observe t . DM.getAlt
+instance Observe t p (f a) => Observe t p (DM.Ap f a) where
+  observe t = observe t . DM.getAp
+instance Observe t p a => Observe t (Maybe p) (DM.First a) where
+  observe t = observe t . DM.getFirst
+instance Observe t p a => Observe t (Maybe p) (DM.Last a) where
+  observe t = observe t . DM.getLast
+instance Observe t p a => Observe t (Maybe p) (DS.Option a) where
+  observe t = observe t . DS.getOption
+instance Observe t p a => Observe t (Maybe p) (Maybe a) where
+  observe t (Just a) = Just $ observe t a
+  observe _ Nothing  = Nothing
+instance (Arbitrary a, Observe t p a) => Observe (a, t) p (DS.Endo a) where
+  observe t = observe t . DS.appEndo
 
 
 -- | Like 'Test.QuickCheck.===', but using the 'Observe' typeclass instead of 'Eq'.
