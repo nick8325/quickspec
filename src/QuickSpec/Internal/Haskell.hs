@@ -290,17 +290,6 @@ data Constant =
     con_size :: Int,
     con_classify :: Classification Constant }
 
-makeQuickcheckFun :: String -> Constant
-makeQuickcheckFun nm = Constant
-  { con_name  = nm
-  , con_style = infixStyle 9  -- high precedence to always force parens
-  , con_value = undefined
-  , con_type = undefined
-  , con_constraints = undefined
-  , con_size = 1
-  , con_classify = Function
-  }
-
 instance Eq Constant where
   x == y =
     con_name x == con_name y && typ (con_value x) == typ (con_value y)
@@ -626,8 +615,8 @@ quickSpec cfg@Config{..} = do
             ForQuickCheck ->
               renderStyle (style {lineLength = 78}) $ nest 2 $
                 prettyPropQC
+                  cfg_default_to
                   was_observed
-                  makeQuickcheckFun
                   n
                   (names instances)
                   prop'

@@ -8,11 +8,12 @@ import qualified Data.DList as DList
 import Data.Ord
 import QuickSpec.Internal.Type
 import QuickSpec.Internal.Utils
-import QuickSpec.Internal.Term
+import QuickSpec.Internal.Term hiding (first)
 import GHC.Generics(Generic)
 import qualified Data.Map.Strict as Map
 import Control.Monad.Trans.State.Strict
 import Data.List
+import Control.Arrow (first)
 
 data Prop a =
   (:=>:) {
@@ -90,18 +91,17 @@ prettyProp cands = pPrint . snd . nameVars cands
 
 prettyPropQC ::
   (Typed fun, Apply (Term fun), PrettyTerm fun) =>
-  (Type -> Bool) -> (String -> fun) -> Int -> (Type -> [String]) -> Prop (Term fun) -> Doc
-prettyPropQC was_observed mk_fun nth cands x
+  Type -> (Type -> Bool) -> Int -> (Type -> [String]) -> Prop (Term fun) -> Doc
+prettyPropQC default_to was_observed nth cands x
   = hang (text first_char <+> text "(" <+> ((text $ show $ show $ pPrint law))) 2
   $ hang (hsep [text ",", text "property", text "$"]) 4
   $ hang ppr_binds 4
-  $ ppr_ctx <+> (pPrint (eq_fn :$: lhs :$: rhs) <> text ")")
-
+  $ (ppr_ctx <+> with_sig lhs lhs_type <+> eq_fn <+> pPrint rhs) <> text ")"
   where
-    eq = mk_fun "==="
-    obs_eq = mk_fun "=~="
-    eq_fn = Fun $ Ordinary $ bool eq obs_eq $ was_observed $ typ lhs_for_type
-
+    eq = "==="
+    obs_eq = "=~="
+    eq_fn = text $ bool eq obs_eq $ was_observed lhs_type
+    lhs_type = defaultTo default_to $ typ lhs_for_type
 
     first_char =
       case nth of
@@ -114,11 +114,12 @@ prettyPropQC was_observed mk_fun nth cands x
 
     (_ :=>: (lhs_for_type :=: _)) = x
     (var_defs, law@(ctx :=>: (lhs :=: rhs))) = nameVars cands x
-    print_sig name ty = parens $ text name <+> text "::" <+> pPrintType ty
+    with_sig expr ty = print_sig (pPrint expr) ty
+    print_sig doc ty = parens $ doc <+> text "::" <+> pPrintType ty
     ppr_binds =
       case Map.size var_defs of
         0 -> pPrintEmpty
-        _ -> (text "\\ " <> sep (fmap (uncurry print_sig) (Map.assocs var_defs))) <+> text "->"
+        _ -> (text "\\ " <> sep (fmap (uncurry print_sig) (fmap (first text) $ Map.assocs var_defs))) <+> text "->"
 
 
 data Named fun = Name String | Ordinary fun
