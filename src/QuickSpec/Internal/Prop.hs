@@ -101,7 +101,7 @@ prettyPropQC default_to was_observed nth cands x
     eq = "==="
     obs_eq = "=~="
     eq_fn = text $ bool eq obs_eq $ was_observed lhs_type
-    lhs_type = defaultTo default_to $ typ lhs_for_type
+    lhs_type = typ lhs_for_type
 
     first_char =
       case nth of
@@ -115,7 +115,7 @@ prettyPropQC default_to was_observed nth cands x
     (_ :=>: (lhs_for_type :=: _)) = x
     (var_defs, law@(ctx :=>: (lhs :=: rhs))) = nameVars cands x
     with_sig expr ty = print_sig (pPrint expr) ty
-    print_sig doc ty = parens $ doc <+> text "::" <+> pPrintType ty
+    print_sig doc ty = parens $ doc <+> text "::" <+> pPrintType (defaultTo default_to ty)
     ppr_binds =
       case Map.size var_defs of
         0 -> pPrintEmpty
