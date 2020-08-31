@@ -1,3 +1,7 @@
+QuickSpec 2.1.5 (released 2020-08-31)
+* Give =~= an explicit fixity (thanks to Sandy Maguire).
+* More Observe instances (thanks to Sandy Maguire).
+
 QuickSpec 2.1.4 (released 2020-07-17)
 * Compatibility with random-1.2.0.0.
 
