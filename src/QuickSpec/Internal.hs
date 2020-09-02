@@ -316,6 +316,10 @@ withMaxTermSize n = Sig (\_ -> setL Haskell.lens_max_size n)
 withMaxCommutativeSize :: Int -> Sig
 withMaxCommutativeSize n = Sig (\_ -> setL Haskell.lens_max_commutative_size n)
 
+-- | Limit how many different function symbols can occur in a term.
+withMaxFunctions :: Int -> Sig
+withMaxFunctions n = Sig (\_ -> setL Haskell.lens_max_functions n)
+
 -- | Set how many times to test each discovered law (default: 1000).
 withMaxTests :: Int -> Sig
 withMaxTests n =

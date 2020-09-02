@@ -93,7 +93,7 @@ module QuickSpec(
   type (==>), liftC, instanceOf,
 
   -- * Customising QuickSpec
-  withMaxTermSize, withMaxTests, withMaxTestSize, defaultTo,
+  withMaxTermSize, withMaxTests, withMaxTestSize, withMaxFunctions, defaultTo,
   withPruningDepth, withPruningTermSize, withFixedSeed,
   withInferInstanceTypes, withPrintStyle, PrintStyle(..),
 
