@@ -28,14 +28,6 @@ False :: Bool
 current :: StackSet OrdA -> Natural
   index :: Natural -> StackSet OrdA -> [OrdA]
 
-WARNING: The following types have no 'Arbitrary' instance declared.
-You will not get any variables of the following types:
-  StackSet Int
-
-WARNING: The following types have no 'Ord' or 'Observe' instance declared.
-You will not get any equations about the following types:
-  StackSet Int
-
 == Laws ==
   1. rotate EQ s = s
   2. current (empty x) = 0

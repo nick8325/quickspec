@@ -18,7 +18,7 @@ module QuickSpec.Internal.Type(
   oneTypeVar, defaultTo, skolemiseTypeVars,
   -- * Polymorphic types
   canonicaliseType,
-  Poly, toPolyValue, poly, unPoly, polyTyp, polyRename, polyApply, polyPair, polyList, polyMgu,
+  Poly, toPolyValue, poly, unPoly, polyTyp, polyRename, polyApply, polyPair, polyList, polyMgu, polyFunctionMgu,
   -- * Dynamic values
   Value, toValue, fromValue, valueType,
   unwrap, Unwrapped(..), Wrapper(..),
@@ -426,6 +426,12 @@ polyMgu ty1 ty2 = do
   sub <- unify ty1' ty2'
   return (poly (typeSubst sub ty1'))
 
+polyFunctionMgu :: Apply a => Poly a -> Poly a -> Maybe (Poly (a, a))
+polyFunctionMgu f x = do
+  let (f', (x', resType)) = unPoly (polyPair f (polyPair x (poly (build (var (V 0))))))
+  s <- unify (typ f') (arrowType [typ x'] resType)
+  return (poly (typeSubst s (f', x')))
+
 instance Typed a => Typed (Poly a) where
   typ = typ . unPoly
   otherTypesDL = otherTypesDL . unPoly
@@ -433,10 +439,8 @@ instance Typed a => Typed (Poly a) where
 
 instance Apply a => Apply (Poly a) where
   tryApply f x = do
-    let (f', (x', resType)) = unPoly (polyPair f (polyPair x (poly (build (var (V 0))))))
-    s <- unify (typ f') (arrowType [typ x'] resType)
-    let (f'', x'') = typeSubst s (f', x')
-    fmap poly (tryApply f'' x'')
+    (f', x') <- unPoly <$> polyFunctionMgu f x
+    fmap poly (tryApply f' x')
 
 -- | Convert an ordinary value to a dynamic value.
 toPolyValue :: (Applicative f, Typeable a) => a -> Poly (Value f)
