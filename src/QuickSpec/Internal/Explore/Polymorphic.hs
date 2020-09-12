@@ -233,7 +233,7 @@ universe xs = Universe (Set.fromList univ)
     -- resulting type. The idea is that, if some term can be built
     -- whose type is a generalisation of the type in the universe,
     -- that generalised type should also be in the universe.
-    univ = oneTypeVar (fixpoint (usort . mgus) univHo)
+    univ = oneTypeVar (fixpoint (usort . map canonicaliseType . mgus) univHo)
       where
         mgus tys =
           tys ++
