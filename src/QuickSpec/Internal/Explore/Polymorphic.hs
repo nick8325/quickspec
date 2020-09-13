@@ -233,17 +233,20 @@ universe xs = Universe (Set.fromList univ)
     -- resulting type. The idea is that, if some term can be built
     -- whose type is a generalisation of the type in the universe,
     -- that generalised type should also be in the universe.
-    univ = oneTypeVar (fixpoint (usort . map canonicaliseType . mgus) univHo)
+    univ = oneTypeVar (fixpoint (usort . map canonicaliseType . mgus . prune) univHo)
       where
+        prune tys = filter (not . subsumed) tys
+          where
+            subsumed ty =
+              or [oneTypeVar pat == oneTypeVar ty && isJust (matchType pat ty) && isNothing (matchType ty pat) | pat <- tys]
         mgus tys =
           tys ++
           [ ty
           | ty1 <- tys, ty2 <- tys, 
             ty <- unPoly <$> combine (poly ty1) (poly ty2),
-            bound <- tys,
-            isJust (matchType ty bound) ]
+            or [isJust (matchType ty bound) | bound <- tys] ]
         combine ty1 ty2 =
-          maybeToList (polyMgu ty1 ty2) ++
+          catMaybes [polyMgu ty1 ty2 | ty1 < ty2] ++
           maybeToList (tryApply ty1 ty2) ++
           -- Get the function and argument types used by tryApply
           concat [[poly x, poly y] | (x, y) <- maybeToList (unPoly <$> polyFunctionMgu ty1 ty2)]
