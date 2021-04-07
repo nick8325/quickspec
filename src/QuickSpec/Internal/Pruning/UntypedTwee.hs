@@ -42,8 +42,7 @@ instance Sized fun => Sized (Extended fun) where
   size (Function f) = size f
   size _ = 1
 
-instance Sized fun => KBO.Sized (Extended fun) where
-  size (Function f) = fromIntegral (size f)
+instance KBO.Sized (Extended fun) where
   size _ = 1
 
 instance Arity fun => Arity (Extended fun) where
