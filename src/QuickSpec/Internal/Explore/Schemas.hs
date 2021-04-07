@@ -141,8 +141,8 @@ instantiate rep t = do
       res <- Terms.explore t
       case res of
         Terms.Discovered prop -> do
-          add prop
-          return (Just prop)
+          res <- add prop
+          if res then return (Just prop) else return Nothing
         _ -> return Nothing)
 
 -- sortBy (comparing generality) should give most general instances first.

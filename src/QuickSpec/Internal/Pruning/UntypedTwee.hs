@@ -108,10 +108,15 @@ instance (Ord fun, Typeable fun, Arity fun, PrettyTerm fun, EqualsBonus fun, Siz
   add ([] :=>: t :=: u) = Pruner $ do
     state <- lift get
     config <- ask
-    lift (put $! addTwee config t u state)
+    let (t' :=: u') = canonicalise (t :=: u)
+    if not (null (Set.intersection (normalFormsTwee state t') (normalFormsTwee state u'))) then
+      return False
+    else do
+      lift (put $! addTwee config t u state)
+      return True
 
   add _ =
-    return ()
+    return True
     --error "twee pruner doesn't support non-unit equalities"
 
 normaliseTwee :: (Ord fun, Typeable fun, Arity fun, PrettyTerm fun, EqualsBonus fun, Sized fun) =>
