@@ -134,6 +134,7 @@ normalFormsTwee state t =
 addTwee :: (Ord fun, Typeable fun, Arity fun, PrettyTerm fun, EqualsBonus fun, Sized fun) =>
   Twee.Config (Extended fun) -> Term fun -> Term fun -> State (Extended fun) -> State (Extended fun)
 addTwee config t u state =
+  interreduce config $
   completePure config $
     addAxiom config state axiom
   where
