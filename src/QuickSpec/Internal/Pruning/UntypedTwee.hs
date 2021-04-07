@@ -1,6 +1,6 @@
 -- A pruner that uses twee. Does not respect types.
 {-# OPTIONS_HADDOCK hide #-}
-{-# LANGUAGE RecordWildCards, FlexibleContexts, FlexibleInstances, GADTs, PatternSynonyms, GeneralizedNewtypeDeriving, MultiParamTypeClasses, UndecidableInstances #-}
+{-# LANGUAGE RecordWildCards, FlexibleContexts, FlexibleInstances, GADTs, PatternSynonyms, GeneralizedNewtypeDeriving, MultiParamTypeClasses, UndecidableInstances, DerivingVia #-}
 module QuickSpec.Internal.Pruning.UntypedTwee where
 
 import QuickSpec.Internal.Testing
@@ -16,7 +16,7 @@ import qualified Twee.Base as Twee
 import Twee hiding (Config(..))
 import Twee.Rule hiding (normalForms)
 import Twee.Proof hiding (Config, defaultConfig)
-import Twee.Base(Ordered(..), Extended(..), Arity(..), EqualsBonus)
+import Twee.Base(Ordered(..), Arity(..), AutoLabel(..), Labelled)
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Strict hiding (State)
 import Control.Monad.Trans.Class
@@ -24,6 +24,7 @@ import Control.Monad.IO.Class
 import QuickSpec.Internal.Terminal
 import qualified Data.Set as Set
 import Data.Set(Set)
+import qualified Data.Map.Strict as Map
 
 data Config =
   Config {
@@ -33,9 +34,41 @@ data Config =
 lens_max_term_size = lens cfg_max_term_size (\x y -> y { cfg_max_term_size = x })
 lens_max_cp_depth = lens cfg_max_cp_depth (\x y -> y { cfg_max_cp_depth = x })
 
-instance (Pretty fun, PrettyTerm fun, Ord fun, Typeable fun, Twee.Sized fun, Arity fun, EqualsBonus fun) => Ordered (Extended fun) where
+data Extended fun = Minimal | Skolem Twee.Var | Function fun
+  deriving (Eq, Ord)
+  deriving Labelled via AutoLabel (Extended fun)
+
+instance Sized fun => Sized (Extended fun) where
+  size (Function f) = size f
+  size _ = 1
+
+instance Sized fun => KBO.Sized (Extended fun) where
+  size (Function f) = fromIntegral (size f)
+  size _ = 1
+
+instance Arity fun => Arity (Extended fun) where
+  arity (Function f) = arity f
+  arity (Skolem _) = 0
+  arity Minimal = 0
+
+instance (Ord fun, Typeable fun) => Twee.Minimal (Extended fun) where
+  minimal = Twee.fun Minimal
+
+instance EqualsBonus (Extended fun)
+
+instance (Ord fun, Typeable fun, Pretty fun) => Pretty (Extended fun) where
+  pPrintPrec l p (Function f) = pPrintPrec l p f
+  pPrintPrec _ _ Minimal = text "?"
+  pPrintPrec _ _ (Skolem (Twee.V x)) = text ("sk" ++ show x)
+
+instance (Ord fun, Typeable fun, PrettyTerm fun) => PrettyTerm (Extended fun) where
+  termStyle (Function f) = termStyle f
+  termStyle _ = curried
+
+instance (Sized fun, Pretty fun, PrettyTerm fun, Ord fun, Typeable fun, Arity fun, EqualsBonus fun) => Ordered (Extended fun) where
   lessEq = KBO.lessEq
   lessIn = KBO.lessIn
+  lessEqSkolem = KBO.lessEqSkolem
 
 newtype Pruner fun m a =
   Pruner (ReaderT (Twee.Config (Extended fun)) (StateT (State (Extended fun)) m) a)
@@ -44,28 +77,26 @@ newtype Pruner fun m a =
 instance MonadTrans (Pruner fun) where
   lift = Pruner . lift . lift
 
-run :: (Sized fun, Monad m) => Config -> Pruner fun m a -> m a
+run :: (Typeable fun, Ord fun, Sized fun, Monad m) => Config -> Pruner fun m a -> m a
 run Config{..} (Pruner x) =
-  evalStateT (runReaderT x config) initialState
+  evalStateT (runReaderT x config) (initialState config)
   where
     config =
       defaultConfig {
         Twee.cfg_accept_term = Just (\t -> size t <= cfg_max_term_size),
         Twee.cfg_max_cp_depth = cfg_max_cp_depth }
 
-instance Sized fun => Sized (Twee.Term fun) where
+instance (Labelled fun, Sized fun) => Sized (Twee.Term fun) where
   size (Twee.Var _) = 1
   size (Twee.App f ts) =
     size (Twee.fun_value f) + sum (map size (Twee.unpack ts))
 
-instance Sized fun => Sized (Twee.Extended fun) where
-  size Twee.Minimal = 1
-  size (Twee.Skolem _) = 1
-  size (Twee.Function f) = size f
+instance KBO.Weighted (Extended fun) where
+  argWeight _ = 1
 
 type Norm fun = Twee.Term (Extended fun)
 
-instance (Ord fun, Typeable fun, Arity fun, Twee.Sized fun, PrettyTerm fun, EqualsBonus fun, Monad m) =>
+instance (Ord fun, Typeable fun, Arity fun, PrettyTerm fun, EqualsBonus fun, Sized fun, Monad m) =>
   MonadPruner (Term fun) (Norm fun) (Pruner fun m) where
   normaliser = Pruner $ do
     state <- lift get
@@ -83,17 +114,19 @@ instance (Ord fun, Typeable fun, Arity fun, Twee.Sized fun, PrettyTerm fun, Equa
     return ()
     --error "twee pruner doesn't support non-unit equalities"
 
-normaliseTwee :: (Ord fun, Typeable fun, Arity fun, Twee.Sized fun, PrettyTerm fun, EqualsBonus fun) =>
+normaliseTwee :: (Ord fun, Typeable fun, Arity fun, PrettyTerm fun, EqualsBonus fun, Sized fun) =>
   State (Extended fun) -> Term fun -> Norm fun
 normaliseTwee state t =
-  result (normaliseTerm state (simplifyTerm state (skolemise t)))
+  result u (normaliseTerm state u)
+  where
+    u = simplifyTerm state (skolemise t)
 
-normalFormsTwee :: (Ord fun, Typeable fun, Arity fun, Twee.Sized fun, PrettyTerm fun, EqualsBonus fun) =>
+normalFormsTwee :: (Ord fun, Typeable fun, Arity fun, PrettyTerm fun, EqualsBonus fun, Sized fun) =>
   State (Extended fun) -> Term fun -> Set (Norm fun)
 normalFormsTwee state t =
-  Set.map result (normalForms state (skolemise t))
+  Set.fromList . Map.elems $ Map.mapWithKey result (normalForms state (skolemise t))
 
-addTwee :: (Ord fun, Typeable fun, Arity fun, Twee.Sized fun, PrettyTerm fun, EqualsBonus fun) =>
+addTwee :: (Ord fun, Typeable fun, Arity fun, PrettyTerm fun, EqualsBonus fun, Sized fun) =>
   Twee.Config (Extended fun) -> Term fun -> Term fun -> State (Extended fun) -> State (Extended fun)
 addTwee config t u state =
   completePure config $

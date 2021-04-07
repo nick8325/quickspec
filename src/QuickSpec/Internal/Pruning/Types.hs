@@ -28,9 +28,6 @@ instance Sized fun => Sized (Tagged fun) where
   size (Func f) = size f
   size (Tag _) = 0
 
-instance Sized fun => Twee.Sized (Tagged fun) where
-  size f = size f `max` 1
-
 instance Pretty fun => Pretty (Tagged fun) where
   pPrint (Func f) = pPrint f
   pPrint (Tag ty) = text "tag[" <#> pPrint ty <#> text "]"

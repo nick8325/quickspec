@@ -1,7 +1,7 @@
 -- | This module is internal to QuickSpec.
 --
 -- Polymorphic types and dynamic values.
-{-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances, GeneralizedNewtypeDeriving, Rank2Types, ExistentialQuantification, PolyKinds, TypeFamilies, FlexibleContexts, StandaloneDeriving, PatternGuards, MultiParamTypeClasses, ConstraintKinds, DataKinds, GADTs #-}
+{-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances, GeneralizedNewtypeDeriving, Rank2Types, ExistentialQuantification, PolyKinds, TypeFamilies, FlexibleContexts, StandaloneDeriving, PatternGuards, MultiParamTypeClasses, ConstraintKinds, DataKinds, GADTs, DerivingVia #-}
 -- To avoid a warning about TyVarNumber's constructor being unused:
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
 module QuickSpec.Internal.Type(
@@ -52,6 +52,7 @@ data TyCon =
     -- really exist in Haskell.
   | String String
   deriving (Eq, Ord, Show)
+  deriving Labelled via AutoLabel TyCon
 
 instance Pretty TyCon where
   pPrint Arrow = text "->"
@@ -159,20 +160,20 @@ isArrowType = isJust . unpackArrow
 --
 -- For multiple-argument functions, unpacks one argument.
 unpackArrow :: Type -> Maybe (Type, Type)
-unpackArrow (App (F Arrow) (Cons t (Cons u Empty))) =
+unpackArrow (App (F _ Arrow) (Cons t (Cons u Empty))) =
   Just (t, u)
 unpackArrow _ =
   Nothing
 
 -- | The arguments of a function type.
 typeArgs :: Type -> [Type]
-typeArgs (App (F Arrow) (Cons arg (Cons res Empty))) =
+typeArgs (App (F _ Arrow) (Cons arg (Cons res Empty))) =
   arg:typeArgs res
 typeArgs _ = []
 
 -- | The result of a function type.
 typeRes :: Type -> Type
-typeRes (App (F Arrow) (Cons _ (Cons res Empty))) =
+typeRes (App (F _ Arrow) (Cons _ (Cons res Empty))) =
   typeRes res
 typeRes ty = ty
 
@@ -180,7 +181,7 @@ typeRes ty = ty
 -- @n@ arguments. Crashes if the type does not have enough arguments.
 typeDrop :: Int -> Type -> Type
 typeDrop 0 ty = ty
-typeDrop n (App (F Arrow) (Cons _ (Cons ty Empty))) =
+typeDrop n (App (F _ Arrow) (Cons _ (Cons ty Empty))) =
   typeDrop (n-1) ty
 typeDrop _ _ =
   error "typeDrop on non-function type"
@@ -235,7 +236,7 @@ tyCon = fromTyCon . mkCon
 
 -- | Check if a type is of the form @`Dict` c@, and if so, return @c@.
 getDictionary :: Type -> Maybe Type
-getDictionary (App (F (TyCon dict)) (Cons ty Empty))
+getDictionary (App (F _ (TyCon dict)) (Cons ty Empty))
   | dict == dictTyCon = Just ty
 getDictionary _ = Nothing
 
@@ -259,9 +260,9 @@ instance CoArbitrary Type where
   coarbitrary = coarbitrary . singleton
 instance CoArbitrary (TermList TyCon) where
   coarbitrary Empty = variant 0
-  coarbitrary (ConsSym (Var (V x)) ts) =
+  coarbitrary ConsSym{hd = Var (V x), rest = ts} =
     variant 1 . coarbitrary x . coarbitrary ts
-  coarbitrary (ConsSym (App f _) ts) =
+  coarbitrary ConsSym{hd = App f _, rest = ts} =
     variant 2 . coarbitrary (fun_id f) . coarbitrary ts
 
 -- | Pretty-print a type. Differs from the `Pretty` instance by printing type
@@ -355,7 +356,7 @@ instance Typed Type where
   typeSubst_ = subst
 
 instance Apply Type where
-  tryApply (App (F Arrow) (Cons arg (Cons res Empty))) t
+  tryApply (App (F _ Arrow) (Cons arg (Cons res Empty))) t
     | t == arg = Just res
   tryApply _ _ = Nothing
 
