@@ -9,6 +9,7 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE GADTs #-}
 module QuickSpec.Internal where
 
 import QuickSpec.Internal.Haskell(Predicateable, PredicateTestCase, Names(..), Observe(..), Use(..))
@@ -125,6 +126,7 @@ instanceOf = inst (Sub Dict :: () :- c)
 --   predicate "member" (member :: Int -> [Int] -> Bool) ]
 -- @
 predicate :: ( Predicateable a
+             , Haskell.PredicateResult a ~ Bool
              , Typeable a
              , Typeable (PredicateTestCase a))
              => String -> a -> Sig

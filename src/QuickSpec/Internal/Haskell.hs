@@ -487,23 +487,23 @@ class Predicateable a where
   --
   -- Some speedup should be possible by using unboxed tuples instead...
   type PredicateTestCase a
-  uncrry :: a -> PredicateTestCase a -> Bool
+  type PredicateResult a
+  uncrry :: a -> PredicateTestCase a -> PredicateResult a
+  true :: proxy a -> Constant
 
 instance Predicateable Bool where
   type PredicateTestCase Bool = ()
+  type PredicateResult Bool = Bool
   uncrry = const
+  true _ = con "True" True
 
 instance forall a b. (Predicateable b, Typeable a) => Predicateable (a -> b) where
   type PredicateTestCase (a -> b) = (a, PredicateTestCase b)
+  type PredicateResult (a -> b) = PredicateResult b
   uncrry f (a, b) = uncrry (f a) b
+  true _ = true (Proxy :: Proxy b)
 
 data TestCaseWrapped (t :: Symbol) a = TestCaseWrapped { unTestCaseWrapped :: a }
-
-true :: Constant
-true = con "True" True
-
-trueTerm :: Term Constant
-trueTerm = Fun true
 
 -- | Declare a predicate with a given name and value.
 -- The predicate should have type @... -> Bool@.
@@ -541,7 +541,7 @@ predicateGen name pred gen =
     inst2 :: Names (TestCaseWrapped SymA (PredicateTestCase a))
     inst2 = Names [name ++ "_var"]
 
-    conPred = (con name pred) { con_classify = Predicate conSels ty (Fun true) }
+    conPred = (con name pred) { con_classify = Predicate conSels ty (Fun (true (Proxy :: Proxy a))) }
     conSels = [ (constant' (name ++ "_" ++ show i) (select (i + length (con_constraints conPred)))) { con_classify = Selector i conPred ty, con_size = 0 } | i <- [0..typeArity (typ conPred)-1] ]
 
     select i =
@@ -560,6 +560,7 @@ predicateGen name pred gen =
 -- | Declare a predicate with a given name and value.
 -- The predicate should have type @... -> Bool@.
 predicate :: forall a. ( Predicateable a
+          , PredicateResult a ~ Bool
           , Typeable a
           , Typeable (PredicateTestCase a))
           => String -> a -> (Instances, Constant)
@@ -692,7 +693,9 @@ quickSpec :: Config -> IO [Prop (Term Constant)]
 quickSpec cfg@Config{..} = do
   let
     constantsOf f =
-      [true | any (/= Function) (map classify (f cfg_constants))] ++
+      usort (concatMap funs $
+        [clas_true | Predicate{..} <- map classify (f cfg_constants)] ++
+        [clas_true (classify clas_pred) | Selector{..} <- map classify (f cfg_constants)]) ++
       f cfg_constants ++ concatMap selectors (f cfg_constants)
     constants = constantsOf concat
 
