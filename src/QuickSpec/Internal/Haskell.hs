@@ -710,7 +710,7 @@ quickSpec cfg@Config{..} = do
       let prop' = prettyDefinition funs (prettyAC norm (conditionalise prop))
       when (cfg_print_filter prop) $ do
         (n :: Int, props) <- get
-        put (n+1, prop':props)
+        put (n+1, props)
         putLine $
           case cfg_print_style of
             ForHumans ->
@@ -758,7 +758,10 @@ quickSpec cfg@Config{..} = do
         when (cfg_print_style == ForQuickCheck) $ do
           putLine "quickspec_laws :: [(String, Property)]"
           putLine "quickspec_laws ="
-      let pres = if n == 0 then \_ -> return () else present (constantsOf f)
+      let
+        pres prop = do
+          modify $ \(k, props) -> (k, prop:props)
+          if n == 0 then return () else present (constantsOf f) prop
       QuickSpec.Internal.Explore.quickSpec pres (flip eval) cfg_max_size cfg_max_commutative_size use univ
         (enumerator (map Fun (constantsOf g)))
       when (n > 0) $ do
