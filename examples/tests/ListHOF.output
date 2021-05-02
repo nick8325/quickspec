@@ -23,7 +23,10 @@ fold :: (a -> b -> b) -> b -> [a] -> b
  15. fold f x . map g = fold (f . g) x
  16. fold (:) xs . (:) x = (:) x . fold (:) xs
  17. f x (fold f y xs) = fold f y (x : xs)
- 18. f x . fold f y = fold f y . (:) x
- 19. fold f (fold f x xs) ys = fold f x (fold (:) xs ys)
- 20. fold f (fold f x xs) = fold f x . fold (:) xs
+ 18. f x : map f xs = map f (x : xs)
+ 19. f x . fold f y = fold f y . (:) x
+ 20. (:) (f x) . map f = map f . (:) x
+ 21. fold f (fold f x xs) ys = fold f x (fold (:) xs ys)
+ 22. fold f (fold f x xs) = fold f x . fold (:) xs
+ 23. fold ((:) . f) (map f xs) = map f . fold (:) xs
 
