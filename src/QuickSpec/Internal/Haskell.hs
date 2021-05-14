@@ -503,17 +503,35 @@ instance forall a b. (Predicateable b, Typeable a) => Predicateable (a -> b) whe
   uncrry f (a, b) = uncrry (f a) b
   true _ = true (Proxy :: Proxy b)
 
+-- A more user-friendly type for PredicateTestCase.
+type FriendlyPredicateTestCase a = Friendly (PredicateTestCase a)
+class HasFriendly a where
+  type Friendly a
+  unfriendly :: Friendly a -> a
+instance HasFriendly () where
+  type Friendly () = ()
+  unfriendly () = ()
+instance HasFriendly (a, ()) where
+  type Friendly (a, ()) = a
+  unfriendly a = (a, ())
+instance HasFriendly (a, (b, ())) where
+  type Friendly (a, (b, ())) = (a, b)
+  unfriendly (a, b) = (a, (b, ()))
+instance HasFriendly (a, (b, (c, ()))) where
+  type Friendly (a, (b, (c, ()))) = (a, b, c)
+  unfriendly (a, b, c) = (a, (b, (c, ())))
+instance HasFriendly (a, (b, (c, (d, ())))) where
+  type Friendly (a, (b, (c, (d, ())))) = (a, b, c, d)
+  unfriendly (a, b, c, d) = (a, (b, (c, (d, ()))))
+
 data TestCaseWrapped (t :: Symbol) a = TestCaseWrapped { unTestCaseWrapped :: a }
 
--- | Declare a predicate with a given name and value.
--- The predicate should have type @... -> Bool@.
--- Uses an explicit generator.
-predicateGen :: forall a b. ( Predicateable a
-             , Typeable a
-             , Typeable b
-             , Typeable (PredicateTestCase a))
-             => String -> a -> (b -> Gen (PredicateTestCase a)) -> (Instances, Constant)
-predicateGen name pred gen =
+unfriendlyPredicateGen :: forall a b. ( Predicateable a
+                       , Typeable a
+                       , Typeable b
+                       , Typeable (PredicateTestCase a))
+                       => String -> a -> (b -> Gen (PredicateTestCase a)) -> (Instances, Constant)
+unfriendlyPredicateGen name pred gen =
   let
     -- The following doesn't compile on GHC 7.10:
     -- ty = typeRep (Proxy :: Proxy (TestCaseWrapped sym (PredicateTestCase a)))
@@ -559,12 +577,23 @@ predicateGen name pred gen =
 
 -- | Declare a predicate with a given name and value.
 -- The predicate should have type @... -> Bool@.
+-- Uses an explicit generator.
+predicateGen :: forall a. ( Predicateable a
+             , Typeable a
+             , Typeable (PredicateTestCase a)
+             , HasFriendly (PredicateTestCase a))
+             => String -> a -> (Gen (FriendlyPredicateTestCase a)) -> (Instances, Constant)
+predicateGen name pred gen =
+  unfriendlyPredicateGen name pred (\() -> unfriendly <$> gen)
+
+-- | Declare a predicate with a given name and value.
+-- The predicate should have type @... -> Bool@.
 predicate :: forall a. ( Predicateable a
           , PredicateResult a ~ Bool
           , Typeable a
           , Typeable (PredicateTestCase a))
           => String -> a -> (Instances, Constant)
-predicate name pred = predicateGen name pred inst
+predicate name pred = unfriendlyPredicateGen name pred inst
   where
     inst :: Dict (Arbitrary (PredicateTestCase a)) -> Gen (PredicateTestCase a)
     inst Dict = arbitrary `suchThat` uncrry pred
@@ -708,7 +737,7 @@ quickSpec cfg@Config{..} = do
     present funs prop = do
       norm <- normaliser
       let prop' = prettyDefinition funs (prettyAC norm (conditionalise prop))
-      when (cfg_print_filter prop) $ do
+      when (not (hasBackgroundPredicates prop') && not (isBackgroundProp prop') && cfg_print_filter prop) $ do
         (n :: Int, props) <- get
         put (n+1, props)
         putLine $
@@ -725,6 +754,22 @@ quickSpec cfg@Config{..} = do
                   (names instances)
                   prop'
                   <+> disambiguatePropType prop
+
+    hasBackgroundPredicates (_ :=>: t :=: u)
+      | not (null [p | p <- funs t, isBackgroundPredicate p]),
+        not (null [q | q <- funs u, isBackgroundPredicate q]) =
+        True
+    hasBackgroundPredicates _ = False
+    isBackgroundPredicate p =
+      p `elem` concat (take 1 cfg_constants) &&
+      case classify p of
+        Predicate{} -> True
+        _ -> False
+
+    isBackgroundProp p =
+      not (null fs) && and [f `elem` concat (take 1 cfg_constants) | f <- fs]
+      where
+        fs = funs p
 
     -- XXX do this during testing
     constraintsOk = memo $ \con ->

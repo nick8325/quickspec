@@ -31,7 +31,8 @@
 --
 -- You can only declare monomorphic types with `monoType`. If you want to test
 -- your own polymorphic types, you must explicitly declare `Arbitrary` and `Ord`
--- instances using the `inst` function.
+-- instances using the `inst` function. You can also use the `generator` function
+-- to use a custom generator instead of the `Arbitrary` instance for a given type.
 --
 -- You can also use QuickSpec to find conditional equations. To do so, you need
 -- to include some /predicates/ in the signature. These are functions returning
@@ -74,7 +75,7 @@ module QuickSpec(
   A, B, C, D, E,
 
   -- * Declaring types
-  monoType, monoTypeObserve, Observe(..), inst,
+  monoType, monoTypeObserve, Observe(..), inst, generator,
   vars, monoTypeWithVars, monoTypeObserveWithVars,
   variableUse, VariableUse(..),
   

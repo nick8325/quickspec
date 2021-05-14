@@ -12,7 +12,7 @@
 {-# LANGUAGE GADTs #-}
 module QuickSpec.Internal where
 
-import QuickSpec.Internal.Haskell(Predicateable, PredicateTestCase, Names(..), Observe(..), Use(..))
+import QuickSpec.Internal.Haskell(Predicateable, PredicateTestCase, Names(..), Observe(..), Use(..), HasFriendly, FriendlyPredicateTestCase)
 import qualified QuickSpec.Internal.Haskell as Haskell
 import qualified QuickSpec.Internal.Haskell.Resolve as Haskell
 import qualified QuickSpec.Internal.Testing.QuickCheck as QuickCheck
@@ -117,6 +117,10 @@ instanceOf = inst (Sub Dict :: () :- c)
 -- It will appear in equations just like any other constant,
 -- but will also be allowed to appear as a condition.
 --
+-- Warning: if the predicate is unlikely to be true for a
+-- randomly-generated value, you will get bad-quality test data.
+-- In that case, use `predicateGen` instead.
+--
 -- For example:
 --
 -- @
@@ -141,11 +145,23 @@ predicate name x =
 -- It will appear in equations just like any other constant,
 -- but will also be allowed to appear as a condition.
 -- The third argument is a generator for values satisfying the predicate.
+--
+-- For example, this declares a predicate that checks if a list is
+-- sorted:
+--
+-- > predicateGen "sorted" sorted genSortedList
+--
+-- where
+--
+-- > sorted :: [a] -> Bool
+-- > sorted xs = sort xs == xs
+-- > genSortedList :: Gen [a]
+-- > genSortedList = sort <$> arbitrary
 predicateGen :: ( Predicateable a
                 , Typeable a
-                , Typeable b
-                , Typeable (PredicateTestCase a))
-                => String -> a -> (b -> Gen (PredicateTestCase a)) -> Sig
+                , Typeable (PredicateTestCase a)
+                , HasFriendly (PredicateTestCase a))
+                => String -> a -> Gen (FriendlyPredicateTestCase a) -> Sig
 predicateGen name x gen =
   Sig $ \ctx@(Context _ names) ->
     if name `elem` names then id else
@@ -154,6 +170,17 @@ predicateGen name x gen =
 
 -- | Declare a new monomorphic type.
 -- The type must implement `Ord` and `Arbitrary`.
+-- 
+-- If the type does not implement `Ord`, you can use `monoTypeObserve`
+-- to declare an observational equivalence function. If the type does
+-- not implement `Arbitrary`, you can use `generator` to declare a
+-- custom QuickCheck generator.
+--
+-- You do not necessarily need `Ord` and `Arbitrary` instances for
+-- every type. If there is no `Ord` (or `Observe` instance) for a
+-- type, you will not get equations between terms of that type. If
+-- there is no `Arbitrary` instance (or generator), you will not get
+-- variables of that type.
 monoType :: forall proxy a. (Ord a, Arbitrary a, Typeable a) => proxy a -> Sig
 monoType _ =
   mconcat [
@@ -236,7 +263,6 @@ variableUse :: forall proxy a. Typeable a => VariableUse -> proxy a -> Sig
 variableUse x _ = instFun (Use x :: Use a)
 
 -- | Declare a typeclass instance. QuickSpec needs to have an `Ord` and
--- | Declare a typeclass instance. QuickSpec needs to have an `Ord` and
 -- `Arbitrary` instance for each type you want it to test.
 --
 -- For example, if you are testing @`Data.Map.Map` k v@, you will need to add
@@ -246,8 +272,21 @@ variableUse x _ = instFun (Use x :: Use a)
 -- `inst` (`Sub` `Dict` :: (Ord A, Ord B) `:-` Ord (Map A B))
 -- `inst` (`Sub` `Dict` :: (Arbitrary A, Arbitrary B) `:-` Arbitrary (Map A B))
 -- @
+--
+-- For a monomorphic type @T@, you can use `monoType` instead, but if you
+-- want to use `inst`, you can do it like this:
+--
+-- @
+-- `inst` (`Sub` `Dict` :: () `:-` Ord T)
+-- `inst` (`Sub` `Dict` :: () `:-` Arbitrary T)
+-- @
 inst :: (Typeable c1, Typeable c2) => c1 :- c2 -> Sig
 inst = instFun
+
+-- | Declare a generator to be used to produce random values of a
+-- given type. This will take precedence over any `Arbitrary` instance.
+generator :: Typeable a => Gen a -> Sig
+generator = instFun
 
 -- | Declare an arbitrary value to be used by instance resolution.
 instFun :: Typeable a => a -> Sig
