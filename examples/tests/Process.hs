@@ -9,7 +9,7 @@ import Test.QuickCheck hiding ((><))
 import System.IO.Unsafe
 import System.Timeout
 import QuickSpec
-import QuickSpec.Utils
+import QuickSpec.Internal.Utils
 import Data.Proxy
 
 --------------------------------------------------------------------------------
@@ -83,7 +83,8 @@ instance Eq P where
   p == q = (p `compare` q) == EQ
 
 instance Ord P where
-  p `compare` q = p `unsafeCompare` q
+  p `compare` q = 
+    fromMaybe EQ (flattenTrace 10 (compareProcesses p q))
 
 instance Show P where
   show Nil       = "0"
@@ -250,26 +251,30 @@ c = Name 'c'
 
 --------------------------------------------------------------------------------
 
-unsafeCompare :: P -> P -> Ordering
-unsafeCompare p q =
-  unsafePerformIO $
-    do mres <- timeout 10000 (res `seq` return ())
-       case mres of
-         Nothing -> return EQ
-         Just _  -> return res
+data Trace = Continue Trace | Finish Ordering
+
+flattenTrace :: Int -> Trace -> Maybe Ordering
+flattenTrace n _ | n < 0 = error "flattenTrace"
+flattenTrace _ (Finish x) = Just x
+flattenTrace 0 (Continue _) = Nothing
+flattenTrace n (Continue t) = flattenTrace (n-1) t
+
+compareProcesses :: P -> P -> Trace
+compareProcesses p q = p ~~ q
  where
-  h p = [ steps i p | i <- [2..7] ]
-  res = p ~~ q
+  h p = takeWhile (\s -> stepsLength s <= 10) [ steps i p | i <- [2..7] ]
+  stepsLength Stop = 0
+  stepsLength (Step xs) = length xs
 
   p ~~ q =
     case (step p, step q) of
-      ([], qs) | null qs   -> EQ
-               | otherwise -> LT
-      (ps, []) | null ps   -> EQ
-               | otherwise -> GT
+      ([], qs) | null qs   -> Finish EQ
+               | otherwise -> Finish LT
+      (ps, []) | null ps   -> Finish EQ
+               | otherwise -> Finish GT
       ([(a,p')],[(b,q')])
-               | a == b   -> p' ~~ q'
-      _                   -> h p `compare` h q
+               | a == b   -> Continue (p' ~~ q')
+      _                   -> Finish (h p `compare` h q)
 
 {-
 sig :: [Sig]
