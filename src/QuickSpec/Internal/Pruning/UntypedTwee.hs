@@ -1,6 +1,6 @@
 -- A pruner that uses twee. Does not respect types.
 {-# OPTIONS_HADDOCK hide #-}
-{-# LANGUAGE RecordWildCards, FlexibleContexts, FlexibleInstances, GADTs, PatternSynonyms, GeneralizedNewtypeDeriving, MultiParamTypeClasses, UndecidableInstances, DerivingVia #-}
+{-# LANGUAGE RecordWildCards, FlexibleContexts, FlexibleInstances, GADTs, PatternSynonyms, GeneralizedNewtypeDeriving, MultiParamTypeClasses, UndecidableInstances #-}
 module QuickSpec.Internal.Pruning.UntypedTwee where
 
 import QuickSpec.Internal.Testing
@@ -16,7 +16,7 @@ import qualified Twee.Base as Twee
 import Twee hiding (Config(..))
 import Twee.Rule hiding (normalForms)
 import Twee.Proof hiding (Config, defaultConfig)
-import Twee.Base(Ordered(..), Arity(..), AutoLabel(..), Labelled)
+import Twee.Base(Ordered(..), Arity(..), Labelled)
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Strict hiding (State)
 import Control.Monad.Trans.Class
@@ -35,8 +35,9 @@ lens_max_term_size = lens cfg_max_term_size (\x y -> y { cfg_max_term_size = x }
 lens_max_cp_depth = lens cfg_max_cp_depth (\x y -> y { cfg_max_cp_depth = x })
 
 data Extended fun = Minimal | Skolem Twee.Var | Function fun
-  deriving (Eq, Ord)
-  deriving Labelled via AutoLabel (Extended fun)
+  deriving (Eq, Ord, Typeable)
+
+instance (Ord fun, Typeable fun) => Labelled (Extended fun)
 
 instance Sized fun => Sized (Extended fun) where
   size (Function f) = size f

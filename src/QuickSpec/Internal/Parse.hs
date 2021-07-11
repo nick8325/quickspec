@@ -9,7 +9,7 @@ import Data.Char
 import QuickSpec.Internal.Prop
 import QuickSpec.Internal.Term hiding (char)
 import QuickSpec.Internal.Type
-import qualified Twee.Label as Label
+import qualified Data.Label as Label
 import Text.ParserCombinators.ReadP
 
 class Parse fun a where
@@ -20,7 +20,7 @@ instance Parse fun Var where
     x <- satisfy isUpper
     xs <- munch isAlphaNum
     let name = x:xs
-    -- Use Twee.Label as an easy way to generate a variable number
+    -- Use Data.Label as an easy way to generate a variable number
     return (V typeVar (fromIntegral (Label.labelNum (Label.label name))))
 
 instance (fun1 ~ fun, Apply (Term fun)) => Parse fun1 (Term fun) where

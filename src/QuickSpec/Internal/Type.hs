@@ -1,7 +1,7 @@
 -- | This module is internal to QuickSpec.
 --
 -- Polymorphic types and dynamic values.
-{-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances, GeneralizedNewtypeDeriving, Rank2Types, ExistentialQuantification, PolyKinds, TypeFamilies, FlexibleContexts, StandaloneDeriving, PatternGuards, MultiParamTypeClasses, ConstraintKinds, DataKinds, GADTs, DerivingVia #-}
+{-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances, GeneralizedNewtypeDeriving, Rank2Types, ExistentialQuantification, PolyKinds, TypeFamilies, FlexibleContexts, StandaloneDeriving, PatternGuards, MultiParamTypeClasses, ConstraintKinds, DataKinds, GADTs #-}
 -- To avoid a warning about TyVarNumber's constructor being unused:
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
 module QuickSpec.Internal.Type(
@@ -51,8 +51,9 @@ data TyCon =
     -- | A string. Can be used to represent miscellaneous types that do not
     -- really exist in Haskell.
   | String String
-  deriving (Eq, Ord, Show)
-  deriving Labelled via AutoLabel TyCon
+  deriving (Eq, Ord, Show, Typeable)
+
+instance Labelled TyCon
 
 instance Pretty TyCon where
   pPrint Arrow = text "->"

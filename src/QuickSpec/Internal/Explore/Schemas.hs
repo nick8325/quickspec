@@ -22,7 +22,7 @@ import qualified Data.Set as Set
 import Data.Set(Set)
 import Data.Maybe
 import Control.Monad
-import Twee.Label
+import Data.Label
 
 -- | Constrains how variables of a particular type may occur in a term.
 data VariableUse =
