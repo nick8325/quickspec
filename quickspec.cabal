@@ -87,11 +87,7 @@ library
     QuickSpec.Internal.Parse
     QuickSpec.Internal.Prop
     QuickSpec.Internal.Pruning
-    QuickSpec.Internal.Pruning.Background
     QuickSpec.Internal.Pruning.Twee
-    QuickSpec.Internal.Pruning.Types
-    QuickSpec.Internal.Pruning.UntypedTwee
-    QuickSpec.Internal.Pruning.PartialApplication
     QuickSpec.Internal.Term
     QuickSpec.Internal.Terminal
     QuickSpec.Internal.Testing
@@ -112,5 +108,5 @@ library
     spoon,
     template-haskell,
     transformers,
-    twee-lib == 2.4,
+    twee-lib == 2.4.1,
     uglymemo

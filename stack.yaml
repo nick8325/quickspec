@@ -4,5 +4,5 @@ packages:
 - .
 extra-deps:
 - spoon-0.3.1
-- twee-lib-2.4
+- twee-lib-2.4.1
 - primitive-0.7.1.0

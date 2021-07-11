@@ -15,7 +15,6 @@ import QuickSpec.Internal.Prop
 import QuickSpec.Internal.Term
 import QuickSpec.Internal.Type
 import QuickSpec.Internal.Pruning
-import QuickSpec.Internal.Pruning.Background(Background(..))
 import QuickSpec.Internal.Testing
 import QuickSpec.Internal.Terminal
 import QuickSpec.Internal.Utils
@@ -83,10 +82,6 @@ instance Pretty fun => Pretty (WithConstructor fun) where
 instance PrettyTerm fun => PrettyTerm (WithConstructor fun) where
   termStyle (Constructor _ _) = curried
   termStyle (Normal f) = termStyle f
-
-instance (Predicate fun, Background fun) => Background (WithConstructor fun) where
-  background (Normal f) = map (mapFun Normal) (background f)
-  background _ = []
 
 instance Typed fun => Typed (WithConstructor fun) where
   typ (Constructor pred ty) =

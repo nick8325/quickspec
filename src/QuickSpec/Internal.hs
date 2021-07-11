@@ -16,7 +16,7 @@ import QuickSpec.Internal.Haskell(Predicateable, PredicateTestCase, Names(..), O
 import qualified QuickSpec.Internal.Haskell as Haskell
 import qualified QuickSpec.Internal.Haskell.Resolve as Haskell
 import qualified QuickSpec.Internal.Testing.QuickCheck as QuickCheck
-import qualified QuickSpec.Internal.Pruning.UntypedTwee as Twee
+import qualified QuickSpec.Internal.Pruning.Twee as Twee
 import QuickSpec.Internal.Prop
 import QuickSpec.Internal.Term(Term)
 import QuickSpec.Internal.Explore.Schemas(VariableUse(..))

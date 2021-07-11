@@ -36,7 +36,6 @@ import qualified QuickSpec.Internal.Pruning.Twee as Twee
 import QuickSpec.Internal.Explore hiding (quickSpec)
 import qualified QuickSpec.Internal.Explore
 import QuickSpec.Internal.Explore.Polymorphic(Universe(..), VariableUse(..))
-import QuickSpec.Internal.Pruning.Background(Background)
 import Control.Monad
 import Control.Monad.Trans.State.Strict
 import QuickSpec.Internal.Terminal
@@ -395,8 +394,6 @@ instance Ord Constant where
   compare =
     comparing $ \con ->
       (typeArity (typ con), typ con, con_name con)
-
-instance Background Constant
 
 con :: Typeable a => String -> a -> Constant
 con name val =
