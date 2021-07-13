@@ -32,7 +32,7 @@ import Test.QuickCheck.Gen.Unsafe
 import Data.Char
 import Data.Ord
 import qualified QuickSpec.Internal.Testing.QuickCheck as QuickCheck
-import qualified QuickSpec.Internal.Pruning.Twee as Twee
+import qualified QuickSpec.Internal.Pruning.Twee as Twee hiding (var)
 import QuickSpec.Internal.Explore hiding (quickSpec)
 import qualified QuickSpec.Internal.Explore
 import QuickSpec.Internal.Explore.Polymorphic(Universe(..), VariableUse(..))
