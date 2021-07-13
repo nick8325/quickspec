@@ -23,6 +23,8 @@ import Data.Ord
 data Term f = Var {-# UNPACK #-} !Var | Fun !f | !(Term f) :$: !(Term f)
   deriving (Eq, Ord, Show, Functor)
 
+infixl 6 :$:
+
 -- | A variable, which has a type and a number.
 data Var = V { var_ty :: !Type, var_id :: {-# UNPACK #-} !Int }
   deriving (Eq, Ord, Show, Generic)

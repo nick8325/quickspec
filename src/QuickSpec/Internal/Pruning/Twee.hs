@@ -134,23 +134,21 @@ normaliseTwee :: (Typed fun, Ord fun, Typeable fun, PrettyTerm fun, Sized fun) =
 normaliseTwee state t =
   result u (normaliseTerm state u)
   where
-    u = simplifyTerm state (skolemise t)
+    u = simplifyTerm state (toTwee (skolemise (encode t)))
 
 normalFormsTwee :: (Typed fun, Ord fun, Typeable fun, PrettyTerm fun, Sized fun) =>
   State (Extended fun) -> Term fun -> Set (Norm fun)
 normalFormsTwee state t =
-  Set.fromList . Map.elems $ Map.mapWithKey result (normalForms state (skolemise t))
+  --Set.fromList . Map.elems $ Map.mapWithKey result (normalForms state (skolemise (encode t)))
+  Set.singleton (normaliseTwee state t)
 
 addTwee :: (Typed fun, Ord fun, Typeable fun, PrettyTerm fun, Sized fun) =>
   Twee.Config (Extended fun) -> Term fun -> Term fun ->
   Set (Twee.Fun (Extended fun)) -> State (Extended fun) ->
   (Set (Twee.Fun (Extended fun)), State (Extended fun))
-addTwee config t0 u0 funs state =
-  addWithAxioms process (funs, state) (axiom (Twee.builder t) (Twee.builder u))
+addTwee config t u funcs state =
+  addWithAxioms process (funcs, state) (encode t :=: encode u)
   where
-    t = toTwee t0
-    u = toTwee u0
-
     process = {-dump . -} interreduce config . completePure config
 {-
     dump !state =
@@ -161,80 +159,64 @@ addTwee config t0 u0 funs state =
         return $! state
 -}
 
-    addWithAxioms proc (funs, state) ax@Axiom{axiom_eqn = t Twee.:=: u} =
-      (funs'', proc $ addAxiom config (proc state'') ax)
+    addWithAxioms proc (funcs, state) eq@(t :=: u) =
+      (funcs'', proc $ addAxiom config (proc state'') ax)
       where
-        funs' =
-          Set.fromList (Twee.funs t ++ Twee.funs u) `Set.difference` funs
-        (funs'', state') =
+        ax = Axiom 0 (prettyShow eq) (toTwee t Twee.:=: toTwee u)
+        funcs' = Set.fromList (map Twee.fun (funs eq)) `Set.difference` funcs
+        (funcs'', state') =
           foldl' (addWithAxioms id)
-            (funs `Set.union` funs', state)
-            (concatMap axioms (map Twee.fun_value (Set.toList funs')))
+            (funcs `Set.union` funcs', state)
+            (concatMap axioms (map Twee.fun_value (Set.toList funcs')))
         state'' = proc state'
 
-axiom :: (Typed fun, Ord fun, Typeable fun, PrettyTerm fun) =>
-  Twee.Builder (Extended fun) -> Twee.Builder (Extended fun) -> Axiom (Extended fun)
-axiom t0 u0 = Axiom 0 (prettyShow (t :=: u)) (t Twee.:=: u)
-  where
-    t = Twee.build t0
-    u = Twee.build u0
+var :: Int -> Term (Extended fun)
+var n = Var (V typeVar n)
 
-axioms :: (Typed fun, Ord fun, Typeable fun, PrettyTerm fun) =>
-  Extended fun -> [Axiom (Extended fun)]
+app :: Type -> Term (Extended fun) -> Term (Extended fun) -> Term (Extended fun)
+app ty t u = Fun (Apply ty) :$: t :$: u
+
+tag :: Type -> Term (Extended fun) -> Term (Extended fun)
+tag ty t = Fun (Tag ty) :$: t
+
+papp :: f -> Int -> Term (Extended f)
+papp f n = Fun (Function f n) :@: map var [0..n-1]
+
+papp' :: f -> Int -> Int -> Term (Extended f) -> Term (Extended f)
+papp' f n i t =
+  Fun (Function f n) :@: (map var [0..i-1] ++ [t] ++ map var [i+1..n-1])
+axioms :: Typed fun => Extended fun -> [Equation (Term (Extended fun))]
 axioms (Function f n) =
-  [ axiom (tag (typeDrop n (typ f)) (papp f n)) (papp f n) ] ++
-  [ axiom (papp' f n i (tag ty (var i))) (papp f n)
+  [ tag (typeDrop n (typ f)) (papp f n) :=: papp f n ] ++
+  [ papp' f n i (tag ty (var i)) :=: papp f n
   | (i, ty) <- zip [0..n-1] (typeArgs (typ f)) ] ++
-  [ axiom (app (typeDrop n (typ f)) (papp f n) (var n)) (papp f (n+1))
+  [ app (typeDrop n (typ f)) (papp f n) (var n) :=: papp f (n+1)
   | n < typeArity (typ f) ]
 axioms (Apply ty) =
-  [axiom (tag res expr) expr,
-   axiom (app ty (tag ty (var 0)) (var 1)) expr,
-   axiom (app ty (var 0) (tag arg (var 1))) expr] 
+  [tag res expr :=: expr,
+   app ty (tag ty (var 0)) (var 1) :=: expr,
+   app ty (var 0) (tag arg (var 1)) :=: expr] 
   where
     expr = app ty (var 0) (var 1)
     Just (arg, res) = unpackArrow ty
 axioms _ = []
 
-fun :: (Typed f, Ord f, Typeable f) => f -> Twee.Builder (Extended f)
-fun f = Twee.con (Twee.fun (Function f 0))
-
-papp :: (Typed f, Ord f, Typeable f) => f -> Int -> Twee.Builder (Extended f)
-papp f n = Twee.app (Twee.fun (Function f n)) (map var [0..n-1])
-
-papp' :: (Typed f, Ord f, Typeable f) => f -> Int -> Int -> Twee.Builder (Extended f) -> Twee.Builder (Extended f)
-papp' f n i t = Twee.app (Twee.fun (Function f n)) (map var [0..i-1] ++ [t] ++ map var [i+1..n-1])
-
-skolem :: (Typed f, Ord f, Typeable f) => Int -> Twee.Builder (Extended f)
-skolem x = Twee.con (Twee.fun (Skolem x))
-
-var :: Int -> Twee.Builder f
-var = Twee.var . Twee.V
-
-tag :: (Typed f, Ord f, Typeable f) =>
-  Type -> Twee.Builder (Extended f) -> Twee.Builder (Extended f)
-tag ty x = Twee.app (Twee.fun (Tag ty)) x
-
-app ::
-  (Typed f, Ord f, Typeable f) =>
-  Type -> Twee.Builder (Extended f) -> Twee.Builder (Extended f) -> Twee.Builder (Extended f)
-app ty x y = Twee.app (Twee.fun (Apply ty)) (Twee.builder x `mappend` Twee.builder y)
-
-toTwee :: (Typed f, Ord f, Typeable f) =>
-  Term f -> Twee.Term (Extended f)
-toTwee = toTweeWith var
-
-skolemise :: (Typed f, Ord f, Typeable f) =>
-  Term f -> Twee.Term (Extended f)
-skolemise = toTweeWith skolem
-
-{-# INLINE toTweeWith #-}
-toTweeWith :: (Typed f, Ord f, Typeable f) =>
-  (Int -> Twee.Builder (Extended f)) ->
-  Term f -> Twee.Term (Extended f)
-toTweeWith var = Twee.build . tt
+encode :: Typed f => Term f -> Term (Extended f)
+encode t = tag (typ t) (enc t)
   where
-    tt t = tag (typ t) (tt1 t)
-    tt1 (Var x) = var (var_id x)
-    tt1 (Fun f) = fun f
-    tt1 (t :$: u) = app (typ t) (tt t) (tt u)
+    enc (Var x) = Var x
+    enc (Fun f) = Fun (Function f 0)
+    enc (t :$: u) = app (typ t) (encode t) (encode u)
+
+skolemise :: Term (Extended f) -> Term (Extended f)
+skolemise (Var x) = Fun (Skolem (var_id x))
+skolemise (Fun f) = Fun f
+skolemise (t :$: u) = skolemise t :$: skolemise u
+
+toTwee :: (Typed f, Ord f, Typeable f) => Term (Extended f) -> Twee.Term (Extended f)
+toTwee = Twee.build . tt
+  where
+    tt (Var x) = Twee.var (Twee.V (var_id x))
+    tt (Fun f :@: ts) = Twee.app (Twee.fun f) (map tt ts)
+    tt _ = error "partial application found after encoding"
+
