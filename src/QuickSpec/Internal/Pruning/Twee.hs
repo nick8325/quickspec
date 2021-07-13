@@ -92,13 +92,17 @@ run Config{..} (Pruner x) =
   where
     config =
       defaultConfig {
-        Twee.cfg_accept_term = Just (\t -> size t <= cfg_max_term_size),
+        Twee.cfg_accept_term = Just (\t -> size (Twee.singleton t) <= cfg_max_term_size),
         Twee.cfg_max_cp_depth = cfg_max_cp_depth }
 
-instance (Labelled fun, Sized fun) => Sized (Twee.Term fun) where
-  size (Twee.Var _) = 1
-  size (Twee.App f ts) =
-    size (Twee.fun_value f) + sum (map size (Twee.unpack ts))
+instance (Labelled fun, Sized fun) => Sized (Twee.TermList fun) where
+  size = aux 0
+    where
+      aux n Twee.Empty = n
+      aux n (Twee.ConsSym{hd = t, rest = ts}) =
+        case t of
+          Twee.Var _ -> aux (n+1) ts
+          Twee.App f _ -> aux (n + size (Twee.fun_value f)) ts
 
 instance KBO.Weighted (Extended fun) where
   argWeight _ = 1
