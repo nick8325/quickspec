@@ -13,7 +13,8 @@ import qualified Twee
 import qualified Twee.Equation as Twee
 import qualified Twee.KBO as KBO
 import qualified Twee.Base as Twee
-import Twee hiding (Config(..))
+import Twee.Join(cfg_use_connectedness_standalone)
+import Twee hiding (Config(..), State)
 import Twee.Rule hiding (normalForms)
 import Twee.Proof hiding (Config, defaultConfig, axiom)
 import Twee.Base(Ordered(..), Labelled)
@@ -25,6 +26,7 @@ import QuickSpec.Internal.Terminal
 import qualified Data.Set as Set
 import Data.Set(Set)
 import Data.List
+import qualified Data.Map.Strict as Map
 
 data Config =
   Config {
@@ -80,20 +82,26 @@ instance (Sized fun, Pretty fun, PrettyTerm fun, Ord fun, Typeable fun) => Order
   lessEqSkolem = KBO.lessEqSkolem
 
 newtype Pruner fun m a =
-  Pruner (ReaderT (Twee.Config (Extended fun)) (StateT (Set (Twee.Fun (Extended fun)), State (Extended fun)) m) a)
+  Pruner (ReaderT (Twee.Config (Extended fun)) (StateT (State fun) m) a)
   deriving (Functor, Applicative, Monad, MonadIO, MonadTester testcase term, MonadTerminal)
+
+data State fun =
+  State {
+    state_funs          :: Set (Twee.Fun (Extended fun)),
+    state_twee          :: Twee.State (Extended fun) }
 
 instance MonadTrans (Pruner fun) where
   lift = Pruner . lift . lift
 
 run :: (Typeable fun, Ord fun, Sized fun, Monad m) => Config -> Pruner fun m a -> m a
 run Config{..} (Pruner x) =
-  evalStateT (runReaderT x config) (Set.empty, initialState config)
+  evalStateT (runReaderT x config) (State Set.empty (initialState config))
   where
     config =
       defaultConfig {
         Twee.cfg_accept_term = Just (\t -> size (Twee.singleton t) <= cfg_max_term_size),
-        Twee.cfg_max_cp_depth = cfg_max_cp_depth }
+        Twee.cfg_max_cp_depth = cfg_max_cp_depth,
+        Twee.cfg_join = (Twee.cfg_join defaultConfig) { cfg_use_connectedness_standalone = False } }
 
 instance (Labelled fun, Sized fun) => Sized (Twee.TermList fun) where
   size = aux 0
@@ -112,21 +120,20 @@ type Norm fun = Twee.Term (Extended fun)
 instance (Typed fun, Ord fun, Typeable fun, PrettyTerm fun, Sized fun, Monad m) =>
   MonadPruner (Term fun) (Norm fun) (Pruner fun m) where
   normaliser = Pruner $ do
-    (_, state) <- lift get
+    state <- lift get
     return $ \t ->
       let u = normaliseTwee state t in
       u
       -- traceShow (text "normalise:" <+> pPrint t <+> text "->" <+> pPrint u) u
 
   add ([] :=>: t :=: u) = Pruner $ do
-    (funs, state) <- lift get
+    state <- lift get
     config <- ask
     let (t' :=: u') = canonicalise (t :=: u)
-    if not (null (Set.intersection (normalFormsTwee state t') (normalFormsTwee state u'))) then
+    if normaliseTwee state t' == normaliseTwee state u' then
       return False
     else do
-      let (!funs', !state') = addTwee config t u funs state
-      lift $ put (funs', state')
+      lift $! put $! addTwee config t u state
       return True
 
   add _ =
@@ -134,26 +141,22 @@ instance (Typed fun, Ord fun, Typeable fun, PrettyTerm fun, Sized fun, Monad m) 
     --error "twee pruner doesn't support non-unit equalities"
 
 normaliseTwee :: (Typed fun, Ord fun, Typeable fun, PrettyTerm fun, Sized fun) =>
-  State (Extended fun) -> Term fun -> Norm fun
-normaliseTwee state t =
-  result u (normaliseTerm state u)
+  State fun -> Term fun -> Norm fun
+normaliseTwee State{..} t =
+  result u (normaliseTerm state_twee u)
   where
-    u = simplifyTerm state (toTwee (skolemise (encode t)))
-
-normalFormsTwee :: (Typed fun, Ord fun, Typeable fun, PrettyTerm fun, Sized fun) =>
-  State (Extended fun) -> Term fun -> Set (Norm fun)
-normalFormsTwee state t =
-  --Set.fromList . Map.elems $ Map.mapWithKey result (normalForms state (skolemise (encode t)))
-  Set.singleton (normaliseTwee state t)
+    u = simplifyTerm state_twee (toTwee (skolemise (encode t)))
 
 addTwee :: (Typed fun, Ord fun, Typeable fun, PrettyTerm fun, Sized fun) =>
-  Twee.Config (Extended fun) -> Term fun -> Term fun ->
-  Set (Twee.Fun (Extended fun)) -> State (Extended fun) ->
-  (Set (Twee.Fun (Extended fun)), State (Extended fun))
-addTwee config t u funcs state =
-  addWithAxioms process (funcs, state) (encode t :=: encode u)
+  Twee.Config (Extended fun) -> Term fun -> Term fun -> State fun -> State fun
+addTwee config t u state =
+  state' {
+    state_twee = process $ addAxiom config (process $ state_twee state') (axiom (encode t :=: encode u)) }
   where
+    state' = addAxiomsForEq state (encode t :=: encode u)
+    axiom eq@(t :=: u) = Axiom 0 (prettyShow eq) (toTwee t Twee.:=: toTwee u)
     process = {-dump . -} interreduce config . completePure config
+
 {-
     dump !state =
       unsafePerformIO $ do
@@ -163,16 +166,20 @@ addTwee config t u funcs state =
         return $! state
 -}
 
-    addWithAxioms proc (funcs, state) eq@(t :=: u) =
-      (funcs'', proc $ addAxiom config (proc state'') ax)
+    addAxiomsForEq state eq =
+      foldl' addAxiomsForFunc state (funs eq)
+
+    addAxiomsForFunc state f
+      | Twee.fun f `Set.member` state_funs state = state
+      | otherwise = foldl' addAxiomsForEq state' axs
       where
-        ax = Axiom 0 (prettyShow eq) (toTwee t Twee.:=: toTwee u)
-        funcs' = Set.fromList (map Twee.fun (funs eq)) `Set.difference` funcs
-        (funcs'', state') =
-          foldl' (addWithAxioms id)
-            (funcs `Set.union` funcs', state)
-            (concatMap axioms (map Twee.fun_value (Set.toList funcs')))
-        state'' = proc state'
+        axs = axioms f
+        axs' = map axiom axs
+
+        state' =
+          State {
+            state_funs = Set.insert (Twee.fun f) (state_funs state),
+            state_twee = foldl' (addAxiom config) (state_twee state) axs' }
 
 var :: Int -> Term (Extended fun)
 var n = Var (V typeVar n)
