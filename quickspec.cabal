@@ -101,9 +101,9 @@ library
     QuickSpec.Internal.Utils
 
   Build-depends:
-    QuickCheck >= 2.10,
+    QuickCheck >= 2.14.2,
     quickcheck-instances >= 0.3.16,
-    base >= 4 && < 5,
+    base >= 4.7 && < 5,
     constraints,
     containers,
     data-lens-light >= 0.1.1,
