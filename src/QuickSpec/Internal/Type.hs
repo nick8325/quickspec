@@ -35,7 +35,7 @@ import Unsafe.Coerce
 import Data.Constraint
 import Twee.Base
 import Data.Proxy
-import Data.List
+import Data.List hiding (singleton)
 import Data.Char
 import Data.Functor.Identity
 
