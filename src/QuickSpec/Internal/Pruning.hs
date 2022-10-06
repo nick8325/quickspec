@@ -3,7 +3,6 @@
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, GeneralizedNewtypeDeriving, FlexibleInstances, UndecidableInstances, DefaultSignatures, GADTs #-}
 module QuickSpec.Internal.Pruning where
 
-
 import QuickSpec.Internal.Type (Arity (..))  
 import QuickSpec.Internal.Prop
 import QuickSpec.Internal.Testing
