@@ -7,6 +7,7 @@
 module QuickSpec.Internal.Type(
   -- * Types
   Typeable,
+  Arity(..),
   Type, TyCon(..), tyCon, fromTyCon, A, B, C, D, E, ClassA, ClassB, ClassC, ClassD, ClassE, ClassF, SymA, typeVar, isTypeVar,
   typeOf, typeRep, typeFromTyCon, applyType, fromTypeRep,
   arrowType, isArrowType, unpackArrow, typeArgs, typeRes, typeDrop, typeArity,
@@ -566,3 +567,7 @@ bringFunctor val =
   case unwrap val of
     x `In` w ->
       fmap (wrap w . Identity) x
+
+class Arity f where
+  -- | Measure the arity.
+  arity :: f -> Int
