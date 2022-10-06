@@ -12,7 +12,6 @@ import QuickSpec.Internal.Terminal
 import QuickSpec.Internal.Testing
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
-import Twee.Base(Arity(..))
 
 data PartiallyApplied f =
     -- A partially-applied function symbol.
