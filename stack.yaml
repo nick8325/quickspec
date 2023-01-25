@@ -1,8 +1,7 @@
-resolver: lts-19.16
+resolver: lts-20.8
 
 packages:
 - .
 extra-deps:
-- spoon-0.3.1
 - twee-lib-2.4.2
 - primitive-0.7.4.0

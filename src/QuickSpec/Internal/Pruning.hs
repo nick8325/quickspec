@@ -1,9 +1,8 @@
 -- A type of pruners.
 {-# OPTIONS_HADDOCK hide #-}
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, GeneralizedNewtypeDeriving, FlexibleInstances, UndecidableInstances, DefaultSignatures, GADTs #-}
+{-# LANGUAGE FunctionalDependencies, GeneralizedNewtypeDeriving, FlexibleInstances, UndecidableInstances, DefaultSignatures, GADTs, TypeOperators #-}
 module QuickSpec.Internal.Pruning where
 
-import QuickSpec.Internal.Type (Arity (..))  
 import QuickSpec.Internal.Prop
 import QuickSpec.Internal.Testing
 import Control.Monad.Trans.Class
@@ -53,4 +52,4 @@ watchPruner :: Monad m => WatchPruner term m a -> m (a, [Prop term])
 watchPruner (WatchPruner mx) = do
   (x, props) <- runStateT mx []
   return (x, reverse props)
-    
+

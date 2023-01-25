@@ -1,6 +1,6 @@
 -- | Parsing strings into properties.
 {-# OPTIONS_HADDOCK hide #-}
-{-# LANGUAGE TypeSynonymInstances, FlexibleInstances, MultiParamTypeClasses, GADTs #-}
+{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, GADTs, TypeOperators #-}
 {-# LANGUAGE FlexibleContexts #-}
 module QuickSpec.Internal.Parse where
 
