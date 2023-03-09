@@ -112,5 +112,5 @@ library
     spoon,
     template-haskell,
     transformers,
-    twee-lib == 2.4,
+    twee-lib,
     uglymemo
