@@ -49,15 +49,19 @@ run config@Config{..} gen eval (Tester x) = do
   seed <- maybe arbitrary return cfg_fixed_seed
   let
     seeds = unfoldr (Just . split) seed
-    n = cfg_num_tests
+    n = fromIntegral (ceiling (fromIntegral cfg_num_tests * (1 - zeroProportion)))
+    zeroes = cfg_num_tests - n
     k = max 1 cfg_max_test_size
     bias = 3
+    -- Run this proportion of tests of size 0.
+    zeroProportion = 0.01
     -- Bias tests towards smaller sizes.
     -- We do this by distributing the cube of the size uniformly.
     sizes =
-      reverse $ map (k -) $
-      map (truncate . (** (1/fromInteger bias)) . fromIntegral) $
-      uniform (toInteger n) (toInteger k^bias)
+      replicate zeroes 0 ++
+      (reverse $ map (k -) $
+       map (truncate . (** (1/fromInteger bias)) . fromIntegral) $
+       uniform (toInteger n) (toInteger k^bias))
     tests = zipWith (unGen gen) seeds sizes
   return $ runReaderT x
     Environment {
