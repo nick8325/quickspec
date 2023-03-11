@@ -64,6 +64,8 @@ import qualified Data.Semigroup as DS
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
 import qualified Data.Map.Strict as Map
+import Test.QuickCheck.Gen
+import Test.QuickCheck.Random
 
 baseInstances :: Instances
 baseInstances =
@@ -798,6 +800,15 @@ quickSpec cfg@Config{..} = do
       ofValue (\(Use x) -> x) $ fromJust $
       (findInstance instances ty :: Maybe (Value Use))
 
+    hole ty =
+      Fun $
+      case findInstance instances ty :: Maybe (Value Gen) of
+        Just vgen ->
+          let runGen g = Identity (unGen g (mkQCGen 0) 0) in
+          constant' "hole" (mapValue runGen vgen)
+        Nothing -> 
+          fromJust (cast ty (con "UNDEF_HOLE" (undefined :: A)))
+        
     mainOf n f g = do
       unless (null (f cfg_constants)) $ do
         putLine $ show $ pPrintSignature
@@ -824,19 +835,21 @@ quickSpec cfg@Config{..} = do
         add prop
       mapM_ round [0..rounds-1]
 {-
-      let hole ty = Fun (con "hole" (undefined :: Int)) { con_type = ty }
       thms <- theorems hole
       let numThms = length thms
+      let test' prop
+            | or [con_name con == "UNDEF_HOLE" | con <- funs prop] = return Nothing
+            | otherwise = test prop
       norm <- normaliser
       forM_ (zip [1 :: Int ..] thms) $ \(i, thm) -> do
         putStatus (printf "checking laws for consistency: %d/%d" i numThms)
-        res <- test (prop thm)
+        res <- test' (prop thm)
         case res of
           Nothing -> return ()
           Just counterexample -> do
             forM_ (axiomsUsed thm) $ \(ax, insts) ->
               forM_ insts $ \inst -> do
-                res <- test inst
+                res <- test' inst
                 case res of
                   Nothing -> return ()
                   Just counterexample -> do
