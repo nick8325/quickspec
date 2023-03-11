@@ -410,6 +410,11 @@ withFixedSeed s = Sig (\_ -> setL (QuickCheck.lens_fixed_seed # Haskell.lens_qui
 withInferInstanceTypes :: Sig
 withInferInstanceTypes = Sig (\_ -> setL (Haskell.lens_infer_instance_types) True)
 
+-- | (Experimental) Check that the discovered laws do not imply any
+-- false laws
+withConsistencyCheck :: Sig
+withConsistencyCheck = Sig (\_ -> setL (Haskell.lens_check_consistency) True)
+
 -- | A signature containing boolean functions:
 -- @(`||`)@, @(`&&`)@, `not`, `True`, `False`.
 bools :: Sig

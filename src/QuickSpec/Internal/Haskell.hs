@@ -625,7 +625,8 @@ data Config =
     cfg_infer_instance_types :: Bool,
     cfg_background :: [Prop (Term Constant)],
     cfg_print_filter :: Prop (Term Constant) -> Bool,
-    cfg_print_style :: PrintStyle
+    cfg_print_style :: PrintStyle,
+    cfg_check_consistency :: Bool
     }
 
 lens_quickCheck = lens cfg_quickCheck (\x y -> y { cfg_quickCheck = x })
@@ -640,6 +641,7 @@ lens_infer_instance_types = lens cfg_infer_instance_types (\x y -> y { cfg_infer
 lens_background = lens cfg_background (\x y -> y { cfg_background = x })
 lens_print_filter = lens cfg_print_filter (\x y -> y { cfg_print_filter = x })
 lens_print_style = lens cfg_print_style (\x y -> y { cfg_print_style = x })
+lens_check_consistency = lens cfg_check_consistency (\x y -> y { cfg_check_consistency = x })
 
 defaultConfig :: Config
 defaultConfig =
@@ -655,7 +657,8 @@ defaultConfig =
     cfg_infer_instance_types = False,
     cfg_background = [],
     cfg_print_filter = \_ -> True,
-    cfg_print_style = ForHumans }
+    cfg_print_style = ForHumans,
+    cfg_check_consistency = False }
 
 -- Extra types for the universe that come from in-scope instances.
 instanceTypes :: Instances -> Config -> [Type]
@@ -739,19 +742,20 @@ quickSpec cfg@Config{..} = do
     eval = evalHaskell cfg_default_to instances
     was_observed = isNothing . findOrdInstance instances  -- it was observed if there is no Ord instance directly in scope
 
-    --prettiestProp norm = prettyProp (names instances) . prettyAC norm . conditionalise
+    prettierProp funs norm = prettyDefinition funs . prettyAC norm . conditionalise
+    prettiestProp funs norm = prettyProp (names instances) . prettierProp funs norm
 
     present funs prop = do
       norm <- normaliser
-      let prop' = prettyDefinition funs (prettyAC norm (conditionalise prop))
+      let prop' = prettierProp funs norm prop
       when (not (hasBackgroundPredicates prop') && not (isBackgroundProp prop') && cfg_print_filter prop) $ do
-        (n :: Int, props, falseProps) <- get
-        put (n+1, props, falseProps)
+        (n :: Int, props) <- get
+        put (n+1, props)
         putLine $
           case cfg_print_style of
             ForHumans ->
               printf "%3d. %s" n $ show $
-                prettyProp (names instances) prop' <+> disambiguatePropType prop
+                prettiestProp funs norm prop <+> disambiguatePropType prop
             ForQuickCheck ->
               renderStyle (style {lineLength = 78}) $ nest 2 $
                 prettyPropQC
@@ -799,15 +803,6 @@ quickSpec cfg@Config{..} = do
       ofValue (\(Use x) -> x) $ fromJust $
       (findInstance instances ty :: Maybe (Value Use))
 
-    hole ty =
-      Fun $
-      case findInstance instances ty :: Maybe (Value Gen) of
-        Just vgen ->
-          let runGen g = Identity (unGen g (mkQCGen 0) 0) in
-          constant' "hole" (mapValue runGen vgen)
-        Nothing -> 
-          fromJust (cast ty (con "UNDEF_HOLE" (undefined :: A)))
-        
     mainOf n f g = do
       unless (null (f cfg_constants)) $ do
         putLine $ show $ pPrintSignature
@@ -821,7 +816,7 @@ quickSpec cfg@Config{..} = do
           putLine "quickspec_laws ="
       let
         pres prop = do
-          modify $ \(k, props, falseProps) -> (k, prop:props, falseProps)
+          modify $ \(k, props) -> (k, prop:props)
           if n == 0 then return () else present (constantsOf f) prop
       QuickSpec.Internal.Explore.quickSpec pres (flip eval) cfg_max_size cfg_max_commutative_size use univ
         (enumerator (map Fun (constantsOf g)))
@@ -833,42 +828,59 @@ quickSpec cfg@Config{..} = do
       forM_ cfg_background $ \prop -> do
         add prop
       mapM_ round [0..rounds-1]
-{-
-      thms <- theorems hole
-      let numThms = length thms
-      let test' prop
-            | or [con_name con == "UNDEF_HOLE" | con <- funs prop] = return Nothing
-            | otherwise = test prop
-      norm <- normaliser
-      forM_ (zip [1 :: Int ..] thms) $ \(i, thm) -> do
-        putStatus (printf "checking laws for consistency: %d/%d" i numThms)
-        res <- test' (prop thm)
-        case res of
-          Just (TestFailed counterexample) -> do
-            forM_ (axiomsUsed thm) $ \(ax, insts) ->
-              forM_ insts $ \inst -> do
-                res <- test' inst
-                case res of
-                  Just (TestFailed counterexample) -> do
-                    (n, props, falseProps) <- get
-                    put (n, props, Map.insertWith Set.union ax (Set.singleton inst) falseProps)
-                  _ -> return ()
-          _ -> return ()
-      (_, _, falseProps) <- get
-      forM_ (Map.toList falseProps) $ \(ax, insts) -> do
-        putLine (printf "*** Law %s is false!" (prettyShow (prettiestProp norm ax)))
-        putLine "False instances:"
-        forM_ (Set.toList insts) $ \inst -> do
-          putLine (printf "  %s is false" (prettyShow (prettiestProp norm inst)))
-        putLine ""
--}
       where
         round n = mainOf n (concat . take 1 . drop n) (concat . take (n+1))
         rounds = length cfg_constants
+
+    -- Used in checkConsistency. Generate a term to be used when a
+    -- Twee proof contains a hole ("?"), i.e. a don't-care variable.
+    hole ty =
+      -- It doesn't matter what the value of the variable is, so
+      -- generate a single random value and use that.
+      case findInstance instances ty :: Maybe (Value Gen) of
+        Just vgen ->
+          let runGen g = Identity (unGen g (mkQCGen 1234) 5) in
+          Fun (constant' "anything" (mapValue runGen vgen))
+        Nothing -> 
+          -- No generator available. We return a variable.
+          -- Testing the property will be skipped, because
+          -- the testing code will fail to generate a value for this
+          -- variable (because it doesn't have a generator).
+          Var (V ty 0)
+
+    testFailed :: Maybe (TestResult a) -> Bool
+    testFailed (Just (TestFailed _)) = True
+    testFailed _ = False
+
+    checkConsistency = do
+      thms <- theorems hole
+      let numThms = length thms
+      norm <- normaliser
+
+      forM_ (zip [1 :: Int ..] thms) $ \(i, thm) -> do
+        putStatus (printf "checking laws for consistency: %d/%d" i numThms)
+        res <- test (prop thm)
+        when (testFailed res) $ do
+          forM_ (axiomsUsed thm) $ \(ax, insts) ->
+            forM_ insts $ \inst -> do
+              res <- test inst
+              when (testFailed res) $ do
+                modify (Map.insertWith Set.union ax (Set.singleton inst))
+
+      falseProps <- get
+      forM_ (Map.toList falseProps) $ \(ax, insts) -> do
+        putLine (printf "*** Law %s is false!" (prettyShow (prettiestProp constants norm ax)))
+        putLine "False instances:"
+        forM_ (Set.toList insts) $ \inst -> do
+          putLine (printf "  %s is false" (prettyShow (prettiestProp constants norm inst)))
+        putLine ""
+
   join $
     fmap withStdioTerminal $
     generate $
     QuickCheck.run cfg_quickCheck (arbitraryTestCase cfg_default_to instances) eval $
     Twee.run cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size } $
-    runConditionals constants $
-    fmap (\(_, props, _) -> reverse props) $ flip execStateT (1, [], Map.empty) main
+    runConditionals constants $ do
+      result <- fmap (reverse . snd) $ flip execStateT (1, []) main
+      when cfg_check_consistency $ void $ execStateT checkConsistency Map.empty
+      return result
