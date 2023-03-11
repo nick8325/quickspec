@@ -17,7 +17,7 @@ module QuickSpec.Internal.Explore.Polymorphic(
 
 import qualified QuickSpec.Internal.Explore.Schemas as Schemas
 import QuickSpec.Internal.Explore.Schemas(Schemas, Result(..), VariableUse(..))
-import QuickSpec.Internal.Term
+import QuickSpec.Internal.Term hiding (mapFun)
 import QuickSpec.Internal.Type
 import QuickSpec.Internal.Testing
 import QuickSpec.Internal.Pruning
