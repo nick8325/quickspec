@@ -128,6 +128,13 @@ instance (PrettyTerm fun, Ord fun, Typed fun, Apply (Term fun), MonadPruner (Ter
     let insts = typeInstances univ (canonicalise (regeneralise (mapFun fun_original prop)))
     or <$> mapM add insts
 
+  normTheorems = PolyM normTheorems
+
+  decodeNormalForm hole t =
+    PolyM $ do
+      t <- decodeNormalForm (fmap fun_specialised . hole) t
+      return $ fmap (\f -> PolyFun f f) t
+
 instance MonadTester testcase (Term fun) m =>
   MonadTester testcase (Term (PolyFun fun)) (PolyM testcase result fun norm m) where
   test prop = PolyM $ lift (test (mapFun fun_original prop))

@@ -25,6 +25,7 @@ import QuickSpec.Internal.Terminal
 import qualified Data.Set as Set
 import Data.Set(Set)
 import qualified Data.Map.Strict as Map
+import qualified Data.IntMap as IntMap
 
 data Config =
   Config {
@@ -96,7 +97,7 @@ instance KBO.Weighted (Extended fun) where
 
 type Norm fun = Twee.Term (Extended fun)
 
-instance (Ord fun, Typeable fun, Arity fun, PrettyTerm fun, EqualsBonus fun, Sized fun, Monad m) =>
+instance (Ord fun, Typed fun, Typeable fun, Arity fun, PrettyTerm fun, EqualsBonus fun, Sized fun, Monad m) =>
   MonadPruner (Term fun) (Norm fun) (Pruner fun m) where
   normaliser = Pruner $ do
     state <- lift get
@@ -118,6 +119,37 @@ instance (Ord fun, Typeable fun, Arity fun, PrettyTerm fun, EqualsBonus fun, Siz
   add _ =
     return True
     --error "twee pruner doesn't support non-unit equalities"
+
+  decodeNormalForm hole t = return (decode t (error "ambiguously-typed term"))
+    where
+      decode (Twee.Var (Twee.V n)) ty =
+        Var (V ty n)
+      decode (Twee.App (Twee.F _ Minimal) Twee.Empty) ty =
+        hole ty
+      decode (Twee.App (Twee.F _ (Skolem (Twee.V n))) Twee.Empty) ty =
+        Var (V ty n)
+      decode (Twee.App (Twee.F _ (Function f)) ts) ty =
+        Fun f :@: zipWith decode (Twee.unpack ts) args
+        where
+          args = typeArgs (typ f)
+
+  normTheorems = Pruner $ do
+    state <- lift get
+    let actives = IntMap.elems (Twee.st_active_set state)
+    let
+      toTheorem active =
+        Theorem
+          (toProp (equation proof))
+          (map toAxiom . Map.toList . groundAxiomsAndSubsts $ deriv)
+        where
+          proof = Twee.active_proof active
+          deriv = derivation proof
+          toProp (t Twee.:=: u) = [] :=>: t :=: u
+          toAxiom (ax, subs) = (toProp eqn, map toProp [Twee.subst sub eqn | sub <- Set.toList subs])
+            where
+              eqn = axiom_eqn ax
+
+    return (map toTheorem actives)
 
 normaliseTwee :: (Ord fun, Typeable fun, Arity fun, PrettyTerm fun, EqualsBonus fun, Sized fun) =>
   State (Extended fun) -> Term fun -> Norm fun

@@ -12,6 +12,7 @@ import QuickSpec.Internal.Terminal
 import QuickSpec.Internal.Testing
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
+import Data.Maybe
 
 data PartiallyApplied f =
     -- A partially-applied function symbol.
@@ -93,6 +94,13 @@ instance (PrettyTerm fun, Typed fun, MonadPruner (Term (PartiallyApplied fun)) n
   add prop =
     Pruner $ do
       add (encode <$> canonicalise prop)
+
+  decodeNormalForm hole t =
+    Pruner $ do
+      t <- decodeNormalForm (fmap (flip Partial 0) . hole) t
+      let f (Partial x _) = Just (Fun x)
+          f (Apply _) = Nothing
+      return $ fromJust $ flatMapFunMaybe f t
 
 encode :: Typed fun => Term fun -> Term (PartiallyApplied fun)
 encode (Var x) = Var x

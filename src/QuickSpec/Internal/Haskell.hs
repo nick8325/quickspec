@@ -31,6 +31,7 @@ import Data.MemoUgly
 import Test.QuickCheck.Gen.Unsafe
 import Data.Char
 import Data.Ord
+import QuickSpec.Internal.Testing
 import qualified QuickSpec.Internal.Testing.QuickCheck as QuickCheck
 import qualified QuickSpec.Internal.Pruning.Twee as Twee
 import QuickSpec.Internal.Explore hiding (quickSpec)
@@ -60,6 +61,9 @@ import Data.Void
 import Data.Unique
 import qualified Data.Monoid as DM
 import qualified Data.Semigroup as DS
+import Control.Monad.IO.Class
+import Control.Monad.Trans.Class
+import qualified Data.Map.Strict as Map
 
 baseInstances :: Instances
 baseInstances =
@@ -734,12 +738,14 @@ quickSpec cfg@Config{..} = do
     eval = evalHaskell cfg_default_to instances
     was_observed = isNothing . findOrdInstance instances  -- it was observed if there is no Ord instance directly in scope
 
+    --prettiestProp norm = prettyProp (names instances) . prettyAC norm . conditionalise
+
     present funs prop = do
       norm <- normaliser
       let prop' = prettyDefinition funs (prettyAC norm (conditionalise prop))
       when (not (hasBackgroundPredicates prop') && not (isBackgroundProp prop') && cfg_print_filter prop) $ do
-        (n :: Int, props) <- get
-        put (n+1, props)
+        (n :: Int, props, falseProps) <- get
+        put (n+1, props, falseProps)
         putLine $
           case cfg_print_style of
             ForHumans ->
@@ -805,7 +811,7 @@ quickSpec cfg@Config{..} = do
           putLine "quickspec_laws ="
       let
         pres prop = do
-          modify $ \(k, props) -> (k, prop:props)
+          modify $ \(k, props, falseProps) -> (k, prop:props, falseProps)
           if n == 0 then return () else present (constantsOf f) prop
       QuickSpec.Internal.Explore.quickSpec pres (flip eval) cfg_max_size cfg_max_commutative_size use univ
         (enumerator (map Fun (constantsOf g)))
@@ -817,14 +823,40 @@ quickSpec cfg@Config{..} = do
       forM_ cfg_background $ \prop -> do
         add prop
       mapM_ round [0..rounds-1]
+{-
+      let hole ty = Fun (con "hole" (undefined :: Int)) { con_type = ty }
+      thms <- theorems hole
+      let numThms = length thms
+      norm <- normaliser
+      forM_ (zip [1 :: Int ..] thms) $ \(i, thm) -> do
+        putStatus (printf "checking laws for consistency: %d/%d" i numThms)
+        res <- test (prop thm)
+        case res of
+          Nothing -> return ()
+          Just counterexample -> do
+            forM_ (axiomsUsed thm) $ \(ax, insts) ->
+              forM_ insts $ \inst -> do
+                res <- test inst
+                case res of
+                  Nothing -> return ()
+                  Just counterexample -> do
+                    (n, props, falseProps) <- get
+                    put (n, props, Map.insertWith Set.union ax (Set.singleton inst) falseProps)
+      (_, _, falseProps) <- get
+      forM_ (Map.toList falseProps) $ \(ax, insts) -> do
+        putLine (printf "*** Law %s is false!" (prettyShow (prettiestProp norm ax)))
+        putLine "False instances:"
+        forM_ (Set.toList insts) $ \inst -> do
+          putLine (printf "  %s is false" (prettyShow (prettiestProp norm inst)))
+        putLine ""
+-}
       where
         round n = mainOf n (concat . take 1 . drop n) (concat . take (n+1))
         rounds = length cfg_constants
-
   join $
     fmap withStdioTerminal $
     generate $
     QuickCheck.run cfg_quickCheck (arbitraryTestCase cfg_default_to instances) eval $
     Twee.run cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size } $
     runConditionals constants $
-    fmap (reverse . snd) $ flip execStateT (1, []) main
+    fmap (\(_, props, _) -> reverse props) $ flip execStateT (1, [], Map.empty) main

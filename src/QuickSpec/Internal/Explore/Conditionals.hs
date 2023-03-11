@@ -42,6 +42,10 @@ instance (Typed fun, Ord fun, PrettyTerm fun, Ord norm, MonadPruner (Term (WithC
       considerConditionalising prop
       return res
 
+  decodeNormalForm hole t = lift $ do
+    t <- decodeNormalForm (fmap Normal . hole) t
+    return $ fmap (\(Normal f) -> f) t
+
 conditionalsUniverse :: (Typed fun, Predicate fun) => [Type] -> [fun] -> Universe
 conditionalsUniverse tys funs =
   universe $
