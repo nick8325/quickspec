@@ -51,7 +51,7 @@ instance_ t = reading (\Schemas{..} -> keyDefault t sc_empty # instances)
 initialState ::
   (Type -> VariableUse) ->
   (Term fun -> Bool) ->
-  (Term fun -> testcase -> result) ->
+  (Term fun -> testcase -> Maybe result) ->
   Schemas testcase result fun norm
 initialState use inst eval =
   Schemas {

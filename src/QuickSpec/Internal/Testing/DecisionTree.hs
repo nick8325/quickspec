@@ -9,7 +9,7 @@ import Data.Map(Map)
 data DecisionTree testcase result term =
   DecisionTree {
     -- A function for evaluating terms on test cases.
-    dt_evaluate :: term -> testcase -> result,
+    dt_evaluate :: term -> testcase -> Maybe result,
     -- The set of test cases gathered so far.
     dt_test_cases :: [testcase],
     -- The tree itself.
@@ -24,7 +24,7 @@ data Result testcase result term =
   | EqualTo term
 
 -- Make a new decision tree.
-empty :: (term -> testcase -> result) -> DecisionTree testcase result term
+empty :: (term -> testcase -> Maybe result) -> DecisionTree testcase result term
 empty eval =
   DecisionTree {
     dt_evaluate = eval,
@@ -50,17 +50,25 @@ insert x dt@DecisionTree{dt_tree = Just dt_tree, ..} =
     k tree = dt{dt_tree = Just tree}
     aux _ [] (Singleton y) = EqualTo y
     aux k (t:ts) (Singleton y) =
-      aux k (t:ts) $
-        TestCase (Map.singleton (dt_evaluate y t) (Singleton y)) 
-    aux k (t:ts) (TestCase res) =
-      let
-        val = dt_evaluate x t
-        k' tree = k (TestCase (Map.insert val tree res))
-      in case Map.lookup val res of
+      case dt_evaluate y t of
         Nothing ->
-          Distinct (k' (Singleton x))
-        Just tree ->
-          aux k' ts tree
+          -- y is untestable, so we can evict it from the tree
+          Distinct (k (Singleton x))
+        Just val ->
+          aux k (t:ts) $
+            TestCase (Map.singleton val (Singleton y)) 
+    aux k (t:ts) (TestCase res) =
+      case dt_evaluate x t of
+        Nothing ->
+          Distinct (k (TestCase res))
+        Just val ->
+          let
+            k' tree = k (TestCase (Map.insert val tree res))
+          in case Map.lookup val res of
+            Nothing ->
+              Distinct (k' (Singleton x))
+            Just tree ->
+              aux k' ts tree
     aux _ [] (TestCase _) =
       error "unexpected node in decision tree"
 

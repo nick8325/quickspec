@@ -33,7 +33,7 @@ data Environment testcase term result =
   Environment {
     env_config :: Config,
     env_tests :: [testcase],
-    env_eval :: testcase -> term -> result }
+    env_eval :: testcase -> term -> Maybe result }
 
 newtype Tester testcase term result m a =
   Tester (ReaderT (Environment testcase term result) m a)
@@ -43,7 +43,7 @@ instance MonadTrans (Tester testcase term result) where
   lift = Tester . lift
 
 run ::
-  Config -> Gen testcase -> (testcase -> term -> result) ->
+  Config -> Gen testcase -> (testcase -> term -> Maybe result) ->
   Tester testcase term result m a -> Gen (m a)
 run config@Config{..} gen eval (Tester x) = do
   seed <- maybe arbitrary return cfg_fixed_seed
@@ -87,15 +87,19 @@ instance (Monad m, Eq result) => MonadTester testcase term (Tester testcase term
 
 quickCheckTest :: Eq result =>
   Environment testcase term result ->
-  Prop term -> Maybe testcase
+  Prop term -> Maybe (TestResult testcase)
 quickCheckTest Environment{env_config = Config{..}, ..} (lhs :=>: rhs) =
-  msum (map test env_tests)
+  foldr combine (Just TestPassed) (map test env_tests)
   where
+    combine (Just TestPassed) x = x
+    combine x _ = x
+
     test testcase = do
-        guard $
-          all (testEq testcase) lhs &&
-          not (testEq testcase rhs)
-        return testcase
+      lhs <- mapM (testEq testcase) lhs
+      rhs <- testEq testcase rhs
+      if and lhs && not rhs then
+        return (TestFailed testcase)
+      else return TestPassed
 
     testEq testcase (t :=: u) =
-      env_eval testcase t == env_eval testcase u
+      liftM2 (==) (env_eval testcase t) (env_eval testcase u)

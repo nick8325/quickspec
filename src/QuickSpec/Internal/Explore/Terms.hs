@@ -37,7 +37,7 @@ treeForType :: Type -> Lens (Terms testcase result term norm) (DecisionTree test
 treeForType ty = reading (\Terms{..} -> keyDefault ty tm_empty # tree)
 
 initialState ::
-  (term -> testcase -> result) ->
+  (term -> testcase -> Maybe result) ->
   Terms testcase result term norm
 initialState eval =
   Terms {
@@ -73,9 +73,11 @@ explore' t = do
   exp norm $ \prop -> do
     res <- test prop
     case res of
-      Nothing -> do
+      Nothing ->
+        return Singleton
+      Just TestPassed -> do
         return (Discovered prop)
-      Just tc -> do
+      Just (TestFailed tc) -> do
         treeForType ty %= addTestCase tc
         exp norm $
           error "returned counterexample failed to falsify property"

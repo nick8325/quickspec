@@ -373,15 +373,14 @@ arbitraryFunction :: CoArbitrary a => (a -> Gen b) -> Gen (a -> b)
 arbitraryFunction gen = promote (\x -> coarbitrary x (gen x))
 
 -- | Evaluate a Haskell term in an environment.
-evalHaskell :: Type -> Instances -> TestCase -> Term Constant -> Either (Value Ordy) (Term Constant)
-evalHaskell def insts (TestCase env obs) t =
-  maybe (Right t) Left $ do
-    let eval env t = evalTerm env (evalConstant insts) t
-    Identity val `In` w <- unwrap <$> eval env (defaultTo def t)
-    res <- obs (wrap w (Identity val))
-    -- Don't allow partial results to enter the decision tree
-    guard (withValue res (\(Ordy x) -> isJust (teaspoon (x == x))))
-    return res
+evalHaskell :: Type -> Instances -> TestCase -> Term Constant -> Maybe (Value Ordy)
+evalHaskell def insts (TestCase env obs) t = do
+  let eval env t = evalTerm env (evalConstant insts) t
+  Identity val `In` w <- unwrap <$> eval env (defaultTo def t)
+  res <- obs (wrap w (Identity val))
+  -- Don't allow partial results to enter the decision tree
+  guard (withValue res (\(Ordy x) -> isJust (teaspoon (x == x))))
+  return res
 
 data Constant =
   Constant {
@@ -845,16 +844,16 @@ quickSpec cfg@Config{..} = do
         putStatus (printf "checking laws for consistency: %d/%d" i numThms)
         res <- test' (prop thm)
         case res of
-          Nothing -> return ()
-          Just counterexample -> do
+          Just (TestFailed counterexample) -> do
             forM_ (axiomsUsed thm) $ \(ax, insts) ->
               forM_ insts $ \inst -> do
                 res <- test' inst
                 case res of
-                  Nothing -> return ()
-                  Just counterexample -> do
+                  Just (TestFailed counterexample) -> do
                     (n, props, falseProps) <- get
                     put (n, props, Map.insertWith Set.union ax (Set.singleton inst) falseProps)
+                  _ -> return ()
+          _ -> return ()
       (_, _, falseProps) <- get
       forM_ (Map.toList falseProps) $ \(ax, insts) -> do
         putLine (printf "*** Law %s is false!" (prettyShow (prettiestProp norm ax)))

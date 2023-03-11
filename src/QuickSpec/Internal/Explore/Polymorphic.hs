@@ -61,7 +61,7 @@ initialState ::
   (Type -> VariableUse) ->
   Universe ->
   (Term fun -> Bool) ->
-  (Term fun -> testcase -> result) ->
+  (Term fun -> testcase -> Maybe result) ->
   Polymorphic testcase result fun norm
 initialState use univ inst eval =
   Polymorphic {
