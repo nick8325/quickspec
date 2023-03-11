@@ -72,10 +72,10 @@ instance (PrettyTerm fun, Typed fun, MonadPruner (UntypedTerm fun) norm pruner) 
 
   decodeNormalForm hole t =
     Pruner $ do
-      t <- decodeNormalForm (fmap Func . hole) t
+      t <- decodeNormalForm (fmap (fmap Func) . hole) t
       let f (Func x) = Just (Fun x)
           f (Tag _) = Nothing
-      return $ fromJust $ flatMapFunMaybe f t
+      return $ t >>= flatMapFunMaybe f
 
 instance (Typed fun, Arity fun, Background fun) => Background (Tagged fun) where
   background = typingAxioms

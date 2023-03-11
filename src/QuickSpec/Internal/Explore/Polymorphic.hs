@@ -132,8 +132,8 @@ instance (PrettyTerm fun, Ord fun, Typed fun, Apply (Term fun), MonadPruner (Ter
 
   decodeNormalForm hole t =
     PolyM $ do
-      t <- decodeNormalForm (fmap fun_specialised . hole) t
-      return $ fmap (\f -> PolyFun f f) t
+      t <- decodeNormalForm (fmap (fmap fun_specialised) . hole) t
+      return $ fmap (fmap (\f -> PolyFun f f)) t
 
 instance MonadTester testcase (Term fun) m =>
   MonadTester testcase (Term (PolyFun fun)) (PolyM testcase result fun norm m) where

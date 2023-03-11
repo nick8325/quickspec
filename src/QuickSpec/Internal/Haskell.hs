@@ -834,19 +834,12 @@ quickSpec cfg@Config{..} = do
 
     -- Used in checkConsistency. Generate a term to be used when a
     -- Twee proof contains a hole ("?"), i.e. a don't-care variable.
-    hole ty =
+    hole ty = do
       -- It doesn't matter what the value of the variable is, so
       -- generate a single random value and use that.
-      case findInstance instances ty :: Maybe (Value Gen) of
-        Just vgen ->
-          let runGen g = Identity (unGen g (mkQCGen 1234) 5) in
-          Fun (constant' "anything" (mapValue runGen vgen))
-        Nothing -> 
-          -- No generator available. We return a variable.
-          -- Testing the property will be skipped, because
-          -- the testing code will fail to generate a value for this
-          -- variable (because it doesn't have a generator).
-          Var (V ty 0)
+      vgen <- findInstance instances ty :: Maybe (Value Gen)
+      let runGen g = Identity (unGen g (mkQCGen 1234) 5)
+      return $ Fun (constant' "anything" (mapValue runGen vgen))
 
     testFailed :: Maybe (TestResult a) -> Bool
     testFailed (Just (TestFailed _)) = True

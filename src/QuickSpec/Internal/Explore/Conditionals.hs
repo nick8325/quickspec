@@ -43,8 +43,10 @@ instance (Typed fun, Ord fun, PrettyTerm fun, Ord norm, MonadPruner (Term (WithC
       return res
 
   decodeNormalForm hole t = lift $ do
-    t <- decodeNormalForm (fmap Normal . hole) t
-    return $ fmap (\(Normal f) -> f) t
+    t <- decodeNormalForm (fmap (fmap Normal) . hole) t
+    let f (Normal x) = Just (Fun x)
+        f _ = Nothing
+    return $ t >>= flatMapFunMaybe f
 
 conditionalsUniverse :: (Typed fun, Predicate fun) => [Type] -> [fun] -> Universe
 conditionalsUniverse tys funs =

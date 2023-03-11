@@ -97,10 +97,10 @@ instance (PrettyTerm fun, Typed fun, MonadPruner (Term (PartiallyApplied fun)) n
 
   decodeNormalForm hole t =
     Pruner $ do
-      t <- decodeNormalForm (fmap (flip Partial 0) . hole) t
+      t <- decodeNormalForm (fmap (fmap (flip Partial 0)) . hole) t
       let f (Partial x _) = Just (Fun x)
           f (Apply _) = Nothing
-      return $ fromJust $ flatMapFunMaybe f t
+      return $ t >>= flatMapFunMaybe f
 
 encode :: Typed fun => Term fun -> Term (PartiallyApplied fun)
 encode (Var x) = Var x
