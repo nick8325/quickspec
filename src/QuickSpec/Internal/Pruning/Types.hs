@@ -12,6 +12,7 @@ import QuickSpec.Internal.Prop
 import QuickSpec.Internal.Terminal
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
+import Data.Maybe
 
 data Tagged fun =
     Func fun
@@ -33,6 +34,13 @@ instance Pretty fun => Pretty (Tagged fun) where
 instance PrettyTerm fun => PrettyTerm (Tagged fun) where
   termStyle (Func f) = termStyle f
   termStyle (Tag _) = uncurried
+
+instance Typed fun => Typed (Tagged fun) where
+  typ (Func f) = typ f
+  typ (Tag ty) = arrowType [ty] ty
+
+  typeSubst_ sub (Func f) = Func (typeSubst_ sub f)
+  typeSubst_ sub (Tag ty) = Tag (typeSubst_ sub ty)
 
 instance EqualsBonus (Tagged fun) where
 
@@ -60,6 +68,13 @@ instance (PrettyTerm fun, Typed fun, MonadPruner (UntypedTerm fun) norm pruner) 
         norm . encode $ t
 
   add prop = lift (add (encode <$> canonicalise prop))
+
+  decodeNormalForm hole t =
+    Pruner $ do
+      t <- decodeNormalForm (fmap Func . hole) t
+      let f (Func x) = Just (Fun x)
+          f (Tag _) = Nothing
+      return $ fromJust $ flatMapFunMaybe f t
 
 instance (Typed fun, Arity fun, Background fun) => Background (Tagged fun) where
   background = typingAxioms

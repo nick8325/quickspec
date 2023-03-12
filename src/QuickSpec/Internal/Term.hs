@@ -18,6 +18,7 @@ import qualified Data.Map.Strict as Map
 import Data.Map(Map)
 import Data.List
 import Data.Ord
+import Data.Maybe
 
 -- | A typed term.
 data Term f = Var {-# UNPACK #-} !Var | Fun !f | !(Term f) :$: !(Term f)
@@ -148,6 +149,19 @@ mapVar :: (Var -> Var) -> Term f -> Term f
 mapVar f (Var x) = Var (f x)
 mapVar _ (Fun x) = Fun x
 mapVar f (t :$: u) = mapVar f t :$: mapVar f u
+
+-- | Map a function over function symbols.
+-- If the function returns 'Nothing', that represents the identity function.
+flatMapFunMaybe :: (f -> Maybe (Term g)) -> Term f -> Maybe (Term g)
+flatMapFunMaybe _ (Var x) = Just (Var x)
+flatMapFunMaybe f (Fun x) = f x
+flatMapFunMaybe f (t :$: u) =
+  case flatMapFunMaybe f t of
+    Nothing -> flatMapFunMaybe f u
+    Just t' ->
+      case flatMapFunMaybe f u of
+        Nothing -> error "Couldn't eliminate identity"
+        Just u' -> Just (t' :$: u')
 
 -- | Find all subterms of a term. Includes the term itself.
 subterms :: Term f -> [Term f]
