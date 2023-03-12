@@ -1,7 +1,7 @@
 -- | This module is internal to QuickSpec.
 --
 -- Polymorphic types and dynamic values.
-{-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables, EmptyDataDecls, TypeSynonymInstances, FlexibleInstances, GeneralizedNewtypeDeriving, Rank2Types, ExistentialQuantification, PolyKinds, TypeFamilies, FlexibleContexts, StandaloneDeriving, PatternGuards, MultiParamTypeClasses, ConstraintKinds, DataKinds, GADTs #-}
+{-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables, FlexibleInstances, GeneralizedNewtypeDeriving, Rank2Types, ExistentialQuantification, PolyKinds, TypeFamilies, FlexibleContexts, StandaloneDeriving, PatternGuards, MultiParamTypeClasses, ConstraintKinds, DataKinds, GADTs, TypeOperators #-}
 -- To avoid a warning about TyVarNumber's constructor being unused:
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
 module QuickSpec.Internal.Type(

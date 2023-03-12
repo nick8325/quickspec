@@ -13,7 +13,7 @@
 -- their types must be such that the instance search will terminate.
 
 {-# OPTIONS_HADDOCK hide #-}
-{-# LANGUAGE RankNTypes, ScopedTypeVariables #-}
+{-# LANGUAGE RankNTypes, ScopedTypeVariables, CPP #-}
 module QuickSpec.Internal.Haskell.Resolve(Instances(..), inst, valueInst, findInstance, findValue) where
 
 import Twee.Base
@@ -23,7 +23,9 @@ import Data.Functor.Identity
 import Data.Maybe
 import Data.Proxy
 import Control.Monad
+#if !MIN_VERSION_base(4,9,0)
 import Data.Semigroup(Semigroup(..))
+#endif
 
 -- A set of instances.
 data Instances =

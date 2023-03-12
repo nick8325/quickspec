@@ -1,4 +1,5 @@
 {-# OPTIONS_HADDOCK hide #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -8,7 +9,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE DefaultSignatures #-}
@@ -262,8 +262,10 @@ instance Observe t p a => Observe t (Maybe p) (DM.First a) where
   observe t = observe t . DM.getFirst
 instance Observe t p a => Observe t (Maybe p) (DM.Last a) where
   observe t = observe t . DM.getLast
+#if !MIN_VERSION_base(4,13,0)
 instance Observe t p a => Observe t (Maybe p) (DS.Option a) where
   observe t = observe t . DS.getOption
+#endif
 instance Observe t p a => Observe t (Maybe p) (Maybe a) where
   observe t (Just a) = Just $ observe t a
   observe _ Nothing  = Nothing

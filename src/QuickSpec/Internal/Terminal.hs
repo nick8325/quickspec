@@ -1,5 +1,5 @@
 {-# OPTIONS_HADDOCK hide #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving, DefaultSignatures, GADTs #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, DefaultSignatures, GADTs, TypeOperators #-}
 module QuickSpec.Internal.Terminal where
 
 import Control.Monad.Trans.Class

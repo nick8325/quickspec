@@ -1,10 +1,10 @@
 -- | The main QuickSpec module, with internal stuff exported.
 -- For QuickSpec hackers only.
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE RankNTypes #-}
@@ -28,7 +28,9 @@ import QuickSpec.Internal.Utils
 import QuickSpec.Internal.Type hiding (defaultTo)
 import Data.Proxy
 import System.Environment
+#if !MIN_VERSION_base(4,9,0)
 import Data.Semigroup(Semigroup(..))
+#endif
 
 -- | Run QuickSpec. See the documentation at the top of this file.
 quickSpec :: Signature sig => sig -> IO ()
@@ -170,7 +172,7 @@ predicateGen name x gen =
 
 -- | Declare a new monomorphic type.
 -- The type must implement `Ord` and `Arbitrary`.
--- 
+--
 -- If the type does not implement `Ord`, you can use `monoTypeObserve`
 -- to declare an observational equivalence function. If the type does
 -- not implement `Arbitrary`, you can use `generator` to declare a

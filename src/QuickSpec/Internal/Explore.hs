@@ -1,5 +1,5 @@
 {-# OPTIONS_HADDOCK hide #-}
-{-# LANGUAGE FlexibleContexts, PatternGuards #-}
+{-# LANGUAGE FlexibleContexts, PatternGuards, CPP #-}
 module QuickSpec.Internal.Explore where
 
 import QuickSpec.Internal.Explore.Polymorphic
@@ -14,7 +14,9 @@ import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.State.Strict
 import Text.Printf
+#if! MIN_VERSION_base(4,9,0)
 import Data.Semigroup(Semigroup(..))
+#endif
 import Data.List
 
 newtype Enumerator a = Enumerator { enumerate :: Int -> [[a]] -> [a] }

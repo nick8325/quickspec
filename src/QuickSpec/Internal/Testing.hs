@@ -1,6 +1,6 @@
 -- A type of test case generators.
 {-# OPTIONS_HADDOCK hide #-}
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, DefaultSignatures, GADTs, FlexibleInstances, UndecidableInstances #-}
+{-# LANGUAGE FunctionalDependencies, DefaultSignatures, GADTs, FlexibleInstances, UndecidableInstances, TypeOperators #-}
 module QuickSpec.Internal.Testing where
 
 import QuickSpec.Internal.Prop

@@ -1,6 +1,6 @@
 -- Encode monomorphic types during pruning.
 {-# OPTIONS_HADDOCK hide #-}
-{-# LANGUAGE RecordWildCards, FlexibleInstances, GeneralizedNewtypeDeriving, MultiParamTypeClasses, FlexibleContexts, ScopedTypeVariables, UndecidableInstances #-}
+{-# LANGUAGE FlexibleInstances, GeneralizedNewtypeDeriving, MultiParamTypeClasses, FlexibleContexts, ScopedTypeVariables, UndecidableInstances #-}
 module QuickSpec.Internal.Pruning.Types where
 
 import QuickSpec.Internal.Pruning
@@ -12,7 +12,6 @@ import QuickSpec.Internal.Prop
 import QuickSpec.Internal.Terminal
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
-import qualified Twee.Base as Twee
 import Data.Maybe
 
 data Tagged fun =
