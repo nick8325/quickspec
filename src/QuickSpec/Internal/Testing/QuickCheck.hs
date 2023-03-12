@@ -9,7 +9,6 @@ import QuickSpec.Internal.Prop
 import Test.QuickCheck
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Random
-import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Reader
@@ -82,24 +81,21 @@ uniform n k =
 instance (Monad m, Eq result) => MonadTester testcase term (Tester testcase term result m) where
   test prop =
     Tester $ do
-      env <- ask
-      return $! quickCheckTest env prop
+      env@Environment{..} <- ask
+      return $! foldr testAnd TestPassed (map (quickCheckTest env prop) env_tests)
+  retest testcase prop =
+    Tester $ do
+      env@Environment{..} <- ask
+      return $! quickCheckTest env prop testcase
 
 quickCheckTest :: Eq result =>
-  Environment testcase term result ->
-  Prop term -> Maybe (TestResult testcase)
-quickCheckTest Environment{env_config = Config{..}, ..} (lhs :=>: rhs) =
-  foldr combine (Just TestPassed) (map test env_tests)
+  Environment testcase term result -> Prop term -> testcase -> TestResult testcase
+quickCheckTest Environment{env_config = Config{..}, ..} (lhs :=>: rhs) testcase =
+  foldr testAnd (testEq rhs) (map testEq lhs)
   where
-    combine (Just TestPassed) x = x
-    combine x _ = x
-
-    test testcase = do
-      lhs <- mapM (testEq testcase) lhs
-      rhs <- testEq testcase rhs
-      if and lhs && not rhs then
-        return (TestFailed testcase)
-      else return TestPassed
-
-    testEq testcase (t :=: u) =
-      liftM2 (==) (env_eval testcase t) (env_eval testcase u)
+    testEq (t :=: u) =
+      case (env_eval testcase t, env_eval testcase u) of
+        (Just t, Just u)
+          | t == u -> TestPassed
+          | otherwise -> TestFailed testcase
+        _ -> Untestable

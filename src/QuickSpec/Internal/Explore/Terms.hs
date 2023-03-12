@@ -73,11 +73,11 @@ explore' t = do
   exp norm $ \prop -> do
     res <- test prop
     case res of
-      Nothing ->
+      Untestable ->
         return Singleton
-      Just TestPassed -> do
+      TestPassed -> do
         return (Discovered prop)
-      Just (TestFailed tc) -> do
+      TestFailed tc -> do
         treeForType ty %= addTestCase tc
         exp norm $
           error "returned counterexample failed to falsify property"

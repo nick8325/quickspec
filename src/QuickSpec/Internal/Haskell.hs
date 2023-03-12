@@ -391,7 +391,8 @@ data Constant =
     con_type :: Type,
     con_constraints :: [Type],
     con_size :: Int,
-    con_classify :: Classification Constant }
+    con_classify :: Classification Constant,
+    con_is_hole :: Bool }
 
 instance Eq Constant where
   x == y =
@@ -424,7 +425,8 @@ constant' name val =
     con_type = ty,
     con_constraints = constraints,
     con_size = 1,
-    con_classify = Function }
+    con_classify = Function,
+    con_is_hole = False }
   where
     (constraints, ty) = splitConstrainedType (typ val)
 
@@ -840,11 +842,15 @@ quickSpec cfg@Config{..} = do
       -- generate a single random value and use that.
       vgen <- findInstance instances ty :: Maybe (Value Gen)
       let runGen g = Identity (unGen g (mkQCGen 1234) 5)
-      return $ Fun (constant' "anything" (mapValue runGen vgen))
+      return $ Fun $ (constant' "hole" (mapValue runGen vgen)) { con_is_hole = True }
 
-    testFailed :: Maybe (TestResult a) -> Bool
-    testFailed (Just (TestFailed _)) = True
-    testFailed _ = False
+    -- Remove holes by replacing them with a fresh variable.
+    removeHoles prop = mapTerm (flatMapFun f) prop
+      where
+        f con
+          | con_is_hole con = Var (V (typ con) n)
+          | otherwise = Fun con
+        n = freeVar prop
 
     checkConsistency = do
       thms <- theorems hole
@@ -854,12 +860,14 @@ quickSpec cfg@Config{..} = do
       forM_ (zip [1 :: Int ..] thms) $ \(i, thm) -> do
         putStatus (printf "checking laws for consistency: %d/%d" i numThms)
         res <- test (prop thm)
-        when (testFailed res) $ do
-          forM_ (axiomsUsed thm) $ \(ax, insts) ->
-            forM_ insts $ \inst -> do
-              res <- test inst
-              when (testFailed res) $ do
-                modify (Map.insertWith Set.union ax (Set.singleton inst))
+        case res of
+          TestFailed testcase -> do
+            forM_ (axiomsUsed thm) $ \(ax, insts) ->
+              forM_ insts $ \inst -> do
+                res <- retest testcase inst
+                when (testResult res == TestFailed ()) $ do
+                  modify (Map.insertWith Set.union (removeHoles ax) (Set.singleton (removeHoles inst)))
+          _ -> return ()
 
       falseProps <- get
       forM_ (Map.toList falseProps) $ \(ax, insts) -> do

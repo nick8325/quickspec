@@ -43,6 +43,11 @@ unitProp p = [] :=>: p
 mapFun :: (fun1 -> fun2) -> Prop (Term fun1) -> Prop (Term fun2)
 mapFun f = fmap (fmap f)
 
+mapTerm :: (Term fun1 -> Term fun2) -> Prop (Term fun1) -> Prop (Term fun2)
+mapTerm f (lhs :=>: rhs) = map (both f) lhs :=>: both f rhs
+  where
+    both f (t :=: u) = f t :=: f u
+
 instance Typed a => Typed (Prop a) where
   typ _ = typeOf True
   otherTypesDL p = DList.fromList (literals p) >>= typesDL

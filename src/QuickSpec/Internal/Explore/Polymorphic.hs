@@ -138,6 +138,7 @@ instance (PrettyTerm fun, Ord fun, Typed fun, Apply (Term fun), MonadPruner (Ter
 instance MonadTester testcase (Term fun) m =>
   MonadTester testcase (Term (PolyFun fun)) (PolyM testcase result fun norm m) where
   test prop = PolyM $ lift (test (mapFun fun_original prop))
+  retest testcase prop = PolyM $ lift (retest testcase (mapFun fun_original prop))
 
 -- Given a property which only contains one type variable,
 -- add as much polymorphism to the property as possible.
