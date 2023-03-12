@@ -262,7 +262,7 @@ instance Observe t p a => Observe t (Maybe p) (DM.First a) where
   observe t = observe t . DM.getFirst
 instance Observe t p a => Observe t (Maybe p) (DM.Last a) where
   observe t = observe t . DM.getLast
-#if !MIN_VERSION_base(4,13,0)
+#if !MIN_VERSION_base(4,16,0)
 instance Observe t p a => Observe t (Maybe p) (DS.Option a) where
   observe t = observe t . DS.getOption
 #endif
