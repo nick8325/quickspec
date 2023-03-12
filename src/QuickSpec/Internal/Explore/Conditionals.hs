@@ -11,8 +11,8 @@
 {-# LANGUAGE DeriveFunctor #-}
 module QuickSpec.Internal.Explore.Conditionals where
 
-import QuickSpec.Internal.Prop
-import QuickSpec.Internal.Term
+import QuickSpec.Internal.Prop as Prop
+import QuickSpec.Internal.Term as Term
 import QuickSpec.Internal.Type
 import QuickSpec.Internal.Pruning
 import QuickSpec.Internal.Pruning.Background(Background(..))
@@ -38,13 +38,15 @@ instance (Typed fun, Ord fun, PrettyTerm fun, Ord norm, MonadPruner (Term (WithC
   add prop = do
     redundant <- conditionallyRedundant prop
     if redundant then return False else do
-      res <- lift (add (mapFun Normal prop))
+      res <- lift (add (Prop.mapFun Normal prop))
       considerConditionalising prop
       return res
 
   decodeNormalForm hole t = lift $ do
-    t <- decodeNormalForm (fmap Normal . hole) t
-    return $ fmap (\(Normal f) -> f) t
+    t <- decodeNormalForm (fmap (fmap Normal) . hole) t
+    let f (Normal x) = Just x
+        f _ = Nothing
+    return $ t >>= sequence . Term.mapFun f
 
 conditionalsUniverse :: (Typed fun, Predicate fun) => [Type] -> [fun] -> Universe
 conditionalsUniverse tys funs =
@@ -89,7 +91,7 @@ instance PrettyTerm fun => PrettyTerm (WithConstructor fun) where
   termStyle (Normal f) = termStyle f
 
 instance (Predicate fun, Background fun) => Background (WithConstructor fun) where
-  background (Normal f) = map (mapFun Normal) (background f)
+  background (Normal f) = map (Prop.mapFun Normal) (background f)
   background _ = []
 
 instance Typed fun => Typed (WithConstructor fun) where

@@ -8,7 +8,7 @@ import QuickSpec.Internal.Pruning.Background(Background(..))
 import QuickSpec.Internal.Testing
 import QuickSpec.Internal.Term
 import QuickSpec.Internal.Type
-import QuickSpec.Internal.Prop
+import QuickSpec.Internal.Prop hiding (mapFun)
 import QuickSpec.Internal.Terminal
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
@@ -71,10 +71,10 @@ instance (PrettyTerm fun, Typed fun, MonadPruner (UntypedTerm fun) norm pruner) 
 
   decodeNormalForm hole t =
     Pruner $ do
-      t <- decodeNormalForm (fmap Func . hole) t
-      let f (Func x) = Just (Fun x)
-          f (Tag _) = Nothing
-      return $ fromJust $ flatMapFunMaybe f t
+      t <- decodeNormalForm (fmap (fmap Func) . hole) t
+      let f (Func x) = NotId x
+          f (Tag _) = Id
+      return $ t >>= eliminateId . mapFun f
 
 instance (Typed fun, Arity fun, Background fun) => Background (Tagged fun) where
   background = typingAxioms

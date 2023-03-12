@@ -26,6 +26,7 @@ import qualified Data.Set as Set
 import Data.Set(Set)
 import qualified Data.Map.Strict as Map
 import qualified Data.IntMap as IntMap
+import Control.Monad
 
 data Config =
   Config {
@@ -123,13 +124,13 @@ instance (Ord fun, Typed fun, Typeable fun, Arity fun, PrettyTerm fun, EqualsBon
   decodeNormalForm hole t = return (decode t (error "ambiguously-typed term"))
     where
       decode (Twee.Var (Twee.V n)) ty =
-        Var (V ty n)
+        Just (Var (V ty n))
       decode (Twee.App (Twee.F _ Minimal) Twee.Empty) ty =
         hole ty
       decode (Twee.App (Twee.F _ (Skolem (Twee.V n))) Twee.Empty) ty =
-        Var (V ty n)
+        Just (Var (V ty n))
       decode (Twee.App (Twee.F _ (Function f)) ts) ty =
-        Fun f :@: zipWith decode (Twee.unpack ts) args
+        (Fun f :@:) <$> zipWithM decode (Twee.unpack ts) args
         where
           args = typeArgs (typ f)
 

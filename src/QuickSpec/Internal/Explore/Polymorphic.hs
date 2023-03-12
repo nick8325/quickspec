@@ -17,7 +17,7 @@ module QuickSpec.Internal.Explore.Polymorphic(
 
 import qualified QuickSpec.Internal.Explore.Schemas as Schemas
 import QuickSpec.Internal.Explore.Schemas(Schemas, Result(..), VariableUse(..))
-import QuickSpec.Internal.Term
+import QuickSpec.Internal.Term hiding (mapFun)
 import QuickSpec.Internal.Type
 import QuickSpec.Internal.Testing
 import QuickSpec.Internal.Pruning
@@ -61,7 +61,7 @@ initialState ::
   (Type -> VariableUse) ->
   Universe ->
   (Term fun -> Bool) ->
-  (Term fun -> testcase -> result) ->
+  (Term fun -> testcase -> Maybe result) ->
   Polymorphic testcase result fun norm
 initialState use univ inst eval =
   Polymorphic {
@@ -132,8 +132,8 @@ instance (PrettyTerm fun, Ord fun, Typed fun, Apply (Term fun), MonadPruner (Ter
 
   decodeNormalForm hole t =
     PolyM $ do
-      t <- decodeNormalForm (fmap fun_specialised . hole) t
-      return $ fmap (\f -> PolyFun f f) t
+      t <- decodeNormalForm (fmap (fmap fun_specialised) . hole) t
+      return $ fmap (fmap (\f -> PolyFun f f)) t
 
 instance MonadTester testcase (Term fun) m =>
   MonadTester testcase (Term (PolyFun fun)) (PolyM testcase result fun norm m) where

@@ -10,6 +10,7 @@ import Control.Monad.Trans.Class
 import Control.Monad.IO.Class
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Reader
+import Data.Maybe
 
 data Theorem norm =
   Theorem {
@@ -25,7 +26,7 @@ instance Pretty norm => Pretty (Theorem norm) where
 class Monad m => MonadPruner term norm m | m -> term norm where
   normaliser :: m (term -> norm)
   add :: Prop term -> m Bool
-  decodeNormalForm :: (Type -> term) -> norm -> m term
+  decodeNormalForm :: (Type -> Maybe term) -> norm -> m (Maybe term)
   normTheorems :: m [Theorem norm]
 
   default normaliser :: (MonadTrans t, MonadPruner term norm m', m ~ t m') => m (term -> norm)
@@ -37,13 +38,16 @@ class Monad m => MonadPruner term norm m | m -> term norm where
   default normTheorems :: (MonadTrans t, MonadPruner term' norm m', m ~ t m') => m [Theorem norm]
   normTheorems = lift normTheorems
 
-  default decodeNormalForm :: (MonadTrans t, MonadPruner term norm m', m ~ t m') => (Type -> term) -> norm -> m term
+  default decodeNormalForm :: (MonadTrans t, MonadPruner term norm m', m ~ t m') => (Type -> Maybe term) -> norm -> m (Maybe term)
   decodeNormalForm hole t = lift (decodeNormalForm hole t)
 
-theorems :: MonadPruner term norm m => (Type -> term) -> m [Theorem term]
+decodeTheorem :: MonadPruner term norm m => (Type -> Maybe term) -> Theorem norm -> m (Maybe (Theorem term))
+decodeTheorem hole thm = sequence <$> mapM (decodeNormalForm hole) thm
+
+theorems :: MonadPruner term norm m => (Type -> Maybe term) -> m [Theorem term]
 theorems hole = do
   thms <- normTheorems
-  mapM (mapM (decodeNormalForm hole)) thms
+  catMaybes <$> mapM (decodeTheorem hole) thms
 
 instance MonadPruner term norm m => MonadPruner term norm (StateT s m)
 instance MonadPruner term norm m => MonadPruner term norm (ReaderT r m)

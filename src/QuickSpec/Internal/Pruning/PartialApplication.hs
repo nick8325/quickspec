@@ -3,11 +3,11 @@
 {-# LANGUAGE FlexibleInstances, TypeSynonymInstances, RecordWildCards, MultiParamTypeClasses, FlexibleContexts, GeneralizedNewtypeDeriving, UndecidableInstances, DeriveFunctor #-}
 module QuickSpec.Internal.Pruning.PartialApplication where
 
-import QuickSpec.Internal.Term
+import QuickSpec.Internal.Term as Term
 import QuickSpec.Internal.Type
 import QuickSpec.Internal.Pruning.Background hiding (Pruner)
 import QuickSpec.Internal.Pruning
-import QuickSpec.Internal.Prop
+import QuickSpec.Internal.Prop as Prop
 import QuickSpec.Internal.Terminal
 import QuickSpec.Internal.Testing
 import Control.Monad.IO.Class
@@ -67,7 +67,7 @@ simpleApply t u =
 
 instance (Typed f, Background f) => Background (PartiallyApplied f) where
   background (Partial f _) =
-    map (mapFun (\f -> Partial f arity)) (background f) ++
+    map (Prop.mapFun (\f -> Partial f arity)) (background f) ++
     [ simpleApply (partial n) (vs !! n) === partial (n+1)
     | n <- [0..arity-1] ]
     where
@@ -97,10 +97,10 @@ instance (PrettyTerm fun, Typed fun, MonadPruner (Term (PartiallyApplied fun)) n
 
   decodeNormalForm hole t =
     Pruner $ do
-      t <- decodeNormalForm (fmap (flip Partial 0) . hole) t
-      let f (Partial x _) = Just (Fun x)
-          f (Apply _) = Nothing
-      return $ fromJust $ flatMapFunMaybe f t
+      t <- decodeNormalForm (fmap (fmap (flip Partial 0)) . hole) t
+      let f (Partial x _) = NotId x
+          f (Apply _) = Id
+      return $ t >>= eliminateId . Term.mapFun f
 
 encode :: Typed fun => Term fun -> Term (PartiallyApplied fun)
 encode (Var x) = Var x

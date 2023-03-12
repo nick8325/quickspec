@@ -97,6 +97,7 @@ module QuickSpec(
   withMaxTermSize, withMaxTests, withMaxTestSize, withMaxFunctions, defaultTo,
   withPruningDepth, withPruningTermSize, withFixedSeed,
   withInferInstanceTypes, withPrintStyle, PrintStyle(..),
+  withConsistencyCheck,
 
   -- * Integrating with QuickCheck
   (=~=),

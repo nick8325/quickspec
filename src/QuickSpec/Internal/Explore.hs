@@ -64,7 +64,7 @@ quickSpec ::
   (Ord fun, Ord norm, Sized fun, Typed fun, Ord result, PrettyTerm fun,
   MonadPruner (Term fun) norm m, MonadTester testcase (Term fun) m, MonadTerminal m) =>
   (Prop (Term fun) -> m ()) ->
-  (Term fun -> testcase -> result) ->
+  (Term fun -> testcase -> Maybe result) ->
   Int -> Int -> (Type -> VariableUse) -> Universe -> Enumerator (Term fun) -> m ()
 quickSpec present eval maxSize maxCommutativeSize use univ enum = do
   let
