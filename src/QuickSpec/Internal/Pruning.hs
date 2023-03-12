@@ -5,6 +5,7 @@ module QuickSpec.Internal.Pruning where
 
 import QuickSpec.Internal.Prop
 import QuickSpec.Internal.Testing
+import QuickSpec.Internal.Type(Type)
 import Twee.Pretty
 import Control.Monad.Trans.Class
 import Control.Monad.IO.Class
