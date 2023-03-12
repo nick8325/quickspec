@@ -12,7 +12,6 @@ import QuickSpec.Internal.Prop hiding (mapFun)
 import QuickSpec.Internal.Terminal
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
-import Data.Maybe
 
 data Tagged fun =
     Func fun

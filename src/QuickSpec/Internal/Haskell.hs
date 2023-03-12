@@ -49,7 +49,7 @@ import QuickSpec.Internal.Explore.Conditionals hiding (Normal)
 import Control.Spoon
 import qualified Data.Set as Set
 import qualified Test.QuickCheck.Poly as Poly
-import Numeric.Natural
+import Numeric.Natural(Natural)
 import Test.QuickCheck.Instances()
 import Data.Word
 import Data.List.NonEmpty (NonEmpty)
@@ -61,8 +61,6 @@ import Data.Void
 import Data.Unique
 import qualified Data.Monoid as DM
 import qualified Data.Semigroup as DS
-import Control.Monad.IO.Class
-import Control.Monad.Trans.Class
 import qualified Data.Map.Strict as Map
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Random

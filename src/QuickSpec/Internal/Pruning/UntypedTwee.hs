@@ -129,10 +129,11 @@ instance (Ord fun, Typed fun, Typeable fun, Arity fun, PrettyTerm fun, EqualsBon
         hole ty
       decode (Twee.App (Twee.F _ (Skolem (Twee.V n))) Twee.Empty) ty =
         Just (Var (V ty n))
-      decode (Twee.App (Twee.F _ (Function f)) ts) ty =
+      decode (Twee.App (Twee.F _ (Function f)) ts) _ =
         (Fun f :@:) <$> zipWithM decode (Twee.unpack ts) args
         where
           args = typeArgs (typ f)
+      decode _ _ = error "ill-typed term"
 
   normTheorems = Pruner $ do
     state <- lift get
