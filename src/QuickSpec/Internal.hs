@@ -1,5 +1,6 @@
 -- | The main QuickSpec module, with internal stuff exported.
 -- For QuickSpec hackers only.
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
