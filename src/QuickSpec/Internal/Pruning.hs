@@ -43,7 +43,17 @@ class Monad m => MonadPruner term norm m | m -> term norm where
   decodeNormalForm hole t = lift (decodeNormalForm hole t)
 
 decodeTheorem :: MonadPruner term norm m => (Type -> Maybe term) -> Theorem norm -> m (Maybe (Theorem term))
-decodeTheorem hole thm = sequence <$> mapM (decodeNormalForm hole) thm
+decodeTheorem hole thm = elimMaybeThm <$> mapM (decodeNormalForm hole) thm
+  where
+    elimMaybeThm (Theorem prop axs) =
+      case sequence prop of
+        Nothing -> Nothing
+        Just prop -> Just (Theorem prop (mapMaybe elimMaybeAx axs))
+    elimMaybeAx (ax, insts) =
+      case sequence ax of
+        Nothing -> Nothing
+        Just ax -> Just (ax, mapMaybe elimMaybeInst insts)
+    elimMaybeInst = sequence
 
 theorems :: MonadPruner term norm m => (Type -> Maybe term) -> m [Theorem term]
 theorems hole = do
