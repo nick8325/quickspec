@@ -1,3 +1,12 @@
+QuickSpec 2.2 (released 2023-09-21)
+* Compatibility with more recent GHC versions.
+* 'generator' for defining a custom generator for a particular data type.
+* 'withMaxFunctions' for limiting the maximum number of function
+  symbols per term.
+* 'withConsistencyCheck' (experimental) for reporting when the
+  discovered laws imply a false law.
+* Improvements to pruning.
+
 QuickSpec 2.1.5 (released 2020-08-31)
 * Give =~= an explicit fixity (thanks to Sandy Maguire).
 * More Observe instances (thanks to Sandy Maguire).
