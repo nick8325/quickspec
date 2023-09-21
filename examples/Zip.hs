@@ -10,6 +10,6 @@ eqLen xs ys = length xs == length ys
 main = quickSpec [
   -- Explore bigger terms.
   withMaxTermSize 8,
-  con "++" ((++) @ Int),
-  con "zip" (zip @ Int @ Int),
-  predicate "eqLen" (eqLen @ Int @ Int) ]
+  con "++" ((++) @Int),
+  con "zip" (zip @Int @Int),
+  predicate "eqLen" (eqLen @Int @Int) ]
