@@ -617,6 +617,7 @@ data Config =
     cfg_quickCheck :: QuickCheck.Config,
     cfg_twee :: Twee.Config,
     cfg_max_size :: Int,
+    cfg_max_depth :: Int,
     cfg_max_commutative_size :: Int,
     cfg_max_functions :: Int,
     cfg_instances :: Instances,
@@ -635,6 +636,7 @@ data Config =
 lens_quickCheck = lens cfg_quickCheck (\x y -> y { cfg_quickCheck = x })
 lens_twee = lens cfg_twee (\x y -> y { cfg_twee = x })
 lens_max_size = lens cfg_max_size (\x y -> y { cfg_max_size = x })
+lens_max_depth = lens cfg_max_depth (\x y -> y { cfg_max_depth = x })
 lens_max_commutative_size = lens cfg_max_commutative_size (\x y -> y { cfg_max_commutative_size = x })
 lens_max_functions = lens cfg_max_functions (\x y -> y { cfg_max_functions = x })
 lens_instances = lens cfg_instances (\x y -> y { cfg_instances = x })
@@ -652,6 +654,7 @@ defaultConfig =
     cfg_quickCheck = QuickCheck.Config { QuickCheck.cfg_num_tests = 1000, QuickCheck.cfg_max_test_size = 100, QuickCheck.cfg_fixed_seed = Nothing },
     cfg_twee = Twee.Config { Twee.cfg_max_term_size = minBound, Twee.cfg_max_cp_depth = maxBound },
     cfg_max_size = 7,
+    cfg_max_depth = maxBound,
     cfg_max_commutative_size = 5,
     cfg_max_functions = maxBound,
     cfg_instances = mempty,
@@ -795,6 +798,7 @@ quickSpec cfg@Config{..} = do
       sortTerms measure $
       filterEnumerator (all constraintsOk . funs) $
       filterEnumerator (\t -> length (usort (funs t)) <= cfg_max_functions) $
+      filterEnumerator (\t -> depth t <= cfg_max_depth) $
       filterEnumerator (\t -> size t + length (conditions t) <= cfg_max_size) $
       enumerateConstants atomic `mappend` enumerateApplications
       where

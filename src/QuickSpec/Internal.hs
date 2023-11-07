@@ -357,6 +357,10 @@ series = foldr op mempty . map signature
 withMaxTermSize :: Int -> Sig
 withMaxTermSize n = Sig (\_ -> setL Haskell.lens_max_size n)
 
+-- | Set the maximum depth of terms to explore (default: unlimited).
+withMaxTermDepth :: Int -> Sig
+withMaxTermDepth n = Sig (\_ -> setL Haskell.lens_max_depth n)
+
 withMaxCommutativeSize :: Int -> Sig
 withMaxCommutativeSize n = Sig (\_ -> setL Haskell.lens_max_commutative_size n)
 
