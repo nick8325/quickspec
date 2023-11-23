@@ -889,4 +889,6 @@ quickSpec cfg@Config{..} = do
     runConditionals constants $ do
       result <- fmap (reverse . snd) $ flip execStateT (1, []) main
       when cfg_check_consistency $ void $ execStateT checkConsistency Map.empty
-      return result
+      -- conditionalise so that conditional properties are returned in readable format
+      let result' = fmap conditionalise result
+      return result'
