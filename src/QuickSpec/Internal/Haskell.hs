@@ -67,6 +67,7 @@ import Test.QuickCheck.Gen
 import Test.QuickCheck.Random
 import Data.IORef
 import Control.Monad.IO.Class
+import Control.Exception
 
 baseInstances :: Instances
 baseInstances =
@@ -632,7 +633,8 @@ data Config =
     cfg_background :: [Prop (Term Constant)],
     cfg_print_filter :: Prop (Term Constant) -> Bool,
     cfg_print_style :: PrintStyle,
-    cfg_check_consistency :: Bool
+    cfg_check_consistency :: Bool,
+    cfg_handle_resource_limit :: Bool
     }
 
 lens_quickCheck = lens cfg_quickCheck (\x y -> y { cfg_quickCheck = x })
@@ -649,6 +651,7 @@ lens_background = lens cfg_background (\x y -> y { cfg_background = x })
 lens_print_filter = lens cfg_print_filter (\x y -> y { cfg_print_filter = x })
 lens_print_style = lens cfg_print_style (\x y -> y { cfg_print_style = x })
 lens_check_consistency = lens cfg_check_consistency (\x y -> y { cfg_check_consistency = x })
+lens_handle_resource_limit = lens cfg_handle_resource_limit (\x y -> y { cfg_handle_resource_limit = x })
 
 defaultConfig :: Config
 defaultConfig =
@@ -666,7 +669,8 @@ defaultConfig =
     cfg_background = [],
     cfg_print_filter = \_ -> True,
     cfg_print_style = ForHumans,
-    cfg_check_consistency = False }
+    cfg_check_consistency = False,
+    cfg_handle_resource_limit = False }
 
 -- Extra types for the universe that come from in-scope instances.
 instanceTypes :: Instances -> Config -> [Type]
@@ -886,13 +890,15 @@ quickSpec cfg@Config{..} = do
           putLine (printf "  %s is false" (prettyShow (prettiestProp constants norm inst)))
         putLine ""
 
-  join $
-    fmap withStdioTerminal $
-    generate $
-    QuickCheck.run cfg_quickCheck (arbitraryTestCase cfg_default_to instances) eval $
-    Twee.run cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size } $
-    runConditionals constants $ do
-      main
-      when cfg_check_consistency $ void $ execStateT checkConsistency Map.empty
+  
+  handleJust (\ex -> if cfg_handle_resource_limit && isResourceLimitException ex then Just () else Nothing) return $
+    join $
+      fmap withStdioTerminal $
+      generate $
+      QuickCheck.run cfg_quickCheck (arbitraryTestCase cfg_default_to instances) eval $
+      Twee.run cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size } $
+      runConditionals constants $ do
+        main
+        when cfg_check_consistency $ void $ execStateT checkConsistency Map.empty
 
   reverse <$> readIORef props

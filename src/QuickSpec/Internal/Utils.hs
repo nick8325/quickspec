@@ -1,6 +1,6 @@
 -- | Miscellaneous utility functions.
 {-# OPTIONS_HADDOCK hide #-}
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, ScopedTypeVariables #-}
 module QuickSpec.Internal.Utils where
 
 import Control.Arrow((&&&))
@@ -20,6 +20,8 @@ import Data.Lens.Light
 import Twee.Base hiding (lookup)
 import Control.Monad.Trans.State.Strict
 import Control.Monad
+import System.Timeout
+import Data.Maybe
 
 (#) :: Category.Category cat => cat b c -> cat a b -> cat a c
 (#) = (Category..)
@@ -136,3 +138,9 @@ fixpoint f x = fxp x
       | otherwise = fxp y
       where
         y = f x
+
+isResourceLimitException :: SomeException -> Bool
+isResourceLimitException ex =
+  fromException ex == Just StackOverflow ||
+  fromException ex == Just HeapOverflow ||
+  isJust (fromException ex :: Maybe Timeout)

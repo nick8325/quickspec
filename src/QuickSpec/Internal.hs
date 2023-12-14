@@ -422,6 +422,11 @@ withInferInstanceTypes = Sig (\_ -> setL (Haskell.lens_infer_instance_types) Tru
 withConsistencyCheck :: Sig
 withConsistencyCheck = Sig (\_ -> setL (Haskell.lens_check_consistency) True)
 
+-- | (Experimental) Still return laws even if a resource limit
+-- occurred (memory exhaustion, timeout caused by System.Timeout)
+withResourceLimitHandling :: Sig
+withResourceLimitHandling = Sig (\_ -> setL (Haskell.lens_handle_resource_limit) True)
+
 -- | A signature containing boolean functions:
 -- @(`||`)@, @(`&&`)@, `not`, `True`, `False`.
 bools :: Sig
