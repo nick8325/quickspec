@@ -65,6 +65,8 @@ import qualified Data.Semigroup as DS
 import qualified Data.Map.Strict as Map
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Random
+import Data.IORef
+import Control.Monad.IO.Class
 
 baseInstances :: Instances
 baseInstances =
@@ -734,6 +736,9 @@ instance Pretty Warnings where
 
 quickSpec :: Config -> IO [Prop (Term Constant)]
 quickSpec cfg@Config{..} = do
+  propNo <- newIORef 1
+  props <- newIORef ([] :: [Prop (Term Constant)])
+
   let
     constantsOf f =
       usort (concatMap funs $
@@ -755,8 +760,8 @@ quickSpec cfg@Config{..} = do
       norm <- normaliser
       let prop' = prettierProp funs norm prop
       when (not (hasBackgroundPredicates prop') && not (isBackgroundProp prop') && cfg_print_filter prop) $ do
-        (n :: Int, props) <- get
-        put (n+1, props)
+        n <- liftIO $ readIORef propNo
+        liftIO $ writeIORef propNo (n+1)
         putLine $
           case cfg_print_style of
             ForHumans ->
@@ -823,7 +828,7 @@ quickSpec cfg@Config{..} = do
           putLine "quickspec_laws ="
       let
         pres prop = do
-          modify $ \(k, props) -> (k, prop:props)
+          liftIO $ modifyIORef props (prop:)
           if n == 0 then return () else present (constantsOf f) prop
       QuickSpec.Internal.Explore.quickSpec pres (flip eval) cfg_max_size cfg_max_commutative_size use univ
         (enumerator (map Fun (constantsOf g)))
@@ -887,6 +892,7 @@ quickSpec cfg@Config{..} = do
     QuickCheck.run cfg_quickCheck (arbitraryTestCase cfg_default_to instances) eval $
     Twee.run cfg_twee { Twee.cfg_max_term_size = Twee.cfg_max_term_size cfg_twee `max` cfg_max_size } $
     runConditionals constants $ do
-      result <- fmap (reverse . snd) $ flip execStateT (1, []) main
+      main
       when cfg_check_consistency $ void $ execStateT checkConsistency Map.empty
-      return result
+
+  reverse <$> readIORef props
