@@ -20,7 +20,7 @@ import Data.Lens.Light
 import Twee.Base hiding (lookup)
 import Control.Monad.Trans.State.Strict
 import Control.Monad
-import Data.Maybe
+import Data.Typeable
 
 (#) :: Category.Category cat => cat b c -> cat a b -> cat a c
 (#) = (Category..)
@@ -142,7 +142,10 @@ isResourceLimitException :: SomeException -> Bool
 isResourceLimitException ex =
   fromException ex == Just StackOverflow ||
   fromException ex == Just HeapOverflow ||
-  isTimeout ex
+  isTimeout ex ||
+  case fromException ex of
+    Just (SomeAsyncException ex) -> isResourceLimitException (SomeException ex)
+    Nothing -> False
   where
     -- The Timeout type wasn't exported until GHC 8.10,
     -- otherwise we could just do:
