@@ -890,7 +890,6 @@ quickSpec cfg@Config{..} = do
           putLine (printf "  %s is false" (prettyShow (prettiestProp constants norm inst)))
         putLine ""
 
-  
   handleJust (\ex -> if cfg_handle_resource_limit && isResourceLimitException ex then Just () else Nothing) return $
     join $
       fmap withStdioTerminal $
@@ -901,4 +900,5 @@ quickSpec cfg@Config{..} = do
         main
         when cfg_check_consistency $ void $ execStateT checkConsistency Map.empty
 
-  reverse <$> readIORef props
+  -- conditionalise so that conditional properties are returned in readable format
+  fmap conditionalise . reverse <$> readIORef props
