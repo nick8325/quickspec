@@ -20,7 +20,6 @@ import Data.Lens.Light
 import Twee.Base hiding (lookup)
 import Control.Monad.Trans.State.Strict
 import Control.Monad
-import System.Timeout
 import Data.Maybe
 
 (#) :: Category.Category cat => cat b c -> cat a b -> cat a c
@@ -143,4 +142,10 @@ isResourceLimitException :: SomeException -> Bool
 isResourceLimitException ex =
   fromException ex == Just StackOverflow ||
   fromException ex == Just HeapOverflow ||
-  isJust (fromException ex :: Maybe Timeout)
+  isTimeout ex
+  where
+    -- The Timeout type wasn't exported until GHC 8.10,
+    -- otherwise we could just do:
+    -- isJust (fromException ex :: Maybe Timeout)
+    isTimeout (SomeException ex) =
+      tyConModule (typeRepTyCon (typeOf ex)) == "System.Timeout"
