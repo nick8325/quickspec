@@ -18,7 +18,6 @@ import qualified Data.Map.Strict as Map
 import Data.Map(Map)
 import Data.List
 import Data.Ord
-import Data.Maybe
 
 -- | A typed term.
 data Term f = Var {-# UNPACK #-} !Var | Fun !f | !(Term f) :$: !(Term f)
