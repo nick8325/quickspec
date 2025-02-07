@@ -1,7 +1,6 @@
-resolver: lts-20.13
+resolver: lts-22.43
 
 packages:
 - .
 extra-deps:
 - twee-lib-2.4.2
-- primitive-0.7.4.0
