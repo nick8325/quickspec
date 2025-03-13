@@ -1,0 +1,16 @@
+== Functions ==
+  0 :: Int
+  1 :: Int
+(+) :: Int -> Int -> Int
+(*) :: Int -> Int -> Int
+
+== Laws ==
+  1. x * y = y * x
+  2. x + y = y + x
+  3. x * 1 = x
+  4. x + 0 = x
+  5. (x * y) * z = x * (y * z)
+  6. x * (y + y) = y * (x + x)
+  7. (x + y) + z = x + (y + z)
+  8. (x * y) + (x * z) = x * (y + z)
+

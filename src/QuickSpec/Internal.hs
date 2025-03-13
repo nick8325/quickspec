@@ -56,6 +56,11 @@ addBackground :: [Prop (Term Haskell.Constant)] -> Sig
 addBackground props =
   Sig $ \_ cfg -> cfg { Haskell.cfg_background = Haskell.cfg_background cfg ++ props }
 
+-- | Add some properties to the background theory.
+withBackgroundStrings :: [String] -> Sig
+withBackgroundStrings props =
+  Sig $ \_ cfg -> cfg { Haskell.cfg_background_str = Haskell.cfg_background_str cfg ++ props }
+
 -- | A signature.
 newtype Sig = Sig { unSig :: Context -> Haskell.Config -> Haskell.Config }
 
