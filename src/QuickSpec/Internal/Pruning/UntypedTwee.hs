@@ -48,11 +48,6 @@ instance Sized fun => Sized (Extended fun) where
 instance KBO.Sized (Extended fun) where
   size _ = 1
 
-instance Arity fun => Arity (Extended fun) where
-  arity (Function f) = arity f
-  arity (Skolem _) = 0
-  arity Minimal = 0
-
 instance (Ord fun, Typeable fun) => Twee.Minimal (Extended fun) where
   minimal = Twee.fun Minimal
 
@@ -67,7 +62,7 @@ instance (Ord fun, Typeable fun, PrettyTerm fun) => PrettyTerm (Extended fun) wh
   termStyle (Function f) = termStyle f
   termStyle _ = curried
 
-instance (Sized fun, Pretty fun, PrettyTerm fun, Ord fun, Typeable fun, Arity fun, EqualsBonus fun) => Ordered (Extended fun) where
+instance (Sized fun, Pretty fun, PrettyTerm fun, Ord fun, Typeable fun) => Ordered (Extended fun) where
   lessEq = KBO.lessEq
   lessIn = KBO.lessIn
   lessEqSkolem = KBO.lessEqSkolem
@@ -79,7 +74,7 @@ newtype Pruner fun m a =
 instance MonadTrans (Pruner fun) where
   lift = Pruner . lift . lift
 
-run :: (Typeable fun, Ord fun, Sized fun, Monad m) => Config -> Pruner fun m a -> m a
+run :: (Typeable fun, Ord fun, PrettyTerm fun, Sized fun, Monad m) => Config -> Pruner fun m a -> m a
 run Config{..} (Pruner x) =
   evalStateT (runReaderT x config) (initialState config)
   where
@@ -98,7 +93,7 @@ instance KBO.Weighted (Extended fun) where
 
 type Norm fun = Twee.Term (Extended fun)
 
-instance (Ord fun, Typed fun, Typeable fun, Arity fun, PrettyTerm fun, EqualsBonus fun, Sized fun, Monad m) =>
+instance (Ord fun, Typed fun, Typeable fun, PrettyTerm fun, EqualsBonus fun, Sized fun, Monad m) =>
   MonadPruner (Term fun) (Norm fun) (Pruner fun m) where
   normaliser = Pruner $ do
     state <- lift get
@@ -153,19 +148,19 @@ instance (Ord fun, Typed fun, Typeable fun, Arity fun, PrettyTerm fun, EqualsBon
 
     return (map toTheorem actives)
 
-normaliseTwee :: (Ord fun, Typeable fun, Arity fun, PrettyTerm fun, EqualsBonus fun, Sized fun) =>
+normaliseTwee :: (Ord fun, Typeable fun, PrettyTerm fun, EqualsBonus fun, Sized fun) =>
   State (Extended fun) -> Term fun -> Norm fun
 normaliseTwee state t =
   result u (normaliseTerm state u)
   where
     u = simplifyTerm state (skolemise t)
 
-normalFormsTwee :: (Ord fun, Typeable fun, Arity fun, PrettyTerm fun, EqualsBonus fun, Sized fun) =>
+normalFormsTwee :: (Ord fun, Typeable fun, PrettyTerm fun, EqualsBonus fun, Sized fun) =>
   State (Extended fun) -> Term fun -> Set (Norm fun)
 normalFormsTwee state t =
   Set.fromList . Map.elems $ Map.mapWithKey result (normalForms state (skolemise t))
 
-addTwee :: (Ord fun, Typeable fun, Arity fun, PrettyTerm fun, EqualsBonus fun, Sized fun) =>
+addTwee :: (Ord fun, Typeable fun, PrettyTerm fun, EqualsBonus fun, Sized fun) =>
   Twee.Config (Extended fun) -> Term fun -> Term fun -> State (Extended fun) -> State (Extended fun)
 addTwee config t u state =
   interreduce config $

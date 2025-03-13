@@ -3,4 +3,4 @@ resolver: lts-22.43
 packages:
 - .
 extra-deps:
-- twee-lib-2.4.2
+- twee-lib-2.5
