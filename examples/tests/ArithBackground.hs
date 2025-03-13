@@ -7,5 +7,5 @@ main = quickSpec [
   con "+" ((+) :: Int -> Int -> Int),
   con "*" ((*) :: Int -> Int -> Int),
 
-  withBackgroundStrings ["*(0, X) = X"]
+  withBackgroundStrings ["*(0, X) = 0"]
   ]
