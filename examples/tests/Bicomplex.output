@@ -1,0 +1,131 @@
+== Functions ==
+  0 :: BiComplex
+  1 :: BiComplex
+(-) :: BiComplex -> BiComplex
+(*) :: BiComplex -> BiComplex -> BiComplex
+
+== Laws ==
+  1. -0 = 0
+  2. x * y = y * x
+  3. x * 0 = 0
+  4. x * 1 = x
+  5. --x = x
+  6. x * -y = -(x * y)
+  7. (x * y) * z = x * (y * z)
+
+== Functions ==
+real :: BiComplex -> Bool
+True :: Bool
+
+== Laws ==
+  8. real 0
+  9. real 1
+ 10. real -x = real x
+ 11. real (x * (x * x)) = real x
+
+== Functions ==
+conj1 :: BiComplex -> BiComplex
+conj2 :: BiComplex -> BiComplex
+conj3 :: BiComplex -> BiComplex
+
+== Laws ==
+ 12. conj1 0 = 0
+ 13. conj1 1 = 1
+ 14. conj2 0 = 0
+ 15. conj2 1 = 1
+ 16. conj3 0 = 0
+ 17. conj3 1 = 1
+ 18. conj1 -x = -(conj1 x)
+ 19. conj1 (conj1 x) = x
+ 20. conj3 x = conj1 (conj2 x)
+ 21. conj2 -x = -(conj2 x)
+ 22. conj3 x = conj2 (conj1 x)
+ 23. conj2 (conj2 x) = x
+ 24. real (conj1 x) = real x
+ 25. real (conj2 x) = real x
+ 26. conj1 x * conj1 y = conj1 (x * y)
+ 27. conj2 x * conj2 y = conj2 (x * y)
+ 28. real (conj2 x * (y * z)) = real (conj1 x * (y * z))
+ 29. real (conj1 x * (y * z)) = real (conj1 y * (x * z))
+
+== Functions ==
+norm1 :: BiComplex -> BiComplex
+norm2 :: BiComplex -> BiComplex
+
+== Laws ==
+ 30. norm1 0 = 0
+ 31. norm1 1 = 1
+ 32. norm2 0 = 0
+ 33. norm2 1 = 1
+ 34. conj1 (norm1 x) = norm1 x
+ 35. conj2 (norm2 x) = norm2 x
+ 36. norm1 -x = norm1 x
+ 37. norm1 (conj1 x) = norm1 x
+ 38. norm1 (conj2 x) = conj2 (norm1 x)
+ 39. norm2 -x = norm2 x
+ 40. norm2 (conj1 x) = conj1 (norm2 x)
+ 41. norm2 (conj2 x) = norm2 x
+ 42. norm2 (norm1 x) = norm1 (norm2 x)
+ 43. norm1 (x * x) = norm1 (norm1 x)
+ 44. norm2 (x * x) = norm2 (norm2 x)
+ 45. norm1 x = x * conj1 x
+ 46. norm2 x = x * conj2 x
+ 47. norm1 x * norm1 y = norm1 (x * y)
+ 48. norm2 x * norm2 y = norm2 (x * y)
+ 49. real (norm1 (norm1 (norm1 (norm1 x)))) = real (norm1 (norm1 (norm1 x)))
+ 50. x * conj3 (y * norm1 x) = conj3 (x * y) * norm2 x
+ 51. x * conj3 (y * norm2 x) = conj3 (x * y) * norm1 x
+ 52. real (norm1 (x * norm1 (norm1 x))) = real (norm1 x)
+ 53. real (x * norm1 (norm1 (norm1 y))) = real (x * norm1 (norm1 y))
+
+== Functions ==
+10 :: BiComplex
+
+== Laws ==
+ 54. conj1 10 = 10
+ 55. conj2 10 = 10
+ 56. real 10
+ 57. real (norm1 10)
+ 58. real (x * 10) = real x
+ 59. conj2 x * norm1 (x * 10) = conj1 x * norm2 (x * 10)
+ 60. norm1 x * conj2 (y * 10) = 10 * (conj2 y * norm1 x)
+ 61. norm1 x * conj3 (y * 10) = 10 * (conj3 y * norm1 x)
+ 62. norm2 x * conj1 (y * 10) = 10 * (conj1 y * norm2 x)
+ 63. norm2 x * conj3 (y * 10) = 10 * (conj3 y * norm2 x)
+ 64. x * conj1 (norm2 (x * 10)) = conj3 x * norm1 (x * 10)
+ 65. x * conj2 (norm1 (x * 10)) = conj3 x * norm2 (x * 10)
+
+== Functions ==
+ i :: BiComplex
+ h :: BiComplex
+ih :: BiComplex
+
+== Laws ==
+ 66. conj1 h = h
+ 67. conj1 i = -i
+ 68. conj1 ih = -ih
+ 69. conj2 h = -h
+ 70. conj2 i = i
+ 71. conj2 ih = -ih
+ 72. norm1 h = -1
+ 73. norm1 i = 1
+ 74. norm1 ih = -1
+ 75. real i = real h
+ 76. real ih = real h
+ 77. ih = h * i
+ 78. real (ih * norm1 x) = real (i * norm1 x)
+ 79. real (i * norm1 (norm1 x)) = real (i * norm1 x)
+ 80. conj2 (x * ih) * norm1 x = conj1 (x * ih) * norm2 x
+ 81. norm1 x * conj2 (y * 10) = 10 * (conj2 y * norm1 x)
+ 82. norm1 x * conj2 (y * i) = i * (conj2 y * norm1 x)
+ 83. norm1 x * conj3 (y * 10) = 10 * (conj3 y * norm1 x)
+ 84. norm1 x * conj3 (y * ih) = ih * (conj3 y * norm1 x)
+ 85. norm2 x * conj1 (y * 10) = 10 * (conj1 y * norm2 x)
+ 86. norm2 x * conj1 (y * h) = h * (conj1 y * norm2 x)
+ 87. norm2 x * conj3 (y * 10) = 10 * (conj3 y * norm2 x)
+ 88. norm2 x * conj3 (y * ih) = ih * (conj3 y * norm2 x)
+ 89. ih * conj1 (ih * norm2 x) = -(conj1 (norm2 x))
+ 90. ih * conj2 (ih * norm1 x) = -(conj2 (norm1 x))
+ 91. conj1 (ih * norm2 x) * ih = -(conj1 (norm2 x))
+ 92. conj2 (ih * norm1 x) * ih = -(conj2 (norm1 x))
+

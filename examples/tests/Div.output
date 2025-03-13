@@ -1,0 +1,140 @@
+== Functions ==
+   1 :: Integer
+ (+) :: Integer -> Integer -> Integer
+ (*) :: Integer -> Integer -> Integer
+(<=) :: Integer -> Integer -> Bool
+
+== Functions ==
+rounddiv :: Integer -> Integer -> Integer
+
+== Laws ==
+  1. rounddiv x x = x
+  2. rounddiv x 1 = x
+  3. rounddiv 1 x = x
+  4. rounddiv x (x * y) = x * y
+  5. rounddiv x (x + y) = x + y
+  6. rounddiv x (rounddiv x y) = rounddiv x y
+  7. rounddiv x (rounddiv y x) = rounddiv y x
+  8. rounddiv (x * y) x = x * y
+  9. rounddiv (x + y) x = x + rounddiv y x
+ 10. rounddiv (rounddiv x y) y = rounddiv x y
+ 11. x <= rounddiv x y
+ 12. x <= y => x <= rounddiv y z
+ 13. rounddiv (x * y) (x * z) = x * rounddiv y z
+ 14. rounddiv (x + x) (y + y) = rounddiv x y + rounddiv x y
+ 15. rounddiv (x + y) (rounddiv x y) = rounddiv x y + rounddiv x y
+ 16. rounddiv (rounddiv x y) (y * z) = rounddiv x (y * z)
+ 17. rounddiv (rounddiv x y) (x * x) = rounddiv y (x * x)
+ 18. rounddiv (rounddiv x y) (x + x) = rounddiv y (x + x)
+ 19. rounddiv (rounddiv x y) (x + y) = x + y
+ 20. rounddiv (rounddiv x y) (rounddiv z y) = rounddiv x (rounddiv z y)
+ 21. rounddiv (rounddiv x y) (rounddiv y x) = rounddiv (rounddiv x y) x
+ 22. rounddiv (x * x) (x + 1) = x + (x * x)
+ 23. rounddiv (x + 1) (x * y) = rounddiv (x + x) (x * y)
+ 24. rounddiv (x + 1) (x + y) = x + y
+ 25. rounddiv (x + 1) (rounddiv y x) = rounddiv (x + x) (rounddiv y x)
+ 26. rounddiv (1 + 1) (x * x) = rounddiv (x + x) (x * x)
+ 27. rounddiv (1 + 1) (x + y) = x + y
+ 28. rounddiv x (y * (x + z)) = y * (x + z)
+ 29. rounddiv x (y * rounddiv x z) = y * rounddiv x z
+ 30. rounddiv x (y + (x * z)) = y + (x * z)
+ 31. rounddiv x (y + rounddiv x z) = y + rounddiv x z
+ 32. rounddiv x (rounddiv y (x * z)) = rounddiv y (x * z)
+ 33. rounddiv x (rounddiv y (x + z)) = rounddiv y (x + z)
+ 34. rounddiv x (rounddiv y (rounddiv x z)) = rounddiv y (rounddiv x z)
+ 35. rounddiv x (rounddiv (x * y) z) = rounddiv (x * y) z
+ 36. rounddiv x (rounddiv (x + y) z) = rounddiv (x + y) z
+ 37. rounddiv x (rounddiv (rounddiv x y) z) = rounddiv (rounddiv x y) z
+ 38. rounddiv (x * rounddiv y z) z = x * rounddiv y z
+ 39. rounddiv (x + (y * z)) y = (y * z) + rounddiv x y
+ 40. rounddiv (x + rounddiv y z) z = rounddiv x z + rounddiv y z
+ 41. rounddiv (rounddiv x (y * z)) y = rounddiv x (y * z)
+ 42. rounddiv (rounddiv x (rounddiv y z)) z = rounddiv x (rounddiv y z)
+ 43. rounddiv (rounddiv (x + 1) y) x = rounddiv (x + x) (rounddiv y x)
+ 44. rounddiv (rounddiv (1 + 1) x) y = rounddiv (1 + 1) (rounddiv x y)
+
+== Functions ==
+ceildiv :: Integer -> Integer -> Integer
+
+== Laws ==
+ 45. ceildiv x x = 1
+ 46. ceildiv x 1 = x
+ 47. ceildiv 1 x = 1
+ 48. x * ceildiv y x = rounddiv y x
+ 49. ceildiv x (x * y) = 1
+ 50. ceildiv x (x + y) = 1
+ 51. ceildiv x (rounddiv x y) = 1
+ 52. ceildiv (x * y) x = y
+ 53. x <= z => 1 + ceildiv x y = ceildiv (y + x) y
+ 54. z <= x => 1 + ceildiv x y = ceildiv (y + x) y
+ 55. x <= z => ceildiv x y + 1 = ceildiv (y + x) y
+ 56. z <= x => ceildiv x y + 1 = ceildiv (y + x) y
+ 57. ceildiv (x + x) (y + y) = ceildiv x y
+ 58. ceildiv (x + y) (rounddiv x y) = 1 + 1
+ 59. ceildiv (ceildiv x y) (ceildiv y x) = ceildiv x y
+ 60. ceildiv (ceildiv x y) (rounddiv y z) = ceildiv (ceildiv x y) (rounddiv z y)
+ 61. ceildiv (rounddiv x y) (x + x) = ceildiv y (x + x)
+ 62. ceildiv (x * x) (x + 1) = x
+ 63. ceildiv (1 + 1) (x * x) = ceildiv (1 + 1) x
+ 64. ceildiv (1 + 1) (rounddiv x y) = ceildiv (1 + 1) (x * y)
+ 65. ceildiv x (y + ceildiv y x) = ceildiv x (y + 1)
+ 66. ceildiv x (ceildiv x (ceildiv x y)) = ceildiv x y
+ 67. ceildiv x (rounddiv y (ceildiv y x)) = ceildiv x y
+ 68. ceildiv (x * (y + z)) y = x + ceildiv (x * z) y
+ 69. ceildiv (x + (y * z)) y = z + ceildiv x y
+ 70. ceildiv (rounddiv x (ceildiv x y)) y = ceildiv x y
+ 71. ceildiv (rounddiv x (ceildiv y x)) y = ceildiv x y
+ 72. ceildiv (rounddiv (ceildiv x y) y) x = ceildiv y x
+ 73. rounddiv x (y * ceildiv y x) = ceildiv y x * rounddiv x y
+ 74. rounddiv x (ceildiv x (ceildiv x y)) = rounddiv x (ceildiv x y)
+ 75. rounddiv x (rounddiv y (ceildiv y x)) = rounddiv (rounddiv x y) (ceildiv y x)
+ 76. rounddiv (ceildiv x (ceildiv y x)) y = rounddiv x y
+ 77. rounddiv (ceildiv x (rounddiv y z)) y = rounddiv (ceildiv x (rounddiv z y)) y
+ 78. ceildiv (rounddiv (x + 1) y) x = rounddiv (1 + 1) (ceildiv y x)
+ 79. ceildiv x (ceildiv x (1 + 1)) = ceildiv (x + x) (x + 1)
+ 80. ceildiv x (ceildiv (1 + 1) x) = x
+ 81. 1 + rounddiv (1 + 1) x = x + ceildiv (1 + 1) x
+
+*** Law ceildiv (ceildiv x y) (rounddiv y z) = ceildiv (ceildiv x y) (rounddiv z y) is false!
+False instances:
+  ceildiv (ceildiv x y) (rounddiv y z) = ceildiv (ceildiv x y) (rounddiv z y) is false
+
+*** Law rounddiv (ceildiv x (rounddiv y z)) y = rounddiv (ceildiv x (rounddiv z y)) y is false!
+False instances:
+  rounddiv (ceildiv x (rounddiv y z)) y = rounddiv (ceildiv x (rounddiv z y)) y is false
+
+*** Law x <= (y * rounddiv y z) = x <= (y * rounddiv z y) is false!
+False instances:
+  x <= (y * rounddiv y z) = x <= (y * rounddiv z y) is false
+
+*** Law x <= y => x <= rounddiv y z is false!
+False instances:
+  x <= y => x <= rounddiv y (z * (y + w)) is false
+  x <= y => x <= rounddiv y (z * rounddiv y w) is false
+  x <= y => x <= rounddiv y (z * (y + w)) is false
+  x <= y => x <= rounddiv y (z * rounddiv y w) is false
+  x <= y => x <= rounddiv y (y * z) is false
+  x <= y => x <= rounddiv y (y * (z * w)) is false
+  x <= y => x <= rounddiv y (z + (y * w)) is false
+  x <= y => x <= rounddiv y (z + (y * w)) is false
+  x <= y => x <= rounddiv y (rounddiv (y * z) w) is false
+
+*** Law (x * rounddiv y x) <= z = (x * rounddiv x y) <= z is false!
+False instances:
+  (x * rounddiv y x) <= z = (x * rounddiv x y) <= z is false
+
+*** Law (x + y) <= x = (x + z) <= x is false!
+False instances:
+  w <= y => (x + (y * z)) <= x = (x + x) <= x is false
+  w <= y => (x + (y * z)) <= x = (x + x) <= x is false
+
+*** Law (x + y) <= y = (x + y) <= x is false!
+False instances:
+  w <= x => ((x * y) + z) <= z = ((x * y) + z) <= (x * y) is false
+  w <= x => ((x * y) + z) <= z = ((x * y) + z) <= (x * y) is false
+
+*** Law z <= y => (x + y) <= z = (x + w) <= x is false!
+False instances:
+  z <= x => ((x * y) + x) <= z = ((x * y) + w) <= (x * y) is false
+  z <= x => ((x * y) + x) <= z = ((x * y) + w) <= (x * y) is false
+

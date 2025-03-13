@@ -1,0 +1,36 @@
+== Functions ==
+  0 :: Natural
+  1 :: Natural
+(+) :: Natural -> Natural -> Natural
+(*) :: Natural -> Natural -> Natural
+
+== Laws ==
+  1. x * y = y * x
+  2. x + y = y + x
+  3. x * 0 = 0
+  4. x * 1 = x
+  5. x + 0 = x
+  6. (x * y) * z = x * (y * z)
+  7. x * (y + y) = y * (x + x)
+  8. (x + y) + z = x + (y + z)
+  9. x * (y + 1) = x + (x * y)
+ 10. (x * y) + (x * z) = x * (y + z)
+
+== Functions ==
+gcd :: Natural -> Natural -> Natural
+
+== Laws ==
+ 11. gcd x y = gcd y x
+ 12. gcd x x = x
+ 13. gcd x 0 = x
+ 14. gcd x 1 = 1
+ 15. gcd x (x * y) = x
+ 16. gcd x (x + y) = gcd x y
+ 17. gcd (gcd x y) z = gcd x (gcd y z)
+ 18. gcd (x * y) (x * z) = x * gcd y z
+ 19. gcd (x * x) (y * y) = gcd x y * gcd x y
+ 20. gcd (x * y) (z + y) = gcd (x * z) (z + y)
+ 21. gcd (x + x) (y + y) = gcd x y + gcd x y
+ 22. gcd (x + y) (y + y) = gcd (x + x) (x + y)
+ 23. gcd (x * x) (1 + 1) = gcd x (1 + 1)
+
