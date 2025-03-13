@@ -900,5 +900,12 @@ quickSpec cfg@Config{..} = do
         main
         when cfg_check_consistency $ void $ execStateT checkConsistency Map.empty
 
-  -- conditionalise so that conditional properties are returned in readable format
-  fmap conditionalise . reverse <$> readIORef props
+  let maybeConditionalise prop
+        | prop == prop' = [prop]
+        | otherwise = [prop, prop']
+        where prop' = conditionalise prop
+
+  -- Return conditional properties both in conditionalised and raw form.
+  -- Raw form is needed if the properties will be passed to addBackground,
+  -- but conditionalised is better for other uses.
+  concatMap maybeConditionalise . reverse <$> readIORef props
