@@ -3,6 +3,7 @@
   1 :: Float
 (+) :: Float -> Float -> Float
 (*) :: Float -> Float -> Float
+(/) :: Float -> Float -> Float
 
 == Laws ==
   1. x * y = y * x
@@ -10,11 +11,77 @@
   3. x * 0 = 0
   4. x * 1 = x
   5. x + 0 = x
-  6. x * (y + y) = y * (x + x)
-  7. (x * y) + (x * y) = x * (y + y)
-  8. (x + x) + (y + y) = (x + y) * (1 + 1)
-  9. x + (x + (x + x)) = (x + x) + (x + x)
- 10. 1 + (x + (x + 1)) = (x + x) + (1 + 1)
- 11. x * (1 + (1 + 1)) = x + (x + x)
- 12. 1 + (1 + (x + 1)) = (x + 1) + (1 + 1)
+  6. x / 1 = x
+  7. x * (y + y) = y * (x + x)
+  8. x + (1 / 0) = y + (1 / 0)
+  9. x / (1 / 0) = y / (1 / 0)
+ 10. 0 / (1 / x) = x / (1 / 0)
+ 11. (1 / 0) / x = (1 / x) / 0
+ 12. (1 + 1) / 0 = x + (1 / 0)
+ 13. (1 / 0) / 0 = x + (1 / 0)
+ 14. (x * y) + (x * y) = x * (y + y)
+ 15. (x + x) + (y + y) = (x + y) * (1 + 1)
+ 16. (1 / x) + (1 / x) = (1 + 1) / x
+ 17. (1 / 0) / (x + x) = (1 / x) * (1 / 0)
+ 18. (1 / x) / (1 + 1) = 1 / (x + x)
+ 19. x + (x + (x + x)) = (x + x) + (x + x)
+ 20. x / (1 / (y + y)) = (x + x) / (1 / y)
+ 21. (1 / (x + x)) / y = (1 / x) / (y + y)
+ 22. x * (y / (1 + 1)) = (x * y) / (1 + 1)
+ 23. 1 + (x + (x + 1)) = (x + x) + (1 + 1)
+ 24. x + ((1 / y) / 0) = z + ((1 / y) / 0)
+
+*** Law (/) = (/) is false!
+False instances:
+  (/) = (/) is false
+
+*** Law (/) x = (/) x is false!
+False instances:
+  (/) x = (/) x is false
+
+*** Law x + y = x + y is false!
+False instances:
+  x + ((1 / (1 / 0)) / 0) = x + ((1 / (1 / 0)) / 0) is false
+  0 + ((1 / (1 / 0)) / 0) = 0 + ((1 / (1 / 0)) / 0) is false
+  (x / y) + 0 = (x / y) + 0 is false
+  (x / y) + (1 / 0) = (x / y) + (1 / 0) is false
+  (1 / 0) + ((1 / (1 / 0)) / 0) = (1 / 0) + ((1 / (1 / 0)) / 0) is false
+  ((1 / (1 / 0)) / 0) + 0 = ((1 / (1 / 0)) / 0) + 0 is false
+  ((1 / (1 / 0)) / 0) + (1 / 0) = ((1 / (1 / 0)) / 0) + (1 / 0) is false
+
+*** Law x + y = y + x is false!
+False instances:
+  0 + ((1 / (1 / 0)) / 0) = ((1 / (1 / 0)) / 0) + 0 is false
+  ((1 / (1 / 0)) / 0) + (1 / 0) = (1 / 0) + ((1 / (1 / 0)) / 0) is false
+
+*** Law x + 0 = x is false!
+False instances:
+  (x / y) + 0 = x / y is false
+  ((1 / (1 / 0)) / 0) + 0 = (1 / (1 / 0)) / 0 is false
+
+*** Law x + (1 / 0) = y + (1 / 0) is false!
+False instances:
+  (x / y) + (1 / 0) = z + (1 / 0) is false
+  ((1 / (1 / 0)) / 0) + (1 / 0) = x + (1 / 0) is false
+
+*** Law x + ((1 / y) / 0) = z + ((1 / y) / 0) is false!
+False instances:
+  x + ((1 / (1 / 0)) / 0) = x + ((1 / (1 / 0)) / 0) is false
+  0 + ((1 / (1 / 0)) / 0) = x + ((1 / (1 / 0)) / 0) is false
+  (1 / 0) + ((1 / (1 / 0)) / 0) = x + ((1 / (1 / 0)) / 0) is false
+
+*** Law x / y = x / y is false!
+False instances:
+  x / y = x / y is false
+  0 / (1 / (1 / 0)) = 0 / (1 / (1 / 0)) is false
+  (1 / 0) / (1 / 0) = (1 / 0) / (1 / 0) is false
+  (1 / (1 / 0)) / 0 = (1 / (1 / 0)) / 0 is false
+
+*** Law x / (1 / 0) = y / (1 / 0) is false!
+False instances:
+  (1 / 0) / (1 / 0) = x / (1 / 0) is false
+
+*** Law 0 / (1 / x) = x / (1 / 0) is false!
+False instances:
+  0 / (1 / (1 / 0)) = (1 / 0) / (1 / 0) is false
 

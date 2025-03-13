@@ -1,6 +1,8 @@
--- A simple example testing arithmetic functions.
+-- Shows the use of the 'withConsistencyCheck' function.
+-- Here, QuickSpec discovers false laws, but withConsistencyCheck
+-- produces a warning for them.
+
 import QuickSpec
-import QuickSpec.Internal
 import Test.QuickCheck
 
 main = quickSpec [
