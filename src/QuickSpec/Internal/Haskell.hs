@@ -483,6 +483,7 @@ instance PrettyTerm Constant where
 
 instance Sized Constant where
   size = con_size
+  sizeMode _ = AddArgs
 
 instance Predicate Constant where
   classify = con_classify

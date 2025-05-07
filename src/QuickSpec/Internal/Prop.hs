@@ -48,6 +48,14 @@ mapTerm f (lhs :=>: rhs) = map (both f) lhs :=>: both f rhs
   where
     both f (t :=: u) = f t :=: f u
 
+mapTermM :: Monad m => (Term fun1 -> m (Term fun2)) -> Prop (Term fun1) -> m (Prop (Term fun2))
+mapTermM f (lhs :=>: rhs) = do
+  lhs <- mapM (both f) lhs
+  rhs <- both f rhs
+  return (lhs :=>: rhs)
+  where
+    both f (t :=: u) = liftM2 (:=:) (f t) (f u)
+
 instance Typed a => Typed (Prop a) where
   typ _ = typeOf True
   otherTypesDL p = DList.fromList (literals p) >>= typesDL

@@ -92,6 +92,7 @@ library
     QuickSpec.Internal.Pruning.Types
     QuickSpec.Internal.Pruning.UntypedTwee
     QuickSpec.Internal.Pruning.PartialApplication
+    QuickSpec.Internal.Pruning.Conditionals
     QuickSpec.Internal.Term
     QuickSpec.Internal.Terminal
     QuickSpec.Internal.Testing

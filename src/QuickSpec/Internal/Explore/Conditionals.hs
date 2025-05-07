@@ -30,34 +30,22 @@ newtype Conditionals m a = Conditionals (m a)
   deriving (Functor, Applicative, Monad, MonadIO, MonadTester testcase term, MonadTerminal)
 instance MonadTrans Conditionals where
   lift = Conditionals
-instance (Typed fun, Ord fun, PrettyTerm fun, Ord norm, MonadPruner (Term (WithConstructor fun)) norm m, Predicate fun, MonadTerminal m) =>
+instance (Typed fun, Ord fun, PrettyTerm fun, Ord norm, MonadPruner (Term fun) norm m, Predicate fun, MonadTerminal m) =>
   MonadPruner (Term fun) norm (Conditionals m) where
-  normaliser = lift $ do
-    norm <- normaliser
-    return (norm . fmap Normal)
-  add prop = do
-    redundant <- conditionallyRedundant prop
-    if redundant then return False else do
-      res <- lift (add (Prop.mapFun Normal prop))
-      considerConditionalising prop
-      return res
-
-  decodeNormalForm hole t = lift $ do
-    t <- decodeNormalForm (fmap (fmap Normal) . hole) t
-    let f (Normal x) = Just x
-        f _ = Nothing
-    return $ t >>= sequence . Term.mapFun f
+  normaliser = lift normaliser
+  add = lift . add . conditionalise
+  decodeNormalForm hole t = lift (decodeNormalForm hole t)
 
 conditionalsUniverse :: (Typed fun, Predicate fun) => [Type] -> [fun] -> Universe
 conditionalsUniverse tys funs =
   universe $
     tys ++
-    (map typ $
-      map Normal funs ++
-      [ Constructor pred clas_test_case | pred <- funs, Predicate{..} <- [classify pred] ])
+    (map typ funs)
+      -- map Normal funs) -- ++
+      -- [ Constructor pred clas_test_case | pred <- funs, Predicate{..} <- [classify pred] ])
 
 runConditionals ::
-  (PrettyTerm fun, Ord norm, MonadPruner (Term (WithConstructor fun)) norm m, Predicate fun, MonadTerminal m) =>
+  (PrettyTerm fun, Ord norm, MonadPruner (Term fun) norm m, Predicate fun, MonadTerminal m) =>
   [fun] -> Conditionals m a -> m a
 runConditionals preds mx =
   run (mapM_ considerPredicate preds >> mx)
@@ -73,42 +61,19 @@ data Classification fun =
   | Function
   deriving (Eq, Ord, Functor)
 
+{-
 data WithConstructor fun =
     Constructor fun Type
   | Normal fun
   deriving (Eq, Ord)
-
-instance Sized fun => Sized (WithConstructor fun) where
-  size Constructor{} = 0
-  size (Normal f) = size f
-
-instance Pretty fun => Pretty (WithConstructor fun) where
-  pPrintPrec l p (Constructor f _) = pPrintPrec l p f <#> text "_con"
-  pPrintPrec l p (Normal f) = pPrintPrec l p f
-
-instance PrettyTerm fun => PrettyTerm (WithConstructor fun) where
-  termStyle (Constructor _ _) = curried
-  termStyle (Normal f) = termStyle f
-
-instance (Predicate fun, Background fun) => Background (WithConstructor fun) where
-  background (Normal f) = map (Prop.mapFun Normal) (background f)
-  background _ = []
-
-instance Typed fun => Typed (WithConstructor fun) where
-  typ (Constructor pred ty) =
-    arrowType (typeArgs (typ pred)) ty
-  typ (Normal f) = typ f
-  otherTypesDL (Constructor pred _) = typesDL pred
-  otherTypesDL (Normal f) = otherTypesDL f
-  typeSubst_ sub (Constructor pred ty) = Constructor (typeSubst_ sub pred) (typeSubst_ sub ty)
-  typeSubst_ sub (Normal f) = Normal (typeSubst_ sub f)
+-}
 
 predType :: TyCon -> [Type] -> Type
 predType name tys =
   Twee.build (Twee.app (Twee.fun name) tys)
 
 considerPredicate ::
-  (PrettyTerm fun, Ord norm, MonadPruner (Term (WithConstructor fun)) norm m, Predicate fun, MonadTerminal m) =>
+  (PrettyTerm fun, Ord norm, MonadPruner (Term fun) norm m, Predicate fun, MonadTerminal m) =>
   fun -> Conditionals m ()
 considerPredicate f =
   case classify f of
@@ -116,75 +81,14 @@ considerPredicate f =
       let
         x = Var (V ty 0)
         eqns =
-          [Fun (Constructor f ty) :@: [Fun (Normal sel) :$: x | sel <- sels] === x,
-           Fun (Normal f) :@: [Fun (Normal sel) :$: x | sel <- sels] === fmap Normal true]
+          [Fun f :@: [Fun sel :$: x | sel <- sels] === true]
       mapM_ (lift . add) eqns
     _ -> return ()
 
 considerConditionalising ::
-  (Typed fun, Ord fun, PrettyTerm fun, Ord norm, MonadPruner (Term (WithConstructor fun)) norm m, Predicate fun, MonadTerminal m) =>
+  (Typed fun, Ord fun, PrettyTerm fun, Ord norm, MonadPruner (Term fun) norm m, Predicate fun, MonadTerminal m) =>
   Prop (Term fun) -> Conditionals m ()
-considerConditionalising (lhs :=>: t :=: u) = do
-  norm <- normaliser
-  -- If we have discovered that "somePredicate x_1 x_2 ... x_n = True"
-  -- we should add the axiom "get_x_n (toSomePredicate x_1 x_2 ... x_n) = x_n"
-  -- to the set of known equations
-  case t of
-    Fun f :@: ts | Predicate{..} <- classify f -> -- It is an interesting predicate, i.e. it was added by the user
-      when (norm u == norm clas_true) $
-        addPredicate lhs f ts
-    _ -> return ()
-
-conditionallyRedundant ::
-  (Typed fun, Ord fun, PrettyTerm fun, Ord norm, MonadPruner (Term (WithConstructor fun)) norm m, Predicate fun, MonadTerminal m) =>
-  Prop (Term fun) -> Conditionals m Bool
-conditionallyRedundant (lhs :=>: t :=: u) = do
-  t' <- normalise t
-  u' <- normalise u
-  conditionallyRedundant' lhs t u t' u'
-
-conditionallyRedundant' ::
-  (Typed fun, Ord fun, PrettyTerm fun, Ord norm, MonadPruner (Term (WithConstructor fun)) norm m, Predicate fun, MonadTerminal m) =>
-  [Equation (Term fun)] -> Term fun -> Term fun -> norm -> norm -> Conditionals m Bool
-conditionallyRedundant' lhs t u t' u' = do
-  forM_ (usort (funs [t, u])) $ \f ->
-    case classify f of
-      Selector{..} -> do
-        let
-          Predicate{..} = classify clas_pred
-          tys = typeArgs (typ clas_pred)
-          argss = sequence [ [ arg | arg <- terms [t, u] >>= subterms, typ arg == ty ] | ty <- tys ]
-        forM_ argss $ \args -> do
-          norm <- normaliser
-          let p = Fun clas_pred :@: args
-          when (norm p == norm clas_true) $ do
-            addPredicate lhs clas_pred args
-      _ -> return ()
-
-  t'' <- normalise t
-  u'' <- normalise u
-  if t'' == u'' then
-    return True
-   else if t'' == t' && u'' == u' then
-     return False
-    else
-     conditionallyRedundant' lhs t u t'' u''
-
-addPredicate ::
-  (PrettyTerm fun, Ord norm, MonadPruner (Term (WithConstructor fun)) norm m, Predicate fun, MonadTerminal m) =>
-  [Equation (Term fun)] -> fun -> [Term fun] -> Conditionals m ()
-addPredicate lhs f ts = do
-  let Predicate{..} = classify f
-      ts' = map (fmap Normal) ts
-      lhs' = map (fmap (fmap Normal)) lhs
-      -- The "to_p x1 x2 ... xm" term
-      construction = Fun (Constructor f clas_test_case) :@: ts'
-      -- The "p_n (to_p x1 x2 ... xn ... xm) = xn"
-      -- equations
-      equations = [ lhs' :=>: Fun (Normal (clas_selectors !! i)) :$: construction :=: x | (x, i) <- zip ts' [0..]]
-
-  -- Declare the relevant equations as axioms
-  mapM_ (lift . add) equations
+considerConditionalising (lhs :=>: t :=: u) = return ()
 
 conditionalise :: (PrettyTerm fun, Typed fun, Ord fun, Predicate fun) => Prop (Term fun) -> Prop (Term fun)
 conditionalise (lhs :=>: t :=: u) =
@@ -212,3 +116,4 @@ conditionalise (lhs :=>: t :=: u) =
 
     replaceMany subs t =
       foldr (uncurry replace) t subs
+

@@ -25,6 +25,9 @@ data PartiallyApplied f =
 instance Sized f => Sized (PartiallyApplied f) where
   size (Partial f _) = size f
   size (Apply _) = 1
+  -- Note that encoding may not preserve size if a function has mode MaxArgs
+  sizeMode (Partial f _) = sizeMode f
+  sizeMode (Apply _) = AddArgs
 
 instance Arity (PartiallyApplied f) where
   arity (Partial _ n) = n

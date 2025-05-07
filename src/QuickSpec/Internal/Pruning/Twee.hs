@@ -15,17 +15,19 @@ import qualified QuickSpec.Internal.Pruning.Background as Background
 import Control.Monad.Trans.Class
 import Control.Monad.IO.Class
 import qualified QuickSpec.Internal.Pruning.UntypedTwee as Untyped
+import qualified QuickSpec.Internal.Pruning.Conditionals as Conditionals
+import QuickSpec.Internal.Pruning.Conditionals(Conditionals)
 import QuickSpec.Internal.Pruning.UntypedTwee(Config(..))
 import Data.Typeable
 
 newtype Pruner fun m a =
-  Pruner (PartialApplication.Pruner fun (Types.Pruner (PartiallyApplied fun) (Background.Pruner (Tagged (PartiallyApplied fun)) (Untyped.Pruner (Tagged (PartiallyApplied fun)) m))) a)
+  Pruner (PartialApplication.Pruner fun (Conditionals.Pruner (PartiallyApplied fun) (Types.Pruner (Conditionals (PartiallyApplied fun)) (Background.Pruner (Tagged (Conditionals (PartiallyApplied fun))) (Untyped.Pruner (Tagged (Conditionals (PartiallyApplied fun))) m)))) a)
   deriving (Functor, Applicative, Monad, MonadIO, MonadTester testcase term,
-            MonadPruner (Term fun) (Untyped.Norm (Tagged (PartiallyApplied fun))), MonadTerminal)
+            MonadPruner (Term fun) (Untyped.Norm (Tagged (Conditionals (PartiallyApplied fun)))), MonadTerminal)
 
 instance MonadTrans (Pruner fun) where
-  lift = Pruner . lift . lift . lift . lift
+  lift = Pruner . lift . lift . lift . lift . lift
 
 run :: (Sized fun, Typeable fun, Ord fun, PrettyTerm fun, Monad m) => Config -> Pruner fun m a -> m a
 run config (Pruner x) =
-  Untyped.run config (Background.run (Types.run (PartialApplication.run x)))
+  Untyped.run config (Background.run (Types.run (Conditionals.run (PartialApplication.run x))))

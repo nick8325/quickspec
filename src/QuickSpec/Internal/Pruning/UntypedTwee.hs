@@ -44,6 +44,8 @@ instance (Ord fun, Typeable fun) => Labelled (Extended fun)
 instance Sized fun => Sized (Extended fun) where
   size (Function f) = size f
   size _ = 1
+  sizeMode (Function f) = sizeMode f
+  sizeMode _ = AddArgs
 
 instance KBO.Sized (Extended fun) where
   size _ = 1
@@ -80,13 +82,15 @@ run Config{..} (Pruner x) =
   where
     config =
       defaultConfig {
-        Twee.cfg_accept_term = Just (\t -> size t <= cfg_max_term_size),
+        Twee.cfg_accept_term = Just (\t -> termSize t <= cfg_max_term_size),
         Twee.cfg_max_cp_depth = cfg_max_cp_depth }
 
-instance (Labelled fun, Sized fun) => Sized (Twee.Term fun) where
-  size (Twee.Var _) = 1
-  size (Twee.App f ts) =
-    size (Twee.fun_value f) + sum (map size (Twee.unpack ts))
+termSize :: (Labelled fun, Sized fun) => Twee.Term fun -> Int
+termSize (Twee.Var _) = 1
+termSize (Twee.App f ts) =
+  case sizeMode (Twee.fun_value f) of
+    AddArgs -> size (Twee.fun_value f) + sum (map termSize (Twee.unpack ts))
+    MaxArgs -> size (Twee.fun_value f) + maximum (0:map termSize (Twee.unpack ts))
 
 instance KBO.Weighted (Extended fun) where
   argWeight _ = 1

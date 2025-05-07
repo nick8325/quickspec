@@ -85,17 +85,22 @@ instance Symbolic f a => Symbolic f [a] where
 
 class Sized a where
   size :: a -> Int
+  sizeMode :: a -> SizeMode
+
+data SizeMode = AddArgs | MaxArgs
 
 instance Sized f => Sized (Term f) where
   size (Var _) = 1
-  size (Fun f) = size f
-  size (t :$: u) =
-    size t + size u +
+  size (Var _ :@: ts) =
     -- Penalise applied function variables, because they can be used
     -- to build many many terms without any constants at all
-    case t of
-      Var _ -> 1
-      _ -> 0
+    2 + sum (map size ts)
+  size (Fun f :@: ts) =
+    case sizeMode f of
+      AddArgs -> size f + sum (map size ts)
+      MaxArgs -> size f + maximum (0:map size ts)
+  sizeMode (Var _ :@: _) = AddArgs
+  sizeMode (Fun f :@: _) = sizeMode f
 
 instance Pretty Var where
   pPrint x = parens $ text "X" <#> pPrint (var_id x+1) <+> text "::" <+> pPrint (var_ty x)
@@ -154,6 +159,12 @@ mapFun :: (f -> g) -> Term f -> Term g
 mapFun _ (Var x) = Var x
 mapFun f (Fun x) = Fun (f x)
 mapFun f (t :$: u) = mapFun f t :$: mapFun f u
+
+-- | Map a function over function symbols.
+mapFunM :: Monad m => (f -> m g) -> Term f -> m (Term g)
+mapFunM _ (Var x) = return (Var x)
+mapFunM f (Fun x) = Fun <$> f x
+mapFunM f (t :$: u) = liftM2 (:$:) (mapFunM f t) (mapFunM f u)
 
 -- | Map a function over function symbols.
 flatMapFun :: (f -> Term g) -> Term f -> Term g
@@ -295,6 +306,8 @@ data a :+: b = Inl a | Inr b deriving (Eq, Ord)
 instance (Sized fun1, Sized fun2) => Sized (fun1 :+: fun2) where
   size (Inl x) = size x
   size (Inr x) = size x
+  sizeMode (Inl x) = sizeMode x
+  sizeMode (Inr x) = sizeMode x
 
 instance (Typed fun1, Typed fun2) => Typed (fun1 :+: fun2) where
   typ (Inl x) = typ x
