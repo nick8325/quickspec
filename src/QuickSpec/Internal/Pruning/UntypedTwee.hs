@@ -177,7 +177,7 @@ addTwee config t u state =
   completePure config $
     addAxiom config state axiom
   where
-    axiom = Axiom 0 (prettyShow (t :=: u)) (toTwee t Twee.:=: toTwee u)
+    axiom = Axiom 0 (prettyShow (t :=: u)) Nothing (toTwee t Twee.:=: toTwee u)
 
 toTwee :: (Ord f, Twee.Intern f) =>
   Term f -> Twee.Term (Extended f)
