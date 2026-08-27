@@ -84,6 +84,8 @@ instance PrettyTerm TyCon where
     | take 2 (show con) == "(," ||
       take 3 (show con) == "(%," =
       fixedArity (1+length (filter (== ',') (show con))) tupleStyle
+    | Just n <- Data.List.lookup con tupleTyCons =
+      fixedArity n tupleStyle
     | isAlphaNum (head (show con)) = curried
     | otherwise = infixStyle 5
 
@@ -228,11 +230,19 @@ fromTyCon ty
   | otherwise = TyCon ty
 
 -- | Some built-in type consructors.
-arrowTyCon, commaTyCon, listTyCon, dictTyCon :: Ty.TyCon
+arrowTyCon, unitTyCon, tuple2TyCon, tuple3TyCon, tuple4TyCon, tuple5TyCon, tuple6TyCon, tuple7TyCon, listTyCon, dictTyCon :: Ty.TyCon
 arrowTyCon = mkCon (Proxy :: Proxy (->))
-commaTyCon = mkCon (Proxy :: Proxy (,))
+unitTyCon = mkCon (Proxy :: Proxy ())
+tuple2TyCon = mkCon (Proxy :: Proxy (,))
+tuple3TyCon = mkCon (Proxy :: Proxy (,,))
+tuple4TyCon = mkCon (Proxy :: Proxy (,,,))
+tuple5TyCon = mkCon (Proxy :: Proxy (,,,,))
+tuple6TyCon = mkCon (Proxy :: Proxy (,,,,,))
+tuple7TyCon = mkCon (Proxy :: Proxy (,,,,,,))
 listTyCon  = mkCon (Proxy :: Proxy [])
 dictTyCon  = mkCon (Proxy :: Proxy Dict)
+tupleTyCons :: [(Ty.TyCon, Int)]
+tupleTyCons = [(unitTyCon, 0), (tuple2TyCon, 2), (tuple3TyCon, 3), (tuple4TyCon, 4), (tuple5TyCon, 5), (tuple6TyCon, 6), (tuple7TyCon, 7)]
 
 mkCon :: Typeable a => proxy a -> Ty.TyCon
 mkCon = fst . Ty.splitTyConApp . Ty.typeRep
@@ -368,7 +378,7 @@ instance Apply Type where
   tryApply _ _ = Nothing
 
 instance (Typed a, Typed b) => Typed (a, b) where
-  typ (x, y) = build (app (Sym (TyCon commaTyCon)) [typ x, typ y])
+  typ (x, y) = build (app (Sym (TyCon tuple2TyCon)) [typ x, typ y])
   otherTypesDL (x, y) = otherTypesDL x `mplus` otherTypesDL y
   typeSubst_ f (x, y) = (typeSubst_ f x, typeSubst_ f y)
 
