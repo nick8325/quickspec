@@ -22,7 +22,7 @@ import qualified Data.Set as Set
 import Data.Set(Set)
 import Data.Maybe
 import Control.Monad
-import Data.Label
+import Data.Intern
 
 -- | Constrains how variables of a particular type may occur in a term.
 data VariableUse =
@@ -157,7 +157,7 @@ mkVar ty n = V ty m
   -- the same number and different but unifiable types, then a type substitution
   -- can turn them into the same variable.)
   where
-    m = fromIntegral (labelNum (label (ty, n)))
+    m = fromIntegral (symId (intern (ty, n)))
 
 -- | Instantiate a schema by making all the variables different.
 mostGeneral :: (Type -> VariableUse) -> Term f -> Term f

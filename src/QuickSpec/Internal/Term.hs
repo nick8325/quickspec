@@ -18,14 +18,15 @@ import qualified Data.Map.Strict as Map
 import Data.Map(Map)
 import Data.List
 import Data.Ord
+import Data.Hashable
 
 -- | A typed term.
 data Term f = Var {-# UNPACK #-} !Var | Fun !f | !(Term f) :$: !(Term f)
-  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
+  deriving (Eq, Ord, Show, Functor, Foldable, Traversable, Generic, Hashable)
 
 -- | A variable, which has a type and a number.
 data Var = V { var_ty :: !Type, var_id :: {-# UNPACK #-} !Int }
-  deriving (Eq, Ord, Show, Generic)
+  deriving (Eq, Ord, Show, Generic, Hashable)
 
 instance CoArbitrary Var where
   coarbitrary = coarbitrary . var_id

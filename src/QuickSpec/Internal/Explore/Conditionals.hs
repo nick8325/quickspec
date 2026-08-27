@@ -70,7 +70,7 @@ data WithConstructor fun =
 
 predType :: TyCon -> [Type] -> Type
 predType name tys =
-  Twee.build (Twee.app (Twee.fun name) tys)
+  Twee.build (Twee.app (Twee.Sym name) tys)
 
 considerPredicate ::
   (PrettyTerm fun, Ord norm, MonadPruner (Term fun) norm m, Predicate fun, MonadTerminal m) =>

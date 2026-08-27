@@ -61,9 +61,9 @@ valueInst x = polyInst (poly x)
       -- (see comment about is_instances).
       case typ x of
         -- A function of type a -> (b -> c) gets uncurried.
-        App (F _ Arrow) (Cons _ (Cons (App (F _ Arrow) _) Empty)) ->
+        App (Sym Arrow) (Cons _ (Cons (App (Sym Arrow) _) Nil)) ->
           polyInst (apply uncur x)
-        App (F _ Arrow) _ ->
+        App (Sym Arrow) _ ->
           makeInstances [x]
         -- A plain old value x (not a function) turns into \() -> x.
         _ ->
@@ -94,10 +94,10 @@ findInstance insts ty =
 --
 -- Invariant: the type of the returned value is an instance of the argument type.
 find_ :: Instances -> Type -> [Value Identity]
-find_ _ (App (F _ unit) Empty)
+find_ _ (App (Sym unit) Nil)
   | unit == tyCon (Proxy :: Proxy ()) =
     return (toValue (Identity ()))
-find_ insts (App (F _ pair) (Cons ty1 (Cons ty2 Empty)))
+find_ insts (App (Sym pair) (Cons ty1 (Cons ty2 Nil)))
   | pair == tyCon (Proxy :: Proxy (,)) = do
     x <- is_find insts ty1
     sub <- maybeToList (match ty1 (typ x))
@@ -109,7 +109,7 @@ find_ insts ty = do
   -- Find a function whose result type unifies with ty.
   -- Rename it to avoid clashes with ty.
   fun <- fmap (polyRename ty) (is_instances insts)
-  App (F _ Arrow) (Cons arg (Cons res Empty)) <- return (typ fun)
+  App (Sym Arrow) (Cons arg (Cons res Nil)) <- return (typ fun)
   sub <- maybeToList (unify ty res)
   fun <- return (typeSubst sub fun)
   arg <- return (typeSubst sub arg)

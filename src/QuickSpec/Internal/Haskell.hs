@@ -70,6 +70,7 @@ import Control.Monad.IO.Class
 import Control.Exception
 import QuickSpec.Internal.Parse
 import Text.ParserCombinators.ReadP(ReadP, string)
+import Data.Hashable
 
 baseInstances :: Instances
 baseInstances =
@@ -408,6 +409,10 @@ instance Ord Constant where
     comparing $ \con ->
       (typeArity (typ con), typ con, con_name con)
 
+instance Hashable Constant where
+  hashWithSalt s con =
+    s `hashWithSalt` con_name con `hashWithSalt` typ (con_value con)
+
 instance Background Constant
 
 con :: Typeable a => String -> a -> Constant
@@ -699,10 +704,10 @@ instanceTypes insts Config{..}
     groundInstances =
       [ dict
       | -- () :- dict
-        Twee.App tc (Twee.Cons (Twee.App unit Twee.Empty) (Twee.Cons dict Twee.Empty)) <-
+        Twee.App (Twee.Sym tc) (Twee.Cons (Twee.App (Twee.Sym unit) Twee.Nil) (Twee.Cons dict Twee.Nil)) <-
         map (typeRes . typ) (is_instances insts),
-        Twee.fun_value tc == tyCon (Proxy :: Proxy (:-)),
-        Twee.fun_value unit == tyCon (Proxy :: Proxy (() :: Constraint)),
+        tc == tyCon (Proxy :: Proxy (:-)),
+        unit == tyCon (Proxy :: Proxy (() :: Constraint)),
         Twee.isGround dict ]
 
 data Warnings =

@@ -39,6 +39,8 @@ import Data.Proxy
 import Data.List hiding (singleton)
 import Data.Char
 import Data.Functor.Identity
+import Data.Intern
+import Data.Hashable
 
 -- | A (possibly polymorphic) type.
 type Type = Term TyCon
@@ -54,7 +56,10 @@ data TyCon =
   | String String
   deriving (Eq, Ord, Show, Typeable)
 
-instance Labelled TyCon
+instance Hashable TyCon where
+  hashWithSalt s Arrow = s `hashWithSalt` (0 :: Int)
+  hashWithSalt s (TyCon tc) = s `hashWithSalt` (1 :: Int) `hashWithSalt` Ty.tyConFingerprint tc
+  hashWithSalt s (String xs) = s `hashWithSalt` (2 :: Int) `hashWithSalt` xs
 
 instance Pretty TyCon where
   pPrint Arrow = text "->"
@@ -139,7 +144,7 @@ typeRep x = fromTypeRep (Ty.typeRep x)
 
 -- | Turn a `TyCon` into a type.
 typeFromTyCon :: TyCon -> Type
-typeFromTyCon tc = build (con (fun tc))
+typeFromTyCon tc = build (con (Sym tc))
 
 -- | Function application for type constructors.
 --
@@ -152,7 +157,7 @@ applyType _ _ = error "tried to apply type variable"
 arrowType :: [Type] -> Type -> Type
 arrowType [] res = res
 arrowType (arg:args) res =
-  build (app (fun Arrow) [arg, arrowType args res])
+  build (app (Sym Arrow) [arg, arrowType args res])
 
 -- | Is a given type a function type?
 isArrowType :: Type -> Bool
@@ -162,20 +167,20 @@ isArrowType = isJust . unpackArrow
 --
 -- For multiple-argument functions, unpacks one argument.
 unpackArrow :: Type -> Maybe (Type, Type)
-unpackArrow (App (F _ Arrow) (Cons t (Cons u Empty))) =
+unpackArrow (App (Sym Arrow) (Cons t (Cons u Nil))) =
   Just (t, u)
 unpackArrow _ =
   Nothing
 
 -- | The arguments of a function type.
 typeArgs :: Type -> [Type]
-typeArgs (App (F _ Arrow) (Cons arg (Cons res Empty))) =
+typeArgs (App (Sym Arrow) (Cons arg (Cons res Nil))) =
   arg:typeArgs res
 typeArgs _ = []
 
 -- | The result of a function type.
 typeRes :: Type -> Type
-typeRes (App (F _ Arrow) (Cons _ (Cons res Empty))) =
+typeRes (App (Sym Arrow) (Cons _ (Cons res Nil))) =
   typeRes res
 typeRes ty = ty
 
@@ -183,7 +188,7 @@ typeRes ty = ty
 -- @n@ arguments. Crashes if the type does not have enough arguments.
 typeDrop :: Int -> Type -> Type
 typeDrop 0 ty = ty
-typeDrop n (App (F _ Arrow) (Cons _ (Cons ty Empty))) =
+typeDrop n (App (Sym Arrow) (Cons _ (Cons ty Nil))) =
   typeDrop (n-1) ty
 typeDrop _ _ =
   error "typeDrop on non-function type"
@@ -205,7 +210,7 @@ defaultTo def = typeSubst (const def)
 skolemiseTypeVars :: Typed a => a -> a
 skolemiseTypeVars = typeSubst (const aTy)
   where
-    aTy = build (con (fun (tyCon (Proxy :: Proxy A))))
+    aTy = build (con (Sym (tyCon (Proxy :: Proxy A))))
 
 -- | Construct a type from a `Ty.TypeRep`.
 fromTypeRep :: Ty.TypeRep -> Type
@@ -214,7 +219,7 @@ fromTypeRep ty
       build (var (V n))
   | otherwise =
     let (tyCon, tys) = Ty.splitTyConApp ty in
-    build (app (fun (fromTyCon tyCon)) (map fromTypeRep tys))
+    build (app (Sym (fromTyCon tyCon)) (map fromTypeRep tys))
 
 -- | Construct a `TyCon` type from a "Data.Typeable" `Ty.TyCon`.
 fromTyCon :: Ty.TyCon -> TyCon
@@ -238,7 +243,7 @@ tyCon = fromTyCon . mkCon
 
 -- | Check if a type is of the form @`Dict` c@, and if so, return @c@.
 getDictionary :: Type -> Maybe Type
-getDictionary (App (F _ (TyCon dict)) (Cons ty Empty))
+getDictionary (App (Sym (TyCon dict)) (Cons ty Nil))
   | dict == dictTyCon = Just ty
 getDictionary _ = Nothing
 
@@ -261,16 +266,16 @@ splitConstrainedType ty =
 instance CoArbitrary Type where
   coarbitrary = coarbitrary . singleton
 instance CoArbitrary (TermList TyCon) where
-  coarbitrary Empty = variant 0
+  coarbitrary Nil = variant 0
   coarbitrary ConsSym{hd = Var (V x), rest = ts} =
     variant 1 . coarbitrary x . coarbitrary ts
   coarbitrary ConsSym{hd = App f _, rest = ts} =
-    variant 2 . coarbitrary (fun_id f) . coarbitrary ts
+    variant 2 . coarbitrary (symId f) . coarbitrary ts
 
 -- | Pretty-print a type. Differs from the `Pretty` instance by printing type
 -- variables in lowercase.
 pPrintType :: Type -> Doc
-pPrintType = ppr . typeSubst (\(V x) -> build (con (fun (String (as !! x))))) . canonicalise
+pPrintType = ppr . typeSubst (\(V x) -> build (con (Sym (String (as !! x))))) . canonicalise
   where
     as = supply [[x] | x <- ['a'..'z']]
     -- Print dictionary arguments specially
@@ -358,12 +363,12 @@ instance Typed Type where
   typeSubst_ = subst
 
 instance Apply Type where
-  tryApply (App (F _ Arrow) (Cons arg (Cons res Empty))) t
+  tryApply (App (Sym Arrow) (Cons arg (Cons res Nil))) t
     | t == arg = Just res
   tryApply _ _ = Nothing
 
 instance (Typed a, Typed b) => Typed (a, b) where
-  typ (x, y) = build (app (fun (TyCon commaTyCon)) [typ x, typ y])
+  typ (x, y) = build (app (Sym (TyCon commaTyCon)) [typ x, typ y])
   otherTypesDL (x, y) = otherTypesDL x `mplus` otherTypesDL y
   typeSubst_ f (x, y) = (typeSubst_ f x, typeSubst_ f y)
 

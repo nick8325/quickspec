@@ -1,6 +1,6 @@
 -- Encode conditionals during pruning.
 {-# OPTIONS_HADDOCK hide #-}
-{-# LANGUAGE FlexibleInstances, GeneralizedNewtypeDeriving, MultiParamTypeClasses, FlexibleContexts, ScopedTypeVariables, UndecidableInstances #-}
+{-# LANGUAGE FlexibleInstances, GeneralizedNewtypeDeriving, MultiParamTypeClasses, FlexibleContexts, ScopedTypeVariables, UndecidableInstances, DeriveGeneric #-}
 module QuickSpec.Internal.Pruning.Conditionals where
 
 import QuickSpec.Internal.Pruning
@@ -13,11 +13,17 @@ import QuickSpec.Internal.Terminal
 import QuickSpec.Internal.Utils
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
+import GHC.Generics
+import Data.Hashable
+import Data.Hashable.Generic
 
 data Conditionals fun =
     Func fun
   | Guard Type (UnconditionalTerm fun) (UnconditionalTerm fun) (UnconditionalTerm fun) (UnconditionalTerm fun) [Var]
-  deriving (Eq, Ord, Show, Typeable)
+  deriving (Eq, Ord, Show, Typeable, Generic)
+
+instance Hashable fun => Hashable (Conditionals fun) where
+  hashWithSalt = genericHashWithSalt
 
 instance Arity fun => Arity (Conditionals fun) where
   arity (Func f) = arity f

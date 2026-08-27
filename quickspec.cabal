@@ -109,9 +109,10 @@ library
     containers,
     data-lens-light >= 0.1.1,
     dlist,
+    hashable >= 1.5,
     random,
     spoon,
     template-haskell,
     transformers,
-    twee-lib >= 2.5,
+    twee-lib >= 2.6,
     uglymemo

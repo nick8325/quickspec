@@ -1,6 +1,6 @@
 -- Pruning support for partial application and the like.
 {-# OPTIONS_HADDOCK hide #-}
-{-# LANGUAGE FlexibleInstances, TypeSynonymInstances, RecordWildCards, MultiParamTypeClasses, FlexibleContexts, GeneralizedNewtypeDeriving, UndecidableInstances, DeriveFunctor #-}
+{-# LANGUAGE FlexibleInstances, TypeSynonymInstances, RecordWildCards, MultiParamTypeClasses, FlexibleContexts, GeneralizedNewtypeDeriving, UndecidableInstances, DeriveFunctor, DeriveGeneric #-}
 module QuickSpec.Internal.Pruning.PartialApplication where
 
 import QuickSpec.Internal.Term as Term
@@ -12,6 +12,9 @@ import QuickSpec.Internal.Terminal
 import QuickSpec.Internal.Testing
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
+import GHC.Generics
+import Data.Hashable
+import Data.Hashable.Generic
 
 data PartiallyApplied f =
     -- A partially-applied function symbol.
@@ -20,7 +23,10 @@ data PartiallyApplied f =
     -- The ($) operator, for oversaturated applications.
     -- The type argument is the type of the first argument to ($).
   | Apply Type
-  deriving (Eq, Ord, Functor)
+  deriving (Eq, Ord, Functor, Generic)
+
+instance Hashable f => Hashable (PartiallyApplied f) where
+  hashWithSalt = genericHashWithSalt
 
 instance Sized f => Sized (PartiallyApplied f) where
   size (Partial f _) = size f

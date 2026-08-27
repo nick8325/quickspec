@@ -1,6 +1,6 @@
 -- Encode monomorphic types during pruning.
 {-# OPTIONS_HADDOCK hide #-}
-{-# LANGUAGE FlexibleInstances, GeneralizedNewtypeDeriving, MultiParamTypeClasses, FlexibleContexts, ScopedTypeVariables, UndecidableInstances #-}
+{-# LANGUAGE FlexibleInstances, GeneralizedNewtypeDeriving, MultiParamTypeClasses, FlexibleContexts, ScopedTypeVariables, UndecidableInstances, DeriveGeneric #-}
 module QuickSpec.Internal.Pruning.Types where
 
 import QuickSpec.Internal.Pruning
@@ -12,11 +12,17 @@ import QuickSpec.Internal.Prop hiding (mapFun)
 import QuickSpec.Internal.Terminal
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
+import GHC.Generics
+import Data.Hashable
+import Data.Hashable.Generic
 
 data Tagged fun =
     Func fun
   | Tag Type
-  deriving (Eq, Ord, Show, Typeable)
+  deriving (Eq, Ord, Show, Typeable, Generic)
+
+instance Hashable fun => Hashable (Tagged fun) where
+  hashWithSalt = genericHashWithSalt
 
 instance Arity fun => Arity (Tagged fun) where
   arity (Func f) = arity f

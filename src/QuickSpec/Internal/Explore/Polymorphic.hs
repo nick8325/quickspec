@@ -173,7 +173,7 @@ regeneralise =
 
     genType = Twee.build . aux 0 . Twee.singleton
       where
-        aux !_ Twee.Empty = mempty
+        aux !_ Twee.Nil = mempty
         aux n (Twee.Cons (Twee.Var _) ts) =
           Twee.var (Twee.V n) `mappend` aux (n+1) ts
         aux n (Twee.Cons (Twee.App f ts) us) =
