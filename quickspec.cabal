@@ -67,7 +67,7 @@ Extra-source-files:
 
 source-repository head
   type:     git
-  location: git://github.com/nick8325/quickspec.git
+  location: https://github.com/nick8325/quickspec.git
   branch:   master
 
 library
